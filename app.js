@@ -10,6 +10,8 @@ window.__rootsSupabaseClient = sb;
 
 const PROFANITY = ['arsch', 'scheiße', 'scheisse', 'fuck', 'shit', 'damn', 'idiot', 'hurensohn'];
 const OPTION_TYPES = new Set(['mc_single', 'mc_multi', 'quiz', 'ranking', 'percent_split']);
+const LP_AVATAR_EMOJIS = () => window.LP_AVATAR_EMOJIS || ['🦊', '🐼', '🦁', '🦄', '🐸', '🐙', '🌟', '🔥'];
+const LP_AVATAR_COLORS = () => window.LP_AVATAR_COLORS || ['#206efb', '#10b981', '#f59e0b', '#dc2626', '#a855f7'];
 
 try {
   if (window.self !== window.top) document.documentElement.classList.add('in-iframe');
@@ -43,6 +45,8 @@ const State = {
   presentMouseHandler: null,
   questionTimer: null,
   quizScores: {},
+  joinProfile: { name: '', emoji: '🦊', color: '#206efb' },
+  activityItems: [],
 };
 
 localStorage.setItem('lp_device_id', State.deviceId);
@@ -89,6 +93,52 @@ function filterProfanity(text, enabled) {
   let out = text;
   PROFANITY.forEach((w) => { out = out.replace(new RegExp(w, 'gi'), '***'); });
   return out;
+}
+
+function participantAvatarHtml(p, size = 'md') {
+  const emoji = p?.avatar_emoji || '👤';
+  const color = p?.avatar_color || '#206efb';
+  const name = p?.display_name || 'Gast';
+  return `<span class="p-avatar p-avatar-${size}" style="background:${esc(color)}" title="${esc(name)}" aria-label="${esc(name)}">${emoji}</span>`;
+}
+
+function participantChipHtml(p) {
+  return `<div class="present-participant-chip">${participantAvatarHtml(p, 'sm')}<span>${esc(p.display_name || 'Gast')}</span></div>`;
+}
+
+function renderPresentParticipants() {
+  const bar = $('#present-participants');
+  if (!bar) return;
+  if (!State.participants.length) {
+    bar.innerHTML = '<span class="present-participants-empty">Warte auf Teilnehmer…</span>';
+    return;
+  }
+  bar.innerHTML = `
+    <div class="present-participants-label"><i class="fa-solid fa-users"></i> ${State.participants.length} Teilnehmer</div>
+    <div class="present-participants-list">${State.participants.map(participantChipHtml).join('')}</div>`;
+}
+
+function pushPresentActivity(participantId, action = 'hat geantwortet') {
+  const p = State.participants.find((x) => x.id === participantId);
+  if (!p?.display_name) return;
+  State.activityItems.unshift({ id: uid(), p, action, at: Date.now() });
+  State.activityItems = State.activityItems.slice(0, 6);
+  renderPresentActivity();
+}
+
+function renderPresentActivity() {
+  const feed = $('#present-activity');
+  if (!feed) return;
+  feed.innerHTML = State.activityItems.map((item) => `
+    <div class="present-activity-item">
+      ${participantAvatarHtml(item.p, 'xs')}
+      <span><strong>${esc(item.p.display_name)}</strong> ${esc(item.action)}</span>
+    </div>`).join('');
+  if (State.activityItems.length) {
+    clearTimeout(State._activityHide);
+    feed.classList.add('visible');
+    State._activityHide = setTimeout(() => feed.classList.remove('visible'), 4000);
+  }
 }
 
 function mountRootsUser() {
@@ -274,10 +324,11 @@ function renderTemplatesModal() {
   const grid = $('#templates-grid');
   grid.innerHTML = window.LP_TEMPLATES.map((t) => `
     <button type="button" class="template-card" data-key="${t.key}">
-      <div style="font-size:.72rem;color:var(--muted);margin-bottom:.35rem">${esc(t.category)}</div>
+      <div class="template-cat">${esc(t.category)}</div>
       <h3>${esc(t.name)}</h3>
       <p>${esc(t.desc)}</p>
-      <p style="margin-top:.35rem;font-size:.72rem;color:var(--brand)">${esc(t.duration)} · ${esc(t.group)} Pers.</p>
+      <div class="template-meta"><span><i class="fa-solid fa-clock"></i> ${esc(t.duration)}</span><span><i class="fa-solid fa-users"></i> ${esc(t.group)}</span><span><i class="fa-solid fa-layer-group"></i> ${t.slides?.length || 0} Folien</span></div>
+      ${t.tips ? `<p class="template-tips"><i class="fa-solid fa-lightbulb"></i> ${esc(t.tips)}</p>` : ''}
     </button>`).join('');
   grid.querySelectorAll('.template-card').forEach((btn) => {
     btn.addEventListener('click', () => createPresentation(btn.dataset.key));
@@ -500,12 +551,14 @@ function renderEditorProps() {
       <input id="prop-max-label" value="${esc(c.maxLabel || '')}" placeholder="Beschriftung rechts" />` : ''}
     ${optionsHtml}
     <div class="props-section">Interaktion</div>
-    <label class="props-check"><input type="checkbox" id="set-anonymous" ${s.anonymous ? 'checked' : ''}> Anonym</label>
-    <label class="props-check"><input type="checkbox" id="set-moderation" ${s.moderation ? 'checked' : ''}> Moderation (Freigabe nötig)</label>
-    <label class="props-check"><input type="checkbox" id="set-live" ${s.showResultsLive !== false ? 'checked' : ''}> Live-Ergebnisse</label>
-    <label class="props-check"><input type="checkbox" id="set-askname" ${s.askName ? 'checked' : ''}> Name abfragen</label>
-    <label class="props-check"><input type="checkbox" id="set-multi" ${s.multipleResponses ? 'checked' : ''}> Mehrfach-Antworten</label>
-    <label class="props-check"><input type="checkbox" id="set-profanity" ${s.profanityFilter !== false ? 'checked' : ''}> Profanity-Filter</label>
+    <div class="props-toggle-grid">
+      <label class="props-toggle"><input type="checkbox" id="set-anonymous" ${s.anonymous ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-user-secret"></i></span><span class="props-toggle-text">Anonyme Antworten</span></label>
+      <label class="props-toggle"><input type="checkbox" id="set-moderation" ${s.moderation ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-shield"></i></span><span class="props-toggle-text">Moderation</span></label>
+      <label class="props-toggle"><input type="checkbox" id="set-live" ${s.showResultsLive !== false ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-chart-simple"></i></span><span class="props-toggle-text">Live-Ergebnisse</span></label>
+      <label class="props-toggle"><input type="checkbox" id="set-multi" ${s.multipleResponses ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-repeat"></i></span><span class="props-toggle-text">Mehrfach-Antworten</span></label>
+      <label class="props-toggle"><input type="checkbox" id="set-profanity" ${s.profanityFilter !== false ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-filter"></i></span><span class="props-toggle-text">Profanity-Filter</span></label>
+    </div>
+    <p class="props-hint"><i class="fa-solid fa-circle-info"></i> Name & Avatar werden bei Teilnahme immer abgefragt.</p>
     <div class="props-label">Zeitlimit (Sek., 0 = aus)</div><input id="set-time" type="number" min="0" value="${s.timeLimitSec || 0}" />`;
 
   const saveContent = debounce(async () => {
@@ -535,9 +588,9 @@ function renderEditorProps() {
       anonymous: $('#set-anonymous')?.checked,
       moderation: $('#set-moderation')?.checked,
       showResultsLive: $('#set-live')?.checked,
-      askName: $('#set-askname')?.checked,
       multipleResponses: $('#set-multi')?.checked,
       profanityFilter: $('#set-profanity')?.checked,
+      askName: true,
       timeLimitSec: Number($('#set-time')?.value || 0),
     };
     await persistSlide(slideObj);
@@ -681,6 +734,7 @@ async function startPresentation() {
   showScreen('present');
   await loadSessionData();
   subscribeSessionChannel();
+  renderPresentParticipants();
   renderPresent();
   bindPresentToolbar();
   toast(`Session gestartet – Code ${code}`, 'success');
@@ -706,6 +760,7 @@ function subscribeSessionChannel() {
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lp_responses', filter: `session_id=eq.${State.session.id}` }, (payload) => {
       State.responses.push(payload.new);
+      if (payload.new.participant_id) pushPresentActivity(payload.new.participant_id);
       renderPresent();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lp_responses', filter: `session_id=eq.${State.session.id}` }, (payload) => {
@@ -715,8 +770,12 @@ function subscribeSessionChannel() {
       renderPresent();
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lp_participants', filter: `session_id=eq.${State.session.id}` }, (payload) => {
-      if (!State.participants.find((p) => p.id === payload.new.id)) State.participants.push(payload.new);
+      if (!State.participants.find((p) => p.id === payload.new.id)) {
+        State.participants.push(payload.new);
+        pushPresentActivity(payload.new.id, 'ist beigetreten');
+      }
       updatePresentStats();
+      renderPresentParticipants();
     })
     .subscribe();
 }
@@ -757,12 +816,17 @@ function renderPresent() {
   const modPanel = pending.length ? `
     <div class="present-mod-panel">
       <div class="present-mod-head">${pending.length} ausstehende Antworten</div>
-      ${pending.slice(0, 5).map((r) => `
+      ${pending.slice(0, 5).map((r) => {
+        const p = State.participants.find((x) => x.id === r.participant_id);
+        const who = p ? `<span class="present-mod-who">${participantAvatarHtml(p, 'xs')} ${esc(p.display_name)}</span>` : '';
+        return `
         <div class="present-mod-item">
+          ${who}
           <span>${esc(r.response?.text || r.response?.value || JSON.stringify(r.response))}</span>
           <button type="button" class="present-mod-btn" data-approve="${r.id}">Freigeben</button>
           <button type="button" class="present-mod-btn danger" data-hide="${r.id}">Verbergen</button>
-        </div>`).join('')}
+        </div>`;
+      }).join('')}
     </div>` : '';
 
   stage.innerHTML = `
@@ -774,6 +838,7 @@ function renderPresent() {
   stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
   stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
   updatePresentStats();
+  renderPresentParticipants();
   void renderQrCode();
 }
 
@@ -885,28 +950,71 @@ function markAnswered(slideId) {
 }
 
 function renderParticipantEntry(codePrefill) {
+  const saved = JSON.parse(localStorage.getItem('lp_join_profile') || '{}');
+  State.joinProfile = {
+    name: saved.name || '',
+    emoji: saved.emoji || LP_AVATAR_EMOJIS()[0],
+    color: saved.color || LP_AVATAR_COLORS()[0],
+  };
   const root = $('#participant-root');
   root.innerHTML = `
-    <div class="participant-card">
+    <div class="participant-card participant-join-card">
       <h1>Live teilnehmen</h1>
-      <p>Code eingeben – kein Account nötig.</p>
+      <p>Code, Name und Avatar – dann bist du dabei.</p>
+      <label class="join-label">Session-Code</label>
       <input class="participant-code-input" id="join-code" maxlength="8" placeholder="CODE" value="${esc(codePrefill || '')}" />
-      <input id="join-name" placeholder="Name (optional)" class="participant-name-input" />
+      <label class="join-label">Dein Name <span class="req">*</span></label>
+      <input id="join-name" placeholder="Vorname oder Nickname" class="participant-name-input" value="${esc(State.joinProfile.name)}" required />
+      <label class="join-label">Dein Avatar <span class="req">*</span></label>
+      <div class="avatar-preview-wrap">
+        <div id="avatar-preview" class="avatar-preview" style="background:${esc(State.joinProfile.color)}">${State.joinProfile.emoji}</div>
+        <div class="avatar-preview-name" id="avatar-preview-name">${esc(State.joinProfile.name || 'Dein Name')}</div>
+      </div>
+      <div class="avatar-color-row">${LP_AVATAR_COLORS().map((c) => `<button type="button" class="avatar-color-btn ${c === State.joinProfile.color ? 'active' : ''}" data-color="${c}" style="background:${c}" aria-label="Farbe"></button>`).join('')}</div>
+      <div class="avatar-emoji-grid">${LP_AVATAR_EMOJIS().map((e) => `<button type="button" class="avatar-emoji-btn ${e === State.joinProfile.emoji ? 'active' : ''}" data-emoji="${e}">${e}</button>`).join('')}</div>
       <button type="button" class="btn-primary participant-submit" id="join-submit"><i class="fa-solid fa-arrow-right"></i> Beitreten</button>
     </div>`;
-  $('#join-submit').onclick = () => joinSession($('#join-code').value.trim().toUpperCase(), $('#join-name').value.trim());
+
+  const updatePreview = () => {
+    const name = $('#join-name').value.trim() || 'Dein Name';
+    $('#avatar-preview').textContent = State.joinProfile.emoji;
+    $('#avatar-preview').style.background = State.joinProfile.color;
+    $('#avatar-preview-name').textContent = name;
+  };
+
+  $('#join-name').addEventListener('input', updatePreview);
+  root.querySelectorAll('.avatar-emoji-btn').forEach((btn) => btn.addEventListener('click', () => {
+    State.joinProfile.emoji = btn.dataset.emoji;
+    root.querySelectorAll('.avatar-emoji-btn').forEach((b) => b.classList.toggle('active', b.dataset.emoji === State.joinProfile.emoji));
+    updatePreview();
+  }));
+  root.querySelectorAll('.avatar-color-btn').forEach((btn) => btn.addEventListener('click', () => {
+    State.joinProfile.color = btn.dataset.color;
+    root.querySelectorAll('.avatar-color-btn').forEach((b) => b.classList.toggle('active', b.dataset.color === State.joinProfile.color));
+    updatePreview();
+  }));
+  $('#join-submit').onclick = () => {
+    const code = $('#join-code').value.trim().toUpperCase();
+    const name = $('#join-name').value.trim();
+    if (!code) { toast('Bitte Code eingeben', 'warn'); return; }
+    if (!name) { toast('Bitte Name eingeben', 'warn'); return; }
+    if (!State.joinProfile.emoji) { toast('Bitte Avatar wählen', 'warn'); return; }
+    localStorage.setItem('lp_join_profile', JSON.stringify({ name, emoji: State.joinProfile.emoji, color: State.joinProfile.color }));
+    void joinSession(code, name, State.joinProfile.emoji, State.joinProfile.color);
+  };
   $('#join-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#join-submit').click(); });
-  if (codePrefill) setTimeout(() => $('#join-submit').click(), 300);
 }
 
-async function joinSession(code, name) {
+async function joinSession(code, name, emoji, color) {
   const { data: session, error } = await sb.from('lp_sessions').select('*').eq('code', code.toUpperCase()).in('status', ['live', 'paused']).maybeSingle();
   if (error || !session) { toast('Code ungültig oder Session beendet', 'error'); return; }
   if (session.join_locked) { toast('Beitritt gesperrt', 'error'); return; }
   const { data: part, error: pErr } = await sb.from('lp_participants').upsert({
     session_id: session.id,
     device_id: State.deviceId,
-    display_name: name || null,
+    display_name: name,
+    avatar_emoji: emoji,
+    avatar_color: color,
   }, { onConflict: 'session_id,device_id' }).select().single();
   if (pErr) { toast(pErr.message, 'error'); return; }
   State.session = session;
@@ -1005,7 +1113,10 @@ function renderParticipantQuestion() {
 
   root.innerHTML = `
     <div class="participant-card">
-      <div class="participant-meta">Code ${esc(State.session.code)}${slide.settings?.anonymous ? ' · Anonym' : ''}</div>
+      <div class="participant-header-row">
+        ${participantAvatarHtml(State.participant, 'md')}
+        <div><div class="participant-meta">Code ${esc(State.session.code)}${slide.settings?.anonymous ? ' · Anonyme Antwort' : ''}</div><div class="participant-you">${esc(State.participant?.display_name || '')}</div></div>
+      </div>
       <h1>${esc(c.title || c.prompt || 'Frage')}</h1>
       <p>${esc(c.prompt || '')}</p>
       ${timeLimit ? `<div id="p-timer" class="p-timer">${timeLimit}s</div>` : ''}
@@ -1132,6 +1243,7 @@ async function submitResponse(response) {
   if (!slide || !State.session.question_open) return;
   if (slide.settings?.askName && !State.participant?.display_name) {
     toast('Bitte mit Namen beitreten', 'warn');
+    renderParticipantEntry(State.session.code);
     return;
   }
   if (response.text) response.text = filterProfanity(response.text, slide.settings?.profanityFilter !== false);
@@ -1242,6 +1354,7 @@ async function routeFromHash() {
     await loadSessionData();
     showScreen('present');
     subscribeSessionChannel();
+    renderPresentParticipants();
     renderPresent();
     bindPresentToolbar();
     return;

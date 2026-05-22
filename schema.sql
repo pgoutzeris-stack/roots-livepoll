@@ -47,6 +47,8 @@ create table if not exists public.lp_participants (
   session_id uuid not null references public.lp_sessions(id) on delete cascade,
   device_id text not null,
   display_name text,
+  avatar_emoji text,
+  avatar_color text default '#206efb',
   joined_at timestamptz not null default now(),
   unique (session_id, device_id)
 );
