@@ -92,7 +92,15 @@ html.lp-join-route #screen-participant{display:flex!important}
 .board-back:hover{border-color:var(--brand);color:var(--brand)}
 .board-title-input{flex:1;max-width:420px;border:1.5px solid transparent;background:transparent;padding:.5rem .75rem;border-radius:8px;font-size:1rem;font-weight:600;outline:none}
 .board-title-input:focus{border-color:var(--brand);background:var(--bg);box-shadow:var(--shadow-focus)}
-.board-status{font-size:.78rem;color:var(--muted);display:flex;align-items:center;gap:.4rem}
+.autosave-pill{display:inline-flex;align-items:center;gap:.45rem;padding:.28rem .75rem;border-radius:999px;font-size:.72rem;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--muted);transition:all .25s;white-space:nowrap;flex-shrink:0}
+.autosave-pill .pill-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);opacity:.45;flex-shrink:0}
+.autosave-pill.is-active{border-color:#10b98144;background:#10b9810d;color:#059669}
+.autosave-pill.is-active .pill-dot{background:#10b981;opacity:1;box-shadow:0 0 0 3px #10b98133}
+.autosave-pill.is-saving{border-color:#206efb55;background:#206efb12;color:var(--brand)}
+.autosave-pill.is-saving .pill-dot{background:var(--brand);opacity:1;animation:autosave-pulse 1s ease infinite}
+.autosave-pill.is-error{border-color:#dc262655;background:#dc262612;color:#dc2626}
+.autosave-pill.is-error .pill-dot{background:#dc2626;opacity:1}
+@keyframes autosave-pulse{0%,100%{opacity:1}50%{opacity:.35}}
 .board-topbar-right{display:flex;align-items:center;gap:.5rem;margin-left:auto}
 .editor-layout{display:flex;flex:1;margin-top:56px;min-height:0;overflow:hidden}
 .editor-slides-panel{width:220px;background:var(--bg);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0}
@@ -143,8 +151,20 @@ html.lp-join-route #screen-participant{display:flex!important}
 .canvas-title:empty:before,.canvas-editable:empty:before{content:attr(data-placeholder);color:var(--muted);opacity:.6}
 .canvas-editable.outline,.canvas-title.editing,.canvas-editable.editing{border-color:var(--brand);background:rgba(32,110,251,.06)}
 .canvas-prompt{font-size:1.1rem;line-height:1.5;color:var(--muted);outline:none;border-radius:8px;padding:.35rem;border:2px dashed transparent;min-height:1.5em}
-.canvas-options{display:grid;gap:.5rem;margin-top:.5rem}
-.canvas-option{padding:.75rem 1rem;border:2px solid var(--line);border-radius:12px;font-weight:600}
+.editor-canvas.is-centered{text-align:center;justify-content:center;align-items:center}
+.editor-canvas.is-centered .canvas-title,.editor-canvas.is-centered .canvas-body-wrap,.editor-canvas.is-centered .menti-hero{max-width:720px;margin-left:auto;margin-right:auto}
+.canvas-centered-icon{width:64px;height:64px;border-radius:18px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin:0 auto 1.25rem;box-shadow:var(--shadow-lg)}
+.canvas-options{display:flex;flex-direction:column;gap:.5rem;margin-top:.5rem;width:100%}
+.canvas-option-row{display:flex;align-items:center;gap:.45rem}
+.canvas-option{flex:1;padding:.75rem 1rem;border:2px solid var(--line);border-radius:12px;font-weight:600;outline:none;min-width:0;text-align:left}
+.canvas-opt-rm{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--bg);cursor:pointer;color:var(--muted);flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.canvas-opt-rm:hover{border-color:var(--danger);color:var(--danger)}
+.canvas-opt-add{align-self:flex-start;padding:.45rem .85rem;border-radius:8px;border:1.5px dashed var(--line);background:transparent;cursor:pointer;font-size:.78rem;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;gap:.35rem}
+.canvas-opt-add:hover{border-color:var(--brand);color:var(--brand)}
+.props-chain-disabled{opacity:.45;pointer-events:none;filter:grayscale(.15)}
+.props-chain-reason{font-size:.78rem;color:var(--muted);margin:.15rem 1rem .65rem;line-height:1.45}
+.pres-results-summary{display:flex;flex-direction:column;gap:2rem;width:100%;max-width:920px;margin:0 auto;text-align:left}
+.pres-results-block h3{font-size:1rem;margin-bottom:.65rem;color:var(--muted);font-weight:700}
 .canvas-image{max-width:100%;border-radius:12px;margin-top:1rem}
 .canvas-hint{font-size:.72rem;color:var(--muted);margin-top:auto;display:flex;align-items:center;gap:.35rem;opacity:.7}
 .editor-mobile-props{display:none}

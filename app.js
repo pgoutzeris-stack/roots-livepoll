@@ -1,7 +1,7 @@
 /* ROOTS Live Poll – Hauptanwendung */
 const SUPABASE_URL = 'https://csmguwcvzreefluhahyu.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNzbWd1d2N2enJlZWZsdWhhaHl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjM0ODcsImV4cCI6MjA5MjUzOTQ4N30.Fiafx7XBaQZXUX3bKQIBH7znBHx3B51yL-bftOHsL4Q';
-const APP_VERSION = '20260520-sop8';
+const APP_VERSION = '20260520-closure';
 const JOIN_BASE = `${location.origin}${location.pathname}`;
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
@@ -275,11 +275,200 @@ function hasBrainstormChain(slide) {
   return Boolean(slide.settings?.brainstormAttachRanking || findBrainstormVoteSlide(slide.id));
 }
 
+const COLLECT_CHAIN_TYPES = new Set(['brainstorm', 'open', 'wordcloud']);
+const DIRECT_RESULTS_CHAIN_TYPES = new Set(['mc_single', 'mc_multi', 'yesno', 'scale', 'ranking', 'quiz', 'percent_split', 'reaction', 'number_guess', 'qa']);
+const SCORABLE_INTERACTIVE_TYPES = new Set(['mc_single', 'mc_multi', 'yesno', 'wordcloud', 'open', 'brainstorm', 'scale', 'ranking', 'quiz', 'reaction', 'number_guess', 'percent_split', 'qa']);
+
+function isSystemLinkedSlide(slide) {
+  return Boolean(
+    slide?.settings?.brainstormLinked
+    || slide?.settings?.slideResultsLinked
+    || slide?.settings?.presentationResults
+    || slide?.settings?.presentationClosing
+  );
+}
+
+function getPresentationSettings() {
+  return {
+    attachPresentationResults: false,
+    attachPresentationClosing: false,
+    ...(State.presentation?.settings || {}),
+  };
+}
+
+function analyzeSlideChainCapability(slide) {
+  if (!slide || isSystemLinkedSlide(slide)) {
+    return { canRank: false, canResults: false, reason: 'System- oder Verknüpfungsfolie' };
+  }
+  const t = slide.slide_type;
+  if (COLLECT_CHAIN_TYPES.has(t)) {
+    return {
+      canRank: true,
+      canResults: true,
+      needsRankForResults: true,
+      rankLabel: 'Ranking-Folie anbinden',
+      resultsLabel: 'Ergebnis-Folie anbinden',
+    };
+  }
+  if (DIRECT_RESULTS_CHAIN_TYPES.has(t)) {
+    return {
+      canRank: false,
+      canResults: true,
+      needsRankForResults: false,
+      resultsLabel: 'Ergebnis-Folie anbinden',
+      rankReason: 'Ranking braucht gesammelte Freitext-Ideen (Brainstorming, Offene Frage, Word Cloud).',
+    };
+  }
+  return { canRank: false, canResults: false, reason: 'Keine auswertbaren Antworten auf dieser Folie.' };
+}
+
+function analyzePresentationScoring(slides = State.slides) {
+  const scorableSlides = (slides || []).filter(
+    (s) => SCORABLE_INTERACTIVE_TYPES.has(s.slide_type) && !isSystemLinkedSlide(s)
+  );
+  return {
+    scorableCount: scorableSlides.length,
+    canPresentationResults: scorableSlides.length > 0,
+    scorableSlides,
+    noResultsReason: scorableSlides.length
+      ? ''
+      : 'Mindestens eine interaktive Folie mit auswertbaren Antworten nötig.',
+  };
+}
+
+function getCollectChainSettings(slide) {
+  const s = { ...window.LP_DEFAULT_SETTINGS, ...(slide?.settings || {}) };
+  if (slide?.slide_type === 'brainstorm') {
+    return {
+      attachRank: !!s.brainstormAttachRanking,
+      attachResults: !!s.brainstormAttachResults,
+      voteMax: Math.max(1, Number(s.brainstormVoteMax || 2)),
+    };
+  }
+  return {
+    attachRank: !!s.slideAttachRanking,
+    attachResults: !!s.slideAttachResults,
+    voteMax: Math.max(1, Number(s.slideAttachVoteMax || 2)),
+  };
+}
+
+function setCollectChainSettings(slide, partial) {
+  slide.settings = slide.settings || {};
+  if (slide.slide_type === 'brainstorm') {
+    if ('attachRank' in partial) slide.settings.brainstormAttachRanking = partial.attachRank;
+    if ('attachResults' in partial) slide.settings.brainstormAttachResults = partial.attachResults;
+    if ('voteMax' in partial) slide.settings.brainstormVoteMax = partial.voteMax;
+  } else {
+    if ('attachRank' in partial) slide.settings.slideAttachRanking = partial.attachRank;
+    if ('attachResults' in partial) slide.settings.slideAttachResults = partial.attachResults;
+    if ('voteMax' in partial) slide.settings.slideAttachVoteMax = partial.voteMax;
+  }
+}
+
+function hasCollectChain(slide) {
+  if (!slide || !COLLECT_CHAIN_TYPES.has(slide.slide_type)) return false;
+  const cs = getCollectChainSettings(slide);
+  return cs.attachRank || Boolean(findBrainstormVoteSlide(slide.id));
+}
+
+function isSlideResultsLinkedSlide(slide) {
+  return Boolean(slide?.settings?.slideResultsLinked && slide?.content?.resultsSourceId);
+}
+
+function findSlideResultsSlide(sourceId) {
+  return State.slides.find((s) => s.settings?.slideResultsLinked && s.content?.resultsSourceId === sourceId);
+}
+
+function findPresentationResultsSlide() {
+  return State.slides.find((s) => s.settings?.presentationResults);
+}
+
+function findPresentationClosingSlide() {
+  return State.slides.find((s) => s.settings?.presentationClosing);
+}
+
+function useCenteredLayout(slide) {
+  if (!slide) return false;
+  const c = { ...defaultStyle(), ...slide.content };
+  if (c.layout === 'default') return false;
+  if (c.layout === 'center') return true;
+  if (slide.settings?.presentationClosing) return true;
+  if (c.mentiHero) return true;
+  if (slide.slide_type === 'section' && !c.sopTrackClass) return true;
+  if (
+    slide.slide_type === 'content'
+    && !c.sopKind
+    && !c.sopTrackResults
+    && !isCardResultsSlide(slide)
+    && !isSlideResultsLinkedSlide(slide)
+    && !slide.settings?.presentationResults
+  ) {
+    return c.layout === 'center';
+  }
+  return false;
+}
+
+function renderCenteredSlideHtml(c, editable, opts = {}) {
+  const icon = opts.icon || 'fa-signal';
+  const titleEl = editable
+    ? `<div class="canvas-editable canvas-title menti-hero-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+    : `<h1 class="menti-hero-title">${esc(c.title || '')}</h1>`;
+  const bodyEl = editable
+    ? `<div class="canvas-editable menti-hero-body" contenteditable="true" data-field="body">${esc(c.body || c.subtitle || '')}</div>`
+    : `<p class="menti-hero-body">${esc(c.body || c.subtitle || '').replace(/\n/g, '<br>')}</p>`;
+  return `
+    <div class="menti-hero canvas-body-wrap">
+      <div class="canvas-centered-icon menti-hero-icon"><i class="fa-solid ${icon}"></i></div>
+      ${titleEl}
+      ${bodyEl}
+    </div>`;
+}
+
+function renderPresentationResultsPresentHtml() {
+  const scoring = analyzePresentationScoring();
+  if (!scoring.scorableSlides.length) {
+    return '<p class="present-wait-msg">Noch keine auswertbaren Folien in dieser Präsentation.</p>';
+  }
+  return `<div class="pres-results-summary">${scoring.scorableSlides.map((s) => {
+    const displaySlide = getTrackVoteDisplaySlide(s);
+    const visible = getVisibleResponses(s.id);
+    const agg = window.LPViz.aggregateResponses(displaySlide, visible);
+    const title = s.content?.title || s.content?.prompt || 'Folie';
+    return `<div class="pres-results-block"><h3>${esc(title)}</h3><div class="viz-wrap viz-wrap-present">${window.LPViz.renderViz(displaySlide, agg, 'present')}</div></div>`;
+  }).join('')}</div>`;
+}
+
+let _autosaveTimer = null;
+function setEditorSaveStatus(state) {
+  const el = $('#editor-save-status');
+  if (!el) return;
+  el.className = 'autosave-pill';
+  if (state === 'saving') {
+    el.classList.add('is-saving');
+    el.innerHTML = '<span class="pill-dot"></span> Speichert…';
+    return;
+  }
+  if (state === 'error') {
+    el.classList.add('is-error');
+    el.innerHTML = '<span class="pill-dot"></span> Fehler beim Speichern';
+    return;
+  }
+  if (state === 'saved') {
+    el.classList.add('is-active');
+    el.innerHTML = '<span class="pill-dot"></span> Gespeichert';
+    clearTimeout(_autosaveTimer);
+    _autosaveTimer = setTimeout(() => setEditorSaveStatus('idle'), 2400);
+    return;
+  }
+  el.classList.add('is-active');
+  el.innerHTML = '<span class="pill-dot"></span> Autosave aktiv';
+}
+
 function isBrainstormCollectSlide(slide) {
-  if (!slide || slide.slide_type !== 'brainstorm') return false;
+  if (!slide || !COLLECT_CHAIN_TYPES.has(slide.slide_type)) return false;
   const c = slide.content || {};
   if (isSopWorkshopPresentation() && (c.sopKind === 'card-workshop' || c.sopCardName)) return true;
-  return hasBrainstormChain(slide);
+  return hasCollectChain(slide);
 }
 
 function shouldUseVoteWorkshopUi(slide) {
@@ -1336,6 +1525,7 @@ async function openEditor(id) {
   State.slides = slides || [];
   State.selectedSlideId = State.slides[0]?.id || null;
   $('#editor-title').value = pres.title;
+  setEditorSaveStatus('idle');
   showScreen('editor');
   renderEditor();
 }
@@ -1358,8 +1548,12 @@ function renderSlideList() {
   list.innerHTML = State.slides.map((s, i) => {
     const typeLabel = window.LP_SLIDE_TYPES.find((t) => t.type === s.slide_type)?.label || s.slide_type;
     const chainTag = s.settings?.brainstormLinked
-      ? (s.settings?.brainstormVote ? ' · Ranking' : s.settings?.brainstormResults ? ' · Ergebnis' : '')
-      : (s.settings?.brainstormAttachRanking && s.slide_type === 'brainstorm' ? ' · +Kette' : '');
+      ? (s.settings?.brainstormVote ? ' · Ranking' : s.settings?.brainstormResults ? ' · Ergebnis' : s.settings?.slideResultsLinked ? ' · Ergebnis' : '')
+      : s.settings?.presentationResults
+        ? ' · Session-Ergebnis'
+        : s.settings?.presentationClosing
+          ? ' · Abschluss'
+          : (s.settings?.brainstormAttachRanking && s.slide_type === 'brainstorm' ? ' · +Kette' : s.settings?.slideAttachRanking ? ' · +Kette' : s.settings?.slideAttachResults ? ' · +Ergebnis' : '');
     return `
     <div class="slide-thumb ${s.id === State.selectedSlideId ? 'active' : ''}" draggable="true" data-id="${s.id}">
       <div class="slide-thumb-row">
@@ -1420,15 +1614,21 @@ async function duplicateSlide(id) {
   toast('Folie dupliziert', 'success');
 }
 
-async function syncBrainstormChainSlides(brainstormSlide) {
-  if (!brainstormSlide || brainstormSlide.slide_type !== 'brainstorm' || !State.presentation?.id) return;
-  const settings = { ...window.LP_DEFAULT_SETTINGS, ...brainstormSlide.settings };
-  const attachRank = !!settings.brainstormAttachRanking;
-  const attachResults = attachRank && !!settings.brainstormAttachResults;
-  const maxSel = Math.max(1, Number(settings.brainstormVoteMax || 2));
-  const sourceId = brainstormSlide.id;
-  const bc = brainstormSlide.content || {};
-  const title = bc.title || 'Brainstorming';
+async function syncBrainstormChainSlides(collectSlide) {
+  return syncCollectChainSlides(collectSlide);
+}
+
+async function syncCollectChainSlides(collectSlide) {
+  if (!collectSlide || !COLLECT_CHAIN_TYPES.has(collectSlide.slide_type) || !State.presentation?.id) return;
+  if (collectSlide.content?.sopTrackKey || collectSlide.content?.sopTrackClass) return;
+  const cs = getCollectChainSettings(collectSlide);
+  const attachRank = cs.attachRank;
+  const attachResults = attachRank && cs.attachResults;
+  const maxSel = cs.voteMax;
+  const sourceId = collectSlide.id;
+  const bc = collectSlide.content || {};
+  const typeLabel = collectSlide.slide_type === 'brainstorm' ? 'Brainstorming' : collectSlide.slide_type === 'wordcloud' ? 'Word Cloud' : 'Offene Frage';
+  const title = bc.title || typeLabel;
 
   const removeLinked = async (slide) => {
     if (!slide?.settings?.brainstormLinked) return;
@@ -1448,7 +1648,7 @@ async function syncBrainstormChainSlides(brainstormSlide) {
     const voteContent = {
       ...defaultStyle(),
       title: `Priorisierung · ${title}`,
-      prompt: 'Wähle deine Favoriten aus dem Brainstorming.',
+      prompt: `Wähle deine Favoriten aus „${title}“.`,
       options: [],
       maxSelections: maxSel,
       brainstormSourceId: sourceId,
@@ -1539,12 +1739,197 @@ async function syncBrainstormChainSlides(brainstormSlide) {
   await sb.from('lp_presentations').update({ updated_at: new Date().toISOString() }).eq('id', State.presentation.id);
 }
 
+async function syncSlideResultsChain(sourceSlide) {
+  if (!sourceSlide || !State.presentation?.id) return;
+  const cap = analyzeSlideChainCapability(sourceSlide);
+  if (!cap.canResults || cap.needsRankForResults) return;
+  const attach = !!sourceSlide.settings?.slideAttachResults;
+  const sourceId = sourceSlide.id;
+  const sc = sourceSlide.content || {};
+  const title = sc.title || sc.prompt || 'Folie';
+
+  const removeLinked = async (slide) => {
+    if (!slide?.settings?.slideResultsLinked) return;
+    await sb.from('lp_slides').delete().eq('id', slide.id);
+    State.slides = State.slides.filter((s) => s.id !== slide.id);
+  };
+
+  let resultsSlide = findSlideResultsSlide(sourceId);
+  if (!attach) {
+    await removeLinked(resultsSlide);
+    State.slides.forEach((s, idx) => { s.sort_order = idx; });
+    await persistSlideOrder();
+    return;
+  }
+
+  const resultsContent = {
+    ...defaultStyle(),
+    layout: 'center',
+    title: `Ergebnis · ${title}`,
+    body: 'Live-Auswertung der Antworten auf der vorherigen Folie.',
+    resultsSourceId: sourceId,
+  };
+  const resultsSettings = {
+    ...window.LP_DEFAULT_SETTINGS,
+    showResultsLive: true,
+    slideResultsLinked: true,
+  };
+
+  if (!resultsSlide) {
+    const insertAt = Math.max(0, State.slides.findIndex((s) => s.id === sourceId) + 1);
+    const { data, error } = await sb.from('lp_slides').insert({
+      presentation_id: State.presentation.id,
+      sort_order: insertAt,
+      slide_type: 'content',
+      content: resultsContent,
+      settings: resultsSettings,
+    }).select().single();
+    if (error) { toast(error.message, 'error'); return; }
+    State.slides.splice(insertAt, 0, data);
+    resultsSlide = data;
+  } else {
+    resultsSlide.content = { ...resultsSlide.content, ...resultsContent };
+    resultsSlide.settings = { ...resultsSlide.settings, ...resultsSettings };
+    await sb.from('lp_slides').update({ content: resultsSlide.content, settings: resultsSlide.settings }).eq('id', resultsSlide.id);
+  }
+
+  const sIdx = State.slides.findIndex((s) => s.id === sourceId);
+  const rIdx = State.slides.findIndex((s) => s.id === resultsSlide.id);
+  if (sIdx >= 0 && rIdx >= 0 && rIdx !== sIdx + 1) {
+    State.slides.splice(rIdx, 1);
+    State.slides.splice(sIdx + 1, 0, resultsSlide);
+  }
+
+  State.slides.forEach((s, idx) => { s.sort_order = idx; });
+  await persistSlideOrder();
+  await sb.from('lp_presentations').update({ updated_at: new Date().toISOString() }).eq('id', State.presentation.id);
+}
+
+async function persistPresentationSettings(partial) {
+  State.presentation.settings = { ...getPresentationSettings(), ...partial };
+  await sb.from('lp_presentations').update({
+    settings: State.presentation.settings,
+    updated_at: new Date().toISOString(),
+  }).eq('id', State.presentation.id);
+}
+
+async function syncPresentationClosureSlides() {
+  if (!State.presentation?.id) return;
+  const ps = getPresentationSettings();
+  const scoring = analyzePresentationScoring();
+
+  const removeLinked = async (slide) => {
+    if (!slide) return;
+    await sb.from('lp_slides').delete().eq('id', slide.id);
+    State.slides = State.slides.filter((s) => s.id !== slide.id);
+  };
+
+  let resultsSlide = findPresentationResultsSlide();
+  let closingSlide = findPresentationClosingSlide();
+
+  if (!ps.attachPresentationResults || !scoring.canPresentationResults) {
+    await removeLinked(resultsSlide);
+    resultsSlide = null;
+    if (ps.attachPresentationResults && !scoring.canPresentationResults) {
+      await persistPresentationSettings({ attachPresentationResults: false });
+    }
+  } else {
+    const resultsContent = {
+      ...defaultStyle(),
+      layout: 'center',
+      title: 'Ergebnisse der Session',
+      body: 'Zusammenfassung aller interaktiven Folien.',
+    };
+    const resultsSettings = {
+      ...window.LP_DEFAULT_SETTINGS,
+      showResultsLive: true,
+      presentationResults: true,
+    };
+    if (!resultsSlide) {
+      const { data, error } = await sb.from('lp_slides').insert({
+        presentation_id: State.presentation.id,
+        sort_order: State.slides.length,
+        slide_type: 'content',
+        content: resultsContent,
+        settings: resultsSettings,
+      }).select().single();
+      if (error) { toast(error.message, 'error'); return; }
+      State.slides.push(data);
+      resultsSlide = data;
+    } else {
+      resultsSlide.settings = { ...resultsSlide.settings, ...resultsSettings };
+      if (!resultsSlide.content?.title) resultsSlide.content = { ...resultsSlide.content, ...resultsContent };
+      await sb.from('lp_slides').update({ content: resultsSlide.content, settings: resultsSlide.settings }).eq('id', resultsSlide.id);
+    }
+  }
+
+  if (!ps.attachPresentationClosing) {
+    await removeLinked(closingSlide);
+    closingSlide = null;
+  } else {
+    const closingContent = {
+      ...defaultStyle(),
+      layout: 'center',
+      title: 'Danke für eure Teilnahme!',
+      body: 'Fragen, Feedback oder Applaus willkommen.',
+    };
+    const closingSettings = {
+      ...window.LP_DEFAULT_SETTINGS,
+      presentationClosing: true,
+    };
+    if (!closingSlide) {
+      const { data, error } = await sb.from('lp_slides').insert({
+        presentation_id: State.presentation.id,
+        sort_order: State.slides.length,
+        slide_type: 'content',
+        content: closingContent,
+        settings: closingSettings,
+      }).select().single();
+      if (error) { toast(error.message, 'error'); return; }
+      State.slides.push(data);
+      closingSlide = data;
+    } else {
+      closingSlide.settings = { ...closingSlide.settings, ...closingSettings };
+      if (!closingSlide.content?.title) closingSlide.content = { ...closingSlide.content, layout: 'center', ...closingContent };
+      else closingSlide.content.layout = closingSlide.content.layout || 'center';
+      await sb.from('lp_slides').update({ content: closingSlide.content, settings: closingSlide.settings }).eq('id', closingSlide.id);
+    }
+  }
+
+  const endSlides = [];
+  if (resultsSlide) endSlides.push(resultsSlide);
+  if (closingSlide) endSlides.push(closingSlide);
+  endSlides.forEach((endSlide) => {
+    const idx = State.slides.findIndex((s) => s.id === endSlide.id);
+    if (idx >= 0) {
+      State.slides.splice(idx, 1);
+      State.slides.push(endSlide);
+    }
+  });
+  if (resultsSlide && closingSlide) {
+    const rIdx = State.slides.findIndex((s) => s.id === resultsSlide.id);
+    const cIdx = State.slides.findIndex((s) => s.id === closingSlide.id);
+    if (rIdx >= 0 && cIdx >= 0 && cIdx !== rIdx + 1) {
+      State.slides.splice(cIdx, 1);
+      State.slides.splice(rIdx + 1, 0, closingSlide);
+    }
+  }
+
+  State.slides.forEach((s, idx) => { s.sort_order = idx; });
+  await persistSlideOrder();
+  await sb.from('lp_presentations').update({ updated_at: new Date().toISOString() }).eq('id', State.presentation.id);
+}
+
 async function deleteSlide(id) {
   const slide = State.slides.find((s) => s.id === id);
-  if (slide?.slide_type === 'brainstorm') {
+  if (slide && COLLECT_CHAIN_TYPES.has(slide.slide_type)) {
     for (const linked of [findBrainstormVoteSlide(id), findBrainstormResultsSlide(id)]) {
       if (linked) await sb.from('lp_slides').delete().eq('id', linked.id);
     }
+  }
+  if (slide && analyzeSlideChainCapability(slide).canResults && !analyzeSlideChainCapability(slide).needsRankForResults) {
+    const linked = findSlideResultsSlide(id);
+    if (linked) await sb.from('lp_slides').delete().eq('id', linked.id);
   }
   await sb.from('lp_slides').delete().eq('id', id);
   State.slides = State.slides.filter((s) => s.id !== id);
@@ -1562,45 +1947,79 @@ function renderEditorCanvas() {
   const accent = c.accentColor || '#206efb';
   canvas.style.background = c.bgColor || '#fff';
   canvas.style.color = c.textColor || '#0f172a';
+  canvas.classList.toggle('is-centered', useCenteredLayout(slide));
 
-  let body = '';
   if (slide.slide_type === 'section' && c.sopTrackClass) {
+    canvas.classList.remove('is-centered');
     canvas.innerHTML = `${renderWorkshopModeBadge('orient')}${renderSopSectionHtml(c, true)}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel, Text und Einleitung direkt bearbeiten</div>`;
     bindCanvasInlineEdit();
     return;
   }
   if (isBrainstormCollectSlide(slide)) {
-    canvas.innerHTML = `${wrapMentiSlide(renderWorkshopCardCollectHtml(c, true), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Freitext sammeln${hasBrainstormChain(slide) ? ' · Ranking & Ergebnis folgen automatisch' : ''}</div>`;
+    canvas.classList.remove('is-centered');
+    canvas.innerHTML = `${wrapMentiSlide(renderWorkshopCardCollectHtml(c, true), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Freitext sammeln${hasCollectChain(slide) ? ' · Ranking & Ergebnis folgen automatisch' : ''}</div>`;
     bindCanvasInlineEdit();
     return;
   }
   if (shouldUseVoteWorkshopUi(slide)) {
-    const max = slide.settings?.brainstormVoteMax || slide.settings?.sopVoteMax || slide.content?.maxSelections || 2;
+    canvas.classList.remove('is-centered');
+    const max = slide.settings?.brainstormVoteMax || slide.settings?.slideAttachVoteMax || slide.settings?.sopVoteMax || slide.content?.maxSelections || 2;
     canvas.innerHTML = `${renderWorkshopModeBadge('decide')}
       <div class="canvas-editable canvas-title menti-q-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>
       <p class="canvas-editable canvas-prompt" contenteditable="true" data-field="prompt">${esc(c.prompt || '')}</p>
       <div class="track-vote-editor-preview">${renderTrackVoteGroupedListHtml(slide)}</div>
-      <div class="canvas-hint"><i class="fa-solid fa-info-circle"></i> Ideen aus Brainstorming · max. ${max} Favoriten</div>`;
+      <div class="canvas-hint"><i class="fa-solid fa-info-circle"></i> Ideen aus Sammelfolie · max. ${max} Favoriten</div>`;
     bindCanvasInlineEdit();
     return;
   }
-  if (isCardResultsSlide(slide)) {
+  if (isCardResultsSlide(slide) || isSlideResultsLinkedSlide(slide)) {
+    canvas.classList.remove('is-centered');
+    const preview = isSlideResultsLinkedSlide(slide)
+      ? (() => {
+          const source = State.slides.find((s) => s.id === slide.content?.resultsSourceId);
+          if (!source) return '<p class="props-hint">Quellfolie nicht gefunden</p>';
+          return `<div class="viz-wrap">${window.LPViz.renderViz(source, window.LPViz.aggregateResponses(source, []), 'editor')}</div>`;
+        })()
+      : `<div class="track-vote-editor-preview">${renderCardResultsPresentHtml(slide)}</div>`;
     canvas.innerHTML = `${renderWorkshopModeBadge('decide')}
       <div class="canvas-editable canvas-title menti-q-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>
       <p class="canvas-editable canvas-prompt" contenteditable="true" data-field="body">${esc(c.body || '')}</p>
-      <div class="track-vote-editor-preview">${renderCardResultsPresentHtml(slide)}</div>
-      <div class="canvas-hint"><i class="fa-solid fa-trophy"></i> Ergebnisfolie mit Prozenten und Gewinnern</div>`;
+      ${preview}
+      <div class="canvas-hint"><i class="fa-solid fa-trophy"></i> Ergebnisfolie · Vorschau im Präsentationsmodus mit Live-Daten</div>`;
+    bindCanvasInlineEdit();
+    return;
+  }
+  if (slide.settings?.presentationResults) {
+    canvas.innerHTML = `${renderCenteredSlideHtml(c, true, { icon: 'fa-chart-column' })}
+      <div class="pres-results-summary" style="margin-top:1.5rem">${renderPresentationResultsPresentHtml()}</div>
+      <div class="canvas-hint"><i class="fa-solid fa-chart-column"></i> Session-Ergebnis · fasst alle interaktiven Folien zusammen</div>`;
+    bindCanvasInlineEdit();
+    return;
+  }
+  if (slide.settings?.presentationClosing) {
+    canvas.innerHTML = `${renderCenteredSlideHtml(c, true, { icon: 'fa-heart' })}
+      <div class="canvas-hint"><i class="fa-solid fa-pen"></i> Abschlussfolie · zentriertes Layout</div>`;
     bindCanvasInlineEdit();
     return;
   }
   if (slide.slide_type === 'content' && (c.mentiHero || c.sopKind || c.sopTrackResults || c.sopKind === 'card-results')) {
     const html = c.mentiHero ? renderMentiHeroHtml(c, true) : renderSopContentHtml(c, true);
     if (html) {
+      canvas.classList.toggle('is-centered', c.mentiHero || useCenteredLayout(slide));
       canvas.innerHTML = `${html}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel und Text direkt bearbeiten</div>`;
       bindCanvasInlineEdit();
       return;
     }
   }
+  if ((slide.slide_type === 'content' || slide.slide_type === 'section') && useCenteredLayout(slide)) {
+    canvas.innerHTML = `${renderCenteredSlideHtml(c, true, { icon: slide.slide_type === 'section' ? 'fa-heading' : 'fa-align-center' })}
+      ${c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="" class="canvas-image">` : ''}
+      <div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel und Text direkt auf der Folie bearbeiten</div>`;
+    bindCanvasInlineEdit();
+    return;
+  }
+
+  let body = '';
   if (slide.slide_type === 'content' || slide.slide_type === 'section') {
     body = `
       <p class="canvas-editable" contenteditable="true" data-field="body" data-placeholder="Text eingeben…">${esc(c.body || c.subtitle || '')}</p>
@@ -1608,8 +2027,13 @@ function renderEditorCanvas() {
   } else if (OPTION_TYPES.has(slide.slide_type)) {
     body = `
       <p class="canvas-editable canvas-prompt" contenteditable="true" data-field="prompt" data-placeholder="Frage eingeben…">${esc(c.prompt || '')}</p>
-      <div class="canvas-options">${(c.options || []).map((o) => `
-        <div class="canvas-option" style="border-color:${accent}22;background:${accent}11">${esc(o.text)}</div>`).join('')}</div>`;
+      <div class="canvas-options">${(c.options || []).map((o, i) => `
+        <div class="canvas-option-row">
+          <div class="canvas-option canvas-editable" contenteditable="true" data-field="option" data-opt-idx="${i}" style="border-color:${esc(o.color || accent)}44;background:${esc(o.color || accent)}11">${esc(o.text)}</div>
+          <button type="button" class="canvas-opt-rm" data-rm-canvas-opt="${i}" title="Option entfernen"><i class="fa-solid fa-xmark"></i></button>
+        </div>`).join('')}
+        <button type="button" class="canvas-opt-add" id="canvas-add-option"><i class="fa-solid fa-plus"></i> Option</button>
+      </div>`;
   } else {
     body = `<p class="canvas-editable canvas-prompt" contenteditable="true" data-field="prompt" data-placeholder="Frage eingeben…">${esc(c.prompt || '')}</p>`;
   }
@@ -1620,6 +2044,29 @@ function renderEditorCanvas() {
     ${body}
     <div class="canvas-hint"><i class="fa-solid fa-pen"></i> Direkt auf der Folie tippen zum Bearbeiten</div>`;
   bindCanvasInlineEdit();
+  bindCanvasOptionActions();
+}
+
+function bindCanvasOptionActions() {
+  const slide = currentSlide();
+  if (!slide || !OPTION_TYPES.has(slide.slide_type)) return;
+  $('#canvas-add-option')?.addEventListener('click', () => {
+    slide.content.options = slide.content.options || [];
+    slide.content.options.push({ id: uid().slice(0, 8), text: 'Neue Option', color: slide.content.accentColor || '#206efb' });
+    void persistSlide(slide);
+    renderEditorProps();
+    renderEditorCanvas();
+  });
+  $$('#editor-canvas [data-rm-canvas-opt]').forEach((btn) => btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const idx = Number(btn.dataset.rmCanvasOpt);
+    if ((slide.content.options || []).length <= 1) { toast('Mindestens eine Option behalten', 'warn'); return; }
+    slide.content.options.splice(idx, 1);
+    void persistSlide(slide);
+    renderEditorProps();
+    renderEditorCanvas();
+  }));
 }
 
 function bindCanvasInlineEdit() {
@@ -1633,6 +2080,11 @@ function bindCanvasInlineEdit() {
       else if (field === 'prompt') slide.content.prompt = val;
       else if (field === 'body') slide.content.body = val;
       else if (field === 'subtitle') slide.content.subtitle = val;
+      else if (field === 'option') {
+        const idx = Number(el.dataset.optIdx);
+        slide.content.options = slide.content.options || [];
+        if (slide.content.options[idx]) slide.content.options[idx].text = val;
+      }
       void persistSlide(slide);
       const propTitle = $('#prop-title');
       const propPrompt = $('#prop-prompt');
@@ -1640,6 +2092,7 @@ function bindCanvasInlineEdit() {
       if ((field === 'prompt' || field === 'body') && propPrompt) propPrompt.value = val;
       if (field === 'subtitle' && $('#prop-subtitle')) $('#prop-subtitle').value = val;
       if (field === 'body' && propPrompt) propPrompt.value = val;
+      if (field === 'option') renderEditorProps();
       renderSlideList();
     }, 600));
     el.addEventListener('focus', () => el.classList.add('editing'));
@@ -1697,19 +2150,54 @@ function renderEditorProps() {
       ${isBrainstormVoteSlide(slide) ? `<p class="props-hint"><i class="fa-solid fa-link"></i> Optionen kommen automatisch aus dem Brainstorming der vorherigen Folie.</p>` : ''}`;
   }
 
-  let brainstormChainHtml = '';
-  if (slide.slide_type === 'brainstorm' && !slide.content?.sopTrackKey && !slide.content?.sopTrackClass) {
+  let slideChainHtml = '';
+  const chainCap = analyzeSlideChainCapability(slide);
+  const isSopSlide = slide.content?.sopTrackKey || slide.content?.sopTrackClass;
+  if (!isSopSlide && (chainCap.canRank || chainCap.canResults)) {
+    const cs = getCollectChainSettings(slide);
+    const attachRank = COLLECT_CHAIN_TYPES.has(slide.slide_type) ? cs.attachRank : false;
+    const attachResults = COLLECT_CHAIN_TYPES.has(slide.slide_type) ? cs.attachResults : !!s.slideAttachResults;
     const voteLinked = findBrainstormVoteSlide(slide.id);
-    const resultsLinked = findBrainstormResultsSlide(slide.id);
-    brainstormChainHtml = `
-    <div class="props-section">Brainstorm → Ranking → Ergebnis</div>
-    <p class="props-hint" style="margin-top:0">Nach dem Freitext-Brainstorming optional Priorisierung und Ergebnisfolie automatisch anbinden.</p>
-    <label class="props-toggle"><input type="checkbox" id="set-brainstorm-rank" ${s.brainstormAttachRanking ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-arrow-down-wide-short"></i></span><span class="props-toggle-text">Ranking-Folie anbinden</span></label>
-    <label class="props-toggle"><input type="checkbox" id="set-brainstorm-results" ${s.brainstormAttachResults ? 'checked' : ''} ${!s.brainstormAttachRanking ? 'disabled' : ''}><span class="props-toggle-box"><i class="fa-solid fa-trophy"></i></span><span class="props-toggle-text">Ergebnis-Folie anbinden</span></label>
-    <div class="props-label">Max. Favoriten bei Ranking</div>
-    <input id="set-brainstorm-vote-max" type="number" min="1" max="10" value="${s.brainstormVoteMax || 2}" ${!s.brainstormAttachRanking ? 'disabled' : ''} />
-    ${voteLinked || resultsLinked ? `<p class="props-hint"><i class="fa-solid fa-link"></i> Verknüpft: ${voteLinked ? 'Ranking' : ''}${voteLinked && resultsLinked ? ' · ' : ''}${resultsLinked ? 'Ergebnis' : ''}</p>` : ''}`;
+    const resultsLinked = findBrainstormResultsSlide(slide.id) || findSlideResultsSlide(slide.id);
+    const rankDisabled = !chainCap.canRank ? ' props-chain-disabled' : '';
+    const resultsDisabled = !chainCap.canResults ? ' props-chain-disabled' : '';
+    slideChainHtml = `
+    <div class="props-section">Folien-Kette</div>
+    <p class="props-hint" style="margin-top:0">Optional Ranking- und Ergebnisfolien automatisch direkt nach dieser Folie einfügen.</p>
+    ${chainCap.canRank ? `
+    <label class="props-toggle${rankDisabled}"><input type="checkbox" id="set-slide-rank" ${attachRank ? 'checked' : ''} ${!chainCap.canRank ? 'disabled' : ''}><span class="props-toggle-box"><i class="fa-solid fa-arrow-down-wide-short"></i></span><span class="props-toggle-text">${esc(chainCap.rankLabel || 'Ranking-Folie anbinden')}</span></label>` : `
+    <label class="props-toggle props-chain-disabled"><input type="checkbox" disabled><span class="props-toggle-box"><i class="fa-solid fa-arrow-down-wide-short"></i></span><span class="props-toggle-text">Ranking-Folie anbinden</span></label>
+    <p class="props-chain-reason">${esc(chainCap.rankReason || 'Ranking ist für diese Folie nicht verfügbar.')}</p>`}
+    <label class="props-toggle${resultsDisabled}"><input type="checkbox" id="set-slide-results" ${attachResults ? 'checked' : ''} ${!chainCap.canResults || (chainCap.needsRankForResults && !attachRank) ? 'disabled' : ''}><span class="props-toggle-box"><i class="fa-solid fa-trophy"></i></span><span class="props-toggle-text">${esc(chainCap.resultsLabel || 'Ergebnis-Folie anbinden')}</span></label>
+    ${chainCap.canRank ? `<div class="props-label">Max. Favoriten bei Ranking</div>
+    <input id="set-slide-vote-max" type="number" min="1" max="10" value="${cs.voteMax || s.brainstormVoteMax || 2}" ${!attachRank ? 'disabled' : ''} />` : ''}
+    ${voteLinked || resultsLinked ? `<p class="props-hint"><i class="fa-solid fa-link"></i> Verknüpft: ${voteLinked ? 'Ranking' : ''}${voteLinked && resultsLinked ? ' · ' : ''}${resultsLinked ? 'Ergebnis' : ''}</p>` : ''}
+    ${!chainCap.canRank && !chainCap.canResults && chainCap.reason ? `<p class="props-chain-reason">${esc(chainCap.reason)}</p>` : ''}`;
   }
+
+  const showLayoutToggle = (
+    slide.slide_type === 'section'
+    || slide.slide_type === 'content'
+    || slide.settings?.presentationClosing
+  ) && !isSopSlide && !slide.settings?.presentationResults;
+  const layoutCentered = useCenteredLayout(slide);
+  const layoutHtml = showLayoutToggle ? `
+    <div class="props-section">Layout</div>
+    <label class="props-toggle"><input type="checkbox" id="prop-layout-center" ${layoutCentered ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-align-center"></i></span><span class="props-toggle-text">Zentriertes Layout</span></label>
+    <p class="props-hint">Titel- und Abschlussfolien wirken damit wie eine Einleitung bzw. ein sauberer Abschluss.</p>` : '';
+
+  const presSettings = getPresentationSettings();
+  const presScoring = analyzePresentationScoring();
+  const presResultsLinked = findPresentationResultsSlide();
+  const presClosingLinked = findPresentationClosingSlide();
+  const presResultsDisabled = !presScoring.canPresentationResults;
+  const presentationClosureHtml = `
+    <div class="props-section">Präsentation abschließen</div>
+    <p class="props-hint" style="margin-top:0">${presScoring.scorableCount} auswertbare Folie${presScoring.scorableCount === 1 ? '' : 'n'} erkannt.</p>
+    <label class="props-toggle${presResultsDisabled ? ' props-chain-disabled' : ''}"><input type="checkbox" id="set-pres-results" ${presSettings.attachPresentationResults ? 'checked' : ''} ${presResultsDisabled ? 'disabled' : ''}><span class="props-toggle-box"><i class="fa-solid fa-chart-column"></i></span><span class="props-toggle-text">Session-Ergebnis am Ende</span></label>
+    ${presResultsDisabled ? `<p class="props-chain-reason">${esc(presScoring.noResultsReason)}</p>` : ''}
+    <label class="props-toggle"><input type="checkbox" id="set-pres-closing" ${presSettings.attachPresentationClosing ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-heart"></i></span><span class="props-toggle-text">Abschlussfolie am Ende</span></label>
+    ${presResultsLinked || presClosingLinked ? `<p class="props-hint"><i class="fa-solid fa-link"></i> Am Ende: ${presResultsLinked ? 'Ergebnis' : ''}${presResultsLinked && presClosingLinked ? ' · ' : ''}${presClosingLinked ? 'Abschluss' : ''}</p>` : ''}`;
 
   panel.innerHTML = `
     <div class="props-head">
@@ -1733,7 +2221,8 @@ function renderEditorProps() {
       <input id="prop-min-label" value="${esc(c.minLabel || '')}" placeholder="Beschriftung links" />
       <input id="prop-max-label" value="${esc(c.maxLabel || '')}" placeholder="Beschriftung rechts" />` : ''}
     ${optionsHtml}
-    ${brainstormChainHtml}
+    ${slideChainHtml}
+    ${layoutHtml}
     <div class="props-section">Interaktion</div>
     <div class="props-toggle-grid">
       <label class="props-toggle"><input type="checkbox" id="set-anonymous" ${s.anonymous ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-user-secret"></i></span><span class="props-toggle-text">Anonyme Antworten</span></label>
@@ -1743,7 +2232,8 @@ function renderEditorProps() {
       <label class="props-toggle"><input type="checkbox" id="set-profanity" ${s.profanityFilter !== false ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-filter"></i></span><span class="props-toggle-text">Profanity-Filter</span></label>
     </div>
     <p class="props-hint"><i class="fa-solid fa-circle-info"></i> Name & Avatar werden bei Teilnahme immer abgefragt.</p>
-    <div class="props-label">Zeitlimit (Sek., 0 = aus)</div><input id="set-time" type="number" min="0" value="${s.timeLimitSec || 0}" />`;
+    <div class="props-label">Zeitlimit (Sek., 0 = aus)</div><input id="set-time" type="number" min="0" value="${s.timeLimitSec || 0}" />
+    ${presentationClosureHtml}`;
 
   const saveContent = debounce(async () => {
     const slideObj = currentSlide();
@@ -1765,6 +2255,7 @@ function renderEditorProps() {
       minLabel: $('#prop-min-label')?.value ?? slideObj.content.minLabel,
       maxLabel: $('#prop-max-label')?.value ?? slideObj.content.maxLabel,
       maxSelections: Number($('#prop-max-sel')?.value ?? slideObj.content.maxSelections ?? 3),
+      layout: $('#prop-layout-center') ? ($('#prop-layout-center')?.checked ? 'center' : 'default') : slideObj.content.layout,
     };
     panel.querySelectorAll('[data-opt="color"]').forEach((inp) => {
       const idx = Number(inp.dataset.idx);
@@ -1780,48 +2271,78 @@ function renderEditorProps() {
       askName: true,
       timeLimitSec: Number($('#set-time')?.value || 0),
     };
-    if (slideObj.slide_type === 'brainstorm' && !slideObj.content?.sopTrackKey && !slideObj.content?.sopTrackClass) {
-      slideObj.settings.brainstormAttachRanking = !!$('#set-brainstorm-rank')?.checked;
-      slideObj.settings.brainstormAttachResults = !!$('#set-brainstorm-results')?.checked;
-      slideObj.settings.brainstormVoteMax = Number($('#set-brainstorm-vote-max')?.value || 2);
+    if (COLLECT_CHAIN_TYPES.has(slideObj.slide_type) && !slideObj.content?.sopTrackKey && !slideObj.content?.sopTrackClass) {
+      setCollectChainSettings(slideObj, {
+        attachRank: !!$('#set-slide-rank')?.checked,
+        attachResults: !!$('#set-slide-results')?.checked,
+        voteMax: Number($('#set-slide-vote-max')?.value || 2),
+      });
+    } else if (chainCap.canResults && !chainCap.needsRankForResults) {
+      slideObj.settings.slideAttachResults = !!$('#set-slide-results')?.checked;
     }
     await persistSlide(slideObj);
   }, 700);
 
-  const saveBrainstormChain = async () => {
+  const saveSlideChain = async () => {
     const slideObj = currentSlide();
-    if (!slideObj || slideObj.slide_type !== 'brainstorm') return;
-    if (slideObj.content?.sopTrackKey || slideObj.content?.sopTrackClass) return;
-    slideObj.settings = {
-      ...slideObj.settings,
-      brainstormAttachRanking: !!$('#set-brainstorm-rank')?.checked,
-      brainstormAttachResults: !!$('#set-brainstorm-results')?.checked,
-      brainstormVoteMax: Number($('#set-brainstorm-vote-max')?.value || 2),
-    };
-    await persistSlide(slideObj);
-    await syncBrainstormChainSlides(slideObj);
+    if (!slideObj || isSopSlide) return;
+    const cap = analyzeSlideChainCapability(slideObj);
+    if (COLLECT_CHAIN_TYPES.has(slideObj.slide_type)) {
+      setCollectChainSettings(slideObj, {
+        attachRank: !!$('#set-slide-rank')?.checked,
+        attachResults: !!$('#set-slide-results')?.checked,
+        voteMax: Number($('#set-slide-vote-max')?.value || 2),
+      });
+      await persistSlide(slideObj);
+      await syncCollectChainSlides(slideObj);
+    } else if (cap.canResults && !cap.needsRankForResults) {
+      slideObj.settings.slideAttachResults = !!$('#set-slide-results')?.checked;
+      await persistSlide(slideObj);
+      await syncSlideResultsChain(slideObj);
+    } else {
+      return;
+    }
     renderEditorProps();
     renderSlideList();
-    toast('Brainstorm-Kette aktualisiert', 'success');
+    renderEditorCanvas();
+    toast('Folien-Kette aktualisiert', 'success');
+  };
+
+  const savePresentationClosure = async () => {
+    const attachResults = !!$('#set-pres-results')?.checked;
+    const attachClosing = !!$('#set-pres-closing')?.checked;
+    const scoring = analyzePresentationScoring();
+    await persistPresentationSettings({
+      attachPresentationResults: attachResults && scoring.canPresentationResults,
+      attachPresentationClosing: attachClosing,
+    });
+    await syncPresentationClosureSlides();
+    renderEditorProps();
+    renderSlideList();
+    renderEditorCanvas();
+    toast('Abschluss-Folien aktualisiert', 'success');
   };
 
   panel.querySelectorAll('input,textarea').forEach((el) => {
     el.addEventListener('input', saveContent);
     el.addEventListener('change', saveContent);
   });
-  $('#set-brainstorm-rank')?.addEventListener('change', () => {
-    const on = $('#set-brainstorm-rank')?.checked;
-    const resultsEl = $('#set-brainstorm-results');
-    const maxEl = $('#set-brainstorm-vote-max');
+  $('#set-slide-rank')?.addEventListener('change', () => {
+    const on = $('#set-slide-rank')?.checked;
+    const resultsEl = $('#set-slide-results');
+    const maxEl = $('#set-slide-vote-max');
     if (resultsEl) {
       resultsEl.disabled = !on;
       if (!on) resultsEl.checked = false;
     }
     if (maxEl) maxEl.disabled = !on;
-    void saveBrainstormChain();
+    void saveSlideChain();
   });
-  $('#set-brainstorm-results')?.addEventListener('change', () => { void saveBrainstormChain(); });
-  $('#set-brainstorm-vote-max')?.addEventListener('change', () => { void saveBrainstormChain(); });
+  $('#set-slide-results')?.addEventListener('change', () => { void saveSlideChain(); });
+  $('#set-slide-vote-max')?.addEventListener('change', () => { void saveSlideChain(); });
+  $('#set-pres-results')?.addEventListener('change', () => { void savePresentationClosure(); });
+  $('#set-pres-closing')?.addEventListener('change', () => { void savePresentationClosure(); });
+  $('#prop-layout-center')?.addEventListener('change', () => { saveContent(); renderEditorCanvas(); });
   panel.querySelectorAll('[data-rm-opt]').forEach((btn) => btn.addEventListener('click', () => {
     currentSlide().content.options.splice(Number(btn.dataset.rmOpt), 1);
     saveContent();
@@ -1840,10 +2361,16 @@ function renderEditorProps() {
 }
 
 async function persistSlide(slideObj) {
-  $('#editor-save-status').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Speichert…';
-  await sb.from('lp_slides').update({ content: slideObj.content, settings: slideObj.settings }).eq('id', slideObj.id);
-  await sb.from('lp_presentations').update({ updated_at: new Date().toISOString() }).eq('id', State.presentation.id);
-  $('#editor-save-status').innerHTML = '<i class="fa-solid fa-cloud"></i> Gespeichert';
+  setEditorSaveStatus('saving');
+  try {
+    await sb.from('lp_slides').update({ content: slideObj.content, settings: slideObj.settings }).eq('id', slideObj.id);
+    await sb.from('lp_presentations').update({ updated_at: new Date().toISOString() }).eq('id', State.presentation.id);
+    setEditorSaveStatus('saved');
+  } catch (err) {
+    setEditorSaveStatus('error');
+    toast(err?.message || 'Speichern fehlgeschlagen', 'error');
+    return;
+  }
   renderEditorCanvas();
 }
 
@@ -1868,6 +2395,10 @@ function renderAddSlideModal() {
         settings.brainstormAttachRanking = !!$('#add-chain-rank')?.checked;
         settings.brainstormAttachResults = !!$('#add-chain-results')?.checked;
         settings.brainstormVoteMax = Number($('#add-chain-max')?.value || 2);
+      } else if (type === 'open' || type === 'wordcloud') {
+        settings.slideAttachRanking = !!$('#add-chain-rank')?.checked;
+        settings.slideAttachResults = !!$('#add-chain-results')?.checked;
+        settings.slideAttachVoteMax = Number($('#add-chain-max')?.value || 2);
       }
       const { data } = await sb.from('lp_slides').insert({
         presentation_id: State.presentation.id,
@@ -1877,15 +2408,15 @@ function renderAddSlideModal() {
         settings,
       }).select().single();
       State.slides.push(data);
-      if (type === 'brainstorm' && settings.brainstormAttachRanking) {
-        await syncBrainstormChainSlides(data);
+      if ((type === 'brainstorm' && settings.brainstormAttachRanking) || ((type === 'open' || type === 'wordcloud') && settings.slideAttachRanking)) {
+        await syncCollectChainSlides(data);
       }
       State.selectedSlideId = data.id;
       closeModal('modal-add-slide');
       renderEditor();
     });
     btn.addEventListener('mouseenter', () => {
-      chainBox?.classList.toggle('hidden', btn.dataset.type !== 'brainstorm');
+      chainBox?.classList.toggle('hidden', !COLLECT_CHAIN_TYPES.has(btn.dataset.type));
     });
   });
   chainBox?.classList.add('hidden');
@@ -2162,6 +2693,40 @@ function renderPresent() {
     return;
   }
 
+  if (slide.slide_type === 'section' && useCenteredLayout(slide)) {
+    stage.innerHTML = wrapMentiSlide(renderCenteredSlideHtml(c, false, { icon: 'fa-heading' }), State.session.current_slide_index || 0);
+    updatePresentHeader();
+    updatePresentStats();
+    renderPresentParticipants();
+    void renderQrCode();
+    syncSopWorkshopShell('present', State.session.current_slide_index || 0);
+    return;
+  }
+
+  if (slide.settings?.presentationResults || slide.settings?.presentationClosing || isSlideResultsLinkedSlide(slide)) {
+    let html = '';
+    if (slide.settings?.presentationResults) {
+      html = `${renderCenteredSlideHtml(c, false, { icon: 'fa-chart-column' })}
+        <div class="viz-wrap viz-wrap-present">${renderPresentationResultsPresentHtml()}</div>`;
+    } else if (slide.settings?.presentationClosing) {
+      html = renderCenteredSlideHtml(c, false, { icon: 'fa-heart' });
+    } else {
+      const source = State.slides.find((s) => s.id === slide.content?.resultsSourceId);
+      const srcVisible = source ? getVisibleResponses(source.id) : [];
+      const srcDisplay = source ? getTrackVoteDisplaySlide(source) : null;
+      const srcAgg = srcDisplay ? window.LPViz.aggregateResponses(srcDisplay, srcVisible) : { total: 0 };
+      html = `${useCenteredLayout(slide) ? renderCenteredSlideHtml(c, false, { icon: 'fa-trophy' }) : `<h1 class="menti-q-title">${esc(c.title || 'Ergebnis')}</h1><p class="menti-q-prompt">${esc(c.body || '').replace(/\n/g, '<br>')}</p>`}
+        <div class="viz-wrap viz-wrap-present">${srcDisplay ? window.LPViz.renderViz(srcDisplay, srcAgg, 'present') : ''}</div>`;
+    }
+    stage.innerHTML = wrapMentiSlide(html, State.session.current_slide_index || 0);
+    updatePresentHeader();
+    updatePresentStats();
+    renderPresentParticipants();
+    void renderQrCode();
+    syncSopWorkshopShell('present', State.session.current_slide_index || 0);
+    return;
+  }
+
   if (slide.slide_type === 'content' && (c.mentiHero || c.sopKind || c.sopTrackResults || isCardResultsSlide(slide))) {
     let html;
     if (isCardResultsSlide(slide)) {
@@ -2180,6 +2745,18 @@ function renderPresent() {
       syncSopWorkshopShell('present', State.session.current_slide_index || 0);
       return;
     }
+  }
+
+  if (slide.slide_type === 'content' && useCenteredLayout(slide) && !interactive) {
+    stage.innerHTML = wrapMentiSlide(`${renderCenteredSlideHtml(c, false, { icon: 'fa-align-center' })}
+      ${c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="" style="max-width:min(720px,90vw);border-radius:16px;margin-top:1rem">` : ''}
+      ${viz ? `<div class="viz-wrap viz-wrap-present">${viz}</div>` : ''}`, State.session.current_slide_index || 0);
+    updatePresentHeader();
+    updatePresentStats();
+    renderPresentParticipants();
+    void renderQrCode();
+    syncSopWorkshopShell('present', State.session.current_slide_index || 0);
+    return;
   }
 
   const sopBadge = renderSopQuestionBadge(c);
