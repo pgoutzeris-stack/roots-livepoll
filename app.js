@@ -316,14 +316,26 @@ function getWorkshopProgress(slideIndex) {
 
 function renderWorkshopProgressHtml(slideIndex) {
   if (!isSopWorkshopPresentation()) {
-    return `<div class="workshop-slide-meta">Folie ${slideIndex + 1} / ${State.slides.length}</div>`;
+    return `<div class="menti-slide-counter">Folie ${slideIndex + 1} / ${State.slides.length}</div>`;
   }
   const p = getWorkshopProgress(slideIndex);
-  if (!p) return `<div class="workshop-slide-meta">Folie ${slideIndex + 1} / ${State.slides.length}</div>`;
-  const counter = p.step === 'decide' ? 'Track abschließen' : p.step === 'orient' ? 'Track-Start' : `Karte ${p.cardIndex} von ${p.cardTotal}`;
-  return `<div class="workshop-progress">
-    <div class="workshop-progress-text"><strong>${esc(p.trackLabel)}</strong> · ${esc(counter)} · ${esc(p.stepLabel)}</div>
-    <div class="workshop-progress-bar" role="progressbar" aria-valuenow="${p.pct}" aria-valuemin="0" aria-valuemax="100"><div class="workshop-progress-fill" style="width:${p.pct}%"></div></div>
+  if (!p) return `<div class="menti-slide-counter">Folie ${slideIndex + 1} / ${State.slides.length}</div>`;
+  const counter = p.step === 'decide' ? 'Priorisierung' : p.step === 'orient' ? 'Track-Start' : `Karte ${p.cardIndex} / ${p.cardTotal}`;
+  const mode = p.step === 'orient' ? 'orient' : p.step === 'collect' ? 'collect' : 'decide';
+  return `<div class="menti-slide-progress">
+    <div class="menti-slide-progress-top">
+      <span class="menti-slide-track">${esc(p.trackLabel)}</span>
+      <span class="menti-slide-step">${esc(counter)}</span>
+      ${renderWorkshopModeBadge(mode)}
+    </div>
+    <div class="workshop-progress-bar"><div class="workshop-progress-fill" style="width:${p.pct}%"></div></div>
+  </div>`;
+}
+
+function wrapMentiSlide(bodyHtml, slideIndex) {
+  return `<div class="menti-slide">
+    ${renderWorkshopProgressHtml(slideIndex)}
+    <div class="menti-slide-content">${bodyHtml}</div>
   </div>`;
 }
 
@@ -418,33 +430,27 @@ function renderTrackVoteResultsHtml(slide, visible) {
 }
 
 function renderWorkshopCardCollectHtml(c, editable = false) {
-  const theme = sopTrackTheme(c.sopTrackClass);
   const titleEl = editable
-    ? `<div class="canvas-editable workshop-card-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
-    : `<h1 class="workshop-card-title">${esc(c.title || c.sopCardName || '')}</h1>`;
-  const subEl = c.subtitle ? `<p class="workshop-card-sub">${esc(c.subtitle)}</p>` : '';
+    ? `<div class="canvas-editable menti-q-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+    : `<h1 class="menti-q-title">${esc(c.title || c.sopCardName || '')}</h1>`;
+  const subEl = c.subtitle ? `<p class="menti-crumb">${esc(c.subtitle)}</p>` : '';
   const bodyEl = editable
-    ? `<div class="canvas-editable workshop-card-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
-    : (c.body ? `<p class="workshop-card-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
-  return `
-    <div class="workshop-collect-shell ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
-      ${renderWorkshopModeBadge('collect')}
-      ${renderSopQuestionBadge(c)}
-      ${titleEl}
-      ${subEl}
-      ${bodyEl}
-    </div>`;
+    ? `<div class="canvas-editable menti-q-sub" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+    : (c.body ? `<p class="menti-q-sub">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+  const promptEl = editable
+    ? `<div class="canvas-editable menti-q-prompt workshop-collect-prompt" contenteditable="true" data-field="prompt">${esc(c.prompt || '')}</div>`
+    : (c.prompt ? `<p class="menti-q-prompt">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : '');
+  return `<div class="menti-question-block">${subEl}${titleEl}${bodyEl}${promptEl || ''}</div>`;
 }
 
 function renderParticipantWorkshopHeader(slideIndex) {
-  const p = getWorkshopProgress(slideIndex);
-  if (!p) return '';
-  const counter = p.step === 'decide' ? 'Priorisierung' : p.step === 'orient' ? 'Orientierung' : `Karte ${p.cardIndex}/${p.cardTotal}`;
-  return `<div class="participant-workshop-header">
-    <div class="participant-workshop-track">${esc(p.trackLabel)}</div>
-    <div class="participant-workshop-step">${esc(counter)} · ${esc(p.stepLabel)}</div>
-    <div class="workshop-progress-bar"><div class="workshop-progress-fill" style="width:${p.pct}%"></div></div>
-  </div>`;
+  if (!isSopWorkshopPresentation()) return '';
+  return renderWorkshopProgressHtml(slideIndex);
+}
+
+function wrapMentiParticipantSlide(bodyHtml, slideIndex) {
+  const header = isSopWorkshopPresentation() ? renderParticipantWorkshopHeader(slideIndex) : '';
+  return `<div class="menti-participant-slide">${header}<div class="menti-participant-content">${bodyHtml}</div></div>`;
 }
 
 function renderParticipantTrackVoteHtml(slide) {
@@ -486,7 +492,8 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
   const navClass = SOP_TRACK_NAV_CLASS[activeTrack.class] || '';
   const trackIdx = findSlideIndexForSopStep(activeTrack.class, null, null, 'track-intro');
   const trackIdxNum = tracks.findIndex((t) => t.class === activeTrack.class);
-  let html = `<div class="workshop-sop-panel ${esc(activeTrack.class)} ${esc(navClass)}">`;
+  let html = `<div class="workshop-sop-panel ${esc(activeTrack.class)} ${esc(navClass)}">
+    <div class="workshop-sop-panel-head"><i class="fa-solid fa-map"></i> Workshop</div>`;
   html += `<button type="button" class="workshop-sop-panel-track${ctx?.kind === 'track-intro' ? ' active' : ''}" data-slide-index="${trackIdx}" ${trackIdx < 0 ? 'disabled' : ''}>
     <span class="workshop-sop-panel-badge">Track ${trackIdxNum + 1}</span>
     <span class="workshop-sop-panel-title">${esc(activeTrack.title.replace(/^Track \d+: /, ''))}</span>
@@ -583,6 +590,7 @@ function syncSopWorkshopShell(mode, slideIndex) {
 
   const mountPanel = (el) => {
     if (!el) return;
+    if (!panel.html) { el.classList.add('hidden'); el.innerHTML = ''; return; }
     el.classList.remove('hidden');
     el.innerHTML = panel.html;
     panel.bind(el);
@@ -1042,10 +1050,6 @@ async function deleteSlide(id) {
   renderEditor();
 }
 
-function renderEditorSopBoardAppend() {
-  return '';
-}
-
 function renderEditorCanvas() {
   const slide = currentSlide();
   const canvas = $('#editor-canvas');
@@ -1062,9 +1066,7 @@ function renderEditorCanvas() {
     return;
   }
   if (slide.slide_type === 'brainstorm' && (c.sopKind === 'card-workshop' || c.sopCardName) && isSopWorkshopPresentation()) {
-    canvas.innerHTML = `${renderWorkshopCardCollectHtml(c, true)}
-      <p class="canvas-editable canvas-prompt workshop-collect-prompt" contenteditable="true" data-field="prompt" data-placeholder="Brainstorming-Frage…">${esc(c.prompt || '')}</p>
-      <div class="canvas-hint"><i class="fa-solid fa-pen"></i> Karten-Kontext und Frage direkt bearbeiten</div>`;
+    canvas.innerHTML = `${wrapMentiSlide(renderWorkshopCardCollectHtml(c, true), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Karten-Kontext und Frage direkt bearbeiten</div>`;
     bindCanvasInlineEdit();
     return;
   }
@@ -1565,10 +1567,7 @@ function renderPresent() {
   const slideMuted = c.subtextColor || 'var(--muted)';
 
   if (slide.slide_type === 'section' && c.sopTrackClass) {
-    stage.innerHTML = `
-      ${renderWorkshopProgressHtml(State.session.current_slide_index || 0)}
-      ${renderWorkshopModeBadge('orient')}
-      ${renderSopSectionHtml(c)}`;
+    stage.innerHTML = wrapMentiSlide(`${renderSopSectionHtml(c)}`, State.session.current_slide_index || 0);
     updatePresentHeader();
     updatePresentStats();
     renderPresentParticipants();
@@ -1580,9 +1579,7 @@ function renderPresent() {
   if (slide.slide_type === 'content' && (c.mentiHero || c.sopKind || c.sopTrackResults)) {
     const html = c.mentiHero ? renderMentiHeroHtml(c) : renderSopContentHtml(c);
     if (html) {
-      stage.innerHTML = `
-        ${renderWorkshopProgressHtml(State.session.current_slide_index || 0)}
-        ${html}`;
+      stage.innerHTML = wrapMentiSlide(html, State.session.current_slide_index || 0);
       updatePresentHeader();
       updatePresentStats();
       renderPresentParticipants();
@@ -1597,11 +1594,9 @@ function renderPresent() {
   const workshopMode = getWorkshopMode(slide);
 
   if (slide.slide_type === 'brainstorm' && (c.sopKind === 'card-workshop' || c.sopCardName) && isSopWorkshopPresentation()) {
-    stage.innerHTML = `
-      ${renderWorkshopProgressHtml(slideIdx)}
+    stage.innerHTML = wrapMentiSlide(`
       ${renderWorkshopCardCollectHtml(c)}
-      <p class="present-slide-body workshop-collect-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>
-      <div class="viz-wrap">${viz}</div>${modPanel}`;
+      <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`, slideIdx);
     stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
     stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
     updatePresentHeader();
@@ -1613,13 +1608,10 @@ function renderPresent() {
   }
 
   if (slide.settings?.sopTrackVote && isSopWorkshopPresentation()) {
-    stage.innerHTML = `
-      ${renderWorkshopProgressHtml(slideIdx)}
-      ${renderWorkshopModeBadge('decide')}
-      ${sopBadge}
-      <h1 class="present-slide-title menti-q-title">${esc(c.title || 'Priorisierung')}</h1>
-      <p class="present-slide-body menti-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>
-      <div class="viz-wrap">${viz}</div>${modPanel}`;
+    stage.innerHTML = wrapMentiSlide(`
+      <h1 class="menti-q-title">${esc(c.title || 'Priorisierung')}</h1>
+      <p class="menti-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>
+      <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`, slideIdx);
     stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
     stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
     updatePresentHeader();
@@ -1630,13 +1622,12 @@ function renderPresent() {
     return;
   }
 
-  stage.innerHTML = `
-    ${renderWorkshopProgressHtml(slideIdx)}
-    ${workshopMode ? renderWorkshopModeBadge(workshopMode) : ''}
-    ${sopBadge}
-    <h1 class="present-slide-title ${c.mentiQuestion ? 'menti-q-title' : ''}" style="color:${esc(slideInk)}">${esc(c.title || c.prompt || 'Folie')}</h1>
-    <p class="present-slide-body ${c.mentiQuestion ? 'menti-q-prompt' : ''}" style="color:${esc(slideMuted)}">${esc(c.prompt || c.body || '').replace(/\n/g, '<br>')}</p>
-    <div class="viz-wrap">${viz}</div>${modPanel}`;
+  stage.innerHTML = wrapMentiSlide(`
+    ${!isSopWorkshopPresentation() && workshopMode ? renderWorkshopModeBadge(workshopMode) : ''}
+    ${!isSopWorkshopPresentation() ? sopBadge : ''}
+    <h1 class="menti-q-title ${c.mentiQuestion ? '' : 'present-slide-title'}" style="color:${esc(slideInk)}">${esc(c.title || c.prompt || 'Folie')}</h1>
+    <p class="menti-q-prompt ${c.mentiQuestion ? '' : 'present-slide-body'}" style="color:${esc(slideMuted)}">${esc(c.prompt || c.body || '').replace(/\n/g, '<br>')}</p>
+    <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`, slideIdx);
 
   stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
   stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
@@ -1721,7 +1712,7 @@ function bindPresentToolbar() {
   $('#present-focus-toggle')?.addEventListener('click', () => {
     State.sopFocusMode = !State.sopFocusMode;
     document.body.classList.toggle('lp-sop-focus', State.sopFocusMode);
-    toast(State.sopFocusMode ? 'Fokusmodus: Sidebar & Board ausgeblendet' : 'Fokusmodus aus', 'success');
+    toast(State.sopFocusMode ? 'Fokusmodus: SOP-Panel ausgeblendet' : 'Fokusmodus aus', 'success');
   });
   $('#present-toggle-panels')?.addEventListener('click', () => {
     State.showPresentPanels = !State.showPresentPanels;
@@ -1917,14 +1908,19 @@ function renderParticipantQuestion() {
   }
   if (!isInteractive(slide.slide_type)) {
     if (slide.slide_type === 'section' && slide.content?.sopTrackClass) {
-      root.innerHTML = `${renderParticipantWorkshopHeader(slideIndex)}<div class="participant-card participant-sop-section">${renderWorkshopModeBadge('orient')}${renderSopSectionHtml(slide.content)}<p class="participant-sop-wait">Bitte auf den Vortragenden achten…</p></div>`;
+      root.innerHTML = wrapMentiParticipantSlide(`
+        <div class="participant-wait-block">
+          ${renderSopSectionHtml(slide.content)}
+          <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf den Vortragenden achten…</p>
+        </div>`, slideIndex);
       finishParticipant();
       return;
     }
     if (slide.slide_type === 'content' && (slide.content?.mentiHero || slide.content?.sopKind || slide.content?.sopTrackResults)) {
       const html = slide.content.mentiHero ? renderMentiHeroHtml(slide.content) : renderSopContentHtml(slide.content);
       if (html) {
-        root.innerHTML = `<div class="participant-card participant-sop-section">${html}<p class="participant-sop-wait">Bitte auf den Vortragenden achten…</p></div>`;
+        root.innerHTML = wrapMentiParticipantSlide(`
+          <div class="participant-wait-block">${html}<p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf den Vortragenden achten…</p></div>`, slideIndex);
         finishParticipant();
         return;
       }
@@ -1934,12 +1930,12 @@ function renderParticipantQuestion() {
     return;
   }
   if (hasAnsweredSlide(slide)) {
-    root.innerHTML = `${renderParticipantWorkshopHeader(slideIndex)}
-      <div class="participant-card participant-sent-card">
+    root.innerHTML = wrapMentiParticipantSlide(`
+      <div class="participant-sent-card">
         <div class="participant-sent-icon"><i class="fa-solid fa-check"></i></div>
-        <h1>Antwort gesendet</h1>
-        <p>Danke! Bitte warte auf die nächste Karte…</p>
-      </div>`;
+        <h1 class="menti-q-title">Antwort gesendet</h1>
+        <p class="menti-q-prompt">Danke! Bitte warte auf die nächste Karte…</p>
+      </div>`, slideIndex);
     finishParticipant();
     return;
   }
@@ -1959,10 +1955,9 @@ function renderParticipantQuestion() {
   } else if (type === 'wordcloud' || type === 'open' || type === 'brainstorm') {
     const isCardWorkshop = isSopWorkshopPresentation() && (c.sopKind === 'card-workshop' || c.sopCardName);
     if (isCardWorkshop) {
-      input = `${renderWorkshopCardCollectHtml(c)}
-        <label class="join-label" for="p-text">Dein KI Use Case</label>
+      input = `<label class="join-label" for="p-text">Dein KI Use Case</label>
         <textarea id="p-text" rows="4" class="participant-textarea participant-textarea-lg" placeholder="${esc((c.prompt || '').split('\n')[0] || 'Use Case beschreiben…')}"></textarea>
-        <button type="button" class="btn-primary participant-submit" id="submit-text">Use Case senden</button>`;
+        <button type="button" class="btn-primary participant-submit participant-submit-lg" id="submit-text">Use Case senden</button>`;
     } else {
       input = `<textarea id="p-text" rows="3" class="participant-textarea" placeholder="${esc(c.prompt || 'Antwort')}"></textarea><button type="button" class="btn-primary participant-submit" id="submit-text">Senden</button>`;
     }
@@ -1997,20 +1992,29 @@ function renderParticipantQuestion() {
       : `<p style="color:var(--muted)">Kein Bild konfiguriert.</p>`;
   }
 
-  root.innerHTML = `
-    ${isSopWorkshopPresentation() ? renderParticipantWorkshopHeader(slideIndex) : ''}
-    <div class="participant-card ${c.mentiQuestion ? 'participant-menti-q' : ''} ${getWorkshopMode(slide) ? `participant-mode-${getWorkshopMode(slide)}` : ''}">
-      <div class="participant-header-row">
+  const isWorkshop = isSopWorkshopPresentation();
+  const isCollect = type === 'brainstorm' && (c.sopKind === 'card-workshop' || c.sopCardName);
+  const isDecide = slide.settings?.sopTrackVote;
+  const cardClass = [
+    'participant-card',
+    c.mentiQuestion || isWorkshop ? 'participant-menti-q' : '',
+    getWorkshopMode(slide) ? `participant-mode-${getWorkshopMode(slide)}` : '',
+    isWorkshop ? 'participant-card-menti' : '',
+  ].filter(Boolean).join(' ');
+
+  root.innerHTML = wrapMentiParticipantSlide(`
+    <div class="${cardClass}">
+      ${!isWorkshop ? `<div class="participant-header-row">
         ${participantAvatarHtml(State.participant, 'md')}
         <div><div class="participant-meta">Code ${esc(State.session.code)}${slide.settings?.anonymous ? ' · Anonym' : ''}</div><div class="participant-you">${esc(State.participant?.display_name || '')}</div></div>
-      </div>
-      ${slide.settings?.sopTrackVote ? renderWorkshopModeBadge('decide') : (type === 'brainstorm' && c.sopCardName ? '' : renderSopQuestionBadge(c))}
-      ${slide.settings?.sopTrackVote || (type === 'brainstorm' && (c.sopKind === 'card-workshop' || c.sopCardName)) ? '' : `<h1 class="${c.mentiQuestion ? 'menti-q-title' : ''}">${esc(c.title || c.prompt || 'Frage')}</h1>`}
-      ${slide.settings?.sopTrackVote || (type === 'brainstorm' && (c.sopKind === 'card-workshop' || c.sopCardName)) ? '' : `<p class="${c.mentiQuestion ? 'menti-q-prompt' : ''}">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>`}
-      ${slide.settings?.sopTrackVote ? `<h1 class="menti-q-title">${esc(c.title || 'Priorisierung')}</h1>` : ''}
+      </div>` : ''}
+      ${isCollect ? renderWorkshopCardCollectHtml(c) : ''}
+      ${isDecide ? `<h1 class="menti-q-title">${esc(c.title || 'Priorisierung')}</h1><p class="menti-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>` : ''}
+      ${!isCollect && !isDecide ? `<h1 class="menti-q-title">${esc(c.title || c.prompt || 'Frage')}</h1>` : ''}
+      ${!isCollect && !isDecide && c.prompt && c.title ? `<p class="menti-q-prompt">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : ''}
       ${timeLimit ? `<div id="p-timer" class="p-timer">${timeLimit}s</div>` : ''}
       ${input}
-    </div>`;
+    </div>`, slideIndex);
 
   if (timeLimit) startQuestionTimer(timeLimit);
   bindParticipantHandlers(slide);
