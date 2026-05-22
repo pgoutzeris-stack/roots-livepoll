@@ -23,7 +23,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-<link rel="stylesheet" href="styles.css?v=20260520-addmodal" />
+<link rel="stylesheet" href="styles.css?v=20260520-resultsfx" />
 </head>
 <body>
 <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -153,9 +153,11 @@
   </div>
   <div id="present-toolbar" class="present-toolbar hidden">
     <button type="button" class="present-btn" id="present-prev"><i class="fa-solid fa-chevron-left"></i></button>
-    <button type="button" class="present-btn" id="present-toggle-question" title="Frage öffnen/schließen"><i class="fa-solid fa-lock-open"></i></button>
+    <span id="present-slide-counter" class="present-slide-counter">1 / 1</span>
+    <button type="button" class="present-btn" id="present-toggle-responses" title="Antworten sammeln"><i class="fa-solid fa-circle-dot"></i></button>
+    <button type="button" class="present-btn" id="present-toggle-join" title="Neue Teilnehmer zulassen"><i class="fa-solid fa-user-plus"></i></button>
+    <button type="button" class="present-btn present-btn-text hidden" id="present-results-mode" title="Ergebnis-Anzeige umschalten">%</button>
     <button type="button" class="present-btn" id="present-reset" title="Antworten zurücksetzen"><i class="fa-solid fa-rotate-left"></i></button>
-    <button type="button" class="present-btn" id="present-lock-join" title="Beitritt sperren"><i class="fa-solid fa-lock-open"></i></button>
     <button type="button" class="present-btn" id="present-show-code" title="Code & QR"><i class="fa-solid fa-qrcode"></i></button>
     <button type="button" class="present-btn" id="present-focus-toggle" title="Fokusmodus"><i class="fa-solid fa-expand"></i></button>
     <button type="button" class="present-btn" id="present-toggle-panels" title="Teilnehmer & Aktivität"><i class="fa-solid fa-users"></i></button>
@@ -210,12 +212,26 @@
         <label class="props-check"><input type="checkbox" id="add-chain-results" checked> Ergebnis-Folie (Gewinner & Prozent)</label>
         <label class="add-slide-chain-max">Max. Favoriten <input type="number" id="add-chain-max" min="1" max="10" value="2"></label>
       </div>
-      <div id="add-slide-closure" class="add-slide-chain">
-        <div class="add-slide-chain-title"><i class="fa-solid fa-flag-checkered"></i> Präsentation abschließen</div>
-        <p class="add-slide-chain-hint" id="add-closure-hint">Am Ende der Präsentation optional Ergebnis- und Abschlussfolie einfügen.</p>
-        <label class="props-check"><input type="checkbox" id="add-pres-results"> Session-Ergebnis am Ende</label>
-        <label class="props-check"><input type="checkbox" id="add-pres-closing"> Abschlussfolie am Ende</label>
-        <p class="add-slide-chain-hint" id="add-closure-linked" style="margin-top:.5rem;margin-bottom:0"></p>
+      <div id="add-closure-options" class="add-slide-chain hidden">
+        <div id="add-closure-results-panel" class="add-closure-panel hidden">
+          <div class="add-slide-chain-title"><i class="fa-solid fa-chart-column"></i> Session-Ergebnis</div>
+          <p class="add-slide-chain-hint" id="add-closure-results-hint"></p>
+          <div class="add-closure-seg" role="group" aria-label="Ergebnis-Anzeige">
+            <button type="button" class="add-closure-seg-btn active" data-results-mode="percent">Prozent</button>
+            <button type="button" class="add-closure-seg-btn" data-results-mode="count">Absolute Zahlen</button>
+          </div>
+          <label class="props-check"><input type="checkbox" id="add-results-confetti" checked> Konfetti für Platz 1</label>
+          <button type="button" class="btn-secondary btn-sm" id="btn-toggle-pres-results"><i class="fa-solid fa-plus"></i> Session-Ergebnis einblenden</button>
+        </div>
+        <div id="add-closure-closing-panel" class="add-closure-panel hidden">
+          <div class="add-slide-chain-title"><i class="fa-solid fa-heart"></i> Abschlussfolie</div>
+          <p class="add-slide-chain-hint">Zentrierte Danke-Folie am Ende der Präsentation.</p>
+          <div class="props-label" style="margin-left:0;margin-top:.5rem">Titel</div>
+          <input id="add-closing-title" value="Danke für eure Teilnahme!" />
+          <div class="props-label" style="margin-left:0">Untertitel</div>
+          <input id="add-closing-body" value="Fragen, Feedback oder Applaus willkommen." />
+          <button type="button" class="btn-secondary btn-sm" id="btn-toggle-pres-closing"><i class="fa-solid fa-plus"></i> Abschlussfolie einblenden</button>
+        </div>
       </div>
     </div>
   </div>
@@ -231,7 +247,7 @@
 
 <script src="https://pgoutzeris-stack.github.io/ROOTS_Intranet/roots-user-bridge.js?v=20260522-hover"></script>
 <script src="templates.js?v=20260520-brainchain"></script>
-<script src="viz.js?v=20260520-brainchain"></script>
-<script src="app.js?v=20260520-addmodal"></script>
+<script src="viz.js?v=20260520-resultsfx"></script>
+<script src="app.js?v=20260520-resultsfx"></script>
 </body>
 </html>

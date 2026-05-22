@@ -138,7 +138,8 @@
     return base;
   }
 
-  function renderViz(slide, agg, mode) {
+  function renderViz(slide, agg, mode, options = {}) {
+    const displayMode = options.displayMode || 'percent';
     const light = mode === 'editor' || mode === 'results' || mode === 'present';
     const textColor = light ? 'var(--ink)' : 'var(--ink)';
     const trackBg = light ? 'rgba(15,23,42,.08)' : 'rgba(15,23,42,.08)';
@@ -154,12 +155,15 @@
           ? Object.keys(agg.counts || {}).map((k) => ({ id: k, text: k }))
           : options;
       const max = Math.max(1, ...entries.map((o) => agg.counts?.[o.id] || 0));
+      const total = Math.max(1, agg.total || 0);
       const correctId = agg.type === 'quiz' ? (options.find((o) => o.correct)?.id) : null;
       return `<div class="viz-bars">${entries.map((o) => {
         const n = agg.counts?.[o.id] || 0;
-        const pct = Math.round((n / max) * 100);
+        const pct = Math.round((n / total) * 100);
+        const barPct = displayMode === 'count' ? Math.round((n / max) * 100) : pct;
+        const valueLabel = displayMode === 'count' ? String(n) : `${pct}%`;
         const highlight = correctId && o.id === correctId ? ' viz-bar-correct' : '';
-        return `<div class="viz-bar-row${highlight}"><span>${esc(o.text || o.id)}</span><div class="viz-bar-track" style="background:${trackBg}"><div class="viz-bar-fill" style="width:${pct}%"></div></div><strong>${n}</strong></div>`;
+        return `<div class="viz-bar-row${highlight}"><span>${esc(o.text || o.id)}</span><div class="viz-bar-track" style="background:${trackBg}"><div class="viz-bar-fill" style="width:${barPct}%"></div></div><strong>${valueLabel}</strong></div>`;
       }).join('')}</div>`;
     }
 
@@ -196,9 +200,12 @@
         return { id, label, val };
       }).sort((a, b) => b.val - a.val);
       const max = Math.max(1, ...entries.map((e) => e.val));
+      const total = Math.max(1, entries.reduce((sum, e) => sum + e.val, 0));
       return `<div class="viz-bars">${entries.map((e) => {
-        const pct = Math.round((e.val / max) * 100);
-        return `<div class="viz-bar-row"><span>${esc(e.label)}</span><div class="viz-bar-track" style="background:${trackBg}"><div class="viz-bar-fill" style="width:${pct}%"></div></div><strong>${Math.round(e.val)}</strong></div>`;
+        const pct = Math.round((e.val / total) * 100);
+        const barPct = displayMode === 'count' ? Math.round((e.val / max) * 100) : pct;
+        const valueLabel = displayMode === 'count' ? String(Math.round(e.val)) : `${pct}%`;
+        return `<div class="viz-bar-row"><span>${esc(e.label)}</span><div class="viz-bar-track" style="background:${trackBg}"><div class="viz-bar-fill" style="width:${barPct}%"></div></div><strong>${valueLabel}</strong></div>`;
       }).join('')}</div>`;
     }
 

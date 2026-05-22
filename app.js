@@ -1,7 +1,7 @@
 /* ROOTS Live Poll – Hauptanwendung */
 const SUPABASE_URL = 'https://csmguwcvzreefluhahyu.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNzbWd1d2N2enJlZWZsdWhhaHl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjM0ODcsImV4cCI6MjA5MjUzOTQ4N30.Fiafx7XBaQZXUX3bKQIBH7znBHx3B51yL-bftOHsL4Q';
-const APP_VERSION = '20260520-addmodal';
+const APP_VERSION = '20260520-resultsfx';
 const JOIN_BASE = `${location.origin}${location.pathname}`;
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
@@ -49,6 +49,9 @@ const State = {
   joinProfile: { name: '', emoji: '🦊', color: '#206efb' },
   activityItems: [],
   addSlideModalBound: false,
+  addSlideFocusType: null,
+  resultsDisplayMode: 'percent',
+  confettiSlideId: null,
   participantPoll: null,
   sopFocusMode: false,
   showPresentPanels: false,
@@ -293,8 +296,139 @@ function getPresentationSettings() {
   return {
     attachPresentationResults: false,
     attachPresentationClosing: false,
+    resultsDisplayMode: 'percent',
+    resultsConfetti: true,
+    closingTitle: 'Danke für eure Teilnahme!',
+    closingBody: 'Fragen, Feedback oder Applaus willkommen.',
     ...(State.presentation?.settings || {}),
   };
+}
+
+const ADD_CLOSURE_CARDS = [
+  { type: 'presentation_results', icon: 'fa-chart-column', label: 'Session-Ergebnis', desc: 'Alle interaktiven Folien in einer Übersicht am Ende.' },
+  { type: 'presentation_closing', icon: 'fa-heart', label: 'Abschlussfolie', desc: 'Zentrierte Danke-Folie als stilvoller Abschluss.' },
+];
+
+function getResultsDisplayMode() {
+  const mode = getPresentationSettings().resultsDisplayMode || State.resultsDisplayMode || 'percent';
+  return mode === 'count' ? 'count' : 'percent';
+}
+
+function setResultsDisplayMode(mode) {
+  State.resultsDisplayMode = mode === 'count' ? 'count' : 'percent';
+  void persistPresentationSettings({ resultsDisplayMode: State.resultsDisplayMode });
+}
+
+function isResultsViewSlide(slide) {
+  if (!slide) return false;
+  return isCardResultsSlide(slide) || !!slide.settings?.presentationResults || isSlideResultsLinkedSlide(slide);
+}
+
+function renderResultsDisplayToggleHtml() {
+  const mode = getResultsDisplayMode();
+  return `<div class="present-results-toggle" role="group" aria-label="Ergebnis-Anzeige">
+    <button type="button" class="present-results-toggle-btn ${mode === 'percent' ? 'active' : ''}" data-results-mode="percent">%</button>
+    <button type="button" class="present-results-toggle-btn ${mode === 'count' ? 'active' : ''}" data-results-mode="count">#</button>
+  </div>`;
+}
+
+function bindResultsDisplayToggle(root) {
+  root?.querySelectorAll('[data-results-mode]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setResultsDisplayMode(btn.dataset.resultsMode);
+      renderPresent();
+      refreshAddSlideClosureUi();
+    });
+  });
+}
+
+function launchResultsConfetti(duration = 3200) {
+  let canvas = document.getElementById('lp-confetti-canvas');
+  if (canvas) canvas.remove();
+  canvas = document.createElement('canvas');
+  canvas.id = 'lp-confetti-canvas';
+  canvas.className = 'lp-confetti-canvas';
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  const resize = () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  };
+  resize();
+  const colors = ['#206efb', '#10b981', '#f59e0b', '#a855f7', '#ef4444', '#fbbf24', '#22d3ee'];
+  const particles = Array.from({ length: 140 }, () => ({
+    x: canvas.width * (0.25 + Math.random() * 0.5),
+    y: -10 - Math.random() * canvas.height * 0.2,
+    w: 5 + Math.random() * 7,
+    h: 4 + Math.random() * 5,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    vx: (Math.random() - 0.5) * 5,
+    vy: 1.5 + Math.random() * 4,
+    rot: Math.random() * 360,
+    vr: (Math.random() - 0.5) * 10,
+  }));
+  const start = performance.now();
+  const tick = (t) => {
+    const elapsed = t - start;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach((p) => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.07;
+      p.rot += p.vr;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate((p.rot * Math.PI) / 180);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    });
+    if (elapsed < duration) requestAnimationFrame(tick);
+    else canvas.remove();
+  };
+  requestAnimationFrame(tick);
+}
+
+function resultsSlideHasWinner(slide) {
+  if (!slide) return false;
+  if (isCardResultsSlide(slide)) {
+    const c = slide.content || {};
+    const voteSlide = isBrainstormResultsSlide(slide)
+      ? findBrainstormVoteSlide(c.brainstormSourceId)
+      : findCardVoteSlide(c.sopTrackKey || c.sopTrackClass, c.sopPhaseName, c.sopCardName);
+    if (!voteSlide) return false;
+    const visible = getVisibleResponses(voteSlide.id);
+    const { voteCounts } = aggregateVoteResponses(voteSlide, visible);
+    return Object.values(voteCounts).some((n) => n > 0);
+  }
+  if (isSlideResultsLinkedSlide(slide)) {
+    const source = State.slides.find((s) => s.id === slide.content?.resultsSourceId);
+    if (!source) return false;
+    const visible = getVisibleResponses(source.id);
+    const agg = window.LPViz.aggregateResponses(source, visible);
+    if (agg.counts) return Object.values(agg.counts).some((n) => n > 0);
+    if (agg.scores) return Object.values(agg.scores).some((n) => n > 0);
+    if (agg.totals) return Object.values(agg.totals).some((n) => n > 0);
+    return (agg.total || 0) > 0;
+  }
+  if (slide.settings?.presentationResults) {
+    return analyzePresentationScoring().scorableSlides.some((s) => {
+      const visible = getVisibleResponses(s.id);
+      const agg = window.LPViz.aggregateResponses(s, visible);
+      if (agg.counts) return Object.values(agg.counts).some((n) => n > 0);
+      return (agg.total || 0) > 0;
+    });
+  }
+  return false;
+}
+
+function maybeLaunchResultsConfetti(slide) {
+  if (!slide || !isResultsViewSlide(slide)) return;
+  if (getPresentationSettings().resultsConfetti === false) return;
+  if (!resultsSlideHasWinner(slide)) return;
+  if (State.confettiSlideId === slide.id) return;
+  State.confettiSlideId = slide.id;
+  launchResultsConfetti();
 }
 
 function analyzeSlideChainCapability(slide) {
@@ -427,15 +561,16 @@ function renderCenteredSlideHtml(c, editable, opts = {}) {
 
 function renderPresentationResultsPresentHtml() {
   const scoring = analyzePresentationScoring();
+  const mode = getResultsDisplayMode();
   if (!scoring.scorableSlides.length) {
     return '<p class="present-wait-msg">Noch keine auswertbaren Folien in dieser Präsentation.</p>';
   }
-  return `<div class="pres-results-summary">${scoring.scorableSlides.map((s) => {
+  return `${renderResultsDisplayToggleHtml()}<div class="pres-results-summary">${scoring.scorableSlides.map((s) => {
     const displaySlide = getTrackVoteDisplaySlide(s);
     const visible = getVisibleResponses(s.id);
     const agg = window.LPViz.aggregateResponses(displaySlide, visible);
     const title = s.content?.title || s.content?.prompt || 'Folie';
-    return `<div class="pres-results-block"><h3>${esc(title)}</h3><div class="viz-wrap viz-wrap-present">${window.LPViz.renderViz(displaySlide, agg, 'present')}</div></div>`;
+    return `<div class="pres-results-block"><h3>${esc(title)}</h3><div class="viz-wrap viz-wrap-present">${window.LPViz.renderViz(displaySlide, agg, 'present', { displayMode: mode })}</div></div>`;
   }).join('')}</div>`;
 }
 
@@ -768,7 +903,8 @@ function aggregateTrackVoteResponses(slide, visible) {
   return { top3Counts, pointTotals, optionMap };
 }
 
-function renderVoteResultsHtml(slide, visible, { showWinners = false } = {}) {
+function renderVoteResultsHtml(slide, visible, { showWinners = false, displayMode = null } = {}) {
+  const mode = displayMode || getResultsDisplayMode();
   const scope = getVoteSlideScope(slide);
   const { voteCounts, pointTotals, totalVotes } = aggregateVoteResponses(slide, visible);
   const options = getVoteOptions(slide).filter((o) => o.id !== 'none');
@@ -781,25 +917,28 @@ function renderVoteResultsHtml(slide, visible, { showWinners = false } = {}) {
     pct: totalVotes ? Math.round((voteCounts[o.id] || 0) / totalVotes * 1000) / 10 : 0,
   })).sort((a, b) => b.votes - a.votes || b.pct - a.pct);
 
+  const maxVotes = Math.max(1, ...ranked.map((o) => o.votes));
   const maxPct = Math.max(1, ...ranked.map((o) => o.pct));
   let html = '<div class="card-vote-results">';
   if (showWinners) {
+    html += renderResultsDisplayToggleHtml();
     const winners = ranked.filter((o) => o.votes > 0).slice(0, 3);
     if (winners.length) {
       html += `<div class="card-vote-winners">${winners.map((w, i) => `
-        <div class="card-vote-winner card-vote-winner--${i + 1}">
+        <div class="card-vote-winner card-vote-winner--${i + 1}${i === 0 ? ' card-vote-winner--confetti' : ''}">
           <span class="card-vote-winner-rank">#${i + 1}</span>
           <span class="card-vote-winner-text">${esc(w.text)}</span>
-          <span class="card-vote-winner-pct">${w.pct}% · ${w.votes} Stimmen</span>
+          <span class="card-vote-winner-pct">${mode === 'count' ? `${w.votes} Stimmen` : `${w.pct}% · ${w.votes} Stimmen`}</span>
         </div>`).join('')}</div>`;
     }
   }
   html += ranked.map((o) => {
-    const barPct = Math.round((o.pct / maxPct) * 100);
+    const barPct = mode === 'count' ? Math.round((o.votes / maxVotes) * 100) : Math.round((o.pct / maxPct) * 100);
+    const label = mode === 'count' ? `${o.votes}` : `${o.pct}%`;
     return `<div class="track-vote-result-row card-vote-result-row">
       <span>${esc(o.text)}</span>
       <div class="viz-bar-track"><div class="viz-bar-fill" style="width:${barPct}%"></div></div>
-      <strong>${o.pct}% · ${o.votes}</strong>
+      <strong>${label}${mode === 'percent' ? '' : ` · ${o.votes}`}</strong>
     </div>`;
   }).join('');
   html += `<div class="card-vote-total">${visible.length} Teilnehmer · ${totalVotes} Stimmen gesamt</div></div>`;
@@ -891,7 +1030,7 @@ function renderCardResultsPresentHtml(slide) {
   return `<div class="card-results-present">
     <div class="track-vote-present-head">
       <span class="track-vote-count">Ergebnis · ${esc(label)}</span>
-      <span class="track-vote-hint">Gewinner und Stimmenanteile in Prozent</span>
+      <span class="track-vote-hint">${getResultsDisplayMode() === 'count' ? 'Gewinner und Stimmen in absoluten Zahlen' : 'Gewinner und Stimmenanteile in Prozent'}</span>
     </div>
     ${renderCardVoteParticipationHtml(voteSlide)}
     ${bubbleHtml}
@@ -1524,6 +1663,7 @@ async function openEditor(id) {
   const { data: slides } = await sb.from('lp_slides').select('*').eq('presentation_id', id).order('sort_order');
   State.presentation = pres;
   State.slides = slides || [];
+  State.resultsDisplayMode = getPresentationSettings().resultsDisplayMode || 'percent';
   State.selectedSlideId = State.slides[0]?.id || null;
   $('#editor-title').value = pres.title;
   setEditorSaveStatus('idle');
@@ -1871,8 +2011,8 @@ async function syncPresentationClosureSlides() {
     const closingContent = {
       ...defaultStyle(),
       layout: 'center',
-      title: 'Danke für eure Teilnahme!',
-      body: 'Fragen, Feedback oder Applaus willkommen.',
+      title: getPresentationSettings().closingTitle || 'Danke für eure Teilnahme!',
+      body: getPresentationSettings().closingBody || 'Fragen, Feedback oder Applaus willkommen.',
     };
     const closingSettings = {
       ...window.LP_DEFAULT_SETTINGS,
@@ -1921,19 +2061,53 @@ async function syncPresentationClosureSlides() {
   await sb.from('lp_presentations').update({ updated_at: new Date().toISOString() }).eq('id', State.presentation.id);
 }
 
-async function savePresentationClosureFromModal() {
-  const attachResults = !!$('#add-pres-results')?.checked;
-  const attachClosing = !!$('#add-pres-closing')?.checked;
+async function savePresentationClosureFromModal(partial = {}) {
   const scoring = analyzePresentationScoring();
-  await persistPresentationSettings({
-    attachPresentationResults: attachResults && scoring.canPresentationResults,
-    attachPresentationClosing: attachClosing,
-  });
+  const settingsPatch = { ...partial };
+  if ('attachPresentationResults' in settingsPatch && settingsPatch.attachPresentationResults && !scoring.canPresentationResults) {
+    settingsPatch.attachPresentationResults = false;
+  }
+  await persistPresentationSettings(settingsPatch);
   await syncPresentationClosureSlides();
   renderSlideList();
   renderEditorCanvas();
   refreshAddSlideClosureUi();
-  toast('Abschluss-Folien aktualisiert', 'success');
+}
+
+async function togglePresentationClosureCard(type) {
+  const presSettings = getPresentationSettings();
+  const scoring = analyzePresentationScoring();
+  if (type === 'presentation_results') {
+    const next = !presSettings.attachPresentationResults;
+    if (next && !scoring.canPresentationResults) {
+      toast(scoring.noResultsReason, 'warn');
+      return;
+    }
+    await savePresentationClosureFromModal({
+      attachPresentationResults: next,
+      resultsDisplayMode: getResultsDisplayMode(),
+      resultsConfetti: $('#add-results-confetti')?.checked !== false,
+    });
+    const slide = findPresentationResultsSlide();
+    if (slide) State.selectedSlideId = slide.id;
+    toast(next ? 'Session-Ergebnis eingefügt' : 'Session-Ergebnis entfernt', 'success');
+  } else if (type === 'presentation_closing') {
+    const next = !presSettings.attachPresentationClosing;
+    await savePresentationClosureFromModal({
+      attachPresentationClosing: next,
+      closingTitle: $('#add-closing-title')?.value || presSettings.closingTitle,
+      closingBody: $('#add-closing-body')?.value || presSettings.closingBody,
+    });
+    const slide = findPresentationClosingSlide();
+    if (slide) {
+      slide.content.title = $('#add-closing-title')?.value || slide.content.title;
+      slide.content.body = $('#add-closing-body')?.value || slide.content.body;
+      await sb.from('lp_slides').update({ content: slide.content }).eq('id', slide.id);
+      State.selectedSlideId = slide.id;
+    }
+    toast(next ? 'Abschlussfolie eingefügt' : 'Abschlussfolie entfernt', 'success');
+  }
+  renderEditor();
 }
 
 function refreshAddSlideClosureUi() {
@@ -1941,25 +2115,81 @@ function refreshAddSlideClosureUi() {
   const presScoring = analyzePresentationScoring();
   const presResultsLinked = findPresentationResultsSlide();
   const presClosingLinked = findPresentationClosingSlide();
-  const resultsEl = $('#add-pres-results');
-  const closingEl = $('#add-pres-closing');
-  const hintEl = $('#add-closure-hint');
-  const linkedEl = $('#add-closure-linked');
-  if (resultsEl) {
-    resultsEl.checked = !!presSettings.attachPresentationResults;
-    resultsEl.disabled = !presScoring.canPresentationResults;
-  }
-  if (closingEl) closingEl.checked = !!presSettings.attachPresentationClosing;
+  const mode = getResultsDisplayMode();
+  const hintEl = $('#add-closure-results-hint');
+  const confettiEl = $('#add-results-confetti');
+  const titleEl = $('#add-closing-title');
+  const bodyEl = $('#add-closing-body');
+  const resultsBtn = $('#btn-toggle-pres-results');
+  const closingBtn = $('#btn-toggle-pres-closing');
+
   if (hintEl) {
     hintEl.textContent = presScoring.canPresentationResults
-      ? `${presScoring.scorableCount} auswertbare Folie${presScoring.scorableCount === 1 ? '' : 'n'} erkannt.`
+      ? `${presScoring.scorableCount} auswertbare Folie${presScoring.scorableCount === 1 ? '' : 'n'} in dieser Präsentation.`
       : presScoring.noResultsReason;
   }
-  if (linkedEl) {
-    linkedEl.innerHTML = presResultsLinked || presClosingLinked
-      ? `<i class="fa-solid fa-link"></i> Am Ende: ${presResultsLinked ? 'Ergebnis' : ''}${presResultsLinked && presClosingLinked ? ' · ' : ''}${presClosingLinked ? 'Abschluss' : ''}`
-      : '';
+  if (confettiEl) confettiEl.checked = presSettings.resultsConfetti !== false;
+  if (titleEl) titleEl.value = presClosingLinked?.content?.title || presSettings.closingTitle || titleEl.value;
+  if (bodyEl) bodyEl.value = presClosingLinked?.content?.body || presSettings.closingBody || bodyEl.value;
+
+  document.querySelectorAll('#add-closure-results-panel .add-closure-seg-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.resultsMode === mode);
+  });
+
+  if (resultsBtn) {
+    const on = !!presSettings.attachPresentationResults && !!presResultsLinked;
+    resultsBtn.innerHTML = on
+      ? '<i class="fa-solid fa-check"></i> Session-Ergebnis entfernen'
+      : `<i class="fa-solid fa-plus"></i> Session-Ergebnis ${presScoring.canPresentationResults ? 'einblenden' : 'nicht möglich'}`;
+    resultsBtn.disabled = !presScoring.canPresentationResults && !on;
   }
+  if (closingBtn) {
+    const on = !!presSettings.attachPresentationClosing && !!presClosingLinked;
+    closingBtn.innerHTML = on
+      ? '<i class="fa-solid fa-check"></i> Abschlussfolie entfernen'
+      : '<i class="fa-solid fa-plus"></i> Abschlussfolie einblenden';
+  }
+
+  $$('.type-card[data-type="presentation_results"]').forEach((card) => {
+    card.classList.toggle('is-enabled', !!presResultsLinked);
+    card.classList.toggle('type-card--disabled', !presScoring.canPresentationResults && !presResultsLinked);
+  });
+  $$('.type-card[data-type="presentation_closing"]').forEach((card) => {
+    card.classList.toggle('is-enabled', !!presClosingLinked);
+  });
+}
+
+function showAddSlideOptions(type) {
+  State.addSlideFocusType = type;
+  const chainBox = $('#brainstorm-add-chain');
+  const layoutBox = $('#add-slide-layout');
+  const closureBox = $('#add-closure-options');
+  const resultsPanel = $('#add-closure-results-panel');
+  const closingPanel = $('#add-closure-closing-panel');
+  $$('.type-card').forEach((card) => card.classList.toggle('type-card--focus', !!type && card.dataset.type === type));
+  if (!type) {
+    chainBox?.classList.add('hidden');
+    layoutBox?.classList.add('hidden');
+    closureBox?.classList.add('hidden');
+    return;
+  }
+  chainBox?.classList.toggle('hidden', !COLLECT_CHAIN_TYPES.has(type));
+  layoutBox?.classList.toggle('hidden', type !== 'section' && type !== 'content');
+  const isClosure = type === 'presentation_results' || type === 'presentation_closing';
+  closureBox?.classList.toggle('hidden', !isClosure);
+  resultsPanel?.classList.toggle('hidden', type !== 'presentation_results');
+  closingPanel?.classList.toggle('hidden', type !== 'presentation_closing');
+  if (type === 'section' || type === 'content') {
+    const centerEl = $('#add-slide-center');
+    if (centerEl) centerEl.checked = type === 'section';
+  }
+  if (isClosure) refreshAddSlideClosureUi();
+}
+
+function finalizePresentUi(slide) {
+  updatePresentToolbarUi(slide);
+  bindResultsDisplayToggle($('#present-stage'));
+  maybeLaunchResultsConfetti(slide);
 }
 
 async function deleteSlide(id) {
@@ -2377,17 +2607,27 @@ async function persistSlideOrder() {
 
 function renderAddSlideModal() {
   const grid = $('#slide-type-grid');
-  const chainBox = $('#brainstorm-add-chain');
-  const layoutBox = $('#add-slide-layout');
-  grid.innerHTML = window.LP_SLIDE_TYPES.map((t) => `
+  const typeCards = [
+    ...window.LP_SLIDE_TYPES.map((t) => `
     <button type="button" class="type-card" data-type="${t.type}">
       <h3><i class="fa-solid ${t.icon}"></i> ${esc(t.label)}</h3>
       <p>${esc(t.desc)}</p>
-    </button>`).join('');
+    </button>`),
+    ...ADD_CLOSURE_CARDS.map((t) => `
+    <button type="button" class="type-card type-card--closure" data-type="${t.type}">
+      <h3><i class="fa-solid ${t.icon}"></i> ${esc(t.label)}</h3>
+      <p>${esc(t.desc)}</p>
+    </button>`),
+  ].join('');
+  grid.innerHTML = typeCards;
   refreshAddSlideClosureUi();
   grid.querySelectorAll('.type-card').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const type = btn.dataset.type;
+      if (type === 'presentation_results' || type === 'presentation_closing') {
+        showAddSlideOptions(type);
+        return;
+      }
       const base = JSON.parse(JSON.stringify(window.LP_DEFAULT_CONTENT[type] || { title: 'Neu' }));
       const settings = { ...window.LP_DEFAULT_SETTINGS };
       const content = { ...defaultStyle(), ...base };
@@ -2418,25 +2658,45 @@ function renderAddSlideModal() {
       closeModal('modal-add-slide');
       renderEditor();
     });
-    btn.addEventListener('mouseenter', () => {
-      const type = btn.dataset.type;
-      chainBox?.classList.toggle('hidden', !COLLECT_CHAIN_TYPES.has(type));
-      layoutBox?.classList.toggle('hidden', type !== 'section' && type !== 'content');
-      if (type === 'section' || type === 'content') {
-        const centerEl = $('#add-slide-center');
-        if (centerEl) centerEl.checked = type === 'section';
-      }
-    });
+    btn.addEventListener('mouseenter', () => showAddSlideOptions(btn.dataset.type));
   });
-  chainBox?.classList.add('hidden');
-  layoutBox?.classList.add('hidden');
+  showAddSlideOptions(null);
 }
 
 function bindAddSlideModalControls() {
   if (State.addSlideModalBound) return;
   State.addSlideModalBound = true;
-  $('#add-pres-results')?.addEventListener('change', () => { void savePresentationClosureFromModal(); });
-  $('#add-pres-closing')?.addEventListener('change', () => { void savePresentationClosureFromModal(); });
+  $('#btn-toggle-pres-results')?.addEventListener('click', () => { void togglePresentationClosureCard('presentation_results'); });
+  $('#btn-toggle-pres-closing')?.addEventListener('click', () => { void togglePresentationClosureCard('presentation_closing'); });
+  $('#add-results-confetti')?.addEventListener('change', () => {
+    void savePresentationClosureFromModal({ resultsConfetti: $('#add-results-confetti')?.checked !== false });
+  });
+  document.querySelectorAll('#add-closure-results-panel .add-closure-seg-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setResultsDisplayMode(btn.dataset.resultsMode);
+      refreshAddSlideClosureUi();
+    });
+  });
+  $('#add-closing-title')?.addEventListener('change', async () => {
+    const title = $('#add-closing-title')?.value || '';
+    await savePresentationClosureFromModal({ closingTitle: title });
+    const slide = findPresentationClosingSlide();
+    if (slide) {
+      slide.content.title = title;
+      await sb.from('lp_slides').update({ content: slide.content }).eq('id', slide.id);
+      renderEditorCanvas();
+    }
+  });
+  $('#add-closing-body')?.addEventListener('change', async () => {
+    const body = $('#add-closing-body')?.value || '';
+    await savePresentationClosureFromModal({ closingBody: body });
+    const slide = findPresentationClosingSlide();
+    if (slide) {
+      slide.content.body = body;
+      await sb.from('lp_slides').update({ content: slide.content }).eq('id', slide.id);
+      renderEditorCanvas();
+    }
+  });
 }
 
 async function saveVersionSnapshot() {
@@ -2525,11 +2785,14 @@ async function startPresentation() {
 }
 
 async function loadSessionData() {
-  const [{ data: slides }, { data: responses }, { data: participants }] = await Promise.all([
+  const [{ data: slides }, { data: responses }, { data: participants }, { data: pres }] = await Promise.all([
     sb.from('lp_slides').select('*').eq('presentation_id', State.session.presentation_id).order('sort_order'),
     sb.from('lp_responses').select('*').eq('session_id', State.session.id).order('created_at'),
     sb.from('lp_participants').select('*').eq('session_id', State.session.id),
+    sb.from('lp_presentations').select('*').eq('id', State.session.presentation_id).maybeSingle(),
   ]);
+  if (pres) State.presentation = pres;
+  State.resultsDisplayMode = getPresentationSettings().resultsDisplayMode || 'percent';
   State.slides = normalizeSlides(slides);
   State.responses = responses || [];
   State.participants = participants || [];
@@ -2673,7 +2936,7 @@ function renderPresent() {
     } else if (slide.slide_type === 'open' || slide.slide_type === 'brainstorm') {
       viz = renderBrainstormPresentViz(slide, visible);
     } else if (agg.total > 0 || !State.session.question_open) {
-      viz = window.LPViz.renderViz(displaySlide, agg, 'present');
+      viz = window.LPViz.renderViz(displaySlide, agg, 'present', { displayMode: getResultsDisplayMode() });
     } else {
       viz = '<div class="present-wait-msg">Antworten werden gesammelt…</div>';
     }
@@ -2707,6 +2970,7 @@ function renderPresent() {
     renderPresentParticipants();
     void renderQrCode();
     syncSopWorkshopShell('present', State.session.current_slide_index || 0);
+    finalizePresentUi(slide);
     return;
   }
 
@@ -2717,6 +2981,7 @@ function renderPresent() {
     renderPresentParticipants();
     void renderQrCode();
     syncSopWorkshopShell('present', State.session.current_slide_index || 0);
+    finalizePresentUi(slide);
     return;
   }
 
@@ -2733,7 +2998,7 @@ function renderPresent() {
       const srcDisplay = source ? getTrackVoteDisplaySlide(source) : null;
       const srcAgg = srcDisplay ? window.LPViz.aggregateResponses(srcDisplay, srcVisible) : { total: 0 };
       html = `${useCenteredLayout(slide) ? renderCenteredSlideHtml(c, false, { icon: 'fa-trophy' }) : `<h1 class="menti-q-title">${esc(c.title || 'Ergebnis')}</h1><p class="menti-q-prompt">${esc(c.body || '').replace(/\n/g, '<br>')}</p>`}
-        <div class="viz-wrap viz-wrap-present">${srcDisplay ? window.LPViz.renderViz(srcDisplay, srcAgg, 'present') : ''}</div>`;
+        <div class="viz-wrap viz-wrap-present">${srcDisplay ? window.LPViz.renderViz(srcDisplay, srcAgg, 'present', { displayMode: getResultsDisplayMode() }) : ''}</div>`;
     }
     stage.innerHTML = wrapMentiSlide(html, State.session.current_slide_index || 0);
     updatePresentHeader();
@@ -2741,6 +3006,7 @@ function renderPresent() {
     renderPresentParticipants();
     void renderQrCode();
     syncSopWorkshopShell('present', State.session.current_slide_index || 0);
+    finalizePresentUi(slide);
     return;
   }
 
@@ -2760,6 +3026,7 @@ function renderPresent() {
       renderPresentParticipants();
       void renderQrCode();
       syncSopWorkshopShell('present', State.session.current_slide_index || 0);
+      finalizePresentUi(slide);
       return;
     }
   }
@@ -2773,6 +3040,7 @@ function renderPresent() {
     renderPresentParticipants();
     void renderQrCode();
     syncSopWorkshopShell('present', State.session.current_slide_index || 0);
+    finalizePresentUi(slide);
     return;
   }
 
@@ -2791,6 +3059,7 @@ function renderPresent() {
     renderPresentParticipants();
     void renderQrCode();
     syncSopWorkshopShell('present', slideIdx);
+    finalizePresentUi(slide);
     return;
   }
 
@@ -2806,6 +3075,7 @@ function renderPresent() {
     renderPresentParticipants();
     void renderQrCode();
     syncSopWorkshopShell('present', slideIdx);
+    finalizePresentUi(slide);
     return;
   }
 
@@ -2823,6 +3093,7 @@ function renderPresent() {
   renderPresentParticipants();
   void renderQrCode();
   syncSopWorkshopShell('present', State.session.current_slide_index || 0);
+  finalizePresentUi(slide);
 }
 
 async function moderateResponse(id, keepHidden) {
@@ -2832,18 +3103,47 @@ async function moderateResponse(id, keepHidden) {
   renderPresent();
 }
 
+function updatePresentToolbarUi(slide) {
+  const idx = State.session?.current_slide_index || 0;
+  const total = State.slides.length || 1;
+  const counter = $('#present-slide-counter');
+  if (counter) counter.textContent = `${idx + 1} / ${total}`;
+
+  const responsesBtn = $('#present-toggle-responses');
+  if (responsesBtn) {
+    const open = !!State.session?.question_open;
+    responsesBtn.innerHTML = open ? '<i class="fa-solid fa-circle-dot"></i>' : '<i class="fa-solid fa-circle-stop"></i>';
+    responsesBtn.title = open ? 'Antworten sammeln (aktiv)' : 'Antworten pausiert';
+    responsesBtn.classList.toggle('is-active', open);
+  }
+
+  const joinBtn = $('#present-toggle-join');
+  if (joinBtn) {
+    const locked = !!State.session?.join_locked;
+    joinBtn.innerHTML = locked ? '<i class="fa-solid fa-user-slash"></i>' : '<i class="fa-solid fa-user-plus"></i>';
+    joinBtn.title = locked ? 'Neue Teilnehmer blockiert' : 'Neue Teilnehmer zulassen';
+    joinBtn.classList.toggle('is-active', !locked);
+  }
+
+  const modeBtn = $('#present-results-mode');
+  if (modeBtn) {
+    const show = isResultsViewSlide(slide);
+    modeBtn.classList.toggle('hidden', !show);
+    if (show) {
+      const mode = getResultsDisplayMode();
+      modeBtn.textContent = mode === 'count' ? '#' : '%';
+      modeBtn.title = mode === 'count' ? 'Absolute Zahlen (klicken für Prozent)' : 'Prozent (klicken für absolute Zahlen)';
+      modeBtn.classList.add('is-active');
+    }
+  }
+}
+
 function updatePresentStats() {
   const slide = currentSessionSlide();
   const count = getVisibleResponses(slide?.id).length;
   const pending = getPendingResponses(slide?.id).length;
   $('#present-stats').textContent = `${State.participants.length} TN · ${count} Antw.${pending ? ` · ${pending} wartend` : ''}`;
-  const lockBtn = $('#present-lock-join');
-  if (lockBtn) {
-    lockBtn.innerHTML = State.session?.join_locked
-      ? '<i class="fa-solid fa-lock"></i>'
-      : '<i class="fa-solid fa-lock-open"></i>';
-    lockBtn.title = State.session?.join_locked ? 'Beitritt gesperrt' : 'Beitritt erlauben';
-  }
+  updatePresentToolbarUi(slide);
 }
 
 async function renderQrCode() {
@@ -2886,12 +3186,22 @@ function bindPresentToolbar() {
 
   $('#present-prev').onclick = () => changeSlide(-1);
   $('#present-next').onclick = () => changeSlide(1);
-  $('#present-toggle-question').onclick = async () => {
+  $('#present-toggle-responses').onclick = async () => {
     const question_open = !State.session.question_open;
     broadcastSessionPatch({ question_open });
     renderPresent();
     await sb.from('lp_sessions').update({ question_open }).eq('id', State.session.id);
   };
+  $('#present-toggle-join').onclick = async () => {
+    const join_locked = !State.session.join_locked;
+    await sb.from('lp_sessions').update({ join_locked }).eq('id', State.session.id);
+    State.session.join_locked = join_locked;
+    updatePresentStats();
+  };
+  $('#present-results-mode')?.addEventListener('click', () => {
+    setResultsDisplayMode(getResultsDisplayMode() === 'count' ? 'percent' : 'count');
+    renderPresent();
+  });
   $('#present-show-code').onclick = () => {
     $('#present-code-bar').classList.toggle('hidden');
     void renderQrCode();
@@ -2906,11 +3216,6 @@ function bindPresentToolbar() {
     document.body.classList.toggle('lp-sop-panels', State.showPresentPanels);
     toast(State.showPresentPanels ? 'Teilnehmer-Leiste eingeblendet' : 'Teilnehmer-Leiste ausgeblendet', 'success');
   });
-  $('#present-lock-join').onclick = async () => {
-    await sb.from('lp_sessions').update({ join_locked: !State.session.join_locked }).eq('id', State.session.id);
-    State.session.join_locked = !State.session.join_locked;
-    updatePresentStats();
-  };
   $('#present-reset').onclick = async () => {
     if (!confirm('Antworten dieser Folie zurücksetzen?')) return;
     const slide = currentSessionSlide();
@@ -2929,6 +3234,7 @@ function bindPresentToolbar() {
 async function changeSlide(delta) {
   const next = clamp((State.session.current_slide_index || 0) + delta, 0, State.slides.length - 1);
   if (next === State.session.current_slide_index) return;
+  State.confettiSlideId = null;
   broadcastSessionPatch({ current_slide_index: next, question_open: true });
   renderPresent();
   await sb.from('lp_sessions').update({ current_slide_index: next, question_open: true }).eq('id', State.session.id);
@@ -2937,6 +3243,7 @@ async function changeSlide(delta) {
 async function goToSlide(index) {
   const next = clamp(index, 0, State.slides.length - 1);
   if (next === State.session.current_slide_index) return;
+  State.confettiSlideId = null;
   broadcastSessionPatch({ current_slide_index: next, question_open: true });
   renderPresent();
   await sb.from('lp_sessions').update({ current_slide_index: next, question_open: true }).eq('id', State.session.id);
@@ -3518,8 +3825,9 @@ async function routeFromHash() {
     const { data: session } = await sb.from('lp_sessions').select('*').eq('id', id).maybeSingle();
     if (!session) return;
     State.session = session;
-    const { data: pres } = await sb.from('lp_presentations').select('title').eq('id', session.presentation_id).maybeSingle();
-    if (pres?.title) State.presentation = { ...(State.presentation || {}), title: pres.title };
+    const { data: pres } = await sb.from('lp_presentations').select('*').eq('id', session.presentation_id).maybeSingle();
+    if (pres) State.presentation = pres;
+    State.resultsDisplayMode = getPresentationSettings().resultsDisplayMode || 'percent';
     await loadSessionData();
     showScreen('present');
     subscribeSessionChannel();
