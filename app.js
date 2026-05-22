@@ -53,6 +53,8 @@ const State = {
   showPresentPanels: false,
   participantVoteExpert: false,
   bubbleSeenIds: {},
+  participantResponsesKey: null,
+  participantResponsesAt: 0,
 };
 
 localStorage.setItem('lp_device_id', State.deviceId);
@@ -1445,7 +1447,7 @@ async function loadSessionData() {
     sb.from('lp_responses').select('*').eq('session_id', State.session.id).order('created_at'),
     sb.from('lp_participants').select('*').eq('session_id', State.session.id),
   ]);
-  State.slides = slides || [];
+  State.slides = normalizeSlides(slides);
   State.responses = responses || [];
   State.participants = participants || [];
 }
@@ -1487,16 +1489,20 @@ function startParticipantSync() {
       .eq('id', State.session.id)
       .maybeSingle();
     if (!data) return;
-    const changed = data.current_slide_index !== State.session.current_slide_index
+    const prevIndex = State.session.current_slide_index;
+    const changed = data.current_slide_index !== prevIndex
       || data.question_open !== State.session.question_open
       || data.status !== State.session.status;
     if (!changed) return;
     applySessionPatch(data);
+    if (data.current_slide_index !== prevIndex) {
+      await ensureParticipantResponses(true);
+    }
     if (data.status === 'ended') {
       handleParticipantSessionEnd();
       return;
     }
-    renderParticipantQuestion();
+    await renderParticipantQuestion();
   }, 2500);
 }
 
@@ -1798,6 +1804,38 @@ async function goToSlide(index) {
 }
 
 /* ─── PARTICIPANT ─── */
+async function ensureParticipantResponses(force = false) {
+  if (!State.session?.id || !State.participant) return;
+  const slideIndex = State.session.current_slide_index || 0;
+  const slide = State.slides[slideIndex];
+  const needsTrackData = Boolean(slide?.settings?.sopTrackVote);
+  if (!needsTrackData && !force) return;
+  const cacheKey = `${State.session.id}:${slideIndex}`;
+  const fresh = State.participantResponsesKey === cacheKey
+    && Date.now() - (State.participantResponsesAt || 0) < 2500;
+  if (!force && fresh) return;
+  const { data } = await sb.from('lp_responses').select('*').eq('session_id', State.session.id).order('created_at');
+  State.responses = data || [];
+  State.participantResponsesKey = cacheKey;
+  State.participantResponsesAt = Date.now();
+}
+
+function normalizeSlideRecord(slide) {
+  if (!slide) return slide;
+  const next = { ...slide };
+  if (typeof next.content === 'string') {
+    try { next.content = JSON.parse(next.content); } catch { next.content = {}; }
+  }
+  if (typeof next.settings === 'string') {
+    try { next.settings = JSON.parse(next.settings); } catch { next.settings = {}; }
+  }
+  return next;
+}
+
+function normalizeSlides(slides) {
+  return (slides || []).map(normalizeSlideRecord);
+}
+
 function loadAnsweredSlides(sessionId) {
   try {
     State.answeredSlides = new Set(JSON.parse(localStorage.getItem(`lp_answered_${sessionId}`) || '[]'));
@@ -1893,11 +1931,12 @@ async function joinSession(code, name, emoji, color) {
   if (pErr) { toast(pErr.message, 'error'); return; }
   State.session = session;
   State.participant = part;
+  State.responses = [];
   loadAnsweredSlides(session.id);
   const { data: slides } = await sb.from('lp_slides').select('*').eq('presentation_id', session.presentation_id).order('sort_order');
-  State.slides = slides || [];
+  State.slides = normalizeSlides(slides);
   subscribeParticipantChannel();
-  renderParticipantQuestion();
+  await renderParticipantQuestion();
 }
 
 function subscribeParticipantChannel() {
@@ -1909,7 +1948,7 @@ function subscribeParticipantChannel() {
         handleParticipantSessionEnd();
         return;
       }
-      renderParticipantQuestion();
+      void renderParticipantQuestion();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lp_sessions', filter: `id=eq.${State.session.id}` }, (payload) => {
       applySessionPatch(payload.new || {});
@@ -1917,10 +1956,20 @@ function subscribeParticipantChannel() {
         handleParticipantSessionEnd();
         return;
       }
-      renderParticipantQuestion();
+      void renderParticipantQuestion();
+    })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lp_responses', filter: `session_id=eq.${State.session.id}` }, () => {
+      void (async () => {
+        await ensureParticipantResponses(true);
+        await renderParticipantQuestion();
+      })();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lp_responses', filter: `session_id=eq.${State.session.id}` }, () => {
-      if (State.slides[State.session.current_slide_index]?.slide_type === 'qa') renderParticipantQuestion();
+      void (async () => {
+        await ensureParticipantResponses(true);
+        const slide = State.slides[State.session.current_slide_index || 0];
+        if (slide?.settings?.sopTrackVote || slide?.slide_type === 'qa') await renderParticipantQuestion();
+      })();
     })
     .subscribe();
   startParticipantSync();
@@ -1936,9 +1985,10 @@ function hasAnsweredSlide(slide) {
   return State.answeredSlides.has(slide.id);
 }
 
-function renderParticipantQuestion() {
+async function renderParticipantQuestion() {
   const slideIndex = State.session.current_slide_index || 0;
   const slide = State.slides[slideIndex];
+  if (slide?.settings?.sopTrackVote) await ensureParticipantResponses(true);
   const root = $('#participant-root');
   const finishParticipant = () => syncSopWorkshopShell('participant', slideIndex);
   if (!slide?.settings?.sopTrackVote) State.participantVoteExpert = false;
@@ -2150,7 +2200,7 @@ function bindParticipantHandlers(slide) {
 
   $('#vote-mode-toggle')?.addEventListener('click', () => {
     State.participantVoteExpert = !State.participantVoteExpert;
-    renderParticipantQuestion();
+    void renderParticipantQuestion();
   });
 
   $('#participant-root').querySelectorAll('.participant-option[data-val]').forEach((btn) => {
@@ -2221,12 +2271,17 @@ async function submitResponse(response) {
     is_hidden: !!slide.settings?.moderation,
   };
 
-  const { error } = await sb.from('lp_responses').insert(row);
+  const { data, error } = await sb.from('lp_responses').insert(row).select().single();
   if (error) {
     State.pendingQueue.push(row);
     localStorage.setItem('lp_pending_queue', JSON.stringify(State.pendingQueue));
     toast('Offline gespeichert – wird nachgereicht', 'warn');
     return;
+  }
+  if (data) {
+    const idx = State.responses.findIndex((r) => r.id === data.id);
+    if (idx >= 0) State.responses[idx] = data;
+    else State.responses.push(data);
   }
 
   if (slide.slide_type === 'quiz') {
