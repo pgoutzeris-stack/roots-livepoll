@@ -185,7 +185,7 @@ function sopCardBrainstorm(track, phase, card) {
 function sopTrackVote(track) {
   return tplSlide('percent_split', {
     title: `Priorisierung · ${track.title.replace(/^Track \d+: /, '')}`,
-    prompt: 'Verteile 100 Punkte auf die KI Use Cases, die du in diesem Track am wichtigsten findest.',
+    prompt: 'Alle gesammelten Use Cases dieses Tracks stehen unten. Verteile 100 Punkte – mehr Punkte bedeuten höhere Priorität.',
     mentiQuestion: true,
     options: [],
     ...sopMeta(track),
@@ -195,19 +195,16 @@ function sopTrackVote(track) {
 function buildSopKiWorkshopSlides() {
   const trackSlides = SOP_TOOL_TRACKS.flatMap((track, trackIndex) => [
     sopTrackIntro(track, trackIndex),
-    ...track.phases.flatMap((phase) => [
-      sopPhaseIntro(track, phase),
-      ...phase.cards.flatMap((card) => [
-        sopCardIntro(track, phase, card),
-        sopCardBrainstorm(track, phase, card),
-      ]),
-    ]),
+    ...track.phases.flatMap((phase) => phase.cards.flatMap((card) => [
+      sopCardIntro(track, phase, card),
+      sopCardBrainstorm(track, phase, card),
+    ])),
     sopTrackVote(track),
   ]);
   return [
     tplSlide('content', {
       title: 'SOP · KI Use-Case Workshop',
-      body: 'Wir gehen alle SOP-Tracks, Unterphasen und Karten durch – exakt wie im SOP-Dashboard.\n\nPro SOP-Karte: KI Use Cases sammeln.\nPro Track: alle Use Cases sammeln & Leader abstimmen.\n\nScannt den QR-Code · Name + Avatar wählen.',
+      body: 'Navigation links wie im SOP-Tool · Board zeigt Track, Phase und Karte.\n\nPro SOP-Karte: kurze Einleitung → Brainstorming.\nAm Track-Ende: 100 Punkte auf die gesammelten Use Cases verteilen.\n\nQR scannen · Name + Avatar wählen.',
       mentiHero: true,
     }),
     ...trackSlides,
@@ -219,15 +216,17 @@ function buildSopKiWorkshopSlides() {
   ];
 }
 
+window.SOP_TOOL_TRACKS = SOP_TOOL_TRACKS;
+
 window.LP_TEMPLATES = [
   {
     key: 'roots-sop-ki-workshop',
     category: 'ROOTS · SOP & KI',
     name: 'SOP-Brainstorming & KI Use Cases',
-    desc: 'Wie im SOP-Tool: 3 Tracks, 10 Phasen, 26 Karten – pro Karte Brainstorming, pro Track Sammelübersicht & Abstimmung.',
+    desc: 'SOP-Tool-Ansicht mit Sidebar: 3 Tracks, 26 Karten – pro Karte Brainstorming, pro Track 100-Punkte-Priorisierung.',
     duration: '120–180 Min.',
     group: '6–25',
-    tips: 'Pro SOP-Karte Brainstorming. Am Track-Ende alle Use Cases gesammelt anzeigen und Leader abstimmen. Einleitungstexte im Folien-Editor bearbeiten.',
+    tips: 'Sidebar links navigiert wie im SOP-Tool. Pro Karte Brainstorming, am Track-Ende Priorisierung mit 100 Punkten. Einleitungstexte im Editor bearbeiten.',
     slides: buildSopKiWorkshopSlides(),
   },
   {

@@ -206,6 +206,216 @@ function getTrackVoteDisplaySlide(slide) {
   return { ...slide, content: { ...slide.content, options: getTrackVoteOptions(slide) } };
 }
 
+const SOP_TRACK_NAV_CLASS = {
+  'track-pre': 'sop-nav-track--pre',
+  'track-ops': 'sop-nav-track--ops',
+  'track-post': 'sop-nav-track--post',
+};
+
+function isSopWorkshopPresentation() {
+  return Boolean(State.slides?.some((s) => s.content?.sopTrackKey || s.content?.sopTrackClass));
+}
+
+function findSlideIndexForSopStep(trackKey, phaseName, cardName, step) {
+  return State.slides.findIndex((s) => {
+    const c = s.content || {};
+    const st = s.settings || {};
+    const trackMatch = c.sopTrackKey === trackKey || c.sopTrackClass === trackKey;
+    if (!trackMatch && step !== 'track-intro') return false;
+    if (step === 'track-intro') {
+      return s.slide_type === 'section' && c.sopKind === 'track' && trackMatch;
+    }
+    if (step === 'card-intro') {
+      return s.slide_type === 'content' && c.sopKind === 'card' && c.sopPhaseName === phaseName && c.sopCardName === cardName;
+    }
+    if (step === 'brainstorm') {
+      return s.slide_type === 'brainstorm' && c.sopPhaseName === phaseName && c.sopCardName === cardName;
+    }
+    if (step === 'track-vote') {
+      return st.sopTrackVote && trackMatch;
+    }
+    return false;
+  });
+}
+
+function getSopSlideContext(slide) {
+  if (!slide) return null;
+  const c = slide.content || {};
+  const st = slide.settings || {};
+  if (st.sopTrackVote) {
+    return { trackKey: c.sopTrackKey || c.sopTrackClass, phaseName: null, cardName: null, kind: 'track-vote' };
+  }
+  if (slide.slide_type === 'brainstorm' && (c.sopTrackKey || c.sopTrackClass)) {
+    return { trackKey: c.sopTrackKey || c.sopTrackClass, phaseName: c.sopPhaseName, cardName: c.sopCardName, kind: 'brainstorm' };
+  }
+  if (c.sopKind === 'card') {
+    return { trackKey: c.sopTrackKey || c.sopTrackClass, phaseName: c.sopPhaseName, cardName: c.sopCardName, kind: 'card-intro' };
+  }
+  if (c.sopKind === 'track') {
+    return { trackKey: c.sopTrackKey || c.sopTrackClass, phaseName: null, cardName: null, kind: 'track-intro' };
+  }
+  return null;
+}
+
+function getSopBoardContextFromSlide(slide) {
+  const ctx = getSopSlideContext(slide);
+  if (!ctx?.trackKey) return { show: false };
+  return {
+    show: true,
+    trackKey: ctx.trackKey,
+    phaseName: ctx.cardName ? ctx.phaseName : null,
+    cardName: ctx.cardName || null,
+  };
+}
+
+function renderSopFullBoardHtml(ctx = {}) {
+  const tracks = window.SOP_TOOL_TRACKS || [];
+  const { trackKey, phaseName, cardName } = ctx;
+  if (!tracks.length) return '';
+  let html = '<div class="sop-workshop-board-inner">';
+  tracks.forEach((track, tIdx) => {
+    if (trackKey && track.class !== trackKey) return;
+    html += `<div class="track ${esc(track.class)}" data-track-index="${tIdx}">
+      <div class="track-header">
+        <span class="track-badge">Track ${tIdx + 1}</span>
+        <span class="track-name">${esc(track.title)}</span>
+      </div>
+      <div class="phases-wrapper"><div class="phases-row">`;
+    (track.phases || []).forEach((phase, pIdx) => {
+      const hidePhase = phaseName && phase.name !== phaseName;
+      html += `<div class="phase-col ${hidePhase ? 'sop-nav-filter-hidden' : ''}" data-phase-index="${pIdx}">
+        <div class="phase-label">${esc(phase.name)}</div>
+        <div class="phase-cards">`;
+      (phase.cards || []).forEach((card) => {
+        const active = track.class === trackKey && phase.name === phaseName && card.name === cardName;
+        html += `<div class="sop-card sop-card-readonly ${active ? 'sop-card-active' : ''}">
+          <div class="card-trigger">
+            <div class="card-header-main"><div class="card-title-wrap"><div class="card-title">${esc(card.name)}</div></div></div>
+            <div class="card-meta-chips"><span class="card-chip"><i class="fa-solid fa-lightbulb"></i> KI Use Cases</span></div>
+          </div>
+        </div>`;
+      });
+      html += '</div></div>';
+    });
+    html += '</div></div></div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderSopWorkshopNavHtml(currentIndex, { clickable = false, onNavigate } = {}) {
+  const tracks = window.SOP_TOOL_TRACKS || [];
+  const ctx = getSopSlideContext(State.slides[currentIndex]);
+  let html = '<div class="dash-nav-section">Inhaltsverzeichnis</div>';
+  tracks.forEach((track) => {
+    const navClass = SOP_TRACK_NAV_CLASS[track.class] || '';
+    const trackIdx = findSlideIndexForSopStep(track.class, null, null, 'track-intro');
+    const trackActive = ctx?.trackKey === track.class;
+    html += `<div class="sop-nav-track-group">
+      <button type="button" class="dash-nav-item ${navClass}${trackActive && ctx?.kind === 'track-intro' ? ' active' : ''}${trackActive && ctx?.kind !== 'track-intro' ? ' sop-nav-parent-active active' : ''}" data-slide-index="${trackIdx}" ${trackIdx < 0 ? 'disabled' : ''}>
+        <i class="fa-solid fa-folder-tree"></i><span>${esc(track.title.replace(/^Track \d+: /, ''))}</span>
+      </button>
+      <div class="sop-nav-phases">`;
+    (track.phases || []).forEach((phase) => {
+      html += `<div class="sop-nav-phase-group"><div class="sop-nav-phase-label">${esc(phase.name)}</div>`;
+      (phase.cards || []).forEach((card) => {
+        const introIdx = findSlideIndexForSopStep(track.class, phase.name, card.name, 'card-intro');
+        const brainIdx = findSlideIndexForSopStep(track.class, phase.name, card.name, 'brainstorm');
+        const cardActive = ctx?.trackKey === track.class && ctx?.phaseName === phase.name && ctx?.cardName === card.name;
+        html += `<button type="button" class="dash-nav-item dash-nav-item--sub ${navClass}${cardActive && ctx?.kind === 'card-intro' ? ' active' : ''}" data-slide-index="${introIdx}" ${introIdx < 0 ? 'disabled' : ''}>
+          <i class="fa-solid fa-file-lines"></i><span>${esc(card.name)}</span>
+        </button>
+        <button type="button" class="dash-nav-item dash-nav-item--step ${navClass}${cardActive && ctx?.kind === 'brainstorm' ? ' active' : ''}" data-slide-index="${brainIdx}" ${brainIdx < 0 ? 'disabled' : ''}>
+          <i class="fa-solid fa-circle"></i><span>Brainstorming</span>
+        </button>`;
+      });
+      html += '</div>';
+    });
+    const voteIdx = findSlideIndexForSopStep(track.class, null, null, 'track-vote');
+    const voteActive = ctx?.trackKey === track.class && ctx?.kind === 'track-vote';
+    html += `<button type="button" class="dash-nav-item dash-nav-item--vote ${navClass}${voteActive ? ' active' : ''}" data-slide-index="${voteIdx}" ${voteIdx < 0 ? 'disabled' : ''}>
+      <i class="fa-solid fa-chart-pie"></i><span>Priorisierung · 100 Punkte</span>
+    </button></div></div>`;
+  });
+  return { html, bind(container) {
+    if (!clickable || !onNavigate || !container) return;
+    container.querySelectorAll('[data-slide-index]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.slideIndex, 10);
+        if (Number.isFinite(idx) && idx >= 0) onNavigate(idx);
+      });
+    });
+  } };
+}
+
+function syncSopWorkshopShell(mode, slideIndex) {
+  const isSop = isSopWorkshopPresentation();
+  document.body.classList.toggle('lp-sop-workshop', isSop);
+  document.body.classList.toggle('editor-mode', mode === 'editor');
+  document.body.classList.toggle('present-mode', mode === 'present');
+  document.body.classList.toggle('participant-mode', mode === 'participant');
+
+  const editorNav = $('#editor-sop-nav');
+  const editorList = $('#editor-slides');
+  const presentSidebar = $('#present-sop-sidebar');
+  const presentBoard = $('#present-sop-board');
+  const participantSidebar = $('#participant-sop-sidebar');
+
+  if (!isSop) {
+    editorNav?.classList.add('hidden');
+    editorList?.classList.remove('hidden');
+    presentSidebar?.classList.add('hidden');
+    presentBoard?.classList.add('hidden');
+    participantSidebar?.classList.add('hidden');
+    return;
+  }
+
+  const idx = slideIndex ?? 0;
+  const slide = State.slides[idx];
+  const boardCtx = getSopBoardContextFromSlide(slide);
+  const nav = renderSopWorkshopNavHtml(idx, {
+    clickable: mode === 'editor' || mode === 'present',
+    onNavigate: (targetIdx) => {
+      if (mode === 'editor') {
+        State.selectedSlideId = State.slides[targetIdx]?.id;
+        renderEditor();
+      } else if (mode === 'present') {
+        void goToSlide(targetIdx);
+      }
+    },
+  });
+
+  if (mode === 'editor') {
+    editorNav?.classList.remove('hidden');
+    editorList?.classList.add('hidden');
+    if (editorNav) {
+      editorNav.innerHTML = nav.html;
+      nav.bind(editorNav);
+    }
+  }
+
+  if (mode === 'present') {
+    presentSidebar?.classList.remove('hidden');
+    if (presentSidebar) {
+      presentSidebar.innerHTML = nav.html;
+      nav.bind(presentSidebar);
+    }
+    if (boardCtx.show && presentBoard) {
+      presentBoard.classList.remove('hidden');
+      presentBoard.innerHTML = renderSopFullBoardHtml(boardCtx);
+    } else {
+      presentBoard?.classList.add('hidden');
+    }
+  }
+
+  if (mode === 'participant') {
+    participantSidebar?.classList.remove('hidden');
+    if (participantSidebar) {
+      participantSidebar.innerHTML = nav.html;
+    }
+  }
+}
+
 function renderSopBoardPreview(c, editable = false) {
   if (c.sopKind === 'track' || c.sopKind === 'phase') return '';
   const board = c.sopBoard || [];
@@ -570,6 +780,8 @@ function renderEditor() {
   renderSlideList();
   renderEditorCanvas();
   renderEditorProps();
+  const slideIdx = State.slides.findIndex((s) => s.id === State.selectedSlideId);
+  syncSopWorkshopShell('editor', slideIdx >= 0 ? slideIdx : 0);
 }
 
 function currentSlide() {
@@ -578,6 +790,11 @@ function currentSlide() {
 
 function renderSlideList() {
   const list = $('#editor-slides');
+  if (!list) return;
+  if (isSopWorkshopPresentation()) {
+    list.innerHTML = '';
+    return;
+  }
   list.innerHTML = State.slides.map((s, i) => `
     <div class="slide-thumb ${s.id === State.selectedSlideId ? 'active' : ''}" draggable="true" data-id="${s.id}">
       <div class="slide-thumb-row">
@@ -646,6 +863,13 @@ async function deleteSlide(id) {
   renderEditor();
 }
 
+function renderEditorSopBoardAppend(slide) {
+  if (!isSopWorkshopPresentation()) return '';
+  const boardCtx = getSopBoardContextFromSlide(slide);
+  if (!boardCtx.show) return '';
+  return `<div class="sop-workshop-board-wrap editor-board-preview">${renderSopFullBoardHtml(boardCtx)}</div>`;
+}
+
 function renderEditorCanvas() {
   const slide = currentSlide();
   const canvas = $('#editor-canvas');
@@ -657,14 +881,14 @@ function renderEditorCanvas() {
 
   let body = '';
   if (slide.slide_type === 'section' && c.sopTrackClass) {
-    canvas.innerHTML = `${renderSopSectionHtml(c, true)}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel, Text und Einleitung direkt bearbeiten</div>`;
+    canvas.innerHTML = `${renderSopSectionHtml(c, true)}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel, Text und Einleitung direkt bearbeiten</div>${renderEditorSopBoardAppend(slide)}`;
     bindCanvasInlineEdit();
     return;
   }
   if (slide.slide_type === 'content' && (c.mentiHero || c.sopKind || c.sopTrackResults)) {
     const html = c.mentiHero ? renderMentiHeroHtml(c, true) : renderSopContentHtml(c, true);
     if (html) {
-      canvas.innerHTML = `${html}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel und Text direkt bearbeiten</div>`;
+      canvas.innerHTML = `${html}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel und Text direkt bearbeiten</div>${renderEditorSopBoardAppend(slide)}`;
       bindCanvasInlineEdit();
       return;
     }
@@ -686,7 +910,7 @@ function renderEditorCanvas() {
     ${renderSopQuestionBadge(c)}
     <div class="canvas-editable canvas-title ${c.mentiQuestion ? 'menti-q-title' : ''}" contenteditable="true" data-field="title" data-placeholder="Titel…">${esc(c.title || c.prompt || 'Folie')}</div>
     ${body}
-    <div class="canvas-hint"><i class="fa-solid fa-pen"></i> Direkt auf der Folie tippen zum Bearbeiten</div>`;
+    <div class="canvas-hint"><i class="fa-solid fa-pen"></i> Direkt auf der Folie tippen zum Bearbeiten</div>${renderEditorSopBoardAppend(slide)}`;
   bindCanvasInlineEdit();
 }
 
@@ -1152,6 +1376,7 @@ function renderPresent() {
     updatePresentStats();
     renderPresentParticipants();
     void renderQrCode();
+    syncSopWorkshopShell('present', State.session.current_slide_index || 0);
     return;
   }
 
@@ -1165,6 +1390,7 @@ function renderPresent() {
       updatePresentStats();
       renderPresentParticipants();
       void renderQrCode();
+      syncSopWorkshopShell('present', State.session.current_slide_index || 0);
       return;
     }
   }
@@ -1184,6 +1410,7 @@ function renderPresent() {
   updatePresentStats();
   renderPresentParticipants();
   void renderQrCode();
+  syncSopWorkshopShell('present', State.session.current_slide_index || 0);
 }
 
 async function moderateResponse(id, keepHidden) {
@@ -1279,6 +1506,14 @@ function bindPresentToolbar() {
 
 async function changeSlide(delta) {
   const next = clamp((State.session.current_slide_index || 0) + delta, 0, State.slides.length - 1);
+  if (next === State.session.current_slide_index) return;
+  broadcastSessionPatch({ current_slide_index: next, question_open: true });
+  renderPresent();
+  await sb.from('lp_sessions').update({ current_slide_index: next, question_open: true }).eq('id', State.session.id);
+}
+
+async function goToSlide(index) {
+  const next = clamp(index, 0, State.slides.length - 1);
   if (next === State.session.current_slide_index) return;
   broadcastSessionPatch({ current_slide_index: next, question_open: true });
   renderPresent();
@@ -1425,30 +1660,37 @@ function hasAnsweredSlide(slide) {
 }
 
 function renderParticipantQuestion() {
-  const slide = State.slides[State.session.current_slide_index || 0];
+  const slideIndex = State.session.current_slide_index || 0;
+  const slide = State.slides[slideIndex];
   const root = $('#participant-root');
-  if (!slide) { root.innerHTML = '<div class="participant-card"><p>Warte auf Folie…</p></div>'; return; }
+  const finishParticipant = () => syncSopWorkshopShell('participant', slideIndex);
+  if (!slide) { root.innerHTML = '<div class="participant-card"><p>Warte auf Folie…</p></div>'; finishParticipant(); return; }
   if (!State.session.question_open) {
     root.innerHTML = `<div class="participant-card"><h1>${esc(slide.content?.title || 'Warte…')}</h1><p>Die Frage ist geschlossen. Bitte warte auf die nächste Folie.</p></div>`;
+    finishParticipant();
     return;
   }
   if (!isInteractive(slide.slide_type)) {
     if (slide.slide_type === 'section' && slide.content?.sopTrackClass) {
       root.innerHTML = `<div class="participant-card participant-sop-section">${renderSopSectionHtml(slide.content)}<p class="participant-sop-wait">Bitte auf den Vortragenden achten…</p></div>`;
+      finishParticipant();
       return;
     }
     if (slide.slide_type === 'content' && (slide.content?.mentiHero || slide.content?.sopKind || slide.content?.sopTrackResults)) {
       const html = slide.content.mentiHero ? renderMentiHeroHtml(slide.content) : renderSopContentHtml(slide.content);
       if (html) {
         root.innerHTML = `<div class="participant-card participant-sop-section">${html}<p class="participant-sop-wait">Bitte auf den Vortragenden achten…</p></div>`;
+        finishParticipant();
         return;
       }
     }
     root.innerHTML = `<div class="participant-card"><h1>${esc(slide.content?.title || 'Folie')}</h1><p>${esc(slide.content?.body || slide.content?.prompt || '')}</p><p style="color:var(--muted);margin-top:1rem">Bitte auf den Vortragenden achten…</p></div>`;
+    finishParticipant();
     return;
   }
   if (hasAnsweredSlide(slide)) {
     root.innerHTML = `<div class="participant-card"><h1>Antwort gesendet</h1><p>Du hast bereits geantwortet. Warte auf die nächste Frage…</p></div>`;
+    finishParticipant();
     return;
   }
 
@@ -1487,7 +1729,7 @@ function renderParticipantQuestion() {
     if (slide.settings?.sopTrackVote && splitOpts.length === 1 && splitOpts[0].id === 'none') {
       input = '<p style="color:var(--muted)">Noch keine Use Cases gesammelt. Bitte warte, bis das Brainstorming abgeschlossen ist.</p>';
     } else {
-      input = `<p style="font-size:.85rem;color:var(--muted)">Verteile 100 Punkte</p>
+      input = `<p style="font-size:.85rem;color:var(--muted);margin-bottom:.75rem">Verteile genau <strong>100 Punkte</strong> auf die Use Cases dieses Tracks. Mehr Punkte = höhere Priorität.</p>
         ${splitOpts.map((o) => `<div class="split-row"><span>${esc(o.text)}</span><input type="number" min="0" max="100" value="0" data-split="${esc(o.id)}" class="split-input" /></div>`).join('')}
         <div id="split-total" style="font-weight:700;margin:.5rem 0">Summe: 0 / 100</div>
         <button type="button" class="btn-primary participant-submit" id="submit-split">Senden</button>`;
@@ -1513,6 +1755,7 @@ function renderParticipantQuestion() {
 
   if (timeLimit) startQuestionTimer(timeLimit);
   bindParticipantHandlers(slide);
+  finishParticipant();
 }
 
 function startQuestionTimer(sec) {

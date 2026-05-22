@@ -23,7 +23,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-<link rel="stylesheet" href="styles.css?v=20260520-sop5" />
+<link rel="stylesheet" href="styles.css?v=20260520-sop6" />
 </head>
 <body>
 <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -102,9 +102,10 @@
   <div class="editor-layout">
     <aside class="editor-slides-panel">
       <div class="editor-slides-head">
-        <span>Folien</span>
+        <span id="editor-nav-label">Folien</span>
         <button type="button" class="btn-ghost" id="btn-add-slide" title="Folie hinzufügen"><i class="fa-solid fa-plus"></i></button>
       </div>
+      <nav id="editor-sop-nav" class="sop-workshop-sidebar hidden" aria-label="SOP Workshop Navigation"></nav>
       <div id="editor-slides" class="editor-slides-list"></div>
     </aside>
     <div class="editor-center">
@@ -128,7 +129,13 @@
         <span class="present-live-badge"><i class="fa-solid fa-circle"></i> Live</span>
       </div>
     </header>
-    <div id="present-stage" class="present-stage"></div>
+    <div class="present-body">
+      <aside id="present-sop-sidebar" class="sop-workshop-sidebar hidden" aria-label="SOP Navigation"></aside>
+      <div class="present-main">
+        <div id="present-stage" class="present-stage"></div>
+        <div id="present-sop-board" class="sop-workshop-board-wrap hidden"></div>
+      </div>
+    </div>
   </div>
   <div id="present-participants" class="present-participants-bar" aria-label="Teilnehmer"></div>
   <div id="present-activity" class="present-activity-feed" aria-live="polite"></div>
@@ -154,7 +161,10 @@
 
 <!-- PARTICIPANT -->
 <section id="screen-participant" class="screen">
-  <div id="participant-root" class="participant-root"></div>
+  <div class="participant-workshop-layout">
+    <aside id="participant-sop-sidebar" class="sop-workshop-sidebar hidden" aria-label="SOP Navigation"></aside>
+    <div id="participant-root" class="participant-root"></div>
+  </div>
 </section>
 
 <!-- RESULTS -->
@@ -191,8 +201,8 @@
 </div>
 
 <script src="https://pgoutzeris-stack.github.io/ROOTS_Intranet/roots-user-bridge.js?v=20260522-hover"></script>
-<script src="templates.js?v=20260520-sop5"></script>
-<script src="viz.js?v=20260520-sop5"></script>
-<script src="app.js?v=20260520-sop5"></script>
+<script src="templates.js?v=20260520-sop6"></script>
+<script src="viz.js?v=20260520-sop6"></script>
+<script src="app.js?v=20260520-sop6"></script>
 </body>
 </html>
