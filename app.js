@@ -1,7 +1,7 @@
 /* ROOTS Live Poll – Hauptanwendung */
 const SUPABASE_URL = 'https://csmguwcvzreefluhahyu.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNzbWd1d2N2enJlZWZsdWhhaHl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjM0ODcsImV4cCI6MjA5MjUzOTQ4N30.Fiafx7XBaQZXUX3bKQIBH7znBHx3B51yL-bftOHsL4Q';
-const APP_VERSION = '20260520-fix';
+const APP_VERSION = '20260520-sop2';
 const JOIN_BASE = `${location.origin}${location.pathname}`;
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
@@ -48,6 +48,7 @@ const State = {
   quizScores: {},
   joinProfile: { name: '', emoji: '🦊', color: '#206efb' },
   activityItems: [],
+  participantPoll: null,
 };
 
 localStorage.setItem('lp_device_id', State.deviceId);
@@ -775,9 +776,63 @@ async function loadSessionData() {
   State.participants = participants || [];
 }
 
+function sessionChannelName(sessionId) {
+  return `lp-session-${sessionId}`;
+}
+
+function applySessionPatch(patch) {
+  if (!State.session) return;
+  State.session = { ...State.session, ...patch };
+}
+
+function broadcastSessionPatch(patch) {
+  applySessionPatch(patch);
+  try {
+    State.sessionChannel?.send({ type: 'broadcast', event: 'session_sync', payload: patch });
+  } catch { /* channel may not be ready */ }
+}
+
+function handleParticipantSessionEnd() {
+  stopParticipantSync();
+  $('#participant-root').innerHTML = '<div class="participant-card"><h1>Session beendet</h1><p>Vielen Dank für deine Teilnahme.</p></div>';
+}
+
+function stopParticipantSync() {
+  if (State.participantPoll) {
+    clearInterval(State.participantPoll);
+    State.participantPoll = null;
+  }
+}
+
+function startParticipantSync() {
+  stopParticipantSync();
+  State.participantPoll = setInterval(async () => {
+    if (!State.session?.id || !State.participant) return;
+    const { data } = await sb.from('lp_sessions')
+      .select('current_slide_index, question_open, status')
+      .eq('id', State.session.id)
+      .maybeSingle();
+    if (!data) return;
+    const changed = data.current_slide_index !== State.session.current_slide_index
+      || data.question_open !== State.session.question_open
+      || data.status !== State.session.status;
+    if (!changed) return;
+    applySessionPatch(data);
+    if (data.status === 'ended') {
+      handleParticipantSessionEnd();
+      return;
+    }
+    renderParticipantQuestion();
+  }, 2500);
+}
+
 function subscribeSessionChannel() {
   if (State.sessionChannel) sb.removeChannel(State.sessionChannel);
-  State.sessionChannel = sb.channel(`lp-session-${State.session.id}`)
+  State.sessionChannel = sb.channel(sessionChannelName(State.session.id))
+    .on('broadcast', { event: 'session_sync' }, ({ payload }) => {
+      applySessionPatch(payload || {});
+      renderPresent();
+    })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'lp_sessions', filter: `id=eq.${State.session.id}` }, (payload) => {
       State.session = { ...State.session, ...payload.new };
       renderPresent();
@@ -833,11 +888,22 @@ function renderPresent() {
 
   let viz = '';
   if (!interactive) {
-    viz = c.imageUrl
-      ? `<img src="${esc(c.imageUrl)}" alt="" style="max-width:min(720px,90vw);border-radius:16px;margin-top:1rem">`
-      : '';
-  } else if (slide.settings?.showResultsLive !== false && State.session.question_open) {
-    viz = window.LPViz.renderViz(slide, agg, 'present');
+    if (slide.settings?.showPreviousSlideResults) {
+      const prevSlide = State.slides[(State.session.current_slide_index || 0) - 1];
+      if (prevSlide) {
+        const prevVisible = getVisibleResponses(prevSlide.id);
+        const prevAgg = window.LPViz.aggregateResponses(prevSlide, prevVisible);
+        viz = `<div class="present-results-review">${window.LPViz.renderViz(prevSlide, prevAgg, 'present')}</div>`;
+      }
+    } else if (c.imageUrl) {
+      viz = `<img src="${esc(c.imageUrl)}" alt="" style="max-width:min(720px,90vw);border-radius:16px;margin-top:1rem">`;
+    }
+  } else if (slide.settings?.showResultsLive !== false) {
+    if (agg.total > 0 || !State.session.question_open) {
+      viz = window.LPViz.renderViz(slide, agg, 'present');
+    } else {
+      viz = '<div class="present-wait-msg">Antworten werden gesammelt…</div>';
+    }
   } else {
     viz = `<div class="present-wait-msg">${State.session.question_open ? 'Antworten werden gesammelt…' : 'Frage geschlossen'}</div>`;
   }
@@ -937,7 +1003,10 @@ function bindPresentToolbar() {
   $('#present-prev').onclick = () => changeSlide(-1);
   $('#present-next').onclick = () => changeSlide(1);
   $('#present-toggle-question').onclick = async () => {
-    await sb.from('lp_sessions').update({ question_open: !State.session.question_open }).eq('id', State.session.id);
+    const question_open = !State.session.question_open;
+    broadcastSessionPatch({ question_open });
+    renderPresent();
+    await sb.from('lp_sessions').update({ question_open }).eq('id', State.session.id);
   };
   $('#present-show-code').onclick = () => {
     $('#present-code-bar').classList.toggle('hidden');
@@ -965,6 +1034,9 @@ function bindPresentToolbar() {
 
 async function changeSlide(delta) {
   const next = clamp((State.session.current_slide_index || 0) + delta, 0, State.slides.length - 1);
+  if (next === State.session.current_slide_index) return;
+  broadcastSessionPatch({ current_slide_index: next, question_open: true });
+  renderPresent();
   await sb.from('lp_sessions').update({ current_slide_index: next, question_open: true }).eq('id', State.session.id);
 }
 
@@ -1073,11 +1145,19 @@ async function joinSession(code, name, emoji, color) {
 
 function subscribeParticipantChannel() {
   if (State.sessionChannel) sb.removeChannel(State.sessionChannel);
-  State.sessionChannel = sb.channel(`lp-part-${State.session.id}`)
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lp_sessions', filter: `id=eq.${State.session.id}` }, (payload) => {
-      State.session = { ...State.session, ...payload.new };
+  State.sessionChannel = sb.channel(sessionChannelName(State.session.id))
+    .on('broadcast', { event: 'session_sync' }, ({ payload }) => {
+      applySessionPatch(payload || {});
       if (State.session.status === 'ended') {
-        $('#participant-root').innerHTML = '<div class="participant-card"><h1>Session beendet</h1><p>Vielen Dank für deine Teilnahme.</p></div>';
+        handleParticipantSessionEnd();
+        return;
+      }
+      renderParticipantQuestion();
+    })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lp_sessions', filter: `id=eq.${State.session.id}` }, (payload) => {
+      applySessionPatch(payload.new || {});
+      if (State.session.status === 'ended') {
+        handleParticipantSessionEnd();
         return;
       }
       renderParticipantQuestion();
@@ -1086,6 +1166,7 @@ function subscribeParticipantChannel() {
       if (State.slides[State.session.current_slide_index]?.slide_type === 'qa') renderParticipantQuestion();
     })
     .subscribe();
+  startParticipantSync();
 }
 
 async function loadQaResponses(slideId) {

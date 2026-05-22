@@ -10,164 +10,161 @@ function tplSlide(type, content, settings = {}) {
   };
 }
 
+const SOP_KI_TRACKS = [
+  {
+    name: 'Pre-Engagement',
+    subtitle: 'Anbahnung · Exploration · Pitch',
+    phases: [
+      { name: 'Anbahnung', desc: 'ROOTS Vorstellung, Zielstellung klären, initiale Analyse.\nSchritte: Erstkontakt, Zieldefinition, Ist-/Marktanalyse.' },
+      { name: 'Exploration', desc: 'Bedarfsanalyse & Problem Framing, Onboarding-Skizze, Website-Analyse, initiale Spezifikationen.' },
+      { name: 'Pitch', desc: 'Angebotsgestaltung & Präsentation, Pitch Benchmarking, Onboarding Admin & Vertrag.' },
+    ],
+  },
+  {
+    name: 'Execution',
+    subtitle: 'Ramp-up · Analyse · Synthese · Delivery · Implementierung',
+    phases: [
+      { name: 'Ramp-up', desc: 'Projektstruktur aufbauen, Briefing & Content-Plan.' },
+      { name: 'Analyse', desc: 'Performance-Analyse, Zielgruppen-Insights.' },
+      { name: 'Synthese', desc: 'Erkenntnisse bündeln, Strategie-Update.' },
+      { name: 'Delivery', desc: 'Content-Produktion, Ausspielung & Community Management.' },
+      { name: 'Implementierung', desc: 'Kampagnen-Setup, Tool-Integration & Automatisierung.' },
+    ],
+  },
+  {
+    name: 'Post-Engagement',
+    subtitle: 'Closeout · Follow-Up',
+    phases: [
+      { name: 'Closeout', desc: 'Finales Reporting & Übergabe, interne Retro & Learnings, Kundenfeedback einholen.' },
+      { name: 'Follow-Up', desc: 'Beziehungspflege & Check-ins, Upsell & Folgeauftrag, Case Study & Referenz.' },
+    ],
+  },
+];
+
+function sopKiPhaseSlides(trackName, phase) {
+  return [
+    tplSlide('section', { title: phase.name, subtitle: `${trackName} · SOP-Unterphase` }),
+    tplSlide('content', {
+      title: phase.name,
+      body: `${phase.desc}\n\nAls Nächstes sammeln wir KI Use Cases für diese Unterphase.`,
+    }),
+    tplSlide('brainstorm', {
+      title: `KI Use Cases · ${phase.name}`,
+      prompt: `Welche konkreten KI Use Cases siehst du in „${phase.name}“ (${trackName})?\nFreitext: Was? Wer? Welches Tool oder welcher Prozess?`,
+    }, { showResultsLive: true, moderation: true }),
+    tplSlide('content', {
+      title: `Ergebnisse · ${phase.name}`,
+      body: 'Die gesammelten KI Use Cases werden live angezeigt.\n\nModerator:in clustert die Ideen – dann weiter zur Abstimmung.',
+    }, { showPreviousSlideResults: true }),
+    tplSlide('ranking', {
+      title: `Priorisierung · ${phase.name}`,
+      prompt: `Priorisiere KI-Hebel für „${phase.name}“ (1 = höchste Priorität)`,
+      options: [
+        { id: 'a', text: 'Zeitersparnis / Effizienz' },
+        { id: 'b', text: 'Qualität & Output' },
+        { id: 'c', text: 'Quick Win (< 4 Wochen)' },
+        { id: 'd', text: 'Strategischer Impact' },
+        { id: 'e', text: 'Skalierbarkeit im Team' },
+      ],
+    }, { showResultsLive: true }),
+  ];
+}
+
+function sopKiTrackSlides(track) {
+  const phaseSlides = track.phases.flatMap((phase) => sopKiPhaseSlides(track.name, phase));
+  const trackRankOptions = track.phases.map((phase, i) => ({
+    id: String.fromCharCode(97 + i),
+    text: `${phase.name} – Top Use Case (vom Team benennen)`,
+  }));
+  return [
+    tplSlide('section', { title: track.name, subtitle: track.subtitle }),
+    tplSlide('content', {
+      title: `SOP-Track · ${track.name}`,
+      body: `Unterphasen:\n${track.phases.map((p) => `• ${p.name}`).join('\n')}\n\nPro Unterphase: Brainstorming → Ergebnisse → Priorisierung.`,
+    }),
+    ...phaseSlides,
+    tplSlide('section', { title: `Track-Übersicht · ${track.name}`, subtitle: 'Zusammenfassung & Top Use Cases' }),
+    tplSlide('content', {
+      title: `${track.name} · Zusammenfassung`,
+      body: `Abgeschlossene Unterphasen: ${track.phases.map((p) => p.name).join(' · ')}\n\nTop Use Cases festhalten und in SOP-Karten überführen.`,
+    }),
+    tplSlide('ranking', {
+      title: `Top Use Cases · ${track.name}`,
+      prompt: `Welche KI Use Cases aus ${track.name} setzen wir zuerst um? (1 = höchste Priorität)`,
+      options: trackRankOptions,
+    }, { showResultsLive: true }),
+    tplSlide('open', {
+      title: `Track-Fazit · ${track.name}`,
+      prompt: `Was ist der wichtigste KI Use Case aus ${track.name} – und wer ist Owner?`,
+    }),
+  ];
+}
+
+function buildSopKiWorkshopSlides() {
+  return [
+    tplSlide('content', {
+      title: 'ROOTS · SOP & KI Use-Case Workshop',
+      body: 'Wir gehen jeden SOP-Track und jede Unterphase durch:\n\n1. KI Use Cases sammeln (Brainstorming)\n2. Ergebnisse anzeigen & besprechen\n3. Priorisieren\n\nScannt den QR-Code, Name + Avatar wählen.',
+    }),
+    tplSlide('section', { title: 'Ankommen', subtitle: 'Kontext · AI for Impact · Erwartungen' }),
+    tplSlide('reaction', { title: 'Stimmung', prompt: 'Wie neugierig bist du auf KI in unserer SOP-Arbeit?' }, { anonymous: true }),
+    tplSlide('content', {
+      title: 'ROOTS AI for Impact',
+      body: 'Vier Dimensionen:\n• Strategy – Wachstum & Wettbewerb\n• Process – Marketing Operations & Automatisierung\n• People – Skills, Coaching, Change\n• Ethics & Compliance – Datenschutz, Transparenz',
+    }),
+    tplSlide('wordcloud', { title: 'Erwartung', prompt: 'Ein Wort: Was soll heute rauskommen?' }, { anonymous: true }),
+    ...SOP_KI_TRACKS.flatMap(sopKiTrackSlides),
+    tplSlide('section', { title: 'Gesamtübersicht', subtitle: 'Alle Tracks · Finale Priorisierung' }),
+    tplSlide('content', {
+      title: 'Workshop · Gesamtübersicht',
+      body: `Tracks durchlaufen:\n${SOP_KI_TRACKS.map((t) => `• ${t.name}: ${t.phases.map((p) => p.name).join(', ')}`).join('\n')}\n\nJetzt: finale Abstimmung über alle Tracks.`,
+    }),
+    tplSlide('ranking', {
+      title: 'Finale Priorisierungsliste',
+      prompt: 'Top KI Use Cases über alle SOP-Tracks (1 = zuerst umsetzen)',
+      options: [
+        { id: 'a', text: 'Pre-Engagement – Top Use Case' },
+        { id: 'b', text: 'Execution – Top Use Case' },
+        { id: 'c', text: 'Post-Engagement – Top Use Case' },
+        { id: 'd', text: 'Cross-Track Quick Win' },
+        { id: 'e', text: 'Enablement / Team-Skill' },
+      ],
+    }, { showResultsLive: true }),
+    tplSlide('percent_split', {
+      title: 'Impact-Budget 100',
+      prompt: 'Verteilt 100 Punkte auf die finale Top-5 Liste',
+      options: [
+        { id: 'a', text: 'Use Case #1' },
+        { id: 'b', text: 'Use Case #2' },
+        { id: 'c', text: 'Use Case #3' },
+        { id: 'd', text: 'Use Case #4' },
+        { id: 'e', text: 'Use Case #5' },
+      ],
+    }, { showResultsLive: true }),
+    tplSlide('yesno', { title: 'Datenschutz', prompt: 'Sind die Top Use Cases mit unseren KI-Richtlinien vereinbar?' }),
+    tplSlide('open', { title: 'Dein Next Step', prompt: 'Was machst du in den nächsten 48 Stunden konkret?' }),
+    tplSlide('scale', {
+      title: 'Workshop-Nutzen',
+      prompt: 'Wie hilfreich war der Workshop?',
+      min: 1, max: 5, minLabel: 'wenig', maxLabel: 'sehr',
+    }, { anonymous: true }),
+    tplSlide('content', {
+      title: 'Danke!',
+      body: 'Ergebnisse werden im SOP-Dashboard festgehalten.\n\nNächster Schritt: Top Use Cases → SOP-Karten → Pilot → Retro.',
+    }),
+  ];
+}
+
 window.LP_TEMPLATES = [
   {
     key: 'roots-sop-ki-workshop',
     category: 'ROOTS · SOP & KI',
     name: 'SOP-Brainstorming & KI Use Cases',
-    desc: 'Workshop entlang ROOTS SOP-Tracks und AI for Impact: Problem Framing, Use-Case-Sammlung, Priorisierung und Commitment.',
-    duration: '90–120 Min.',
+    desc: 'Jeder SOP-Track und jede Unterphase: KI Use Cases sammeln, Ergebnisse zeigen, priorisieren – mit Track- und Gesamtübersicht.',
+    duration: '120–180 Min.',
     group: '6–25',
-    tips: 'Ideal nach SOP-Dashboard-Einführung. Phase 2–3 am Whiteboard clustern, Live Poll für Abstimmung. Ergebnisse in SOP-Karten überführen.',
-    slides: [
-      tplSlide('content', {
-        title: 'ROOTS · KI Use-Case Workshop',
-        body: 'Heute: SOP-Prozesse verstehen → KI-Potenziale sammeln → priorisieren → nächste Schritte festlegen.\n\nScannt den QR-Code, gebt euren Namen ein und wählt einen Avatar.',
-        accentColor: '#206efb',
-      }),
-      tplSlide('section', { title: 'Teil 1 · Ankommen', subtitle: 'Problem Framing & SOP-Kontext' }),
-      tplSlide('reaction', { title: 'Stimmung', prompt: 'Wie neugierig bist du auf KI in unserer Arbeit?' }, { anonymous: true }),
-      tplSlide('scale', {
-        title: 'KI-Reifegrad',
-        prompt: 'Wie reif ist unser Team im Umgang mit KI?',
-        min: 1, max: 5, minLabel: 'Anfang', maxLabel: 'Fortgeschritten',
-      }, { anonymous: true }),
-      tplSlide('wordcloud', { title: 'Erwartung', prompt: 'Ein Wort: Was soll heute rauskommen?' }, { anonymous: true }),
-      tplSlide('content', {
-        title: 'ROOTS AI for Impact',
-        body: 'Vier Dimensionen:\n• Strategy – Wachstum & Wettbewerb\n• Process – Marketing Operations & Automatisierung\n• People – Skills, Coaching, Change\n• Ethics & Compliance – Datenschutz, Transparenz',
-      }),
-      tplSlide('open', { title: 'Problem Framing', prompt: 'Welches konkrete Problem wollen wir mit KI lösen?' }),
-      tplSlide('section', { title: 'Teil 2 · SOP entlang denken', subtitle: 'Pre · Execution · Post Engagement' }),
-      tplSlide('content', {
-        title: 'SOP-Tracks',
-        body: 'Pre-Engagement: Anbahnung · Exploration · Pitch\nExecution: Ramp-up · Analyse · Synthese · Delivery · Implementierung\nPost-Engagement: Closeout · Follow-Up',
-      }),
-      tplSlide('brainstorm', {
-        title: 'SOP-Reibungspunkte',
-        prompt: 'Wo kostet uns ein SOP-Schritt zu viel Zeit oder Qualität? (konkret benennen)',
-      }, { moderation: true }),
-      tplSlide('mc_multi', {
-        title: 'Betroffene SOP-Phase',
-        prompt: 'In welchen Phasen seht ihr KI-Potenzial? (max. 3)',
-        options: [
-          { id: 'pre', text: 'Pre-Engagement (Anbahnung, Exploration, Pitch)' },
-          { id: 'exec', text: 'Execution (Analyse, Synthese, Delivery)' },
-          { id: 'post', text: 'Post-Engagement (Reporting, Retro, Follow-Up)' },
-          { id: 'ops', text: 'Interne Operations (Zeit, Ablage, Admin)' },
-        ],
-        maxSelections: 3,
-      }),
-      tplSlide('mc_multi', {
-        title: '6P-Bereiche',
-        prompt: 'Welche ROOTS 6Ps sind betroffen? (max. 3)',
-        options: [
-          { id: 'plan', text: 'Planning – Wachstumsstrategie' },
-          { id: 'purp', text: 'Purpose – Markenpositionierung' },
-          { id: 'pres', text: 'Presence – CX & Content' },
-          { id: 'peop', text: 'People – Capability & Coaching' },
-          { id: 'prod', text: 'Productivity – Ops & Automation' },
-          { id: 'perf', text: 'Performance – Analytics & Maturity' },
-        ],
-        maxSelections: 3,
-      }),
-      tplSlide('section', { title: 'Teil 3 · KI Use Cases sammeln', subtitle: 'Brainstorming · so konkret wie möglich' }),
-      tplSlide('brainstorm', {
-        title: 'KI Use Case Idee',
-        prompt: 'Beschreibe einen KI Use Case in einem Satz (Was? Wer? Welches Tool/Prozess?)',
-      }),
-      tplSlide('brainstorm', {
-        title: 'Quick Win',
-        prompt: 'Welcher KI Use Case wäre in 2–4 Wochen umsetzbar?',
-      }),
-      tplSlide('wordcloud', { title: 'KI-Hebel', prompt: 'Ein Wort: Wo entfaltet KI bei uns den größten Hebel?' }),
-      tplSlide('open', {
-        title: 'Stärkster Use Case',
-        prompt: 'Beschreibe den Use Case, den du am liebsten zuerst angehen würdest',
-      }),
-      tplSlide('section', { title: 'Teil 4 · Priorisierung', subtitle: 'Impact · Aufwand · Alignment' }),
-      tplSlide('mc_multi', {
-        title: 'AI for Impact Dimension',
-        prompt: 'Ordne euren Top-Use-Case ein (max. 2)',
-        options: [
-          { id: 'strat', text: 'Strategy' },
-          { id: 'proc', text: 'Process' },
-          { id: 'people', text: 'People' },
-          { id: 'ethics', text: 'Ethics & Compliance' },
-        ],
-        maxSelections: 2,
-      }),
-      tplSlide('ranking', {
-        title: 'Use-Case-Kategorien',
-        prompt: 'Priorisiert nach Business Impact (1 = höchster Impact)',
-        options: [
-          { id: 'a', text: 'Content & Kreativ-Produktion' },
-          { id: 'b', text: 'Analyse & Insights' },
-          { id: 'c', text: 'Kundenkommunikation & Pitches' },
-          { id: 'd', text: 'Projekt- & SOP-Administration' },
-          { id: 'e', text: 'Schulung & Enablement' },
-          { id: 'f', text: 'Qualitätssicherung & Compliance' },
-        ],
-      }),
-      tplSlide('percent_split', {
-        title: 'Impact-Budget 100',
-        prompt: 'Verteilt 100 Punkte auf die wichtigsten KI-Hebel',
-        options: [
-          { id: 'a', text: 'Zeitersparnis' },
-          { id: 'b', text: 'Qualität / Output' },
-          { id: 'c', text: 'Kundennutzen' },
-          { id: 'd', text: 'Skalierbarkeit' },
-          { id: 'e', text: 'Innovation / Differenzierung' },
-        ],
-      }),
-      tplSlide('mc_single', {
-        title: 'Quick Win vs. Strategie',
-        prompt: 'Was priorisieren wir zuerst?',
-        options: [
-          { id: 'a', text: 'Quick Win – schnell sichtbarer Nutzen' },
-          { id: 'b', text: 'Strategisches Projekt – langfristiger Impact' },
-          { id: 'c', text: 'Beides parallel in kleinen Piloten' },
-          { id: 'd', text: 'Erst Enablement, dann Tooling' },
-        ],
-      }),
-      tplSlide('yesno', { title: 'Datenschutz', prompt: 'Ist der Use Case mit unseren KI-Richtlinien vereinbar? (keine Kundendaten in Public AI)' }),
-      tplSlide('section', { title: 'Teil 5 · Deep Dive & Bedenken', subtitle: 'Hypothesen · Risiken · Q&A' }),
-      tplSlide('brainstorm', {
-        title: 'Hypothese',
-        prompt: 'Wenn wir [Use Case] umsetzen, dann erwarten wir …',
-      }),
-      tplSlide('qa', {
-        title: 'Fragen & Bedenken',
-        prompt: 'Was hält euch noch zurück? (Ethik, Qualität, Akzeptanz)',
-      }, { anonymous: true, moderation: true }),
-      tplSlide('number_guess', {
-        title: 'Impact-Schätzung',
-        prompt: 'Wie viele Stunden pro Woche könnte der Top-Use-Case einsparen? (Schätzung)',
-      }),
-      tplSlide('section', { title: 'Teil 6 · Commitment', subtitle: 'Next Steps · SOP-Überführung' }),
-      tplSlide('ranking', {
-        title: 'Nächste SOP-Schritte',
-        prompt: 'Was dokumentieren wir als Nächstes im SOP?',
-        options: [
-          { id: 'a', text: 'Use Case in SOP-Karte aufnehmen' },
-          { id: 'b', text: 'Pilot definieren & Owner benennen' },
-          { id: 'c', text: 'Tool-Evaluation / AI House abstimmen' },
-          { id: 'd', text: 'Team-Enablement planen' },
-          { id: 'e', text: 'Ethics-Check mit Compliance' },
-        ],
-      }),
-      tplSlide('open', { title: 'Dein Next Step', prompt: 'Was machst du in den nächsten 48 Stunden konkret?' }),
-      tplSlide('yesno', { title: 'Commitment', prompt: 'Kannst du dich hinter dem priorisierten Use Case committen?' }),
-      tplSlide('scale', {
-        title: 'Workshop-Nutzen',
-        prompt: 'Wie hilfreich war der Workshop?',
-        min: 1, max: 5, minLabel: 'wenig', maxLabel: 'sehr',
-      }, { anonymous: true }),
-      tplSlide('content', {
-        title: 'Danke!',
-        body: 'Ergebnisse werden im SOP-Dashboard und im Team festgehalten.\n\nNächster Schritt: Top-3 Use Cases → Pilot → Retro.',
-      }),
-    ],
+    tips: 'Pro Unterphase: Brainstorming → Ergebnisse-Folie (zeigt Antworten der Vorfolie) → Ranking. Track- und Gesamtübersicht am Ende. Ergebnisse in SOP-Karten überführen.',
+    slides: buildSopKiWorkshopSlides(),
   },
   {
     key: 'workshop-full',

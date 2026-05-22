@@ -203,6 +203,7 @@ html.lp-join-route #screen-participant{display:flex!important}
 .present-slide-title{font-size:clamp(2rem,5vw,3.5rem);margin-bottom:1rem;line-height:1.15;font-weight:800}
 .present-slide-body{color:var(--muted);max-width:720px;line-height:1.6;margin:0 auto 1rem}
 .present-wait-msg{color:var(--muted);margin-top:1rem;font-size:1rem}
+.present-results-review{width:100%;max-width:960px;margin-top:1rem;padding:1rem;background:var(--bg);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-dash);text-align:left}
 .present-stage h1{font-size:clamp(2rem,5vw,3.5rem);margin-bottom:1rem}
 .present-stage .viz-wrap{width:min(960px,92vw);margin-top:1.5rem}
 .present-toolbar{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:.5rem;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:.45rem .75rem;z-index:200;box-shadow:var(--shadow-lg)}
