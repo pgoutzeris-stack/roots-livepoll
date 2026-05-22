@@ -150,7 +150,17 @@ function renderSopQuestionBadge(c) {
 
 function getTrackBrainstormSlides(trackKey) {
   if (!trackKey || !State.slides?.length) return [];
-  return State.slides.filter((s) => s.slide_type === 'brainstorm' && s.content?.sopTrackKey === trackKey);
+  const byKey = State.slides.filter((s) => s.slide_type === 'brainstorm' && s.content?.sopTrackKey === trackKey);
+  if (byKey.length) return byKey;
+  return State.slides.filter((s) => s.slide_type === 'brainstorm' && s.content?.sopTrackClass === trackKey);
+}
+
+function stableUseCaseOptionId(text, index) {
+  const base = String(text).toLowerCase().trim()
+    .replace(/[^a-z0-9äöüß]+/gi, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 48);
+  return base ? `uc-${base}` : `uc-${index}`;
 }
 
 function aggregateTrackUseCases(trackKey) {
@@ -158,8 +168,10 @@ function aggregateTrackUseCases(trackKey) {
   const byCard = [];
   const allItems = [];
   slides.forEach((slide) => {
-    const visible = (State.responses || []).filter((r) => r.slide_id === slide.id && !r.is_hidden);
-    const items = visible.map((r) => String(r.response?.text || '').trim()).filter(Boolean);
+    const items = (State.responses || [])
+      .filter((r) => r.slide_id === slide.id)
+      .map((r) => String(r.response?.text || '').trim())
+      .filter(Boolean);
     byCard.push({
       phase: slide.content?.sopPhaseName || '',
       card: slide.content?.sopCardName || slide.content?.title || 'Karte',
@@ -182,14 +194,20 @@ function aggregateTrackUseCases(trackKey) {
 }
 
 function getTrackVoteOptions(slide) {
-  const key = slide.content?.sopTrackKey;
+  const key = slide.content?.sopTrackKey || slide.content?.sopTrackClass;
   if (!slide.settings?.sopTrackVote || !key) return slide.content?.options || [];
   const { unique } = aggregateTrackUseCases(key);
-  if (!unique.length) return slide.content?.options || [{ id: 'a', text: 'Noch keine Use Cases gesammelt' }];
-  return unique.slice(0, 12).map((item, i) => ({ id: `uc${i}`, text: item.text }));
+  if (!unique.length) return [{ id: 'none', text: 'Noch keine Use Cases gesammelt' }];
+  return unique.slice(0, 12).map((item, i) => ({ id: stableUseCaseOptionId(item.text, i), text: item.text }));
+}
+
+function getTrackVoteDisplaySlide(slide) {
+  if (!slide.settings?.sopTrackVote) return slide;
+  return { ...slide, content: { ...slide.content, options: getTrackVoteOptions(slide) } };
 }
 
 function renderSopBoardPreview(c, editable = false) {
+  if (c.sopKind === 'track' || c.sopKind === 'phase') return '';
   const board = c.sopBoard || [];
   if (!board.length) return '';
   const theme = sopTrackTheme(c.sopTrackClass);
@@ -1080,9 +1098,7 @@ function renderPresent() {
   const interactive = isInteractive(slide.slide_type);
   const visible = getVisibleResponses(slide.id);
   const pending = getPendingResponses(slide.id);
-  const displaySlide = (slide.settings?.sopTrackVote && slide.content?.sopTrackKey)
-    ? { ...slide, content: { ...slide.content, options: getTrackVoteOptions(slide) } }
-    : slide;
+  const displaySlide = getTrackVoteDisplaySlide(slide);
   const agg = window.LPViz.aggregateResponses(displaySlide, visible);
 
   let viz = '';
@@ -1467,10 +1483,15 @@ function renderParticipantQuestion() {
       <div id="rank-order" class="rank-order"></div>
       <button type="button" class="btn-primary participant-submit" id="submit-rank">Senden</button>`;
   } else if (type === 'percent_split') {
-    input = `<p style="font-size:.85rem;color:var(--muted)">Verteile 100 Punkte</p>
-      ${(c.options || []).map((o) => `<div class="split-row"><span>${esc(o.text)}</span><input type="number" min="0" max="100" value="0" data-split="${esc(o.id)}" class="split-input" /></div>`).join('')}
-      <div id="split-total" style="font-weight:700;margin:.5rem 0">Summe: 0 / 100</div>
-      <button type="button" class="btn-primary participant-submit" id="submit-split">Senden</button>`;
+    const splitOpts = slide.settings?.sopTrackVote ? getTrackVoteOptions(slide) : (c.options || []);
+    if (slide.settings?.sopTrackVote && splitOpts.length === 1 && splitOpts[0].id === 'none') {
+      input = '<p style="color:var(--muted)">Noch keine Use Cases gesammelt. Bitte warte, bis das Brainstorming abgeschlossen ist.</p>';
+    } else {
+      input = `<p style="font-size:.85rem;color:var(--muted)">Verteile 100 Punkte</p>
+        ${splitOpts.map((o) => `<div class="split-row"><span>${esc(o.text)}</span><input type="number" min="0" max="100" value="0" data-split="${esc(o.id)}" class="split-input" /></div>`).join('')}
+        <div id="split-total" style="font-weight:700;margin:.5rem 0">Summe: 0 / 100</div>
+        <button type="button" class="btn-primary participant-submit" id="submit-split">Senden</button>`;
+    }
   } else if (type === 'pin_image') {
     input = c.imageUrl
       ? `<div class="pin-wrap" id="pin-wrap"><img src="${esc(c.imageUrl)}" alt="" id="pin-img" /><div id="pin-marker" class="pin-marker hidden">📍</div></div><button type="button" class="btn-primary participant-submit" id="submit-pin" disabled>Pin setzen & senden</button>`

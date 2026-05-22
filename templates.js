@@ -148,7 +148,6 @@ function sopTrackIntro(track, trackIndex) {
     body: track.intro,
     sopKind: 'track',
     sopTrackIndex: trackIndex + 1,
-    sopBoard: sopBoardData(track),
     ...sopMeta(track),
   });
 }
@@ -159,7 +158,6 @@ function sopPhaseIntro(track, phase) {
     subtitle: track.title,
     body: phase.intro,
     sopKind: 'phase',
-    sopBoard: sopBoardData(track, phase),
     ...sopMeta(track, phase),
   });
 }
@@ -181,31 +179,15 @@ function sopCardBrainstorm(track, phase, card) {
     prompt: `Welche KI Use Cases siehst du für „${card.name}“?\nFreitext · Was? Wer? Welches Tool?`,
     mentiQuestion: true,
     ...sopMeta(track, phase, card),
-  }, { showResultsLive: true, moderation: true });
-}
-
-function sopTrackResults(track) {
-  return tplSlide('content', {
-    title: `Alle Use Cases · ${track.title.replace(/^Track \d+: /, '')}`,
-    body: 'Gesammelte KI Use Cases aus allen SOP-Karten dieses Tracks – gruppiert nach Karte.',
-    subtitle: track.title,
-    sopKind: 'track-results',
-    sopTrackResults: true,
-    sopBoard: sopBoardData(track),
-    ...sopMeta(track),
   }, { showResultsLive: true });
 }
 
 function sopTrackVote(track) {
-  return tplSlide('mc_single', {
-    title: `Top Use Case · ${track.title.replace(/^Track \d+: /, '')}`,
-    prompt: 'Stimme für den wichtigsten KI Use Case in diesem Track ab.',
+  return tplSlide('percent_split', {
+    title: `Priorisierung · ${track.title.replace(/^Track \d+: /, '')}`,
+    prompt: 'Verteile 100 Punkte auf die KI Use Cases, die du in diesem Track am wichtigsten findest.',
     mentiQuestion: true,
-    options: [
-      { id: 'a', text: 'Use Case 1 (wird aus Brainstorming geladen)' },
-      { id: 'b', text: 'Use Case 2' },
-      { id: 'c', text: 'Use Case 3' },
-    ],
+    options: [],
     ...sopMeta(track),
   }, { showResultsLive: true, sopTrackVote: true });
 }
@@ -220,7 +202,6 @@ function buildSopKiWorkshopSlides() {
         sopCardBrainstorm(track, phase, card),
       ]),
     ]),
-    sopTrackResults(track),
     sopTrackVote(track),
   ]);
   return [
