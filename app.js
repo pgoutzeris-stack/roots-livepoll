@@ -52,6 +52,7 @@ const State = {
   sopFocusMode: false,
   showPresentPanels: false,
   participantVoteExpert: false,
+  bubbleSeenIds: {},
 };
 
 localStorage.setItem('lp_device_id', State.deviceId);
@@ -172,16 +173,16 @@ function aggregateTrackUseCases(trackKey) {
   const allItems = [];
   slides.forEach((slide) => {
     const items = (State.responses || [])
-      .filter((r) => r.slide_id === slide.id)
-      .map((r) => String(r.response?.text || '').trim())
-      .filter(Boolean);
+      .filter((r) => r.slide_id === slide.id && !r.is_hidden)
+      .map((r) => ({ id: r.id, text: String(r.response?.text || '').trim() }))
+      .filter((item) => item.text);
     byCard.push({
       phase: slide.content?.sopPhaseName || '',
       card: slide.content?.sopCardName || slide.content?.title || 'Karte',
       items,
     });
-    items.forEach((text) => allItems.push({
-      text,
+    items.forEach((item) => allItems.push({
+      ...item,
       phase: slide.content?.sopPhaseName || '',
       card: slide.content?.sopCardName || '',
     }));
@@ -199,9 +200,9 @@ function aggregateTrackUseCases(trackKey) {
 function getTrackVoteOptions(slide) {
   const key = slide.content?.sopTrackKey || slide.content?.sopTrackClass;
   if (!slide.settings?.sopTrackVote || !key) return slide.content?.options || [];
-  const { unique } = aggregateTrackUseCases(key);
-  if (!unique.length) return [{ id: 'none', text: 'Noch keine Use Cases gesammelt' }];
-  return unique.slice(0, 12).map((item, i) => ({ id: stableUseCaseOptionId(item.text, i), text: item.text }));
+  const { allItems } = aggregateTrackUseCases(key);
+  if (!allItems.length) return [{ id: 'none', text: 'Noch keine Use Cases gesammelt' }];
+  return allItems.map((item) => ({ id: `resp-${item.id}`, text: item.text }));
 }
 
 function getTrackVoteDisplaySlide(slide) {
@@ -375,8 +376,49 @@ function getTrackVoteOptionsGrouped(slide) {
     .map((g) => ({
       phase: g.phase,
       card: g.card,
-      options: g.items.map((text, i) => ({ id: stableUseCaseOptionId(text, i), text })),
+      options: g.items.map((item) => ({ id: `resp-${item.id}`, text: item.text })),
     }));
+}
+
+function markNewBubbleIds(scopeKey, items) {
+  if (!State.bubbleSeenIds) State.bubbleSeenIds = {};
+  const prev = State.bubbleSeenIds[scopeKey] || new Set();
+  const newIds = new Set();
+  items.forEach((item) => {
+    const id = typeof item === 'object' ? item.id : item;
+    if (!id) return;
+    if (!prev.has(id)) newIds.add(id);
+    prev.add(id);
+  });
+  State.bubbleSeenIds[scopeKey] = prev;
+  return newIds;
+}
+
+function renderTrackVotePresentHtml(slide, visible) {
+  const key = slide.content?.sopTrackKey || slide.content?.sopTrackClass;
+  const { allItems } = aggregateTrackUseCases(key);
+  if (!allItems.length) {
+    return '<div class="present-wait-msg">Noch keine Use Cases gesammelt. Bitte zuerst das Brainstorming in den Karten abschließen.</div>';
+  }
+  const newIds = markNewBubbleIds(`track-vote-${key}`, allItems);
+  const bubbleHtml = window.LPViz.renderBrainstormBubbles(allItems, { mode: 'present', maxItems: 120, newIds });
+  const hasVotes = visible.length > 0 || !State.session.question_open;
+  return `<div class="track-vote-present">
+    <div class="track-vote-present-head">
+      <span class="track-vote-count">${allItems.length} Use Cases</span>
+      <span class="track-vote-hint">Gesammelt aus dem Brainstorming · ${State.session.question_open ? 'Teilnehmer priorisieren jetzt' : 'Priorisierung abgeschlossen'}</span>
+    </div>
+    ${bubbleHtml}
+    ${hasVotes ? `<div class="track-vote-live-ranking"><div class="track-vote-live-label">Live-Ranking</div>${renderTrackVoteResultsHtml(slide, visible)}</div>` : ''}
+  </div>`;
+}
+
+function renderBrainstormPresentViz(slide, visible) {
+  const items = visible
+    .map((r) => ({ id: r.id, text: String(r.response?.text || '').trim() }))
+    .filter((item) => item.text);
+  const newIds = markNewBubbleIds(slide.id, items);
+  return window.LPViz.renderBrainstormBubbles(items, { mode: 'present', maxItems: 100, newIds });
 }
 
 function renderTrackVoteGroupedListHtml(slide, { selectable = false, selectedIds = [] } = {}) {
@@ -684,7 +726,7 @@ function renderSopTrackResultsHtml(trackKey) {
   return `<div class="sop-track-results">${byCard.filter((g) => g.items.length).map((group) => `
     <div class="sop-track-result-group">
       <div class="sop-track-result-head"><span>${esc(group.phase)}</span><strong>${esc(group.card)}</strong></div>
-      <div class="sop-track-result-items">${group.items.map((t) => `<div class="sop-track-result-item">${esc(t)}</div>`).join('')}</div>
+      <div class="sop-track-result-items">${group.items.map((item) => `<div class="sop-track-result-item">${esc(item.text || item)}</div>`).join('')}</div>
     </div>`).join('')}<div class="sop-track-result-total">${allItems.length} Use Cases gesammelt</div></div>`;
 }
 
@@ -1535,9 +1577,9 @@ function renderPresent() {
     }
   } else if (slide.settings?.showResultsLive !== false) {
     if (slide.settings?.sopTrackVote) {
-      viz = visible.length || !State.session.question_open
-        ? renderTrackVoteResultsHtml(displaySlide, visible)
-        : renderTrackVoteGroupedListHtml(displaySlide);
+      viz = renderTrackVotePresentHtml(displaySlide, visible);
+    } else if (slide.slide_type === 'open' || slide.slide_type === 'brainstorm') {
+      viz = renderBrainstormPresentViz(slide, visible);
     } else if (agg.total > 0 || !State.session.question_open) {
       viz = window.LPViz.renderViz(displaySlide, agg, 'present');
     } else {

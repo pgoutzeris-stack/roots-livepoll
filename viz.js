@@ -1,6 +1,41 @@
 (function () {
+  const BUBBLE_COLORS = ['#dbeafe', '#dcfce7', '#fef3c7', '#ede9fe', '#fce7f3', '#cffafe', '#ffedd5', '#e0e7ff'];
+
   function esc(s) {
     return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function hashStr(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i += 1) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    return Math.abs(h);
+  }
+
+  function normalizeBubbleItems(items) {
+    return (items || []).map((item, i) => {
+      if (typeof item === 'string') return { id: `t-${i}-${item.slice(0, 24)}`, text: item };
+      return { id: item.id || `t-${i}-${String(item.text || '').slice(0, 24)}`, text: String(item.text || '').trim() };
+    }).filter((item) => item.text);
+  }
+
+  function renderBrainstormBubbles(items, options = {}) {
+    const { mode = 'present', maxItems = 80, newIds = null } = options;
+    const normalized = normalizeBubbleItems(items).slice(-maxItems);
+    if (!normalized.length) {
+      return mode === 'present'
+        ? '<div class="viz-bubble-cloud viz-bubble-cloud--empty"><div class="viz-bubble-empty">Antworten werden gesammelt…</div></div>'
+        : '<div class="viz-open-list"></div>';
+    }
+    const bubbles = normalized.map((item, i) => {
+      const h = hashStr(String(item.id) + item.text + i);
+      const color = BUBBLE_COLORS[h % BUBBLE_COLORS.length];
+      const scale = 0.88 + (h % 28) / 100;
+      const delay = (h % 16) * 0.055;
+      const rotate = (h % 11) - 5;
+      const isNew = newIds?.has?.(item.id) ? ' viz-bubble--new' : '';
+      return `<div class="viz-bubble${isNew}" data-bubble-id="${esc(item.id)}" style="--bubble-bg:${color};--bubble-scale:${scale};--bubble-delay:${delay}s;--bubble-rotate:${rotate}deg"><span class="viz-bubble-text">${esc(item.text)}</span></div>`;
+    }).join('');
+    return `<div class="viz-bubble-cloud viz-bubble-cloud--${mode}">${bubbles}</div>`;
   }
 
   function aggregateResponses(slide, responses) {
@@ -39,7 +74,12 @@
     }
 
     if (type === 'open' || type === 'brainstorm') {
-      return { ...base, items: visible.map((r) => r.response?.text || '').filter(Boolean) };
+      return {
+        ...base,
+        items: visible
+          .map((r) => ({ id: r.id, text: String(r.response?.text || '').trim() }))
+          .filter((item) => item.text),
+      };
     }
 
     if (type === 'scale' || type === 'number_guess') {
@@ -133,7 +173,11 @@
     }
 
     if (agg.type === 'open' || agg.type === 'brainstorm') {
-      return `<div class="viz-open-list">${(agg.items || []).slice(-20).map((t) => `<div class="viz-open-item" style="background:${itemBg};border-color:${itemBorder}">${esc(t)}</div>`).join('')}</div>`;
+      if (mode === 'present') {
+        return renderBrainstormBubbles(agg.items || [], { mode: 'present', maxItems: 100 });
+      }
+      const list = normalizeBubbleItems(agg.items || []);
+      return `<div class="viz-open-list">${list.slice(-20).map((item) => `<div class="viz-open-item" style="background:${itemBg};border-color:${itemBorder}">${esc(item.text)}</div>`).join('')}</div>`;
     }
 
     if (agg.type === 'scale' || agg.type === 'number_guess') {
@@ -170,5 +214,5 @@
     return `<div style="color:var(--muted)">${agg.total || 0} Antworten</div>`;
   }
 
-  window.LPViz = { aggregateResponses, renderViz, esc };
+  window.LPViz = { aggregateResponses, renderViz, renderBrainstormBubbles, esc };
 })();
