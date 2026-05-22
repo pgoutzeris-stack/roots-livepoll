@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ROOTS Live Poll</title>
+<link rel="stylesheet" href="https://fonts.cdnfonts.com/css/circular-std" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+<!-- LOGIN -->
+<section id="screen-login" class="screen active">
+  <div class="login-card">
+    <div class="login-logo"><div class="logo-mark lg"><i class="fa-solid fa-signal"></i></div></div>
+    <h1 class="login-title">ROOTS Live Poll</h1>
+    <p class="login-sub">Interaktive Präsentationen mit Live-Abstimmungen</p>
+    <div id="login-alert" class="login-alert"></div>
+    <form id="login-form">
+      <div class="form-group"><label for="login-email">E-Mail</label><div class="input-wrap"><i class="fa-solid fa-envelope icon"></i><input id="login-email" type="email" required autocomplete="email" /></div></div>
+      <div class="form-group"><label for="login-password">Passwort</label><div class="input-wrap"><i class="fa-solid fa-lock icon"></i><input id="login-password" type="password" required autocomplete="current-password" /></div></div>
+      <button type="submit" class="btn-primary btn-primary--block" id="login-submit"><i class="fa-solid fa-right-to-bracket"></i> Anmelden</button>
+    </form>
+    <p class="login-toggle"><a href="#" id="login-toggle-mode">Noch kein Konto? Registrieren</a></p>
+  </div>
+</section>
+
+<!-- DASHBOARD -->
+<section id="screen-dashboard" class="screen">
+  <header class="sop-header">
+    <div class="header-left">
+      <div class="logo-mark"><i class="fa-solid fa-signal"></i></div>
+      <span class="wordmark">ROOTS <span>Live Poll</span></span>
+      <span class="header-divider"></span>
+      <span class="header-sub">Präsentationen</span>
+    </div>
+    <div class="header-right">
+      <div id="roots-sync-status" class="roots-sync-wrap" aria-live="polite"></div>
+    </div>
+  </header>
+  <div class="dash-body">
+    <aside class="dash-sidebar">
+      <nav class="dash-nav">
+        <div class="dash-nav-section">Bibliothek</div>
+        <button type="button" class="dash-nav-item active" data-filter="all"><i class="fa-solid fa-layer-group"></i> Alle</button>
+        <button type="button" class="dash-nav-item" data-filter="recent"><i class="fa-solid fa-clock-rotate-left"></i> Zuletzt</button>
+        <button type="button" class="dash-nav-item" data-filter="favorites"><i class="fa-solid fa-star"></i> Favoriten</button>
+        <button type="button" class="dash-nav-item" data-filter="draft"><i class="fa-solid fa-pen"></i> Entwürfe</button>
+        <button type="button" class="dash-nav-item" data-filter="active"><i class="fa-solid fa-circle-play"></i> Aktiv</button>
+        <button type="button" class="dash-nav-item" data-filter="archived"><i class="fa-solid fa-box-archive"></i> Archiv</button>
+        <div class="dash-nav-section">Start</div>
+        <button type="button" class="dash-nav-item" id="btn-open-templates"><i class="fa-solid fa-clone"></i> Vorlagen</button>
+        <button type="button" class="dash-nav-item" id="btn-join-as-participant"><i class="fa-solid fa-mobile-screen"></i> Als Teilnehmer beitreten</button>
+      </nav>
+    </aside>
+    <main class="dash-main">
+      <div class="dash-toolbar">
+        <h1 class="dash-title">Meine Präsentationen</h1>
+        <div class="dash-search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input id="dash-search" class="dash-search" type="search" placeholder="Suchen…" /></div>
+        <button type="button" class="btn-primary" id="btn-new-presentation"><i class="fa-solid fa-plus"></i> Neu</button>
+      </div>
+      <div class="dash-content">
+        <div id="presentations-grid" class="boards-grid"></div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- EDITOR -->
+<section id="screen-editor" class="screen">
+  <header class="board-topbar">
+    <button type="button" class="board-back" id="editor-back" title="Zurück"><i class="fa-solid fa-arrow-left"></i></button>
+    <input id="editor-title" class="board-title-input" type="text" placeholder="Präsentationstitel" />
+    <span class="board-status" id="editor-save-status"><i class="fa-solid fa-cloud"></i> Gespeichert</span>
+    <div class="board-topbar-right">
+      <button type="button" class="btn-secondary" id="btn-save-version"><i class="fa-solid fa-clock-rotate-left"></i> Version</button>
+      <button type="button" class="btn-primary" id="btn-start-present"><i class="fa-solid fa-play"></i> Präsentieren</button>
+    </div>
+  </header>
+  <div class="editor-layout">
+    <aside class="editor-slides-panel">
+      <div class="editor-slides-head">
+        <span>Folien</span>
+        <button type="button" class="btn-ghost" id="btn-add-slide" title="Folie hinzufügen"><i class="fa-solid fa-plus"></i></button>
+      </div>
+      <div id="editor-slides" class="editor-slides-list"></div>
+    </aside>
+    <div class="editor-center">
+      <div id="editor-canvas" class="editor-canvas"></div>
+    </div>
+    <aside id="editor-props" class="props-panel visible"></aside>
+  </div>
+</section>
+
+<!-- PRESENT -->
+<section id="screen-present" class="screen">
+  <div id="present-stage" class="present-stage"></div>
+  <div id="present-code-bar" class="present-code-bar hidden">
+    <div class="present-code-inner">
+      <div id="present-code-text" class="present-code-text"></div>
+      <canvas id="present-qr" width="120" height="120"></canvas>
+      <div class="present-code-url" id="present-join-url"></div>
+    </div>
+  </div>
+  <div id="present-toolbar" class="present-toolbar hidden">
+    <button type="button" class="present-btn" id="present-prev"><i class="fa-solid fa-chevron-left"></i></button>
+    <button type="button" class="present-btn" id="present-toggle-question"><i class="fa-solid fa-lock-open"></i></button>
+    <button type="button" class="present-btn" id="present-show-code"><i class="fa-solid fa-qrcode"></i></button>
+    <span id="present-stats" class="present-stats">0 Teilnehmer · 0 Antworten</span>
+    <button type="button" class="present-btn" id="present-next"><i class="fa-solid fa-chevron-right"></i></button>
+    <button type="button" class="present-btn danger" id="present-end"><i class="fa-solid fa-stop"></i></button>
+  </div>
+</section>
+
+<!-- PARTICIPANT -->
+<section id="screen-participant" class="screen">
+  <div id="participant-root" class="participant-root"></div>
+</section>
+
+<!-- RESULTS -->
+<section id="screen-results" class="screen">
+  <header class="sop-header compact">
+    <div class="header-left"><button type="button" class="board-back" id="results-back"><i class="fa-solid fa-arrow-left"></i></button><span class="wordmark">Session-Auswertung</span></div>
+    <div class="header-right"><button type="button" class="btn-secondary" id="btn-export-csv"><i class="fa-solid fa-download"></i> CSV</button></div>
+  </header>
+  <div class="dash-content" id="results-content"></div>
+</section>
+
+<!-- MODAL: Templates -->
+<div id="modal-templates" class="modal">
+  <div class="modal-card modal-lg">
+    <div class="modal-head"><h2>Vorlagen</h2><button type="button" class="btn-ghost modal-close" data-close="modal-templates"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-body"><div id="templates-grid" class="templates-grid"></div></div>
+  </div>
+</div>
+
+<!-- MODAL: Add Slide -->
+<div id="modal-add-slide" class="modal">
+  <div class="modal-card">
+    <div class="modal-head"><h2>Folie hinzufügen</h2><button type="button" class="btn-ghost modal-close" data-close="modal-add-slide"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-body"><div id="slide-type-grid" class="slide-type-grid"></div></div>
+  </div>
+</div>
+
+<script src="https://pgoutzeris-stack.github.io/ROOTS_Intranet/roots-user-bridge.js?v=20260522-hover"></script>
+<script src="templates.js"></script>
+<script src="viz.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
