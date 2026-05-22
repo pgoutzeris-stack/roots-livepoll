@@ -217,6 +217,13 @@ function getVoteSlideScope(slide) {
   if (!slide) return null;
   const c = slide.content || {};
   const st = slide.settings || {};
+  if (st.brainstormVote && c.brainstormSourceId) {
+    return {
+      kind: 'brainstorm',
+      sourceId: c.brainstormSourceId,
+      maxSelections: st.brainstormVoteMax || c.maxSelections || 2,
+    };
+  }
   const key = c.sopTrackKey || c.sopTrackClass;
   if (st.sopCardVote && key && c.sopCardName) {
     return { kind: 'card', key, phaseName: c.sopPhaseName, cardName: c.sopCardName, maxSelections: st.sopVoteMax || 2 };
@@ -235,6 +242,52 @@ function isSopCardResultsSlide(slide) {
   return Boolean(slide?.settings?.sopCardResults);
 }
 
+function isBrainstormResultsSlide(slide) {
+  return Boolean(slide?.settings?.brainstormResults && slide?.content?.brainstormSourceId);
+}
+
+function isBrainstormVoteSlide(slide) {
+  return Boolean(slide?.settings?.brainstormVote && slide?.content?.brainstormSourceId);
+}
+
+function isCardResultsSlide(slide) {
+  return isSopCardResultsSlide(slide) || isBrainstormResultsSlide(slide);
+}
+
+function aggregateBrainstormItems(sourceSlideId) {
+  const items = (State.responses || [])
+    .filter((r) => r.slide_id === sourceSlideId && !r.is_hidden)
+    .map((r) => ({ id: r.id, text: String(r.response?.text || '').trim() }))
+    .filter((item) => item.text);
+  return { items };
+}
+
+function findBrainstormVoteSlide(sourceId) {
+  return State.slides.find((s) => s.settings?.brainstormVote && s.content?.brainstormSourceId === sourceId);
+}
+
+function findBrainstormResultsSlide(sourceId) {
+  return State.slides.find((s) => s.settings?.brainstormResults && s.content?.brainstormSourceId === sourceId);
+}
+
+function hasBrainstormChain(slide) {
+  if (!slide || slide.slide_type !== 'brainstorm') return false;
+  return Boolean(slide.settings?.brainstormAttachRanking || findBrainstormVoteSlide(slide.id));
+}
+
+function isBrainstormCollectSlide(slide) {
+  if (!slide || slide.slide_type !== 'brainstorm') return false;
+  const c = slide.content || {};
+  if (isSopWorkshopPresentation() && (c.sopKind === 'card-workshop' || c.sopCardName)) return true;
+  return hasBrainstormChain(slide);
+}
+
+function shouldUseVoteWorkshopUi(slide) {
+  if (!slide) return false;
+  if (isSopWorkshopPresentation() && (slide.settings?.sopCardVote || slide.settings?.sopTrackVote)) return true;
+  return isBrainstormVoteSlide(slide);
+}
+
 function findCardVoteSlide(trackKey, phaseName, cardName) {
   return State.slides.find((s) => {
     const c = s.content || {};
@@ -247,6 +300,11 @@ function findCardVoteSlide(trackKey, phaseName, cardName) {
 function getVoteOptions(slide) {
   const scope = getVoteSlideScope(slide);
   if (!scope) return slide?.content?.options || [];
+  if (scope.kind === 'brainstorm') {
+    const { items } = aggregateBrainstormItems(scope.sourceId);
+    if (!items.length) return [{ id: 'none', text: 'Noch keine Ideen gesammelt' }];
+    return items.map((item) => ({ id: `resp-${item.id}`, text: item.text }));
+  }
   if (scope.kind === 'card') {
     const { items } = aggregateCardUseCases(scope.key, scope.phaseName, scope.cardName);
     if (!items.length) return [{ id: 'none', text: 'Noch keine Use Cases gesammelt' }];
@@ -452,6 +510,16 @@ function getSopBoardContextFromSlide(slide) {
 
 function getTrackVoteOptionsGrouped(slide) {
   const scope = getVoteSlideScope(slide);
+  if (scope?.kind === 'brainstorm') {
+    const opts = getVoteOptions(slide).filter((o) => o.id !== 'none');
+    if (!opts.length) return [];
+    const sourceSlide = State.slides.find((s) => s.id === scope.sourceId);
+    return [{
+      phase: '',
+      card: sourceSlide?.content?.title || 'Brainstorming',
+      options: opts,
+    }];
+  }
   if (scope?.kind === 'card') {
     const opts = getVoteOptions(slide).filter((o) => o.id !== 'none');
     if (!opts.length) return [];
@@ -580,18 +648,29 @@ function renderCardVoteParticipationHtml(slide) {
 
 function renderCardVotePresentHtml(slide, visible) {
   const scope = getVoteSlideScope(slide);
-  if (!scope || scope.kind !== 'card') return renderTrackVotePresentHtml(slide, visible);
-  const { items } = aggregateCardUseCases(scope.key, scope.phaseName, scope.cardName);
-  if (!items.length) {
-    return '<div class="present-wait-msg">Noch keine Use Cases gesammelt. Bitte zuerst das Brainstorming abschließen.</div>';
+  if (!scope || (scope.kind !== 'card' && scope.kind !== 'brainstorm')) return renderTrackVotePresentHtml(slide, visible);
+  let items = [];
+  let label = scope.cardName || 'Karte';
+  if (scope.kind === 'brainstorm') {
+    ({ items } = aggregateBrainstormItems(scope.sourceId));
+    const sourceSlide = State.slides.find((s) => s.id === scope.sourceId);
+    label = sourceSlide?.content?.title || 'Brainstorming';
+  } else {
+    ({ items } = aggregateCardUseCases(scope.key, scope.phaseName, scope.cardName));
+    label = scope.cardName;
   }
-  const newIds = markNewBubbleIds(`card-vote-${scope.key}-${scope.cardName}`, items);
+  if (!items.length) {
+    return '<div class="present-wait-msg">Noch keine Ideen gesammelt. Bitte zuerst das Brainstorming abschließen.</div>';
+  }
+  const bubbleKey = scope.kind === 'brainstorm' ? `brainstorm-vote-${scope.sourceId}` : `card-vote-${scope.key}-${scope.cardName}`;
+  const newIds = markNewBubbleIds(bubbleKey, items);
   const bubbleHtml = window.LPViz.renderBrainstormBubbles(items, { mode: 'present', maxItems: 80, newIds });
   const hasVotes = visible.length > 0;
+  const maxHint = scope.maxSelections || 2;
   return `<div class="track-vote-present card-vote-present">
     <div class="track-vote-present-head">
-      <span class="track-vote-count">${items.length} Use Cases · ${esc(scope.cardName)}</span>
-      <span class="track-vote-hint">${State.session.question_open ? 'Max. 2 Favoriten pro Person' : 'Abstimmung abgeschlossen'}</span>
+      <span class="track-vote-count">${items.length} Ideen · ${esc(label)}</span>
+      <span class="track-vote-hint">${State.session.question_open ? `Max. ${maxHint} Favoriten pro Person` : 'Abstimmung abgeschlossen'}</span>
     </div>
     ${renderCardVoteParticipationHtml(slide)}
     ${bubbleHtml}
@@ -601,17 +680,27 @@ function renderCardVotePresentHtml(slide, visible) {
 
 function renderCardResultsPresentHtml(slide) {
   const c = slide.content || {};
-  const key = c.sopTrackKey || c.sopTrackClass;
-  const voteSlide = findCardVoteSlide(key, c.sopPhaseName, c.sopCardName);
-  if (!voteSlide) return '<div class="present-wait-msg">Keine Abstimmung für diese Karte gefunden.</div>';
+  let voteSlide = null;
+  let items = [];
+  let label = c.sopCardName || c.title || 'Karte';
+  if (isBrainstormResultsSlide(slide)) {
+    voteSlide = findBrainstormVoteSlide(c.brainstormSourceId);
+    ({ items } = aggregateBrainstormItems(c.brainstormSourceId));
+    const sourceSlide = State.slides.find((s) => s.id === c.brainstormSourceId);
+    label = sourceSlide?.content?.title || label;
+  } else {
+    const key = c.sopTrackKey || c.sopTrackClass;
+    voteSlide = findCardVoteSlide(key, c.sopPhaseName, c.sopCardName);
+    ({ items } = aggregateCardUseCases(key, c.sopPhaseName, c.sopCardName));
+  }
+  if (!voteSlide) return '<div class="present-wait-msg">Keine Abstimmungsfolie gefunden.</div>';
   const visible = State.session ? getVisibleResponses(voteSlide.id) : [];
-  const { items } = aggregateCardUseCases(key, c.sopPhaseName, c.sopCardName);
   const bubbleHtml = items.length
     ? window.LPViz.renderBrainstormBubbles(items, { mode: 'present', maxItems: 80 })
     : '';
   return `<div class="card-results-present">
     <div class="track-vote-present-head">
-      <span class="track-vote-count">Ergebnis · ${esc(c.sopCardName || c.title || 'Karte')}</span>
+      <span class="track-vote-count">Ergebnis · ${esc(label)}</span>
       <span class="track-vote-hint">Gewinner und Stimmenanteile in Prozent</span>
     </div>
     ${renderCardVoteParticipationHtml(voteSlide)}
@@ -1266,17 +1355,23 @@ function currentSlide() {
 function renderSlideList() {
   const list = $('#editor-slides');
   if (!list) return;
-  list.innerHTML = State.slides.map((s, i) => `
+  list.innerHTML = State.slides.map((s, i) => {
+    const typeLabel = window.LP_SLIDE_TYPES.find((t) => t.type === s.slide_type)?.label || s.slide_type;
+    const chainTag = s.settings?.brainstormLinked
+      ? (s.settings?.brainstormVote ? ' · Ranking' : s.settings?.brainstormResults ? ' · Ergebnis' : '')
+      : (s.settings?.brainstormAttachRanking && s.slide_type === 'brainstorm' ? ' · +Kette' : '');
+    return `
     <div class="slide-thumb ${s.id === State.selectedSlideId ? 'active' : ''}" draggable="true" data-id="${s.id}">
       <div class="slide-thumb-row">
-        <div class="slide-thumb-num">${i + 1} · ${esc(window.LP_SLIDE_TYPES.find((t) => t.type === s.slide_type)?.label || s.slide_type)}</div>
+        <div class="slide-thumb-num">${i + 1} · ${esc(typeLabel)}${esc(chainTag)}</div>
         <div class="slide-thumb-actions">
           <button type="button" class="slide-mini-btn" data-dup="${s.id}" title="Duplizieren"><i class="fa-solid fa-copy"></i></button>
           <button type="button" class="slide-mini-btn danger" data-del="${s.id}" title="Löschen"><i class="fa-solid fa-trash"></i></button>
         </div>
       </div>
       <div class="slide-thumb-title">${esc(s.content?.title || s.content?.prompt || 'Folie')}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   list.querySelectorAll('.slide-thumb').forEach((el) => {
     el.addEventListener('click', (e) => {
       if (e.target.closest('.slide-mini-btn')) return;
@@ -1325,7 +1420,132 @@ async function duplicateSlide(id) {
   toast('Folie dupliziert', 'success');
 }
 
+async function syncBrainstormChainSlides(brainstormSlide) {
+  if (!brainstormSlide || brainstormSlide.slide_type !== 'brainstorm' || !State.presentation?.id) return;
+  const settings = { ...window.LP_DEFAULT_SETTINGS, ...brainstormSlide.settings };
+  const attachRank = !!settings.brainstormAttachRanking;
+  const attachResults = attachRank && !!settings.brainstormAttachResults;
+  const maxSel = Math.max(1, Number(settings.brainstormVoteMax || 2));
+  const sourceId = brainstormSlide.id;
+  const bc = brainstormSlide.content || {};
+  const title = bc.title || 'Brainstorming';
+
+  const removeLinked = async (slide) => {
+    if (!slide?.settings?.brainstormLinked) return;
+    await sb.from('lp_slides').delete().eq('id', slide.id);
+    State.slides = State.slides.filter((s) => s.id !== slide.id);
+  };
+
+  let voteSlide = findBrainstormVoteSlide(sourceId);
+  let resultsSlide = findBrainstormResultsSlide(sourceId);
+
+  if (!attachRank) {
+    await removeLinked(voteSlide);
+    await removeLinked(resultsSlide);
+    voteSlide = null;
+    resultsSlide = null;
+  } else {
+    const voteContent = {
+      ...defaultStyle(),
+      title: `Priorisierung · ${title}`,
+      prompt: 'Wähle deine Favoriten aus dem Brainstorming.',
+      options: [],
+      maxSelections: maxSel,
+      brainstormSourceId: sourceId,
+    };
+    const voteSettings = {
+      ...window.LP_DEFAULT_SETTINGS,
+      showResultsLive: true,
+      brainstormVote: true,
+      brainstormVoteMax: maxSel,
+      brainstormLinked: true,
+      workshopMode: 'decide',
+    };
+    if (!voteSlide) {
+      const insertAt = Math.max(0, State.slides.findIndex((s) => s.id === sourceId) + 1);
+      const { data, error } = await sb.from('lp_slides').insert({
+        presentation_id: State.presentation.id,
+        sort_order: insertAt,
+        slide_type: 'mc_multi',
+        content: voteContent,
+        settings: voteSettings,
+      }).select().single();
+      if (error) { toast(error.message, 'error'); return; }
+      State.slides.splice(insertAt, 0, data);
+      voteSlide = data;
+    } else {
+      voteSlide.content = { ...voteSlide.content, ...voteContent };
+      voteSlide.settings = { ...voteSlide.settings, ...voteSettings };
+      await sb.from('lp_slides').update({ content: voteSlide.content, settings: voteSlide.settings }).eq('id', voteSlide.id);
+    }
+  }
+
+  if (!attachResults) {
+    await removeLinked(resultsSlide);
+    resultsSlide = null;
+  } else if (voteSlide) {
+    const resultsContent = {
+      ...defaultStyle(),
+      title: `Ergebnis · ${title}`,
+      body: 'Die favorisierten Ideen mit Stimmenanteil und Gewinnern.',
+      brainstormSourceId: sourceId,
+    };
+    const resultsSettings = {
+      ...window.LP_DEFAULT_SETTINGS,
+      showResultsLive: true,
+      brainstormResults: true,
+      brainstormLinked: true,
+      workshopMode: 'decide',
+    };
+    if (!resultsSlide) {
+      const voteIdx = State.slides.findIndex((s) => s.id === voteSlide.id);
+      const insertAt = voteIdx >= 0 ? voteIdx + 1 : State.slides.length;
+      const { data, error } = await sb.from('lp_slides').insert({
+        presentation_id: State.presentation.id,
+        sort_order: insertAt,
+        slide_type: 'content',
+        content: resultsContent,
+        settings: resultsSettings,
+      }).select().single();
+      if (error) { toast(error.message, 'error'); return; }
+      State.slides.splice(insertAt, 0, data);
+      resultsSlide = data;
+    } else {
+      resultsSlide.content = { ...resultsSlide.content, ...resultsContent };
+      resultsSlide.settings = { ...resultsSlide.settings, ...resultsSettings };
+      await sb.from('lp_slides').update({ content: resultsSlide.content, settings: resultsSlide.settings }).eq('id', resultsSlide.id);
+    }
+  }
+
+  const bIdx = State.slides.findIndex((s) => s.id === sourceId);
+  if (bIdx >= 0 && voteSlide) {
+    const vIdx = State.slides.findIndex((s) => s.id === voteSlide.id);
+    if (vIdx >= 0 && vIdx !== bIdx + 1) {
+      State.slides.splice(vIdx, 1);
+      State.slides.splice(bIdx + 1, 0, voteSlide);
+    }
+  }
+  if (voteSlide && resultsSlide) {
+    const vIdx = State.slides.findIndex((s) => s.id === voteSlide.id);
+    const rIdx = State.slides.findIndex((s) => s.id === resultsSlide.id);
+    if (vIdx >= 0 && rIdx >= 0 && rIdx !== vIdx + 1) {
+      State.slides.splice(rIdx, 1);
+      State.slides.splice(vIdx + 1, 0, resultsSlide);
+    }
+  }
+
+  State.slides.forEach((s, idx) => { s.sort_order = idx; });
+  await persistSlideOrder();
+  await sb.from('lp_presentations').update({ updated_at: new Date().toISOString() }).eq('id', State.presentation.id);
+}
+
 async function deleteSlide(id) {
+  const slide = State.slides.find((s) => s.id === id);
+  if (slide?.slide_type === 'brainstorm') {
+    for (const linked of [findBrainstormVoteSlide(id), findBrainstormResultsSlide(id)]) {
+      if (linked) await sb.from('lp_slides').delete().eq('id', linked.id);
+    }
+  }
   await sb.from('lp_slides').delete().eq('id', id);
   State.slides = State.slides.filter((s) => s.id !== id);
   State.slides.forEach((s, idx) => { s.sort_order = idx; });
@@ -1349,21 +1569,22 @@ function renderEditorCanvas() {
     bindCanvasInlineEdit();
     return;
   }
-  if (slide.slide_type === 'brainstorm' && (c.sopKind === 'card-workshop' || c.sopCardName) && isSopWorkshopPresentation()) {
-    canvas.innerHTML = `${wrapMentiSlide(renderWorkshopCardCollectHtml(c, true), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Karten-Kontext und Frage direkt bearbeiten</div>`;
+  if (isBrainstormCollectSlide(slide)) {
+    canvas.innerHTML = `${wrapMentiSlide(renderWorkshopCardCollectHtml(c, true), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Freitext sammeln${hasBrainstormChain(slide) ? ' · Ranking & Ergebnis folgen automatisch' : ''}</div>`;
     bindCanvasInlineEdit();
     return;
   }
-  if ((slide.settings?.sopCardVote || slide.settings?.sopTrackVote) && isSopWorkshopPresentation()) {
+  if (shouldUseVoteWorkshopUi(slide)) {
+    const max = slide.settings?.brainstormVoteMax || slide.settings?.sopVoteMax || slide.content?.maxSelections || 2;
     canvas.innerHTML = `${renderWorkshopModeBadge('decide')}
       <div class="canvas-editable canvas-title menti-q-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>
       <p class="canvas-editable canvas-prompt" contenteditable="true" data-field="prompt">${esc(c.prompt || '')}</p>
       <div class="track-vote-editor-preview">${renderTrackVoteGroupedListHtml(slide)}</div>
-      <div class="canvas-hint"><i class="fa-solid fa-info-circle"></i> Use Cases aus Brainstorming dieser Karte · max. ${slide.settings?.sopVoteMax || 2} Favoriten</div>`;
+      <div class="canvas-hint"><i class="fa-solid fa-info-circle"></i> Ideen aus Brainstorming · max. ${max} Favoriten</div>`;
     bindCanvasInlineEdit();
     return;
   }
-  if (isSopCardResultsSlide(slide) && isSopWorkshopPresentation()) {
+  if (isCardResultsSlide(slide)) {
     canvas.innerHTML = `${renderWorkshopModeBadge('decide')}
       <div class="canvas-editable canvas-title menti-q-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>
       <p class="canvas-editable canvas-prompt" contenteditable="true" data-field="body">${esc(c.body || '')}</p>
@@ -1472,7 +1693,22 @@ function renderEditorProps() {
           <button type="button" class="opt-rm" data-rm-opt="${i}"><i class="fa-solid fa-xmark"></i></button>
         </div>`).join('')}
       <button type="button" class="btn-secondary btn-sm" id="btn-add-option"><i class="fa-solid fa-plus"></i> Option</button>
-      ${slide.slide_type === 'mc_multi' ? `<div class="props-label">Max. Auswahl</div><input id="prop-max-sel" type="number" min="1" value="${c.maxSelections || 3}" />` : ''}`;
+      ${slide.slide_type === 'mc_multi' && !isBrainstormVoteSlide(slide) ? `<div class="props-label">Max. Auswahl</div><input id="prop-max-sel" type="number" min="1" value="${c.maxSelections || 3}" />` : ''}
+      ${isBrainstormVoteSlide(slide) ? `<p class="props-hint"><i class="fa-solid fa-link"></i> Optionen kommen automatisch aus dem Brainstorming der vorherigen Folie.</p>` : ''}`;
+  }
+
+  let brainstormChainHtml = '';
+  if (slide.slide_type === 'brainstorm' && !slide.content?.sopTrackKey && !slide.content?.sopTrackClass) {
+    const voteLinked = findBrainstormVoteSlide(slide.id);
+    const resultsLinked = findBrainstormResultsSlide(slide.id);
+    brainstormChainHtml = `
+    <div class="props-section">Brainstorm → Ranking → Ergebnis</div>
+    <p class="props-hint" style="margin-top:0">Nach dem Freitext-Brainstorming optional Priorisierung und Ergebnisfolie automatisch anbinden.</p>
+    <label class="props-toggle"><input type="checkbox" id="set-brainstorm-rank" ${s.brainstormAttachRanking ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-arrow-down-wide-short"></i></span><span class="props-toggle-text">Ranking-Folie anbinden</span></label>
+    <label class="props-toggle"><input type="checkbox" id="set-brainstorm-results" ${s.brainstormAttachResults ? 'checked' : ''} ${!s.brainstormAttachRanking ? 'disabled' : ''}><span class="props-toggle-box"><i class="fa-solid fa-trophy"></i></span><span class="props-toggle-text">Ergebnis-Folie anbinden</span></label>
+    <div class="props-label">Max. Favoriten bei Ranking</div>
+    <input id="set-brainstorm-vote-max" type="number" min="1" max="10" value="${s.brainstormVoteMax || 2}" ${!s.brainstormAttachRanking ? 'disabled' : ''} />
+    ${voteLinked || resultsLinked ? `<p class="props-hint"><i class="fa-solid fa-link"></i> Verknüpft: ${voteLinked ? 'Ranking' : ''}${voteLinked && resultsLinked ? ' · ' : ''}${resultsLinked ? 'Ergebnis' : ''}</p>` : ''}`;
   }
 
   panel.innerHTML = `
@@ -1497,6 +1733,7 @@ function renderEditorProps() {
       <input id="prop-min-label" value="${esc(c.minLabel || '')}" placeholder="Beschriftung links" />
       <input id="prop-max-label" value="${esc(c.maxLabel || '')}" placeholder="Beschriftung rechts" />` : ''}
     ${optionsHtml}
+    ${brainstormChainHtml}
     <div class="props-section">Interaktion</div>
     <div class="props-toggle-grid">
       <label class="props-toggle"><input type="checkbox" id="set-anonymous" ${s.anonymous ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-user-secret"></i></span><span class="props-toggle-text">Anonyme Antworten</span></label>
@@ -1543,13 +1780,48 @@ function renderEditorProps() {
       askName: true,
       timeLimitSec: Number($('#set-time')?.value || 0),
     };
+    if (slideObj.slide_type === 'brainstorm' && !slideObj.content?.sopTrackKey && !slideObj.content?.sopTrackClass) {
+      slideObj.settings.brainstormAttachRanking = !!$('#set-brainstorm-rank')?.checked;
+      slideObj.settings.brainstormAttachResults = !!$('#set-brainstorm-results')?.checked;
+      slideObj.settings.brainstormVoteMax = Number($('#set-brainstorm-vote-max')?.value || 2);
+    }
     await persistSlide(slideObj);
   }, 700);
+
+  const saveBrainstormChain = async () => {
+    const slideObj = currentSlide();
+    if (!slideObj || slideObj.slide_type !== 'brainstorm') return;
+    if (slideObj.content?.sopTrackKey || slideObj.content?.sopTrackClass) return;
+    slideObj.settings = {
+      ...slideObj.settings,
+      brainstormAttachRanking: !!$('#set-brainstorm-rank')?.checked,
+      brainstormAttachResults: !!$('#set-brainstorm-results')?.checked,
+      brainstormVoteMax: Number($('#set-brainstorm-vote-max')?.value || 2),
+    };
+    await persistSlide(slideObj);
+    await syncBrainstormChainSlides(slideObj);
+    renderEditorProps();
+    renderSlideList();
+    toast('Brainstorm-Kette aktualisiert', 'success');
+  };
 
   panel.querySelectorAll('input,textarea').forEach((el) => {
     el.addEventListener('input', saveContent);
     el.addEventListener('change', saveContent);
   });
+  $('#set-brainstorm-rank')?.addEventListener('change', () => {
+    const on = $('#set-brainstorm-rank')?.checked;
+    const resultsEl = $('#set-brainstorm-results');
+    const maxEl = $('#set-brainstorm-vote-max');
+    if (resultsEl) {
+      resultsEl.disabled = !on;
+      if (!on) resultsEl.checked = false;
+    }
+    if (maxEl) maxEl.disabled = !on;
+    void saveBrainstormChain();
+  });
+  $('#set-brainstorm-results')?.addEventListener('change', () => { void saveBrainstormChain(); });
+  $('#set-brainstorm-vote-max')?.addEventListener('change', () => { void saveBrainstormChain(); });
   panel.querySelectorAll('[data-rm-opt]').forEach((btn) => btn.addEventListener('click', () => {
     currentSlide().content.options.splice(Number(btn.dataset.rmOpt), 1);
     saveContent();
@@ -1581,6 +1853,7 @@ async function persistSlideOrder() {
 
 function renderAddSlideModal() {
   const grid = $('#slide-type-grid');
+  const chainBox = $('#brainstorm-add-chain');
   grid.innerHTML = window.LP_SLIDE_TYPES.map((t) => `
     <button type="button" class="type-card" data-type="${t.type}">
       <h3><i class="fa-solid ${t.icon}"></i> ${esc(t.label)}</h3>
@@ -1590,19 +1863,32 @@ function renderAddSlideModal() {
     btn.addEventListener('click', async () => {
       const type = btn.dataset.type;
       const base = JSON.parse(JSON.stringify(window.LP_DEFAULT_CONTENT[type] || { title: 'Neu' }));
+      const settings = { ...window.LP_DEFAULT_SETTINGS };
+      if (type === 'brainstorm') {
+        settings.brainstormAttachRanking = !!$('#add-chain-rank')?.checked;
+        settings.brainstormAttachResults = !!$('#add-chain-results')?.checked;
+        settings.brainstormVoteMax = Number($('#add-chain-max')?.value || 2);
+      }
       const { data } = await sb.from('lp_slides').insert({
         presentation_id: State.presentation.id,
         sort_order: State.slides.length,
         slide_type: type,
         content: { ...defaultStyle(), ...base },
-        settings: { ...window.LP_DEFAULT_SETTINGS },
+        settings,
       }).select().single();
       State.slides.push(data);
+      if (type === 'brainstorm' && settings.brainstormAttachRanking) {
+        await syncBrainstormChainSlides(data);
+      }
       State.selectedSlideId = data.id;
       closeModal('modal-add-slide');
       renderEditor();
     });
+    btn.addEventListener('mouseenter', () => {
+      chainBox?.classList.toggle('hidden', btn.dataset.type !== 'brainstorm');
+    });
   });
+  chainBox?.classList.add('hidden');
 }
 
 async function saveVersionSnapshot() {
@@ -1832,7 +2118,7 @@ function renderPresent() {
       viz = `<img src="${esc(c.imageUrl)}" alt="" style="max-width:min(720px,90vw);border-radius:16px;margin-top:1rem">`;
     }
   } else if (slide.settings?.showResultsLive !== false) {
-    if (slide.settings?.sopCardVote) {
+    if (slide.settings?.sopCardVote || slide.settings?.brainstormVote) {
       viz = renderCardVotePresentHtml(displaySlide, visible);
     } else if (slide.settings?.sopTrackVote) {
       viz = renderTrackVotePresentHtml(displaySlide, visible);
@@ -1876,9 +2162,9 @@ function renderPresent() {
     return;
   }
 
-  if (slide.slide_type === 'content' && (c.mentiHero || c.sopKind || c.sopTrackResults || isSopCardResultsSlide(slide))) {
+  if (slide.slide_type === 'content' && (c.mentiHero || c.sopKind || c.sopTrackResults || isCardResultsSlide(slide))) {
     let html;
-    if (isSopCardResultsSlide(slide)) {
+    if (isCardResultsSlide(slide)) {
       html = `<h1 class="menti-q-title">${esc(c.title || 'Ergebnis')}</h1>
         <p class="menti-q-prompt">${esc(c.body || '').replace(/\n/g, '<br>')}</p>
         <div class="viz-wrap viz-wrap-present">${renderCardResultsPresentHtml(slide)}</div>`;
@@ -1900,7 +2186,7 @@ function renderPresent() {
   const slideIdx = State.session.current_slide_index || 0;
   const workshopMode = getWorkshopMode(slide);
 
-  if (slide.slide_type === 'brainstorm' && (c.sopKind === 'card-workshop' || c.sopCardName) && isSopWorkshopPresentation()) {
+  if (isBrainstormCollectSlide(slide)) {
     stage.innerHTML = wrapMentiSlide(`
       ${renderWorkshopCardCollectHtml(c)}
       <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`, slideIdx);
@@ -1914,7 +2200,7 @@ function renderPresent() {
     return;
   }
 
-  if ((slide.settings?.sopCardVote || slide.settings?.sopTrackVote) && isSopWorkshopPresentation()) {
+  if (shouldUseVoteWorkshopUi(slide)) {
     stage.innerHTML = wrapMentiSlide(`
       <h1 class="menti-q-title">${esc(c.title || 'Priorisierung')}</h1>
       <p class="menti-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>
@@ -2067,7 +2353,7 @@ async function ensureParticipantResponses(force = false) {
   if (!State.session?.id || !State.participant) return;
   const slideIndex = State.session.current_slide_index || 0;
   const slide = State.slides[slideIndex];
-  const needsTrackData = Boolean(slide?.settings?.sopTrackVote || slide?.settings?.sopCardVote);
+  const needsTrackData = Boolean(slide?.settings?.sopTrackVote || slide?.settings?.sopCardVote || slide?.settings?.brainstormVote);
   if (!needsTrackData && !force) return;
   const cacheKey = `${State.session.id}:${slideIndex}`;
   const fresh = State.participantResponsesKey === cacheKey
@@ -2227,7 +2513,7 @@ function subscribeParticipantChannel() {
       void (async () => {
         await ensureParticipantResponses(true);
         const slide = State.slides[State.session.current_slide_index || 0];
-        if (slide?.settings?.sopTrackVote || slide?.settings?.sopCardVote || slide?.slide_type === 'qa') await renderParticipantQuestion();
+        if (slide?.settings?.sopTrackVote || slide?.settings?.sopCardVote || slide?.settings?.brainstormVote || slide?.slide_type === 'qa') await renderParticipantQuestion();
       })();
     })
     .subscribe();
@@ -2309,8 +2595,8 @@ async function renderParticipantQuestion() {
       input = `<div id="multi-wrap">${(c.options || []).map((o) => `<label class="props-check"><input type="checkbox" value="${esc(o.id)}"> ${esc(o.text)}</label>`).join('')}</div><button type="button" class="btn-primary participant-submit" id="submit-multi">Senden</button>`;
     }
   } else if (type === 'wordcloud' || type === 'open' || type === 'brainstorm') {
-    const isCardWorkshop = isSopWorkshopPresentation() && (c.sopKind === 'card-workshop' || c.sopCardName);
-    if (isCardWorkshop) {
+    const isCollect = isBrainstormCollectSlide(slide);
+    if (isCollect) {
       input = `<label class="join-label" for="p-text">Dein KI Use Case</label>
         <textarea id="p-text" rows="4" class="participant-textarea participant-textarea-lg" placeholder="${esc((c.prompt || '').split('\n')[0] || 'Use Case beschreiben…')}"></textarea>
         <button type="button" class="btn-primary participant-submit participant-submit-lg" id="submit-text">Use Case senden</button>`;
@@ -2348,9 +2634,9 @@ async function renderParticipantQuestion() {
       : `<p style="color:var(--muted)">Kein Bild konfiguriert.</p>`;
   }
 
-  const isWorkshop = isSopWorkshopPresentation();
-  const isCollect = type === 'brainstorm' && (c.sopKind === 'card-workshop' || c.sopCardName);
-  const isDecide = isSopVoteSlide(slide);
+  const isWorkshop = isSopWorkshopPresentation() || hasBrainstormChain(slide) || isBrainstormVoteSlide(slide) || isBrainstormResultsSlide(slide);
+  const isCollect = isBrainstormCollectSlide(slide);
+  const isDecide = shouldUseVoteWorkshopUi(slide);
   const cardClass = [
     'participant-card',
     c.mentiQuestion || isWorkshop ? 'participant-menti-q' : '',
@@ -2479,8 +2765,8 @@ function bindParticipantHandlers(slide) {
   });
   $('#submit-text')?.addEventListener('click', () => {
     const text = filterProfanity($('#p-text').value.trim(), slide.settings?.profanityFilter !== false);
-    const isCardWorkshop = isSopWorkshopPresentation() && (c.sopKind === 'card-workshop' || c.sopCardName);
-    if (!text && (slide.settings?.required || isCardWorkshop)) { toast(isCardWorkshop ? 'Bitte Use Case eingeben' : 'Antwort erforderlich', 'warn'); return; }
+    const isCollect = isBrainstormCollectSlide(slide);
+    if (!text && (slide.settings?.required || isCollect)) { toast(isCollect ? 'Bitte Idee eingeben' : 'Antwort erforderlich', 'warn'); return; }
     submitResponse({ text, upvotes: 0 });
   });
   $('#submit-num')?.addEventListener('click', () => {

@@ -196,7 +196,16 @@
 <div id="modal-add-slide" class="modal">
   <div class="modal-card">
     <div class="modal-head"><h2>Folie hinzufügen</h2><button type="button" class="btn-ghost modal-close" data-close="modal-add-slide"><i class="fa-solid fa-xmark"></i></button></div>
-    <div class="modal-body"><div id="slide-type-grid" class="slide-type-grid"></div></div>
+    <div class="modal-body">
+      <div id="slide-type-grid" class="slide-type-grid"></div>
+      <div id="brainstorm-add-chain" class="add-slide-chain hidden">
+        <div class="add-slide-chain-title"><i class="fa-solid fa-link"></i> Brainstorm-Workflow</div>
+        <p class="add-slide-chain-hint">Optional direkt Ranking- und Ergebnisfolien an die Brainstorm-Folie anbinden.</p>
+        <label class="props-check"><input type="checkbox" id="add-chain-rank" checked> Ranking-Folie (Favoriten wählen)</label>
+        <label class="props-check"><input type="checkbox" id="add-chain-results" checked> Ergebnis-Folie (Gewinner & Prozent)</label>
+        <label class="add-slide-chain-max">Max. Favoriten <input type="number" id="add-chain-max" min="1" max="10" value="2"></label>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -209,8 +218,8 @@
 </div>
 
 <script src="https://pgoutzeris-stack.github.io/ROOTS_Intranet/roots-user-bridge.js?v=20260522-hover"></script>
-<script src="templates.js?v=20260520-sop12"></script>
-<script src="viz.js?v=20260520-sop12"></script>
-<script src="app.js?v=20260520-sop12"></script>
+<script src="templates.js?v=20260520-brainchain"></script>
+<script src="viz.js?v=20260520-brainchain"></script>
+<script src="app.js?v=20260520-brainchain"></script>
 </body>
 </html>

@@ -284,6 +284,13 @@ html.lp-join-route #screen-participant{display:flex!important}
 .modal-head h2{font-size:1.05rem}
 .modal-body{padding:1rem 1.25rem 1.25rem;overflow-y:auto}
 .templates-grid,.slide-type-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem}
+.add-slide-chain{margin-top:1rem;padding:1rem 1.1rem;border:1px dashed var(--line);border-radius:12px;background:var(--brand-light)}
+.add-slide-chain.hidden{display:none}
+.add-slide-chain-title{font-size:.82rem;font-weight:700;color:var(--brand-dark);margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}
+.add-slide-chain-hint{font-size:.75rem;color:var(--muted);margin:0 0 .65rem;line-height:1.45}
+.add-slide-chain .props-check{display:flex;align-items:center;gap:.45rem;font-size:.82rem;margin:.35rem 0}
+.add-slide-chain-max{display:flex;align-items:center;justify-content:space-between;gap:.75rem;font-size:.78rem;color:var(--muted);margin-top:.55rem}
+.add-slide-chain-max input{width:64px;height:34px;border:1px solid var(--line);border-radius:8px;padding:0 .5rem;font-family:inherit}
 .template-card,.type-card{border:1.5px solid var(--line);border-radius:12px;padding:1rem;cursor:pointer;background:var(--bg);transition:all .15s}
 .template-card:hover,.type-card:hover{border-color:var(--brand);background:var(--brand-light)}
 .template-card h3,.type-card h3{font-size:.92rem;margin-bottom:.35rem}
