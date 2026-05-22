@@ -1,7 +1,7 @@
 /* ROOTS Live Poll – Hauptanwendung */
 const SUPABASE_URL = 'https://csmguwcvzreefluhahyu.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNzbWd1d2N2enJlZWZsdWhhaHl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjM0ODcsImV4cCI6MjA5MjUzOTQ4N30.Fiafx7XBaQZXUX3bKQIBH7znBHx3B51yL-bftOHsL4Q';
-const APP_VERSION = '20260520-closure';
+const APP_VERSION = '20260520-addmodal';
 const JOIN_BASE = `${location.origin}${location.pathname}`;
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
@@ -48,6 +48,7 @@ const State = {
   quizScores: {},
   joinProfile: { name: '', emoji: '🦊', color: '#206efb' },
   activityItems: [],
+  addSlideModalBound: false,
   participantPoll: null,
   sopFocusMode: false,
   showPresentPanels: false,
@@ -1920,6 +1921,47 @@ async function syncPresentationClosureSlides() {
   await sb.from('lp_presentations').update({ updated_at: new Date().toISOString() }).eq('id', State.presentation.id);
 }
 
+async function savePresentationClosureFromModal() {
+  const attachResults = !!$('#add-pres-results')?.checked;
+  const attachClosing = !!$('#add-pres-closing')?.checked;
+  const scoring = analyzePresentationScoring();
+  await persistPresentationSettings({
+    attachPresentationResults: attachResults && scoring.canPresentationResults,
+    attachPresentationClosing: attachClosing,
+  });
+  await syncPresentationClosureSlides();
+  renderSlideList();
+  renderEditorCanvas();
+  refreshAddSlideClosureUi();
+  toast('Abschluss-Folien aktualisiert', 'success');
+}
+
+function refreshAddSlideClosureUi() {
+  const presSettings = getPresentationSettings();
+  const presScoring = analyzePresentationScoring();
+  const presResultsLinked = findPresentationResultsSlide();
+  const presClosingLinked = findPresentationClosingSlide();
+  const resultsEl = $('#add-pres-results');
+  const closingEl = $('#add-pres-closing');
+  const hintEl = $('#add-closure-hint');
+  const linkedEl = $('#add-closure-linked');
+  if (resultsEl) {
+    resultsEl.checked = !!presSettings.attachPresentationResults;
+    resultsEl.disabled = !presScoring.canPresentationResults;
+  }
+  if (closingEl) closingEl.checked = !!presSettings.attachPresentationClosing;
+  if (hintEl) {
+    hintEl.textContent = presScoring.canPresentationResults
+      ? `${presScoring.scorableCount} auswertbare Folie${presScoring.scorableCount === 1 ? '' : 'n'} erkannt.`
+      : presScoring.noResultsReason;
+  }
+  if (linkedEl) {
+    linkedEl.innerHTML = presResultsLinked || presClosingLinked
+      ? `<i class="fa-solid fa-link"></i> Am Ende: ${presResultsLinked ? 'Ergebnis' : ''}${presResultsLinked && presClosingLinked ? ' · ' : ''}${presClosingLinked ? 'Abschluss' : ''}`
+      : '';
+  }
+}
+
 async function deleteSlide(id) {
   const slide = State.slides.find((s) => s.id === id);
   if (slide && COLLECT_CHAIN_TYPES.has(slide.slide_type)) {
@@ -2175,30 +2217,6 @@ function renderEditorProps() {
     ${!chainCap.canRank && !chainCap.canResults && chainCap.reason ? `<p class="props-chain-reason">${esc(chainCap.reason)}</p>` : ''}`;
   }
 
-  const showLayoutToggle = (
-    slide.slide_type === 'section'
-    || slide.slide_type === 'content'
-    || slide.settings?.presentationClosing
-  ) && !isSopSlide && !slide.settings?.presentationResults;
-  const layoutCentered = useCenteredLayout(slide);
-  const layoutHtml = showLayoutToggle ? `
-    <div class="props-section">Layout</div>
-    <label class="props-toggle"><input type="checkbox" id="prop-layout-center" ${layoutCentered ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-align-center"></i></span><span class="props-toggle-text">Zentriertes Layout</span></label>
-    <p class="props-hint">Titel- und Abschlussfolien wirken damit wie eine Einleitung bzw. ein sauberer Abschluss.</p>` : '';
-
-  const presSettings = getPresentationSettings();
-  const presScoring = analyzePresentationScoring();
-  const presResultsLinked = findPresentationResultsSlide();
-  const presClosingLinked = findPresentationClosingSlide();
-  const presResultsDisabled = !presScoring.canPresentationResults;
-  const presentationClosureHtml = `
-    <div class="props-section">Präsentation abschließen</div>
-    <p class="props-hint" style="margin-top:0">${presScoring.scorableCount} auswertbare Folie${presScoring.scorableCount === 1 ? '' : 'n'} erkannt.</p>
-    <label class="props-toggle${presResultsDisabled ? ' props-chain-disabled' : ''}"><input type="checkbox" id="set-pres-results" ${presSettings.attachPresentationResults ? 'checked' : ''} ${presResultsDisabled ? 'disabled' : ''}><span class="props-toggle-box"><i class="fa-solid fa-chart-column"></i></span><span class="props-toggle-text">Session-Ergebnis am Ende</span></label>
-    ${presResultsDisabled ? `<p class="props-chain-reason">${esc(presScoring.noResultsReason)}</p>` : ''}
-    <label class="props-toggle"><input type="checkbox" id="set-pres-closing" ${presSettings.attachPresentationClosing ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-heart"></i></span><span class="props-toggle-text">Abschlussfolie am Ende</span></label>
-    ${presResultsLinked || presClosingLinked ? `<p class="props-hint"><i class="fa-solid fa-link"></i> Am Ende: ${presResultsLinked ? 'Ergebnis' : ''}${presResultsLinked && presClosingLinked ? ' · ' : ''}${presClosingLinked ? 'Abschluss' : ''}</p>` : ''}`;
-
   panel.innerHTML = `
     <div class="props-head">
       <span>Design & Einstellungen</span>
@@ -2222,7 +2240,6 @@ function renderEditorProps() {
       <input id="prop-max-label" value="${esc(c.maxLabel || '')}" placeholder="Beschriftung rechts" />` : ''}
     ${optionsHtml}
     ${slideChainHtml}
-    ${layoutHtml}
     <div class="props-section">Interaktion</div>
     <div class="props-toggle-grid">
       <label class="props-toggle"><input type="checkbox" id="set-anonymous" ${s.anonymous ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-user-secret"></i></span><span class="props-toggle-text">Anonyme Antworten</span></label>
@@ -2232,8 +2249,7 @@ function renderEditorProps() {
       <label class="props-toggle"><input type="checkbox" id="set-profanity" ${s.profanityFilter !== false ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-filter"></i></span><span class="props-toggle-text">Profanity-Filter</span></label>
     </div>
     <p class="props-hint"><i class="fa-solid fa-circle-info"></i> Name & Avatar werden bei Teilnahme immer abgefragt.</p>
-    <div class="props-label">Zeitlimit (Sek., 0 = aus)</div><input id="set-time" type="number" min="0" value="${s.timeLimitSec || 0}" />
-    ${presentationClosureHtml}`;
+    <div class="props-label">Zeitlimit (Sek., 0 = aus)</div><input id="set-time" type="number" min="0" value="${s.timeLimitSec || 0}" />`;
 
   const saveContent = debounce(async () => {
     const slideObj = currentSlide();
@@ -2255,7 +2271,6 @@ function renderEditorProps() {
       minLabel: $('#prop-min-label')?.value ?? slideObj.content.minLabel,
       maxLabel: $('#prop-max-label')?.value ?? slideObj.content.maxLabel,
       maxSelections: Number($('#prop-max-sel')?.value ?? slideObj.content.maxSelections ?? 3),
-      layout: $('#prop-layout-center') ? ($('#prop-layout-center')?.checked ? 'center' : 'default') : slideObj.content.layout,
     };
     panel.querySelectorAll('[data-opt="color"]').forEach((inp) => {
       const idx = Number(inp.dataset.idx);
@@ -2308,21 +2323,6 @@ function renderEditorProps() {
     toast('Folien-Kette aktualisiert', 'success');
   };
 
-  const savePresentationClosure = async () => {
-    const attachResults = !!$('#set-pres-results')?.checked;
-    const attachClosing = !!$('#set-pres-closing')?.checked;
-    const scoring = analyzePresentationScoring();
-    await persistPresentationSettings({
-      attachPresentationResults: attachResults && scoring.canPresentationResults,
-      attachPresentationClosing: attachClosing,
-    });
-    await syncPresentationClosureSlides();
-    renderEditorProps();
-    renderSlideList();
-    renderEditorCanvas();
-    toast('Abschluss-Folien aktualisiert', 'success');
-  };
-
   panel.querySelectorAll('input,textarea').forEach((el) => {
     el.addEventListener('input', saveContent);
     el.addEventListener('change', saveContent);
@@ -2340,9 +2340,6 @@ function renderEditorProps() {
   });
   $('#set-slide-results')?.addEventListener('change', () => { void saveSlideChain(); });
   $('#set-slide-vote-max')?.addEventListener('change', () => { void saveSlideChain(); });
-  $('#set-pres-results')?.addEventListener('change', () => { void savePresentationClosure(); });
-  $('#set-pres-closing')?.addEventListener('change', () => { void savePresentationClosure(); });
-  $('#prop-layout-center')?.addEventListener('change', () => { saveContent(); renderEditorCanvas(); });
   panel.querySelectorAll('[data-rm-opt]').forEach((btn) => btn.addEventListener('click', () => {
     currentSlide().content.options.splice(Number(btn.dataset.rmOpt), 1);
     saveContent();
@@ -2381,16 +2378,22 @@ async function persistSlideOrder() {
 function renderAddSlideModal() {
   const grid = $('#slide-type-grid');
   const chainBox = $('#brainstorm-add-chain');
+  const layoutBox = $('#add-slide-layout');
   grid.innerHTML = window.LP_SLIDE_TYPES.map((t) => `
     <button type="button" class="type-card" data-type="${t.type}">
       <h3><i class="fa-solid ${t.icon}"></i> ${esc(t.label)}</h3>
       <p>${esc(t.desc)}</p>
     </button>`).join('');
+  refreshAddSlideClosureUi();
   grid.querySelectorAll('.type-card').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const type = btn.dataset.type;
       const base = JSON.parse(JSON.stringify(window.LP_DEFAULT_CONTENT[type] || { title: 'Neu' }));
       const settings = { ...window.LP_DEFAULT_SETTINGS };
+      const content = { ...defaultStyle(), ...base };
+      if (type === 'section' || type === 'content') {
+        content.layout = $('#add-slide-center')?.checked ? 'center' : 'default';
+      }
       if (type === 'brainstorm') {
         settings.brainstormAttachRanking = !!$('#add-chain-rank')?.checked;
         settings.brainstormAttachResults = !!$('#add-chain-results')?.checked;
@@ -2404,7 +2407,7 @@ function renderAddSlideModal() {
         presentation_id: State.presentation.id,
         sort_order: State.slides.length,
         slide_type: type,
-        content: { ...defaultStyle(), ...base },
+        content,
         settings,
       }).select().single();
       State.slides.push(data);
@@ -2416,10 +2419,24 @@ function renderAddSlideModal() {
       renderEditor();
     });
     btn.addEventListener('mouseenter', () => {
-      chainBox?.classList.toggle('hidden', !COLLECT_CHAIN_TYPES.has(btn.dataset.type));
+      const type = btn.dataset.type;
+      chainBox?.classList.toggle('hidden', !COLLECT_CHAIN_TYPES.has(type));
+      layoutBox?.classList.toggle('hidden', type !== 'section' && type !== 'content');
+      if (type === 'section' || type === 'content') {
+        const centerEl = $('#add-slide-center');
+        if (centerEl) centerEl.checked = type === 'section';
+      }
     });
   });
   chainBox?.classList.add('hidden');
+  layoutBox?.classList.add('hidden');
+}
+
+function bindAddSlideModalControls() {
+  if (State.addSlideModalBound) return;
+  State.addSlideModalBound = true;
+  $('#add-pres-results')?.addEventListener('change', () => { void savePresentationClosureFromModal(); });
+  $('#add-pres-closing')?.addEventListener('change', () => { void savePresentationClosureFromModal(); });
 }
 
 async function saveVersionSnapshot() {
@@ -3545,6 +3562,7 @@ function bindUi() {
   $('#btn-join-as-participant')?.addEventListener('click', () => { location.hash = '#join'; enterParticipantJoin(); });
   $('#editor-back')?.addEventListener('click', goDashboard);
   $('#btn-add-slide')?.addEventListener('click', () => { renderAddSlideModal(); openModal('modal-add-slide'); });
+  bindAddSlideModalControls();
   $('#btn-save-version')?.addEventListener('click', saveVersionSnapshot);
   $('#btn-show-versions')?.addEventListener('click', openVersionsModal);
   $('#btn-export-pres')?.addEventListener('click', exportPresentationJson);
