@@ -1,7 +1,8 @@
 /* ROOTS Live Poll – Hauptanwendung */
 const SUPABASE_URL = 'https://csmguwcvzreefluhahyu.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNzbWd1d2N2enJlZWZsdWhhaHl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjM0ODcsImV4cCI6MjA5MjUzOTQ4N30.Fiafx7XBaQZXUX3bKQIBH7znBHx3B51yL-bftOHsL4Q';
-const JOIN_BASE = `${location.origin}${location.pathname}#join/`;
+const APP_VERSION = '20260520-fix';
+const JOIN_BASE = `${location.origin}${location.pathname}`;
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false, storage: window.localStorage },
@@ -73,6 +74,30 @@ function showScreen(name) {
   $$('.screen').forEach((s) => s.classList.remove('active'));
   const el = $(`#screen-${name}`);
   if (el) el.classList.add('active');
+}
+
+function isJoinRoute() {
+  const hash = location.hash.toLowerCase();
+  if (hash.startsWith('#join')) return true;
+  return Boolean(new URLSearchParams(location.search).get('join'));
+}
+
+function buildJoinUrl(code) {
+  const safe = String(code || '').trim().toUpperCase();
+  return `${JOIN_BASE}?join=${encodeURIComponent(safe)}&v=${APP_VERSION}#join/${safe}`;
+}
+
+function parseJoinCodeFromHash() {
+  const fromQuery = new URLSearchParams(location.search).get('join');
+  if (fromQuery) return fromQuery.trim().toUpperCase();
+  const raw = location.hash.replace(/^#join\/?/i, '');
+  return raw.split(/[/?#&]/)[0]?.trim().toUpperCase() || '';
+}
+
+function enterParticipantJoin() {
+  document.documentElement.classList.add('lp-join-route');
+  showScreen('participant');
+  renderParticipantEntry(parseJoinCodeFromHash());
 }
 
 function showLoginAlert(msg) {
@@ -164,9 +189,8 @@ async function onAuthSession(session) {
   State.user = session.user;
   await loadProfile(session.user);
   mountRootsUser();
-  if (location.hash.startsWith('#join')) {
-    showScreen('participant');
-    renderParticipantEntry(parseJoinCodeFromHash());
+  if (isJoinRoute()) {
+    enterParticipantJoin();
     return;
   }
   if (location.hash.startsWith('#editor/') || location.hash.startsWith('#present/') || location.hash.startsWith('#results/')) {
@@ -792,6 +816,11 @@ function getPendingResponses(slideId) {
   return State.responses.filter((r) => r.slide_id === slideId && r.is_hidden);
 }
 
+function updatePresentHeader() {
+  const titleEl = $('#present-title');
+  if (titleEl) titleEl.textContent = State.presentation?.title || 'Präsentation';
+}
+
 function renderPresent() {
   const slide = currentSessionSlide();
   const stage = $('#present-stage');
@@ -810,7 +839,7 @@ function renderPresent() {
   } else if (slide.settings?.showResultsLive !== false && State.session.question_open) {
     viz = window.LPViz.renderViz(slide, agg, 'present');
   } else {
-    viz = `<div style="color:#64748b;margin-top:1rem">${State.session.question_open ? 'Antworten werden gesammelt…' : 'Frage geschlossen'}</div>`;
+    viz = `<div class="present-wait-msg">${State.session.question_open ? 'Antworten werden gesammelt…' : 'Frage geschlossen'}</div>`;
   }
 
   const modPanel = pending.length ? `
@@ -829,14 +858,18 @@ function renderPresent() {
       }).join('')}
     </div>` : '';
 
+  const slideInk = c.textColor || 'var(--ink)';
+  const slideMuted = c.subtextColor || 'var(--muted)';
+
   stage.innerHTML = `
-    <div style="font-size:.85rem;color:#64748b;margin-bottom:.5rem">Folie ${(State.session.current_slide_index || 0) + 1} / ${State.slides.length}</div>
-    <h1 style="color:${esc(c.textColor || '#f8fafc')}">${esc(c.title || c.prompt || 'Folie')}</h1>
-    <p style="color:#94a3b8;max-width:720px">${esc(c.prompt || c.body || '')}</p>
+    <div class="present-slide-meta">Folie ${(State.session.current_slide_index || 0) + 1} / ${State.slides.length}</div>
+    <h1 class="present-slide-title" style="color:${esc(slideInk)}">${esc(c.title || c.prompt || 'Folie')}</h1>
+    <p class="present-slide-body" style="color:${esc(slideMuted)}">${esc(c.prompt || c.body || '')}</p>
     <div class="viz-wrap">${viz}</div>${modPanel}`;
 
   stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
   stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
+  updatePresentHeader();
   updatePresentStats();
   renderPresentParticipants();
   void renderQrCode();
@@ -865,7 +898,7 @@ function updatePresentStats() {
 
 async function renderQrCode() {
   if (!State.session) return;
-  const url = `${JOIN_BASE}${State.session.code}`;
+  const url = buildJoinUrl(State.session.code);
   const img = $('#present-qr');
   const urlEl = $('#present-join-url');
   const codeEl = $('#present-code-text');
@@ -877,7 +910,7 @@ async function renderQrCode() {
       img.src = await QRCode.toDataURL(url, {
         width: 140,
         margin: 1,
-        color: { dark: '#ffffff', light: '#0b1220' },
+        color: { dark: '#0f172a', light: '#ffffff' },
       });
       img.alt = `QR Code ${State.session.code}`;
     } else {
@@ -950,14 +983,17 @@ function markAnswered(slideId) {
 }
 
 function renderParticipantEntry(codePrefill) {
-  const saved = JSON.parse(localStorage.getItem('lp_join_profile') || '{}');
-  const code = (codePrefill || '').trim().toUpperCase();
+  const saved = JSON.parse(localStorage.getItem('lp_join_profile') || 'null');
+  const code = (codePrefill || parseJoinCodeFromHash() || '').trim().toUpperCase();
   const hasCode = Boolean(code);
   State.joinProfile = {
-    name: saved.name || '',
-    emoji: saved.emoji || LP_AVATAR_EMOJIS()[0],
-    color: saved.color || LP_AVATAR_COLORS()[0],
+    name: '',
+    emoji: LP_AVATAR_EMOJIS()[0],
+    color: LP_AVATAR_COLORS()[0],
   };
+  if (!hasCode && saved?.name) State.joinProfile.name = saved.name;
+  if (!hasCode && saved?.emoji) State.joinProfile.emoji = saved.emoji;
+  if (!hasCode && saved?.color) State.joinProfile.color = saved.color;
   const root = $('#participant-root');
   root.innerHTML = `
     <div class="participant-card participant-join-card">
@@ -1252,7 +1288,7 @@ async function submitResponse(response) {
   if (!slide || !State.session.question_open) return;
   if (slide.settings?.askName && !State.participant?.display_name) {
     toast('Bitte mit Namen beitreten', 'warn');
-    renderParticipantEntry(State.session.code);
+    enterParticipantJoin();
     return;
   }
   if (response.text) response.text = filterProfanity(response.text, slide.settings?.profanityFilter !== false);
@@ -1341,11 +1377,6 @@ function openModal(id) { document.getElementById(id)?.classList.add('visible'); 
 function closeModal(id) { document.getElementById(id)?.classList.remove('visible'); }
 window.closeModal = closeModal;
 
-function parseJoinCodeFromHash() {
-  const raw = location.hash.replace(/^#join\/?/i, '');
-  return raw.split('/')[0]?.trim() || '';
-}
-
 async function routeFromHash() {
   const hash = location.hash.replace(/^#/, '');
   if (!hash || hash === 'dashboard') {
@@ -1356,8 +1387,7 @@ async function routeFromHash() {
     return;
   }
   if (hash.startsWith('join')) {
-    showScreen('participant');
-    renderParticipantEntry(parseJoinCodeFromHash());
+    enterParticipantJoin();
     return;
   }
   if (hash.startsWith('present/')) {
@@ -1365,6 +1395,8 @@ async function routeFromHash() {
     const { data: session } = await sb.from('lp_sessions').select('*').eq('id', id).maybeSingle();
     if (!session) return;
     State.session = session;
+    const { data: pres } = await sb.from('lp_presentations').select('title').eq('id', session.presentation_id).maybeSingle();
+    if (pres?.title) State.presentation = { ...(State.presentation || {}), title: pres.title };
     await loadSessionData();
     showScreen('present');
     subscribeSessionChannel();
@@ -1404,7 +1436,7 @@ function bindUi() {
   $('#dash-search')?.addEventListener('input', debounce((e) => { State.search = e.target.value; renderDashboard(); }, 200));
   $('#btn-new-presentation')?.addEventListener('click', () => createPresentation());
   $('#btn-open-templates')?.addEventListener('click', () => { renderTemplatesModal(); openModal('modal-templates'); });
-  $('#btn-join-as-participant')?.addEventListener('click', () => { location.hash = '#join'; showScreen('participant'); renderParticipantEntry(); });
+  $('#btn-join-as-participant')?.addEventListener('click', () => { location.hash = '#join'; enterParticipantJoin(); });
   $('#editor-back')?.addEventListener('click', goDashboard);
   $('#btn-add-slide')?.addEventListener('click', () => { renderAddSlideModal(); openModal('modal-add-slide'); });
   $('#btn-save-version')?.addEventListener('click', saveVersionSnapshot);
@@ -1428,9 +1460,8 @@ sb.auth.onAuthStateChange((_ev, session) => { if (session) void onAuthSession(se
 
 bindUi();
 void flushPendingQueue();
-if (location.hash.startsWith('#join')) {
-  showScreen('participant');
-  renderParticipantEntry(parseJoinCodeFromHash());
+if (isJoinRoute()) {
+  enterParticipantJoin();
 } else {
   void routeFromHash();
 }

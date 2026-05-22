@@ -99,13 +99,12 @@
   }
 
   function renderViz(slide, agg, mode) {
-    const dark = mode === 'present';
-    const light = mode === 'editor' || mode === 'results';
-    const textColor = dark ? '#f8fafc' : 'var(--ink)';
-    const trackBg = dark ? 'rgba(255,255,255,.12)' : 'rgba(15,23,42,.08)';
-    const itemBg = dark ? 'rgba(255,255,255,.06)' : 'var(--surface)';
-    const itemBorder = dark ? 'rgba(255,255,255,.1)' : 'var(--line)';
-    const wordColor = dark ? '#fff' : 'var(--brand)';
+    const light = mode === 'editor' || mode === 'results' || mode === 'present';
+    const textColor = light ? 'var(--ink)' : 'var(--ink)';
+    const trackBg = light ? 'rgba(15,23,42,.08)' : 'rgba(15,23,42,.08)';
+    const itemBg = light ? 'var(--surface)' : 'var(--surface)';
+    const itemBorder = light ? 'var(--line)' : 'var(--line)';
+    const wordColor = light ? 'var(--brand)' : 'var(--brand)';
 
     if (agg.type === 'mc_single' || agg.type === 'mc_multi' || agg.type === 'yesno' || agg.type === 'quiz' || agg.type === 'reaction') {
       const options = slide.content.options || [];
@@ -138,7 +137,7 @@
     }
 
     if (agg.type === 'scale' || agg.type === 'number_guess') {
-      const sub = light ? 'var(--muted)' : '#94a3b8';
+      const sub = 'var(--muted)';
       return `<div style="font-size:2.5rem;font-weight:800;color:${textColor}">Ø ${(agg.avg || 0).toFixed(1)} · Median ${agg.median || 0}<div style="font-size:.9rem;color:${sub};margin-top:.5rem">${agg.total} Antworten</div></div>`;
     }
 
@@ -165,11 +164,10 @@
     }
 
     if (agg.type === 'content' || agg.type === 'section') {
-      return `<div style="color:${light ? 'var(--muted)' : '#64748b'}">Inhaltsfolie</div>`;
+      return `<div style="color:var(--muted)">Inhaltsfolie</div>`;
     }
 
-    const emptyColor = light ? 'var(--muted)' : '#94a3b8';
-    return `<div style="color:${emptyColor}">${agg.total || 0} Antworten</div>`;
+    return `<div style="color:var(--muted)">${agg.total || 0} Antworten</div>`;
   }
 
   window.LPViz = { aggregateResponses, renderViz, esc };

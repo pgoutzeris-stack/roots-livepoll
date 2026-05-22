@@ -22,7 +22,7 @@ Live: https://pgoutzeris-stack.github.io/roots-livepoll/
 
 ## Teilnahme
 
-Teilnehmer öffnen: `https://pgoutzeris-stack.github.io/roots-livepoll/#join/CODE`
+Teilnehmer öffnen: `https://pgoutzeris-stack.github.io/roots-livepoll/?join=CODE#join/CODE`
 
 ## Architektur
 

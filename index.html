@@ -3,12 +3,27 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <title>ROOTS Live Poll</title>
+<script>
+(function () {
+  var h = (location.hash || '').toLowerCase();
+  var q = new URLSearchParams(location.search).get('join');
+  if (h.indexOf('#join') === 0 || q) {
+    document.documentElement.classList.add('lp-join-route');
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('.screen').forEach(function (s) { s.classList.remove('active'); });
+      var p = document.getElementById('screen-participant');
+      if (p) p.classList.add('active');
+    });
+  }
+})();
+</script>
 <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/circular-std" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="styles.css?v=20260520-fix" />
 </head>
 <body>
 <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -101,11 +116,25 @@
 
 <!-- PRESENT -->
 <section id="screen-present" class="screen">
-  <div id="present-stage" class="present-stage"></div>
+  <div class="present-shell">
+    <header class="present-header sop-header compact">
+      <div class="header-left">
+        <div class="logo-mark"><i class="fa-solid fa-signal"></i></div>
+        <span class="wordmark">ROOTS <span>Live Poll</span></span>
+        <span class="header-divider"></span>
+        <span class="header-sub" id="present-title">Präsentation</span>
+      </div>
+      <div class="header-right">
+        <span class="present-live-badge"><i class="fa-solid fa-circle"></i> Live</span>
+      </div>
+    </header>
+    <div id="present-stage" class="present-stage"></div>
+  </div>
   <div id="present-participants" class="present-participants-bar" aria-label="Teilnehmer"></div>
   <div id="present-activity" class="present-activity-feed" aria-live="polite"></div>
   <div id="present-code-bar" class="present-code-bar hidden">
     <div class="present-code-inner">
+      <div class="present-code-label">Teilnahme-Code</div>
       <div id="present-code-text" class="present-code-text"></div>
       <img id="present-qr" class="present-qr-img" alt="QR Code" width="140" height="140" />
       <div class="present-code-url" id="present-join-url"></div>
@@ -162,8 +191,8 @@
 </div>
 
 <script src="https://pgoutzeris-stack.github.io/ROOTS_Intranet/roots-user-bridge.js?v=20260522-hover"></script>
-<script src="templates.js?v=20260522-sop"></script>
-<script src="viz.js?v=20260522-sop"></script>
-<script src="app.js?v=20260522-sop"></script>
+<script src="templates.js?v=20260520-fix"></script>
+<script src="viz.js?v=20260520-fix"></script>
+<script src="app.js?v=20260520-fix"></script>
 </body>
 </html>
