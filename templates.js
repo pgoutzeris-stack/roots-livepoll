@@ -185,6 +185,28 @@ function sopCardBrainstorm(track, phase, card) {
   }, { showResultsLive: true, workshopMode: 'collect' });
 }
 
+function sopCardVote(track, phase, card) {
+  return tplSlide('mc_multi', {
+    title: `Priorisierung · ${card.name}`,
+    prompt: 'Wähle deine 2 Lieblings-Use-Cases aus dem Brainstorming dieser Karte.',
+    subtitle: `${phase.name} · ${track.title.replace(/^Track \d+: /, '')}`,
+    mentiQuestion: true,
+    maxSelections: 2,
+    options: [],
+    ...sopMeta(track, phase, card),
+  }, { showResultsLive: true, sopCardVote: true, sopVoteMax: 2, workshopMode: 'decide' });
+}
+
+function sopCardResults(track, phase, card) {
+  return tplSlide('content', {
+    title: `Ergebnis · ${card.name}`,
+    subtitle: `${phase.name} · ${track.title.replace(/^Track \d+: /, '')}`,
+    body: 'Die favorisierten Use Cases mit Stimmenanteil und Gewinnern.',
+    sopKind: 'card-results',
+    ...sopMeta(track, phase, card),
+  }, { showResultsLive: true, sopCardResults: true, workshopMode: 'decide' });
+}
+
 function sopTrackVote(track) {
   return tplSlide('percent_split', {
     title: `Priorisierung · ${track.title.replace(/^Track \d+: /, '')}`,
@@ -198,13 +220,16 @@ function sopTrackVote(track) {
 function buildSopKiWorkshopSlides() {
   const trackSlides = SOP_TOOL_TRACKS.flatMap((track, trackIndex) => [
     sopTrackIntro(track, trackIndex),
-    ...track.phases.flatMap((phase) => phase.cards.map((card) => sopCardBrainstorm(track, phase, card))),
-    sopTrackVote(track),
+    ...track.phases.flatMap((phase) => phase.cards.flatMap((card) => [
+      sopCardBrainstorm(track, phase, card),
+      sopCardVote(track, phase, card),
+      sopCardResults(track, phase, card),
+    ])),
   ]);
   return [
     tplSlide('content', {
       title: 'SOP · KI Use-Case Workshop',
-      body: 'Pro SOP-Karte: Kontext & Brainstorming in einem Schritt.\nAm Track-Ende: Top 3 priorisieren (oder 100 Punkte im Expertenmodus).\n\nQR scannen · Name + Avatar wählen.',
+      body: 'Pro SOP-Karte: Brainstorming → 2 Favoriten wählen → Ergebnis mit Prozenten und Gewinnern.\n\nQR scannen · Name + Avatar wählen.',
       mentiHero: true,
     }),
     ...trackSlides,
@@ -223,10 +248,10 @@ window.LP_TEMPLATES = [
     key: 'roots-sop-ki-workshop',
     category: 'ROOTS · SOP & KI',
     name: 'SOP-Brainstorming & KI Use Cases',
-    desc: 'Fokussierter SOP-Workshop: 26 Karten Brainstorming, pro Track Top-3-Priorisierung mit klarem Fortschritt.',
+    desc: 'Fokussierter SOP-Workshop: pro Karte Brainstorming, 2 Favoriten wählen, Ergebnis mit Prozenten und Gewinnern.',
     duration: '90–150 Min.',
     group: '6–25',
-    tips: 'Sidebar zeigt nur den aktiven Track. Board nur bei Track-Start. Priorisierung: Top 3 (Standard) oder 100 Punkte (Experte).',
+    tips: 'Pro Unterphase (z. B. ROOTS Vorstellung): sammeln → max. 2 Favoriten → Ergebnisfolie. Live-Ansicht zeigt Abstimmungsfortschritt.',
     slides: buildSopKiWorkshopSlides(),
   },
   {
