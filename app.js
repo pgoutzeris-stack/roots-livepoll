@@ -1,7 +1,7 @@
 /* ROOTS Live Poll – Hauptanwendung */
 const SUPABASE_URL = 'https://csmguwcvzreefluhahyu.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNzbWd1d2N2enJlZWZsdWhhaHl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjM0ODcsImV4cCI6MjA5MjUzOTQ4N30.Fiafx7XBaQZXUX3bKQIBH7znBHx3B51yL-bftOHsL4Q';
-const APP_VERSION = '20260520-sop4';
+const APP_VERSION = '20260520-sop7';
 const JOIN_BASE = `${location.origin}${location.pathname}`;
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
@@ -49,6 +49,9 @@ const State = {
   joinProfile: { name: '', emoji: '🦊', color: '#206efb' },
   activityItems: [],
   participantPoll: null,
+  sopFocusMode: false,
+  showPresentPanels: false,
+  participantVoteExpert: false,
 };
 
 localStorage.setItem('lp_device_id', State.deviceId);
@@ -221,15 +224,17 @@ function findSlideIndexForSopStep(trackKey, phaseName, cardName, step) {
     const c = s.content || {};
     const st = s.settings || {};
     const trackMatch = c.sopTrackKey === trackKey || c.sopTrackClass === trackKey;
-    if (!trackMatch && step !== 'track-intro') return false;
     if (step === 'track-intro') {
       return s.slide_type === 'section' && c.sopKind === 'track' && trackMatch;
     }
     if (step === 'card-intro') {
-      return s.slide_type === 'content' && c.sopKind === 'card' && c.sopPhaseName === phaseName && c.sopCardName === cardName;
+      return s.slide_type === 'content' && c.sopKind === 'card' && c.sopPhaseName === phaseName && c.sopCardName === cardName && trackMatch;
     }
-    if (step === 'brainstorm') {
-      return s.slide_type === 'brainstorm' && c.sopPhaseName === phaseName && c.sopCardName === cardName;
+    if (step === 'brainstorm' || step === 'card') {
+      if (!trackMatch) return false;
+      if (s.slide_type === 'brainstorm' && c.sopPhaseName === phaseName && c.sopCardName === cardName) return true;
+      if (s.slide_type === 'content' && c.sopKind === 'card' && c.sopPhaseName === phaseName && c.sopCardName === cardName) return true;
+      return false;
     }
     if (step === 'track-vote') {
       return st.sopTrackVote && trackMatch;
@@ -245,11 +250,11 @@ function getSopSlideContext(slide) {
   if (st.sopTrackVote) {
     return { trackKey: c.sopTrackKey || c.sopTrackClass, phaseName: null, cardName: null, kind: 'track-vote' };
   }
-  if (slide.slide_type === 'brainstorm' && (c.sopTrackKey || c.sopTrackClass)) {
-    return { trackKey: c.sopTrackKey || c.sopTrackClass, phaseName: c.sopPhaseName, cardName: c.sopCardName, kind: 'brainstorm' };
+  if (slide.slide_type === 'brainstorm' && (c.sopTrackKey || c.sopTrackClass) && c.sopCardName) {
+    return { trackKey: c.sopTrackKey || c.sopTrackClass, phaseName: c.sopPhaseName, cardName: c.sopCardName, kind: 'card-brainstorm' };
   }
-  if (c.sopKind === 'card') {
-    return { trackKey: c.sopTrackKey || c.sopTrackClass, phaseName: c.sopPhaseName, cardName: c.sopCardName, kind: 'card-intro' };
+  if (c.sopKind === 'card' || c.sopKind === 'card-workshop') {
+    return { trackKey: c.sopTrackKey || c.sopTrackClass, phaseName: c.sopPhaseName, cardName: c.sopCardName, kind: 'card-brainstorm' };
   }
   if (c.sopKind === 'track') {
     return { trackKey: c.sopTrackKey || c.sopTrackClass, phaseName: null, cardName: null, kind: 'track-intro' };
@@ -257,15 +262,209 @@ function getSopSlideContext(slide) {
   return null;
 }
 
+function getActiveTrackKey(slideIndex) {
+  const ctx = getSopSlideContext(State.slides[slideIndex]);
+  if (ctx?.trackKey) return ctx.trackKey;
+  for (let i = slideIndex; i >= 0; i -= 1) {
+    const c = getSopSlideContext(State.slides[i]);
+    if (c?.trackKey) return c.trackKey;
+  }
+  const tracks = window.SOP_TOOL_TRACKS || [];
+  return tracks[0]?.class || null;
+}
+
+function getTrackCardSlideIndexes(trackKey) {
+  return State.slides
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => {
+      const c = s.content || {};
+      const trackMatch = c.sopTrackKey === trackKey || c.sopTrackClass === trackKey;
+      return trackMatch && s.slide_type === 'brainstorm' && c.sopCardName;
+    });
+}
+
+function getWorkshopMode(slide) {
+  const ctx = getSopSlideContext(slide);
+  if (!ctx) return slide?.settings?.workshopMode || null;
+  if (ctx.kind === 'track-intro') return 'orient';
+  if (ctx.kind === 'card-brainstorm') return 'collect';
+  if (ctx.kind === 'track-vote') return 'decide';
+  return slide?.settings?.workshopMode || null;
+}
+
+function getWorkshopProgress(slideIndex) {
+  const slide = State.slides[slideIndex];
+  const ctx = getSopSlideContext(slide);
+  const trackKey = ctx?.trackKey || getActiveTrackKey(slideIndex);
+  if (!trackKey || !ctx) return null;
+  const cards = getTrackCardSlideIndexes(trackKey);
+  const track = (window.SOP_TOOL_TRACKS || []).find((t) => t.class === trackKey);
+  const trackLabel = track?.title.replace(/^Track \d+: /, '') || trackKey;
+  if (ctx.kind === 'track-vote') {
+    return { trackKey, trackLabel, step: 'decide', stepLabel: 'Priorisierung', cardIndex: cards.length, cardTotal: cards.length, pct: 100 };
+  }
+  if (ctx.kind === 'track-intro') {
+    return { trackKey, trackLabel, step: 'orient', stepLabel: 'Orientierung', cardIndex: 0, cardTotal: cards.length, pct: 0 };
+  }
+  if (ctx.cardName) {
+    const idx = cards.findIndex(({ s }) => s.content?.sopCardName === ctx.cardName);
+    const cardNum = idx >= 0 ? idx + 1 : 0;
+    const pct = cards.length ? Math.round((cardNum / cards.length) * 100) : 0;
+    return { trackKey, trackLabel, step: 'collect', stepLabel: 'Brainstorming', cardIndex: cardNum, cardTotal: cards.length, pct, cardName: ctx.cardName, phaseName: ctx.phaseName };
+  }
+  return null;
+}
+
+function renderWorkshopProgressHtml(slideIndex) {
+  if (!isSopWorkshopPresentation()) {
+    return `<div class="workshop-slide-meta">Folie ${slideIndex + 1} / ${State.slides.length}</div>`;
+  }
+  const p = getWorkshopProgress(slideIndex);
+  if (!p) return `<div class="workshop-slide-meta">Folie ${slideIndex + 1} / ${State.slides.length}</div>`;
+  const counter = p.step === 'decide' ? 'Track abschließen' : p.step === 'orient' ? 'Track-Start' : `Karte ${p.cardIndex} von ${p.cardTotal}`;
+  return `<div class="workshop-progress">
+    <div class="workshop-progress-text"><strong>${esc(p.trackLabel)}</strong> · ${esc(counter)} · ${esc(p.stepLabel)}</div>
+    <div class="workshop-progress-bar" role="progressbar" aria-valuenow="${p.pct}" aria-valuemin="0" aria-valuemax="100"><div class="workshop-progress-fill" style="width:${p.pct}%"></div></div>
+  </div>`;
+}
+
+function renderWorkshopModeBadge(mode) {
+  const labels = { orient: 'Orientierung', collect: 'Brainstorming', decide: 'Priorisierung' };
+  const icons = { orient: 'fa-compass', collect: 'fa-lightbulb', decide: 'fa-chart-pie' };
+  if (!mode || !labels[mode]) return '';
+  return `<div class="workshop-mode-badge workshop-mode-${mode}"><i class="fa-solid ${icons[mode]}"></i> ${labels[mode]}</div>`;
+}
+
+function getCardNavStatus(trackKey, phaseName, cardName, currentIndex) {
+  const idx = findSlideIndexForSopStep(trackKey, phaseName, cardName, 'card');
+  if (idx < 0) return 'open';
+  if (idx === currentIndex) return 'active';
+  if (idx < currentIndex) return 'done';
+  return 'open';
+}
+
+function cardNavStatusIcon(status) {
+  if (status === 'done') return '<i class="fa-solid fa-check sop-nav-status done"></i>';
+  if (status === 'active') return '<i class="fa-solid fa-circle sop-nav-status active"></i>';
+  return '<i class="fa-regular fa-circle sop-nav-status open"></i>';
+}
+
 function getSopBoardContextFromSlide(slide) {
   const ctx = getSopSlideContext(slide);
-  if (!ctx?.trackKey) return { show: false };
-  return {
-    show: true,
-    trackKey: ctx.trackKey,
-    phaseName: ctx.cardName ? ctx.phaseName : null,
-    cardName: ctx.cardName || null,
-  };
+  if (ctx?.kind !== 'track-intro') return { show: false };
+  return { show: true, trackKey: ctx.trackKey, phaseName: null, cardName: null };
+}
+
+function getTrackVoteOptionsGrouped(slide) {
+  const key = slide.content?.sopTrackKey || slide.content?.sopTrackClass;
+  if (!key) return [];
+  const { byCard } = aggregateTrackUseCases(key);
+  return byCard
+    .filter((g) => g.items.length)
+    .map((g) => ({
+      phase: g.phase,
+      card: g.card,
+      options: g.items.map((text, i) => ({ id: stableUseCaseOptionId(text, i), text })),
+    }));
+}
+
+function renderTrackVoteGroupedListHtml(slide, { selectable = false, selectedIds = [] } = {}) {
+  const groups = getTrackVoteOptionsGrouped(slide);
+  if (!groups.length) return '<div class="present-wait-msg">Noch keine Use Cases gesammelt.</div>';
+  return `<div class="track-vote-grouped">${groups.map((g) => `
+    <div class="track-vote-group">
+      <div class="track-vote-group-head"><span>${esc(g.phase)}</span><strong>${esc(g.card)}</strong></div>
+      <div class="track-vote-group-items">${g.options.map((o) => {
+        if (selectable) {
+          const checked = selectedIds.includes(o.id) ? ' checked' : '';
+          return `<label class="track-vote-option"><input type="checkbox" value="${esc(o.id)}"${checked} /><span>${esc(o.text)}</span></label>`;
+        }
+        return `<div class="track-vote-option-read">${esc(o.text)}</div>`;
+      }).join('')}</div>
+    </div>`).join('')}</div>`;
+}
+
+function aggregateTrackVoteResponses(slide, visible) {
+  const optionMap = {};
+  getTrackVoteOptions(slide).forEach((o) => { optionMap[o.id] = o.text; });
+  const top3Counts = {};
+  const pointTotals = {};
+  visible.forEach((r) => {
+    (r.response?.values || []).forEach((id) => { top3Counts[id] = (top3Counts[id] || 0) + 1; });
+    const pts = r.response?.points || {};
+    Object.entries(pts).forEach(([id, val]) => { pointTotals[id] = (pointTotals[id] || 0) + Number(val || 0); });
+  });
+  return { top3Counts, pointTotals, optionMap };
+}
+
+function renderTrackVoteResultsHtml(slide, visible) {
+  const { top3Counts, pointTotals, optionMap } = aggregateTrackVoteResponses(slide, visible);
+  const groups = getTrackVoteOptionsGrouped(slide);
+  const scoreFor = (id) => (top3Counts[id] || 0) * 10 + (pointTotals[id] || 0);
+  let html = '<div class="track-vote-results">';
+  groups.forEach((g) => {
+    html += `<div class="track-vote-group"><div class="track-vote-group-head"><span>${esc(g.phase)}</span><strong>${esc(g.card)}</strong></div><div class="track-vote-group-items">`;
+    g.options
+      .map((o) => ({ ...o, score: scoreFor(o.id), votes: top3Counts[o.id] || 0, points: pointTotals[o.id] || 0 }))
+      .sort((a, b) => b.score - a.score)
+      .forEach((o) => {
+        const max = Math.max(1, ...g.options.map((x) => scoreFor(x.id)));
+        const pct = Math.round((o.score / max) * 100);
+        html += `<div class="track-vote-result-row"><span>${esc(o.text)}</span><div class="viz-bar-track"><div class="viz-bar-fill" style="width:${pct}%"></div></div><strong>${o.votes ? `${o.votes}× Top 3` : ''}${o.votes && o.points ? ' · ' : ''}${o.points ? `${Math.round(o.points)} Pkt` : ''}</strong></div>`;
+      });
+    html += '</div></div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderWorkshopCardCollectHtml(c, editable = false) {
+  const theme = sopTrackTheme(c.sopTrackClass);
+  const titleEl = editable
+    ? `<div class="canvas-editable workshop-card-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+    : `<h1 class="workshop-card-title">${esc(c.title || c.sopCardName || '')}</h1>`;
+  const subEl = c.subtitle ? `<p class="workshop-card-sub">${esc(c.subtitle)}</p>` : '';
+  const bodyEl = editable
+    ? `<div class="canvas-editable workshop-card-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+    : (c.body ? `<p class="workshop-card-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+  return `
+    <div class="workshop-collect-shell ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+      ${renderWorkshopModeBadge('collect')}
+      ${renderSopQuestionBadge(c)}
+      ${titleEl}
+      ${subEl}
+      ${bodyEl}
+    </div>`;
+}
+
+function renderParticipantWorkshopHeader(slideIndex) {
+  const p = getWorkshopProgress(slideIndex);
+  if (!p) return '';
+  const counter = p.step === 'decide' ? 'Priorisierung' : p.step === 'orient' ? 'Orientierung' : `Karte ${p.cardIndex}/${p.cardTotal}`;
+  return `<div class="participant-workshop-header">
+    <div class="participant-workshop-track">${esc(p.trackLabel)}</div>
+    <div class="participant-workshop-step">${esc(counter)} · ${esc(p.stepLabel)}</div>
+    <div class="workshop-progress-bar"><div class="workshop-progress-fill" style="width:${p.pct}%"></div></div>
+  </div>`;
+}
+
+function renderParticipantTrackVoteHtml(slide) {
+  const groups = getTrackVoteOptionsGrouped(slide);
+  if (!groups.length) return '<p style="color:var(--muted)">Noch keine Use Cases gesammelt. Bitte warte, bis das Brainstorming abgeschlossen ist.</p>';
+  const expert = State.participantVoteExpert;
+  if (expert) {
+    const opts = getTrackVoteOptions(slide);
+    return `<p class="vote-mode-hint">Expertenmodus: Verteile genau <strong>100 Punkte</strong>.</p>
+      ${opts.map((o) => `<div class="split-row"><span>${esc(o.text)}</span><input type="number" min="0" max="100" value="0" data-split="${esc(o.id)}" class="split-input" /></div>`).join('')}
+      <div id="split-total" style="font-weight:700;margin:.5rem 0">Summe: 0 / 100</div>
+      <button type="button" class="btn-ghost vote-mode-toggle" id="vote-mode-toggle">← Zurück zu Top 3</button>
+      <button type="button" class="btn-primary participant-submit" id="submit-split">Punkte senden</button>`;
+  }
+  return `<p class="vote-mode-hint">Wähle deine <strong>Top 3 Use Cases</strong> in diesem Track.</p>
+    ${renderTrackVoteGroupedListHtml(slide, { selectable: true })}
+    <div id="top3-counter" class="top3-counter">0 / 3 gewählt</div>
+    <button type="button" class="btn-ghost vote-mode-toggle" id="vote-mode-toggle">Expertenmodus: 100 Punkte</button>
+    <button type="button" class="btn-primary participant-submit" id="submit-top3">Top 3 senden</button>`;
 }
 
 function renderSopFullBoardHtml(ctx = {}) {
@@ -306,35 +505,47 @@ function renderSopFullBoardHtml(ctx = {}) {
 function renderSopWorkshopNavHtml(currentIndex, { clickable = false, onNavigate } = {}) {
   const tracks = window.SOP_TOOL_TRACKS || [];
   const ctx = getSopSlideContext(State.slides[currentIndex]);
-  let html = '<div class="dash-nav-section">Inhaltsverzeichnis</div>';
+  const activeTrackKey = getActiveTrackKey(currentIndex);
+  let html = '<div class="dash-nav-section">Workshop</div>';
   tracks.forEach((track) => {
     const navClass = SOP_TRACK_NAV_CLASS[track.class] || '';
     const trackIdx = findSlideIndexForSopStep(track.class, null, null, 'track-intro');
-    const trackActive = ctx?.trackKey === track.class;
+    const isActiveTrack = track.class === activeTrackKey;
+    const trackStarted = trackIdx >= 0 && currentIndex >= trackIdx;
+    const trackDone = (() => {
+      const voteIdx = findSlideIndexForSopStep(track.class, null, null, 'track-vote');
+      return voteIdx >= 0 && currentIndex > voteIdx;
+    })();
+
+    if (!isActiveTrack) {
+      const label = trackDone ? 'Abgeschlossen' : trackStarted ? 'Später' : 'Noch nicht gestartet';
+      html += `<button type="button" class="dash-nav-item sop-nav-track-collapsed ${navClass}" disabled>
+        <i class="fa-solid fa-folder-tree"></i><span>${esc(track.title.replace(/^Track \d+: /, ''))}</span>
+        <small>${label}</small>
+      </button>`;
+      return;
+    }
+
     html += `<div class="sop-nav-track-group">
-      <button type="button" class="dash-nav-item ${navClass}${trackActive && ctx?.kind === 'track-intro' ? ' active' : ''}${trackActive && ctx?.kind !== 'track-intro' ? ' sop-nav-parent-active active' : ''}" data-slide-index="${trackIdx}" ${trackIdx < 0 ? 'disabled' : ''}>
+      <button type="button" class="dash-nav-item ${navClass}${ctx?.kind === 'track-intro' ? ' active' : ' sop-nav-parent-active active'}" data-slide-index="${trackIdx}" ${trackIdx < 0 ? 'disabled' : ''}>
         <i class="fa-solid fa-folder-tree"></i><span>${esc(track.title.replace(/^Track \d+: /, ''))}</span>
       </button>
       <div class="sop-nav-phases">`;
     (track.phases || []).forEach((phase) => {
       html += `<div class="sop-nav-phase-group"><div class="sop-nav-phase-label">${esc(phase.name)}</div>`;
       (phase.cards || []).forEach((card) => {
-        const introIdx = findSlideIndexForSopStep(track.class, phase.name, card.name, 'card-intro');
-        const brainIdx = findSlideIndexForSopStep(track.class, phase.name, card.name, 'brainstorm');
-        const cardActive = ctx?.trackKey === track.class && ctx?.phaseName === phase.name && ctx?.cardName === card.name;
-        html += `<button type="button" class="dash-nav-item dash-nav-item--sub ${navClass}${cardActive && ctx?.kind === 'card-intro' ? ' active' : ''}" data-slide-index="${introIdx}" ${introIdx < 0 ? 'disabled' : ''}>
-          <i class="fa-solid fa-file-lines"></i><span>${esc(card.name)}</span>
-        </button>
-        <button type="button" class="dash-nav-item dash-nav-item--step ${navClass}${cardActive && ctx?.kind === 'brainstorm' ? ' active' : ''}" data-slide-index="${brainIdx}" ${brainIdx < 0 ? 'disabled' : ''}>
-          <i class="fa-solid fa-circle"></i><span>Brainstorming</span>
+        const cardIdx = findSlideIndexForSopStep(track.class, phase.name, card.name, 'card');
+        const status = getCardNavStatus(track.class, phase.name, card.name, currentIndex);
+        html += `<button type="button" class="dash-nav-item dash-nav-item--card ${navClass}${status === 'active' ? ' active' : ''}${status === 'done' ? ' done' : ''}" data-slide-index="${cardIdx}" ${cardIdx < 0 ? 'disabled' : ''}>
+          ${cardNavStatusIcon(status)}<span>${esc(card.name)}</span>
         </button>`;
       });
       html += '</div>';
     });
     const voteIdx = findSlideIndexForSopStep(track.class, null, null, 'track-vote');
-    const voteActive = ctx?.trackKey === track.class && ctx?.kind === 'track-vote';
+    const voteActive = ctx?.kind === 'track-vote';
     html += `<button type="button" class="dash-nav-item dash-nav-item--vote ${navClass}${voteActive ? ' active' : ''}" data-slide-index="${voteIdx}" ${voteIdx < 0 ? 'disabled' : ''}>
-      <i class="fa-solid fa-chart-pie"></i><span>Priorisierung · 100 Punkte</span>
+      <i class="fa-solid fa-chart-pie"></i><span>Priorisierung · Top 3</span>
     </button></div></div>`;
   });
   return { html, bind(container) {
@@ -351,9 +562,17 @@ function renderSopWorkshopNavHtml(currentIndex, { clickable = false, onNavigate 
 function syncSopWorkshopShell(mode, slideIndex) {
   const isSop = isSopWorkshopPresentation();
   document.body.classList.toggle('lp-sop-workshop', isSop);
+  document.body.classList.toggle('lp-sop-focus', isSop && State.sopFocusMode);
+  document.body.classList.toggle('lp-sop-panels', isSop && State.showPresentPanels);
   document.body.classList.toggle('editor-mode', mode === 'editor');
   document.body.classList.toggle('present-mode', mode === 'present');
   document.body.classList.toggle('participant-mode', mode === 'participant');
+
+  const slide = State.slides[slideIndex ?? 0];
+  const modeName = getWorkshopMode(slide);
+  document.body.classList.toggle('workshop-orient', modeName === 'orient');
+  document.body.classList.toggle('workshop-collect', modeName === 'collect');
+  document.body.classList.toggle('workshop-decide', modeName === 'decide');
 
   const editorNav = $('#editor-sop-nav');
   const editorList = $('#editor-slides');
@@ -371,7 +590,6 @@ function syncSopWorkshopShell(mode, slideIndex) {
   }
 
   const idx = slideIndex ?? 0;
-  const slide = State.slides[idx];
   const boardCtx = getSopBoardContextFromSlide(slide);
   const nav = renderSopWorkshopNavHtml(idx, {
     clickable: mode === 'editor' || mode === 'present',
@@ -405,14 +623,13 @@ function syncSopWorkshopShell(mode, slideIndex) {
       presentBoard.innerHTML = renderSopFullBoardHtml(boardCtx);
     } else {
       presentBoard?.classList.add('hidden');
+      if (presentBoard) presentBoard.innerHTML = '';
     }
   }
 
   if (mode === 'participant') {
     participantSidebar?.classList.remove('hidden');
-    if (participantSidebar) {
-      participantSidebar.innerHTML = nav.html;
-    }
+    if (participantSidebar) participantSidebar.innerHTML = nav.html;
   }
 }
 
@@ -881,7 +1098,23 @@ function renderEditorCanvas() {
 
   let body = '';
   if (slide.slide_type === 'section' && c.sopTrackClass) {
-    canvas.innerHTML = `${renderSopSectionHtml(c, true)}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel, Text und Einleitung direkt bearbeiten</div>${renderEditorSopBoardAppend(slide)}`;
+    canvas.innerHTML = `${renderWorkshopModeBadge('orient')}${renderSopSectionHtml(c, true)}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel, Text und Einleitung direkt bearbeiten</div>${renderEditorSopBoardAppend(slide)}`;
+    bindCanvasInlineEdit();
+    return;
+  }
+  if (slide.slide_type === 'brainstorm' && (c.sopKind === 'card-workshop' || c.sopCardName) && isSopWorkshopPresentation()) {
+    canvas.innerHTML = `${renderWorkshopCardCollectHtml(c, true)}
+      <p class="canvas-editable canvas-prompt workshop-collect-prompt" contenteditable="true" data-field="prompt" data-placeholder="Brainstorming-Frage…">${esc(c.prompt || '')}</p>
+      <div class="canvas-hint"><i class="fa-solid fa-pen"></i> Karten-Kontext und Frage direkt bearbeiten</div>`;
+    bindCanvasInlineEdit();
+    return;
+  }
+  if (slide.settings?.sopTrackVote && isSopWorkshopPresentation()) {
+    canvas.innerHTML = `${renderWorkshopModeBadge('decide')}
+      <div class="canvas-editable canvas-title menti-q-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>
+      <p class="canvas-editable canvas-prompt" contenteditable="true" data-field="prompt">${esc(c.prompt || '')}</p>
+      <div class="track-vote-editor-preview">${renderTrackVoteGroupedListHtml(slide)}</div>
+      <div class="canvas-hint"><i class="fa-solid fa-info-circle"></i> Use Cases werden live aus dem Brainstorming geladen</div>`;
     bindCanvasInlineEdit();
     return;
   }
@@ -1340,7 +1573,11 @@ function renderPresent() {
       viz = `<img src="${esc(c.imageUrl)}" alt="" style="max-width:min(720px,90vw);border-radius:16px;margin-top:1rem">`;
     }
   } else if (slide.settings?.showResultsLive !== false) {
-    if (agg.total > 0 || !State.session.question_open) {
+    if (slide.settings?.sopTrackVote) {
+      viz = visible.length || !State.session.question_open
+        ? renderTrackVoteResultsHtml(displaySlide, visible)
+        : renderTrackVoteGroupedListHtml(displaySlide);
+    } else if (agg.total > 0 || !State.session.question_open) {
       viz = window.LPViz.renderViz(displaySlide, agg, 'present');
     } else {
       viz = '<div class="present-wait-msg">Antworten werden gesammelt…</div>';
@@ -1370,7 +1607,8 @@ function renderPresent() {
 
   if (slide.slide_type === 'section' && c.sopTrackClass) {
     stage.innerHTML = `
-      <div class="present-slide-meta">Folie ${(State.session.current_slide_index || 0) + 1} / ${State.slides.length}</div>
+      ${renderWorkshopProgressHtml(State.session.current_slide_index || 0)}
+      ${renderWorkshopModeBadge('orient')}
       ${renderSopSectionHtml(c)}`;
     updatePresentHeader();
     updatePresentStats();
@@ -1384,7 +1622,7 @@ function renderPresent() {
     const html = c.mentiHero ? renderMentiHeroHtml(c) : renderSopContentHtml(c);
     if (html) {
       stage.innerHTML = `
-        <div class="present-slide-meta">Folie ${(State.session.current_slide_index || 0) + 1} / ${State.slides.length}</div>
+        ${renderWorkshopProgressHtml(State.session.current_slide_index || 0)}
         ${html}`;
       updatePresentHeader();
       updatePresentStats();
@@ -1396,9 +1634,46 @@ function renderPresent() {
   }
 
   const sopBadge = renderSopQuestionBadge(c);
+  const slideIdx = State.session.current_slide_index || 0;
+  const workshopMode = getWorkshopMode(slide);
+
+  if (slide.slide_type === 'brainstorm' && (c.sopKind === 'card-workshop' || c.sopCardName) && isSopWorkshopPresentation()) {
+    stage.innerHTML = `
+      ${renderWorkshopProgressHtml(slideIdx)}
+      ${renderWorkshopCardCollectHtml(c)}
+      <p class="present-slide-body workshop-collect-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>
+      <div class="viz-wrap">${viz}</div>${modPanel}`;
+    stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
+    stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
+    updatePresentHeader();
+    updatePresentStats();
+    renderPresentParticipants();
+    void renderQrCode();
+    syncSopWorkshopShell('present', slideIdx);
+    return;
+  }
+
+  if (slide.settings?.sopTrackVote && isSopWorkshopPresentation()) {
+    stage.innerHTML = `
+      ${renderWorkshopProgressHtml(slideIdx)}
+      ${renderWorkshopModeBadge('decide')}
+      ${sopBadge}
+      <h1 class="present-slide-title menti-q-title">${esc(c.title || 'Priorisierung')}</h1>
+      <p class="present-slide-body menti-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>
+      <div class="viz-wrap">${viz}</div>${modPanel}`;
+    stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
+    stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
+    updatePresentHeader();
+    updatePresentStats();
+    renderPresentParticipants();
+    void renderQrCode();
+    syncSopWorkshopShell('present', slideIdx);
+    return;
+  }
 
   stage.innerHTML = `
-    <div class="present-slide-meta">Folie ${(State.session.current_slide_index || 0) + 1} / ${State.slides.length}</div>
+    ${renderWorkshopProgressHtml(slideIdx)}
+    ${workshopMode ? renderWorkshopModeBadge(workshopMode) : ''}
     ${sopBadge}
     <h1 class="present-slide-title ${c.mentiQuestion ? 'menti-q-title' : ''}" style="color:${esc(slideInk)}">${esc(c.title || c.prompt || 'Folie')}</h1>
     <p class="present-slide-body ${c.mentiQuestion ? 'menti-q-prompt' : ''}" style="color:${esc(slideMuted)}">${esc(c.prompt || c.body || '').replace(/\n/g, '<br>')}</p>
@@ -1484,6 +1759,16 @@ function bindPresentToolbar() {
     $('#present-code-bar').classList.toggle('hidden');
     void renderQrCode();
   };
+  $('#present-focus-toggle')?.addEventListener('click', () => {
+    State.sopFocusMode = !State.sopFocusMode;
+    document.body.classList.toggle('lp-sop-focus', State.sopFocusMode);
+    toast(State.sopFocusMode ? 'Fokusmodus: Sidebar & Board ausgeblendet' : 'Fokusmodus aus', 'success');
+  });
+  $('#present-toggle-panels')?.addEventListener('click', () => {
+    State.showPresentPanels = !State.showPresentPanels;
+    document.body.classList.toggle('lp-sop-panels', State.showPresentPanels);
+    toast(State.showPresentPanels ? 'Teilnehmer-Leiste eingeblendet' : 'Teilnehmer-Leiste ausgeblendet', 'success');
+  });
   $('#present-lock-join').onclick = async () => {
     await sb.from('lp_sessions').update({ join_locked: !State.session.join_locked }).eq('id', State.session.id);
     State.session.join_locked = !State.session.join_locked;
@@ -1664,6 +1949,7 @@ function renderParticipantQuestion() {
   const slide = State.slides[slideIndex];
   const root = $('#participant-root');
   const finishParticipant = () => syncSopWorkshopShell('participant', slideIndex);
+  if (!slide?.settings?.sopTrackVote) State.participantVoteExpert = false;
   if (!slide) { root.innerHTML = '<div class="participant-card"><p>Warte auf Folie…</p></div>'; finishParticipant(); return; }
   if (!State.session.question_open) {
     root.innerHTML = `<div class="participant-card"><h1>${esc(slide.content?.title || 'Warte…')}</h1><p>Die Frage ist geschlossen. Bitte warte auf die nächste Folie.</p></div>`;
@@ -1672,7 +1958,7 @@ function renderParticipantQuestion() {
   }
   if (!isInteractive(slide.slide_type)) {
     if (slide.slide_type === 'section' && slide.content?.sopTrackClass) {
-      root.innerHTML = `<div class="participant-card participant-sop-section">${renderSopSectionHtml(slide.content)}<p class="participant-sop-wait">Bitte auf den Vortragenden achten…</p></div>`;
+      root.innerHTML = `${renderParticipantWorkshopHeader(slideIndex)}<div class="participant-card participant-sop-section">${renderWorkshopModeBadge('orient')}${renderSopSectionHtml(slide.content)}<p class="participant-sop-wait">Bitte auf den Vortragenden achten…</p></div>`;
       finishParticipant();
       return;
     }
@@ -1689,7 +1975,12 @@ function renderParticipantQuestion() {
     return;
   }
   if (hasAnsweredSlide(slide)) {
-    root.innerHTML = `<div class="participant-card"><h1>Antwort gesendet</h1><p>Du hast bereits geantwortet. Warte auf die nächste Frage…</p></div>`;
+    root.innerHTML = `${renderParticipantWorkshopHeader(slideIndex)}
+      <div class="participant-card participant-sent-card">
+        <div class="participant-sent-icon"><i class="fa-solid fa-check"></i></div>
+        <h1>Antwort gesendet</h1>
+        <p>Danke! Bitte warte auf die nächste Karte…</p>
+      </div>`;
     finishParticipant();
     return;
   }
@@ -1707,7 +1998,15 @@ function renderParticipantQuestion() {
   } else if (type === 'mc_multi') {
     input = `<div id="multi-wrap">${(c.options || []).map((o) => `<label class="props-check"><input type="checkbox" value="${esc(o.id)}"> ${esc(o.text)}</label>`).join('')}</div><button type="button" class="btn-primary participant-submit" id="submit-multi">Senden</button>`;
   } else if (type === 'wordcloud' || type === 'open' || type === 'brainstorm') {
-    input = `<textarea id="p-text" rows="3" class="participant-textarea" placeholder="${esc(c.prompt || 'Antwort')}"></textarea><button type="button" class="btn-primary participant-submit" id="submit-text">Senden</button>`;
+    const isCardWorkshop = isSopWorkshopPresentation() && (c.sopKind === 'card-workshop' || c.sopCardName);
+    if (isCardWorkshop) {
+      input = `${renderWorkshopCardCollectHtml(c)}
+        <label class="join-label" for="p-text">Dein KI Use Case</label>
+        <textarea id="p-text" rows="4" class="participant-textarea participant-textarea-lg" placeholder="${esc((c.prompt || '').split('\n')[0] || 'Use Case beschreiben…')}"></textarea>
+        <button type="button" class="btn-primary participant-submit" id="submit-text">Use Case senden</button>`;
+    } else {
+      input = `<textarea id="p-text" rows="3" class="participant-textarea" placeholder="${esc(c.prompt || 'Antwort')}"></textarea><button type="button" class="btn-primary participant-submit" id="submit-text">Senden</button>`;
+    }
   } else if (type === 'qa') {
     input = `<textarea id="p-text" rows="2" class="participant-textarea" placeholder="Deine Frage…"></textarea><button type="button" class="btn-primary participant-submit" id="submit-text">Frage senden</button><div id="qa-list" class="qa-list"></div>`;
   } else if (type === 'scale') {
@@ -1725,12 +2024,11 @@ function renderParticipantQuestion() {
       <div id="rank-order" class="rank-order"></div>
       <button type="button" class="btn-primary participant-submit" id="submit-rank">Senden</button>`;
   } else if (type === 'percent_split') {
-    const splitOpts = slide.settings?.sopTrackVote ? getTrackVoteOptions(slide) : (c.options || []);
-    if (slide.settings?.sopTrackVote && splitOpts.length === 1 && splitOpts[0].id === 'none') {
-      input = '<p style="color:var(--muted)">Noch keine Use Cases gesammelt. Bitte warte, bis das Brainstorming abgeschlossen ist.</p>';
+    if (slide.settings?.sopTrackVote) {
+      input = renderParticipantTrackVoteHtml(slide);
     } else {
-      input = `<p style="font-size:.85rem;color:var(--muted);margin-bottom:.75rem">Verteile genau <strong>100 Punkte</strong> auf die Use Cases dieses Tracks. Mehr Punkte = höhere Priorität.</p>
-        ${splitOpts.map((o) => `<div class="split-row"><span>${esc(o.text)}</span><input type="number" min="0" max="100" value="0" data-split="${esc(o.id)}" class="split-input" /></div>`).join('')}
+      input = `<p style="font-size:.85rem;color:var(--muted)">Verteile 100 Punkte</p>
+        ${(c.options || []).map((o) => `<div class="split-row"><span>${esc(o.text)}</span><input type="number" min="0" max="100" value="0" data-split="${esc(o.id)}" class="split-input" /></div>`).join('')}
         <div id="split-total" style="font-weight:700;margin:.5rem 0">Summe: 0 / 100</div>
         <button type="button" class="btn-primary participant-submit" id="submit-split">Senden</button>`;
     }
@@ -1741,14 +2039,16 @@ function renderParticipantQuestion() {
   }
 
   root.innerHTML = `
-    <div class="participant-card ${c.mentiQuestion ? 'participant-menti-q' : ''}">
+    ${isSopWorkshopPresentation() ? renderParticipantWorkshopHeader(slideIndex) : ''}
+    <div class="participant-card ${c.mentiQuestion ? 'participant-menti-q' : ''} ${getWorkshopMode(slide) ? `participant-mode-${getWorkshopMode(slide)}` : ''}">
       <div class="participant-header-row">
         ${participantAvatarHtml(State.participant, 'md')}
-        <div><div class="participant-meta">Code ${esc(State.session.code)}${slide.settings?.anonymous ? ' · Anonyme Antwort' : ''}</div><div class="participant-you">${esc(State.participant?.display_name || '')}</div></div>
+        <div><div class="participant-meta">Code ${esc(State.session.code)}${slide.settings?.anonymous ? ' · Anonym' : ''}</div><div class="participant-you">${esc(State.participant?.display_name || '')}</div></div>
       </div>
-      ${renderSopQuestionBadge(c)}
-      <h1 class="${c.mentiQuestion ? 'menti-q-title' : ''}">${esc(c.title || c.prompt || 'Frage')}</h1>
-      <p class="${c.mentiQuestion ? 'menti-q-prompt' : ''}">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>
+      ${slide.settings?.sopTrackVote ? renderWorkshopModeBadge('decide') : (type === 'brainstorm' && c.sopCardName ? '' : renderSopQuestionBadge(c))}
+      ${slide.settings?.sopTrackVote || (type === 'brainstorm' && (c.sopKind === 'card-workshop' || c.sopCardName)) ? '' : `<h1 class="${c.mentiQuestion ? 'menti-q-title' : ''}">${esc(c.title || c.prompt || 'Frage')}</h1>`}
+      ${slide.settings?.sopTrackVote || (type === 'brainstorm' && (c.sopKind === 'card-workshop' || c.sopCardName)) ? '' : `<p class="${c.mentiQuestion ? 'menti-q-prompt' : ''}">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>`}
+      ${slide.settings?.sopTrackVote ? `<h1 class="menti-q-title">${esc(c.title || 'Priorisierung')}</h1>` : ''}
       ${timeLimit ? `<div id="p-timer" class="p-timer">${timeLimit}s</div>` : ''}
       ${input}
     </div>`;
@@ -1820,6 +2120,34 @@ function bindParticipantHandlers(slide) {
     submitResponse({ points });
   });
 
+  const updateTop3Counter = () => {
+    const n = $$('.track-vote-option input:checked').length;
+    const el = $('#top3-counter');
+    if (el) {
+      el.textContent = `${n} / 3 gewählt`;
+      el.style.color = n > 3 ? 'var(--danger)' : n === 3 ? 'var(--success)' : 'var(--muted)';
+    }
+  };
+  $$('.track-vote-option input').forEach((inp) => inp.addEventListener('change', () => {
+    if ($$('.track-vote-option input:checked').length > 3) {
+      inp.checked = false;
+      toast('Maximal 3 Use Cases', 'warn');
+    }
+    updateTop3Counter();
+  }));
+  updateTop3Counter();
+
+  $('#submit-top3')?.addEventListener('click', () => {
+    const values = $$('.track-vote-option input:checked').map((i) => i.value);
+    if (!values.length) { toast('Mindestens 1 Use Case wählen', 'warn'); return; }
+    submitResponse({ values });
+  });
+
+  $('#vote-mode-toggle')?.addEventListener('click', () => {
+    State.participantVoteExpert = !State.participantVoteExpert;
+    renderParticipantQuestion();
+  });
+
   $('#participant-root').querySelectorAll('.participant-option[data-val]').forEach((btn) => {
     btn.onclick = () => submitResponse({ value: btn.dataset.val });
   });
@@ -1828,7 +2156,8 @@ function bindParticipantHandlers(slide) {
   });
   $('#submit-text')?.addEventListener('click', () => {
     const text = filterProfanity($('#p-text').value.trim(), slide.settings?.profanityFilter !== false);
-    if (!text && slide.settings?.required) { toast('Antwort erforderlich', 'warn'); return; }
+    const isCardWorkshop = isSopWorkshopPresentation() && (c.sopKind === 'card-workshop' || c.sopCardName);
+    if (!text && (slide.settings?.required || isCardWorkshop)) { toast(isCardWorkshop ? 'Bitte Use Case eingeben' : 'Antwort erforderlich', 'warn'); return; }
     submitResponse({ text, upvotes: 0 });
   });
   $('#submit-num')?.addEventListener('click', () => {

@@ -149,7 +149,7 @@ function sopTrackIntro(track, trackIndex) {
     sopKind: 'track',
     sopTrackIndex: trackIndex + 1,
     ...sopMeta(track),
-  });
+  }, { workshopMode: 'orient' });
 }
 
 function sopPhaseIntro(track, phase) {
@@ -175,36 +175,36 @@ function sopCardIntro(track, phase, card) {
 
 function sopCardBrainstorm(track, phase, card) {
   return tplSlide('brainstorm', {
-    title: `KI Use Cases · ${card.name}`,
-    prompt: `Welche KI Use Cases siehst du für „${card.name}“?\nFreitext · Was? Wer? Welches Tool?`,
+    title: card.name,
+    body: card.intro,
+    subtitle: `${phase.name} · ${track.title.replace(/^Track \d+: /, '')}`,
+    prompt: 'Welche KI Use Cases siehst du hier?\nWas · Wer · Welches Tool?',
     mentiQuestion: true,
+    sopKind: 'card-workshop',
     ...sopMeta(track, phase, card),
-  }, { showResultsLive: true });
+  }, { showResultsLive: true, workshopMode: 'collect' });
 }
 
 function sopTrackVote(track) {
   return tplSlide('percent_split', {
     title: `Priorisierung · ${track.title.replace(/^Track \d+: /, '')}`,
-    prompt: 'Alle gesammelten Use Cases dieses Tracks stehen unten. Verteile 100 Punkte – mehr Punkte bedeuten höhere Priorität.',
+    prompt: 'Wähle deine Top 3 Use Cases in diesem Track. Optional: Expertenmodus mit 100 Punkten.',
     mentiQuestion: true,
     options: [],
     ...sopMeta(track),
-  }, { showResultsLive: true, sopTrackVote: true });
+  }, { showResultsLive: true, sopTrackVote: true, sopVoteMode: 'top3', workshopMode: 'decide' });
 }
 
 function buildSopKiWorkshopSlides() {
   const trackSlides = SOP_TOOL_TRACKS.flatMap((track, trackIndex) => [
     sopTrackIntro(track, trackIndex),
-    ...track.phases.flatMap((phase) => phase.cards.flatMap((card) => [
-      sopCardIntro(track, phase, card),
-      sopCardBrainstorm(track, phase, card),
-    ])),
+    ...track.phases.flatMap((phase) => phase.cards.map((card) => sopCardBrainstorm(track, phase, card))),
     sopTrackVote(track),
   ]);
   return [
     tplSlide('content', {
       title: 'SOP · KI Use-Case Workshop',
-      body: 'Navigation links wie im SOP-Tool · Board zeigt Track, Phase und Karte.\n\nPro SOP-Karte: kurze Einleitung → Brainstorming.\nAm Track-Ende: 100 Punkte auf die gesammelten Use Cases verteilen.\n\nQR scannen · Name + Avatar wählen.',
+      body: 'Pro SOP-Karte: Kontext & Brainstorming in einem Schritt.\nAm Track-Ende: Top 3 priorisieren (oder 100 Punkte im Expertenmodus).\n\nQR scannen · Name + Avatar wählen.',
       mentiHero: true,
     }),
     ...trackSlides,
@@ -223,10 +223,10 @@ window.LP_TEMPLATES = [
     key: 'roots-sop-ki-workshop',
     category: 'ROOTS · SOP & KI',
     name: 'SOP-Brainstorming & KI Use Cases',
-    desc: 'SOP-Tool-Ansicht mit Sidebar: 3 Tracks, 26 Karten – pro Karte Brainstorming, pro Track 100-Punkte-Priorisierung.',
-    duration: '120–180 Min.',
+    desc: 'Fokussierter SOP-Workshop: 26 Karten Brainstorming, pro Track Top-3-Priorisierung mit klarem Fortschritt.',
+    duration: '90–150 Min.',
     group: '6–25',
-    tips: 'Sidebar links navigiert wie im SOP-Tool. Pro Karte Brainstorming, am Track-Ende Priorisierung mit 100 Punkten. Einleitungstexte im Editor bearbeiten.',
+    tips: 'Sidebar zeigt nur den aktiven Track. Board nur bei Track-Start. Priorisierung: Top 3 (Standard) oder 100 Punkte (Experte).',
     slides: buildSopKiWorkshopSlides(),
   },
   {
