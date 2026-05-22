@@ -10,147 +10,113 @@ function tplSlide(type, content, settings = {}) {
   };
 }
 
-const SOP_KI_TRACKS = [
+const SOP_TOOL_TRACKS = [
   {
-    name: 'Pre-Engagement',
-    subtitle: 'Anbahnung · Exploration · Pitch',
+    title: 'Track 1: Pre-Engagement',
+    class: 'track-pre',
     phases: [
-      { name: 'Anbahnung', desc: 'ROOTS Vorstellung, Zielstellung klären, initiale Analyse.\nSchritte: Erstkontakt, Zieldefinition, Ist-/Marktanalyse.' },
-      { name: 'Exploration', desc: 'Bedarfsanalyse & Problem Framing, Onboarding-Skizze, Website-Analyse, initiale Spezifikationen.' },
-      { name: 'Pitch', desc: 'Angebotsgestaltung & Präsentation, Pitch Benchmarking, Onboarding Admin & Vertrag.' },
+      { name: 'Anbahnung', cards: ['ROOTS Vorstellung', 'Zielstellung klären', 'Initiale Analyse'] },
+      { name: 'Exploration', cards: ['Bedarfsanalyse / Problem Framing', 'Onboarding-Skizze & Aufwand', 'Website & Online-Analyse', 'Initiale Spezifikationen'] },
+      { name: 'Pitch', cards: ['Angebotsgestaltung & Präsentation', 'Pitch Benchmarking', 'Onboarding Admin & Vertrag'] },
     ],
   },
   {
-    name: 'Execution',
-    subtitle: 'Ramp-up · Analyse · Synthese · Delivery · Implementierung',
+    title: 'Track 2: Execution',
+    class: 'track-ops',
     phases: [
-      { name: 'Ramp-up', desc: 'Projektstruktur aufbauen, Briefing & Content-Plan.' },
-      { name: 'Analyse', desc: 'Performance-Analyse, Zielgruppen-Insights.' },
-      { name: 'Synthese', desc: 'Erkenntnisse bündeln, Strategie-Update.' },
-      { name: 'Delivery', desc: 'Content-Produktion, Ausspielung & Community Management.' },
-      { name: 'Implementierung', desc: 'Kampagnen-Setup, Tool-Integration & Automatisierung.' },
+      { name: 'Ramp-up', cards: ['Projektstruktur aufbauen', 'Briefing & Content-Plan'] },
+      { name: 'Analyse', cards: ['Performance-Analyse', 'Zielgruppen-Insights'] },
+      { name: 'Synthese', cards: ['Erkenntnisse bündeln', 'Strategie-Update'] },
+      { name: 'Delivery', cards: ['Content-Produktion', 'Ausspielung & Community Management'] },
+      { name: 'Implementierung', cards: ['Kampagnen-Setup', 'Tool-Integration & Automatisierung'] },
     ],
   },
   {
-    name: 'Post-Engagement',
-    subtitle: 'Closeout · Follow-Up',
+    title: 'Track 3: Post-Engagement',
+    class: 'track-post',
     phases: [
-      { name: 'Closeout', desc: 'Finales Reporting & Übergabe, interne Retro & Learnings, Kundenfeedback einholen.' },
-      { name: 'Follow-Up', desc: 'Beziehungspflege & Check-ins, Upsell & Folgeauftrag, Case Study & Referenz.' },
+      { name: 'Closeout', cards: ['Finales Reporting & Übergabe', 'Interne Retro & Learnings', 'Kundenfeedback einholen'] },
+      { name: 'Follow-Up', cards: ['Beziehungspflege & Check-ins', 'Upsell & Folgeauftrag', 'Case Study & Referenz'] },
     ],
   },
 ];
 
-function sopKiPhaseSlides(trackName, phase) {
-  return [
-    tplSlide('section', { title: phase.name, subtitle: `${trackName} · SOP-Unterphase` }),
-    tplSlide('content', {
-      title: phase.name,
-      body: `${phase.desc}\n\nAls Nächstes sammeln wir KI Use Cases für diese Unterphase.`,
-    }),
-    tplSlide('brainstorm', {
-      title: `KI Use Cases · ${phase.name}`,
-      prompt: `Welche konkreten KI Use Cases siehst du in „${phase.name}“ (${trackName})?\nFreitext: Was? Wer? Welches Tool oder welcher Prozess?`,
-    }, { showResultsLive: true, moderation: true }),
-    tplSlide('content', {
-      title: `Ergebnisse · ${phase.name}`,
-      body: 'Die gesammelten KI Use Cases werden live angezeigt.\n\nModerator:in clustert die Ideen – dann weiter zur Abstimmung.',
-    }, { showPreviousSlideResults: true }),
-    tplSlide('ranking', {
-      title: `Priorisierung · ${phase.name}`,
-      prompt: `Priorisiere KI-Hebel für „${phase.name}“ (1 = höchste Priorität)`,
-      options: [
-        { id: 'a', text: 'Zeitersparnis / Effizienz' },
-        { id: 'b', text: 'Qualität & Output' },
-        { id: 'c', text: 'Quick Win (< 4 Wochen)' },
-        { id: 'd', text: 'Strategischer Impact' },
-        { id: 'e', text: 'Skalierbarkeit im Team' },
-      ],
-    }, { showResultsLive: true }),
-  ];
+function sopTrackSection(track) {
+  return tplSlide('section', {
+    title: track.title,
+    subtitle: track.phases.map((p) => p.name).join(' · '),
+    sopKind: 'track',
+    sopTrackClass: track.class,
+    sopTrackLabel: track.title.replace(/^Track \d+: /, ''),
+    sopPills: track.phases.map((p) => p.name),
+    bgColor: '#ffffff',
+    accentColor: track.class === 'track-pre' ? '#206efb' : track.class === 'track-ops' ? '#0f6b57' : '#5b21b6',
+  });
 }
 
-function sopKiTrackSlides(track) {
-  const phaseSlides = track.phases.flatMap((phase) => sopKiPhaseSlides(track.name, phase));
-  const trackRankOptions = track.phases.map((phase, i) => ({
-    id: String.fromCharCode(97 + i),
-    text: `${phase.name} – Top Use Case (vom Team benennen)`,
-  }));
-  return [
-    tplSlide('section', { title: track.name, subtitle: track.subtitle }),
-    tplSlide('content', {
-      title: `SOP-Track · ${track.name}`,
-      body: `Unterphasen:\n${track.phases.map((p) => `• ${p.name}`).join('\n')}\n\nPro Unterphase: Brainstorming → Ergebnisse → Priorisierung.`,
-    }),
-    ...phaseSlides,
-    tplSlide('section', { title: `Track-Übersicht · ${track.name}`, subtitle: 'Zusammenfassung & Top Use Cases' }),
-    tplSlide('content', {
-      title: `${track.name} · Zusammenfassung`,
-      body: `Abgeschlossene Unterphasen: ${track.phases.map((p) => p.name).join(' · ')}\n\nTop Use Cases festhalten und in SOP-Karten überführen.`,
-    }),
-    tplSlide('ranking', {
-      title: `Top Use Cases · ${track.name}`,
-      prompt: `Welche KI Use Cases aus ${track.name} setzen wir zuerst um? (1 = höchste Priorität)`,
-      options: trackRankOptions,
-    }, { showResultsLive: true }),
-    tplSlide('open', {
-      title: `Track-Fazit · ${track.name}`,
-      prompt: `Was ist der wichtigste KI Use Case aus ${track.name} – und wer ist Owner?`,
-    }),
-  ];
+function sopPhaseSection(track, phase) {
+  return tplSlide('section', {
+    title: phase.name,
+    subtitle: track.title,
+    sopKind: 'phase',
+    sopTrackClass: track.class,
+    sopTrackLabel: track.title.replace(/^Track \d+: /, ''),
+    sopPhaseName: phase.name,
+    sopPills: phase.cards,
+    bgColor: '#ffffff',
+    accentColor: track.class === 'track-pre' ? '#206efb' : track.class === 'track-ops' ? '#0f6b57' : '#5b21b6',
+  });
+}
+
+function sopBrainstormSlide(track, phase) {
+  return tplSlide('brainstorm', {
+    title: `KI Use Cases · ${phase.name}`,
+    prompt: `Welche KI Use Cases siehst du in „${phase.name}“?\nFreitext · Was? Wer? Welches Tool?`,
+    sopTrackClass: track.class,
+    sopTrackLabel: track.title.replace(/^Track \d+: /, ''),
+    sopPhaseName: phase.name,
+    mentiQuestion: true,
+  }, { showResultsLive: true, moderation: true });
+}
+
+function sopPrioritizeSlide(track, phase) {
+  return tplSlide('ranking', {
+    title: `Use Cases priorisieren · ${phase.name}`,
+    prompt: 'Ordne die KI Use Cases nach Priorität (1 = zuerst umsetzen).\nModerator:in trägt die Top-Ideen aus dem Brainstorming in die Optionen ein.',
+    sopTrackClass: track.class,
+    sopTrackLabel: track.title.replace(/^Track \d+: /, ''),
+    sopPhaseName: phase.name,
+    mentiQuestion: true,
+    options: [
+      { id: 'a', text: 'Use Case 1' },
+      { id: 'b', text: 'Use Case 2' },
+      { id: 'c', text: 'Use Case 3' },
+      { id: 'd', text: 'Use Case 4' },
+      { id: 'e', text: 'Use Case 5' },
+    ],
+  }, { showResultsLive: true });
 }
 
 function buildSopKiWorkshopSlides() {
+  const trackSlides = SOP_TOOL_TRACKS.flatMap((track) => [
+    sopTrackSection(track),
+    ...track.phases.flatMap((phase) => [
+      sopPhaseSection(track, phase),
+      sopBrainstormSlide(track, phase),
+      sopPrioritizeSlide(track, phase),
+    ]),
+  ]);
   return [
     tplSlide('content', {
-      title: 'ROOTS · SOP & KI Use-Case Workshop',
-      body: 'Wir gehen jeden SOP-Track und jede Unterphase durch:\n\n1. KI Use Cases sammeln (Brainstorming)\n2. Ergebnisse anzeigen & besprechen\n3. Priorisieren\n\nScannt den QR-Code, Name + Avatar wählen.',
+      title: 'SOP · KI Use-Case Workshop',
+      body: 'Wir gehen alle SOP-Tracks und Unterphasen durch – wie im SOP-Dashboard.\n\nPro Unterphase: KI Use Cases sammeln → priorisieren.\n\nScannt den QR-Code · Name + Avatar wählen.',
+      mentiHero: true,
     }),
-    tplSlide('section', { title: 'Ankommen', subtitle: 'Kontext · AI for Impact · Erwartungen' }),
-    tplSlide('reaction', { title: 'Stimmung', prompt: 'Wie neugierig bist du auf KI in unserer SOP-Arbeit?' }, { anonymous: true }),
+    ...trackSlides,
     tplSlide('content', {
-      title: 'ROOTS AI for Impact',
-      body: 'Vier Dimensionen:\n• Strategy – Wachstum & Wettbewerb\n• Process – Marketing Operations & Automatisierung\n• People – Skills, Coaching, Change\n• Ethics & Compliance – Datenschutz, Transparenz',
-    }),
-    tplSlide('wordcloud', { title: 'Erwartung', prompt: 'Ein Wort: Was soll heute rauskommen?' }, { anonymous: true }),
-    ...SOP_KI_TRACKS.flatMap(sopKiTrackSlides),
-    tplSlide('section', { title: 'Gesamtübersicht', subtitle: 'Alle Tracks · Finale Priorisierung' }),
-    tplSlide('content', {
-      title: 'Workshop · Gesamtübersicht',
-      body: `Tracks durchlaufen:\n${SOP_KI_TRACKS.map((t) => `• ${t.name}: ${t.phases.map((p) => p.name).join(', ')}`).join('\n')}\n\nJetzt: finale Abstimmung über alle Tracks.`,
-    }),
-    tplSlide('ranking', {
-      title: 'Finale Priorisierungsliste',
-      prompt: 'Top KI Use Cases über alle SOP-Tracks (1 = zuerst umsetzen)',
-      options: [
-        { id: 'a', text: 'Pre-Engagement – Top Use Case' },
-        { id: 'b', text: 'Execution – Top Use Case' },
-        { id: 'c', text: 'Post-Engagement – Top Use Case' },
-        { id: 'd', text: 'Cross-Track Quick Win' },
-        { id: 'e', text: 'Enablement / Team-Skill' },
-      ],
-    }, { showResultsLive: true }),
-    tplSlide('percent_split', {
-      title: 'Impact-Budget 100',
-      prompt: 'Verteilt 100 Punkte auf die finale Top-5 Liste',
-      options: [
-        { id: 'a', text: 'Use Case #1' },
-        { id: 'b', text: 'Use Case #2' },
-        { id: 'c', text: 'Use Case #3' },
-        { id: 'd', text: 'Use Case #4' },
-        { id: 'e', text: 'Use Case #5' },
-      ],
-    }, { showResultsLive: true }),
-    tplSlide('yesno', { title: 'Datenschutz', prompt: 'Sind die Top Use Cases mit unseren KI-Richtlinien vereinbar?' }),
-    tplSlide('open', { title: 'Dein Next Step', prompt: 'Was machst du in den nächsten 48 Stunden konkret?' }),
-    tplSlide('scale', {
-      title: 'Workshop-Nutzen',
-      prompt: 'Wie hilfreich war der Workshop?',
-      min: 1, max: 5, minLabel: 'wenig', maxLabel: 'sehr',
-    }, { anonymous: true }),
-    tplSlide('content', {
-      title: 'Danke!',
-      body: 'Ergebnisse werden im SOP-Dashboard festgehalten.\n\nNächster Schritt: Top Use Cases → SOP-Karten → Pilot → Retro.',
+      title: 'Workshop abgeschlossen',
+      body: 'Top Use Cases in SOP-Karten überführen → Pilot starten → Retro.',
+      mentiHero: true,
     }),
   ];
 }
@@ -160,10 +126,10 @@ window.LP_TEMPLATES = [
     key: 'roots-sop-ki-workshop',
     category: 'ROOTS · SOP & KI',
     name: 'SOP-Brainstorming & KI Use Cases',
-    desc: 'Jeder SOP-Track und jede Unterphase: KI Use Cases sammeln, Ergebnisse zeigen, priorisieren – mit Track- und Gesamtübersicht.',
-    duration: '120–180 Min.',
+    desc: 'Exakt wie im SOP-Tool: 3 Tracks, 10 Unterphasen – pro Phase Brainstorming + Priorisierung.',
+    duration: '90–120 Min.',
     group: '6–25',
-    tips: 'Pro Unterphase: Brainstorming → Ergebnisse-Folie (zeigt Antworten der Vorfolie) → Ranking. Track- und Gesamtübersicht am Ende. Ergebnisse in SOP-Karten überführen.',
+    tips: 'Tracks/Phasen wie SOP-Dashboard. Pro Unterphase: erst KI Use Cases sammeln, dann Optionen im Editor mit den Top-Ideen aus dem Brainstorming füllen und priorisieren lassen.',
     slides: buildSopKiWorkshopSlides(),
   },
   {

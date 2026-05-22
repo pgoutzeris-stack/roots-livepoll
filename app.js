@@ -1,7 +1,7 @@
 /* ROOTS Live Poll – Hauptanwendung */
 const SUPABASE_URL = 'https://csmguwcvzreefluhahyu.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNzbWd1d2N2enJlZWZsdWhhaHl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjM0ODcsImV4cCI6MjA5MjUzOTQ4N30.Fiafx7XBaQZXUX3bKQIBH7znBHx3B51yL-bftOHsL4Q';
-const APP_VERSION = '20260520-sop2';
+const APP_VERSION = '20260520-sop3';
 const JOIN_BASE = `${location.origin}${location.pathname}`;
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
@@ -130,6 +130,44 @@ function participantAvatarHtml(p, size = 'md') {
 
 function participantChipHtml(p) {
   return `<div class="present-participant-chip">${participantAvatarHtml(p, 'sm')}<span>${esc(p.display_name || 'Gast')}</span></div>`;
+}
+
+function sopTrackTheme(trackClass) {
+  const themes = {
+    'track-pre': { accent: '#206efb', badgeBg: '#dbe7ff', badgeColor: '#165fd9', soft: '#eff6ff' },
+    'track-ops': { accent: '#0f6b57', badgeBg: '#d0f4ee', badgeColor: '#0f6b57', soft: '#ecfdf5' },
+    'track-post': { accent: '#5b21b6', badgeBg: '#ede9fe', badgeColor: '#5b21b6', soft: '#f5f3ff' },
+  };
+  return themes[trackClass] || themes['track-pre'];
+}
+
+function renderSopSectionHtml(c) {
+  const theme = sopTrackTheme(c.sopTrackClass);
+  const pills = (c.sopPills || []).map((p) => `<span class="sop-pill">${esc(p)}</span>`).join('');
+  const isTrack = c.sopKind === 'track';
+  return `
+    <div class="sop-menti-section ${isTrack ? 'sop-menti-track' : 'sop-menti-phase'} ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+      <div class="sop-menti-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel || 'SOP')}</div>
+      <h1 class="sop-menti-title">${esc(c.title)}</h1>
+      ${c.subtitle ? `<p class="sop-menti-sub">${esc(c.subtitle)}</p>` : ''}
+      <div class="sop-menti-cards-label">${isTrack ? 'Unterphasen' : 'SOP-Karten'}</div>
+      <div class="sop-menti-pills">${pills}</div>
+    </div>`;
+}
+
+function renderMentiHeroHtml(c) {
+  return `
+    <div class="menti-hero">
+      <div class="menti-hero-icon"><i class="fa-solid fa-signal"></i></div>
+      <h1 class="menti-hero-title">${esc(c.title)}</h1>
+      <p class="menti-hero-body">${esc(c.body || '').replace(/\n/g, '<br>')}</p>
+    </div>`;
+}
+
+function renderSopQuestionBadge(c) {
+  if (!c.sopPhaseName) return '';
+  const theme = sopTrackTheme(c.sopTrackClass);
+  return `<div class="sop-menti-q-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel)} · ${esc(c.sopPhaseName)}</div>`;
 }
 
 function renderPresentParticipants() {
@@ -463,6 +501,14 @@ function renderEditorCanvas() {
   canvas.style.color = c.textColor || '#0f172a';
 
   let body = '';
+  if (slide.slide_type === 'section' && c.sopTrackClass) {
+    canvas.innerHTML = renderSopSectionHtml(c);
+    return;
+  }
+  if (slide.slide_type === 'content' && c.mentiHero) {
+    canvas.innerHTML = renderMentiHeroHtml(c);
+    return;
+  }
   if (slide.slide_type === 'content' || slide.slide_type === 'section') {
     body = `
       <p class="canvas-editable" contenteditable="true" data-field="body" data-placeholder="Text eingeben…">${esc(c.body || c.subtitle || '')}</p>
@@ -477,7 +523,8 @@ function renderEditorCanvas() {
   }
 
   canvas.innerHTML = `
-    <div class="canvas-editable canvas-title" contenteditable="true" data-field="title" data-placeholder="Titel…">${esc(c.title || c.prompt || 'Folie')}</div>
+    ${renderSopQuestionBadge(c)}
+    <div class="canvas-editable canvas-title ${c.mentiQuestion ? 'menti-q-title' : ''}" contenteditable="true" data-field="title" data-placeholder="Titel…">${esc(c.title || c.prompt || 'Folie')}</div>
     ${body}
     <div class="canvas-hint"><i class="fa-solid fa-pen"></i> Direkt auf der Folie tippen zum Bearbeiten</div>`;
   bindCanvasInlineEdit();
@@ -927,10 +974,35 @@ function renderPresent() {
   const slideInk = c.textColor || 'var(--ink)';
   const slideMuted = c.subtextColor || 'var(--muted)';
 
+  if (slide.slide_type === 'section' && c.sopTrackClass) {
+    stage.innerHTML = `
+      <div class="present-slide-meta">Folie ${(State.session.current_slide_index || 0) + 1} / ${State.slides.length}</div>
+      ${renderSopSectionHtml(c)}`;
+    updatePresentHeader();
+    updatePresentStats();
+    renderPresentParticipants();
+    void renderQrCode();
+    return;
+  }
+
+  if (slide.slide_type === 'content' && c.mentiHero) {
+    stage.innerHTML = `
+      <div class="present-slide-meta">Folie ${(State.session.current_slide_index || 0) + 1} / ${State.slides.length}</div>
+      ${renderMentiHeroHtml(c)}`;
+    updatePresentHeader();
+    updatePresentStats();
+    renderPresentParticipants();
+    void renderQrCode();
+    return;
+  }
+
+  const sopBadge = renderSopQuestionBadge(c);
+
   stage.innerHTML = `
     <div class="present-slide-meta">Folie ${(State.session.current_slide_index || 0) + 1} / ${State.slides.length}</div>
-    <h1 class="present-slide-title" style="color:${esc(slideInk)}">${esc(c.title || c.prompt || 'Folie')}</h1>
-    <p class="present-slide-body" style="color:${esc(slideMuted)}">${esc(c.prompt || c.body || '')}</p>
+    ${sopBadge}
+    <h1 class="present-slide-title ${c.mentiQuestion ? 'menti-q-title' : ''}" style="color:${esc(slideInk)}">${esc(c.title || c.prompt || 'Folie')}</h1>
+    <p class="present-slide-body ${c.mentiQuestion ? 'menti-q-prompt' : ''}" style="color:${esc(slideMuted)}">${esc(c.prompt || c.body || '').replace(/\n/g, '<br>')}</p>
     <div class="viz-wrap">${viz}</div>${modPanel}`;
 
   stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
@@ -1188,6 +1260,14 @@ function renderParticipantQuestion() {
     return;
   }
   if (!isInteractive(slide.slide_type)) {
+    if (slide.slide_type === 'section' && slide.content?.sopTrackClass) {
+      root.innerHTML = `<div class="participant-card participant-sop-section">${renderSopSectionHtml(slide.content)}<p class="participant-sop-wait">Bitte auf den Vortragenden achten…</p></div>`;
+      return;
+    }
+    if (slide.slide_type === 'content' && slide.content?.mentiHero) {
+      root.innerHTML = `<div class="participant-card">${renderMentiHeroHtml(slide.content)}<p class="participant-sop-wait">Bitte auf den Vortragenden achten…</p></div>`;
+      return;
+    }
     root.innerHTML = `<div class="participant-card"><h1>${esc(slide.content?.title || 'Folie')}</h1><p>${esc(slide.content?.body || slide.content?.prompt || '')}</p><p style="color:var(--muted);margin-top:1rem">Bitte auf den Vortragenden achten…</p></div>`;
     return;
   }
@@ -1238,13 +1318,14 @@ function renderParticipantQuestion() {
   }
 
   root.innerHTML = `
-    <div class="participant-card">
+    <div class="participant-card ${c.mentiQuestion ? 'participant-menti-q' : ''}">
       <div class="participant-header-row">
         ${participantAvatarHtml(State.participant, 'md')}
         <div><div class="participant-meta">Code ${esc(State.session.code)}${slide.settings?.anonymous ? ' · Anonyme Antwort' : ''}</div><div class="participant-you">${esc(State.participant?.display_name || '')}</div></div>
       </div>
-      <h1>${esc(c.title || c.prompt || 'Frage')}</h1>
-      <p>${esc(c.prompt || '')}</p>
+      ${renderSopQuestionBadge(c)}
+      <h1 class="${c.mentiQuestion ? 'menti-q-title' : ''}">${esc(c.title || c.prompt || 'Frage')}</h1>
+      <p class="${c.mentiQuestion ? 'menti-q-prompt' : ''}">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>
       ${timeLimit ? `<div id="p-timer" class="p-timer">${timeLimit}s</div>` : ''}
       ${input}
     </div>`;
