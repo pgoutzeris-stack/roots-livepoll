@@ -123,9 +123,20 @@ window.LP_SLIDE_TYPES = [
   { type: 'pin_image', label: 'Pin auf Bild', icon: 'fa-location-dot', desc: 'Marker setzen' },
 ];
 
+window.LP_DEFAULT_STYLE = {
+  bgColor: '#ffffff',
+  textColor: '#0f172a',
+  accentColor: '#206efb',
+};
+
+window.LP_INTERACTIVE_TYPES = new Set([
+  'mc_single', 'mc_multi', 'yesno', 'wordcloud', 'open', 'scale', 'ranking',
+  'quiz', 'qa', 'brainstorm', 'reaction', 'number_guess', 'percent_split', 'pin_image',
+]);
+
 window.LP_DEFAULT_CONTENT = {
-  content: { title: 'Neue Folie', body: '', imageUrl: '' },
-  section: { title: 'Kapitel', subtitle: '' },
+  content: { title: 'Neue Folie', body: '', imageUrl: '', ...window.LP_DEFAULT_STYLE },
+  section: { title: 'Kapitel', subtitle: '', ...window.LP_DEFAULT_STYLE },
   mc_single: { title: 'Frage', prompt: 'Wähle eine Option', options: [{ id: 'a', text: 'Option A' }, { id: 'b', text: 'Option B' }] },
   mc_multi: { title: 'Frage', prompt: 'Wähle mehrere', options: [{ id: 'a', text: 'Option A' }, { id: 'b', text: 'Option B' }], maxSelections: 3 },
   yesno: { title: 'Ja oder Nein?', prompt: '' },

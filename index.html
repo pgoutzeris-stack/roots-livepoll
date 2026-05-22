@@ -77,7 +77,10 @@
     <input id="editor-title" class="board-title-input" type="text" placeholder="Präsentationstitel" />
     <span class="board-status" id="editor-save-status"><i class="fa-solid fa-cloud"></i> Gespeichert</span>
     <div class="board-topbar-right">
-      <button type="button" class="btn-secondary" id="btn-save-version"><i class="fa-solid fa-clock-rotate-left"></i> Version</button>
+      <button type="button" class="btn-ghost editor-mobile-props" id="btn-toggle-props" title="Eigenschaften"><i class="fa-solid fa-sliders"></i></button>
+      <button type="button" class="btn-secondary" id="btn-show-versions"><i class="fa-solid fa-clock-rotate-left"></i> Versionen</button>
+      <button type="button" class="btn-secondary" id="btn-save-version"><i class="fa-solid fa-bookmark"></i> Snapshot</button>
+      <button type="button" class="btn-secondary" id="btn-export-pres"><i class="fa-solid fa-download"></i> Export</button>
       <button type="button" class="btn-primary" id="btn-start-present"><i class="fa-solid fa-play"></i> Präsentieren</button>
     </div>
   </header>
@@ -102,14 +105,16 @@
   <div id="present-code-bar" class="present-code-bar hidden">
     <div class="present-code-inner">
       <div id="present-code-text" class="present-code-text"></div>
-      <canvas id="present-qr" width="120" height="120"></canvas>
+      <img id="present-qr" class="present-qr-img" alt="QR Code" width="140" height="140" />
       <div class="present-code-url" id="present-join-url"></div>
     </div>
   </div>
   <div id="present-toolbar" class="present-toolbar hidden">
     <button type="button" class="present-btn" id="present-prev"><i class="fa-solid fa-chevron-left"></i></button>
-    <button type="button" class="present-btn" id="present-toggle-question"><i class="fa-solid fa-lock-open"></i></button>
-    <button type="button" class="present-btn" id="present-show-code"><i class="fa-solid fa-qrcode"></i></button>
+    <button type="button" class="present-btn" id="present-toggle-question" title="Frage öffnen/schließen"><i class="fa-solid fa-lock-open"></i></button>
+    <button type="button" class="present-btn" id="present-reset" title="Antworten zurücksetzen"><i class="fa-solid fa-rotate-left"></i></button>
+    <button type="button" class="present-btn" id="present-lock-join" title="Beitritt sperren"><i class="fa-solid fa-lock-open"></i></button>
+    <button type="button" class="present-btn" id="present-show-code" title="Code & QR"><i class="fa-solid fa-qrcode"></i></button>
     <span id="present-stats" class="present-stats">0 Teilnehmer · 0 Antworten</span>
     <button type="button" class="present-btn" id="present-next"><i class="fa-solid fa-chevron-right"></i></button>
     <button type="button" class="present-btn danger" id="present-end"><i class="fa-solid fa-stop"></i></button>
@@ -143,6 +148,14 @@
   <div class="modal-card">
     <div class="modal-head"><h2>Folie hinzufügen</h2><button type="button" class="btn-ghost modal-close" data-close="modal-add-slide"><i class="fa-solid fa-xmark"></i></button></div>
     <div class="modal-body"><div id="slide-type-grid" class="slide-type-grid"></div></div>
+  </div>
+</div>
+
+<!-- MODAL: Versions -->
+<div id="modal-versions" class="modal">
+  <div class="modal-card">
+    <div class="modal-head"><h2>Versionsverlauf</h2><button type="button" class="btn-ghost modal-close" data-close="modal-versions"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-body"><div id="versions-list"></div></div>
   </div>
 </div>
 

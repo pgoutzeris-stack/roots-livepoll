@@ -99,8 +99,13 @@
   }
 
   function renderViz(slide, agg, mode) {
-    const dark = mode !== 'editor';
+    const dark = mode === 'present';
+    const light = mode === 'editor' || mode === 'results';
     const textColor = dark ? '#f8fafc' : 'var(--ink)';
+    const trackBg = dark ? 'rgba(255,255,255,.12)' : 'rgba(15,23,42,.08)';
+    const itemBg = dark ? 'rgba(255,255,255,.06)' : 'var(--surface)';
+    const itemBorder = dark ? 'rgba(255,255,255,.1)' : 'var(--line)';
+    const wordColor = dark ? '#fff' : 'var(--brand)';
 
     if (agg.type === 'mc_single' || agg.type === 'mc_multi' || agg.type === 'yesno' || agg.type === 'quiz' || agg.type === 'reaction') {
       const options = slide.content.options || [];
@@ -110,10 +115,12 @@
           ? Object.keys(agg.counts || {}).map((k) => ({ id: k, text: k }))
           : options;
       const max = Math.max(1, ...entries.map((o) => agg.counts?.[o.id] || 0));
+      const correctId = agg.type === 'quiz' ? (options.find((o) => o.correct)?.id) : null;
       return `<div class="viz-bars">${entries.map((o) => {
         const n = agg.counts?.[o.id] || 0;
         const pct = Math.round((n / max) * 100);
-        return `<div class="viz-bar-row"><span>${esc(o.text || o.id)}</span><div class="viz-bar-track"><div class="viz-bar-fill" style="width:${pct}%"></div></div><strong>${n}</strong></div>`;
+        const highlight = correctId && o.id === correctId ? ' viz-bar-correct' : '';
+        return `<div class="viz-bar-row${highlight}"><span>${esc(o.text || o.id)}</span><div class="viz-bar-track" style="background:${trackBg}"><div class="viz-bar-fill" style="width:${pct}%"></div></div><strong>${n}</strong></div>`;
       }).join('')}</div>`;
     }
 
@@ -122,20 +129,21 @@
       const max = words[0]?.[1] || 1;
       return `<div class="viz-wordcloud">${words.map(([w, c]) => {
         const size = 0.85 + (c / max) * 1.6;
-        return `<span class="viz-word" style="font-size:${size}rem">${esc(w)}</span>`;
+        return `<span class="viz-word" style="font-size:${size}rem;color:${wordColor}">${esc(w)}</span>`;
       }).join('')}</div>`;
     }
 
     if (agg.type === 'open' || agg.type === 'brainstorm') {
-      return `<div class="viz-open-list">${(agg.items || []).slice(-20).map((t) => `<div class="viz-open-item">${esc(t)}</div>`).join('')}</div>`;
+      return `<div class="viz-open-list">${(agg.items || []).slice(-20).map((t) => `<div class="viz-open-item" style="background:${itemBg};border-color:${itemBorder}">${esc(t)}</div>`).join('')}</div>`;
     }
 
     if (agg.type === 'scale' || agg.type === 'number_guess') {
-      return `<div style="font-size:2.5rem;font-weight:800;color:${textColor}">Ø ${(agg.avg || 0).toFixed(1)} · Median ${agg.median || 0}<div style="font-size:.9rem;color:#94a3b8;margin-top:.5rem">${agg.total} Antworten</div></div>`;
+      const sub = light ? 'var(--muted)' : '#94a3b8';
+      return `<div style="font-size:2.5rem;font-weight:800;color:${textColor}">Ø ${(agg.avg || 0).toFixed(1)} · Median ${agg.median || 0}<div style="font-size:.9rem;color:${sub};margin-top:.5rem">${agg.total} Antworten</div></div>`;
     }
 
     if (agg.type === 'qa') {
-      return `<div class="viz-open-list">${(agg.items || []).slice(0, 12).map((i) => `<div class="viz-open-item"><strong>${i.upvotes}▲</strong> ${esc(i.text)}</div>`).join('')}</div>`;
+      return `<div class="viz-open-list">${(agg.items || []).slice(0, 12).map((i) => `<div class="viz-open-item" style="background:${itemBg};border-color:${itemBorder}"><strong>${i.upvotes}▲</strong> ${esc(i.text)}</div>`).join('')}</div>`;
     }
 
     if (agg.type === 'ranking' || agg.type === 'percent_split') {
@@ -147,7 +155,7 @@
       const max = Math.max(1, ...entries.map((e) => e.val));
       return `<div class="viz-bars">${entries.map((e) => {
         const pct = Math.round((e.val / max) * 100);
-        return `<div class="viz-bar-row"><span>${esc(e.label)}</span><div class="viz-bar-track"><div class="viz-bar-fill" style="width:${pct}%"></div></div><strong>${Math.round(e.val)}</strong></div>`;
+        return `<div class="viz-bar-row"><span>${esc(e.label)}</span><div class="viz-bar-track" style="background:${trackBg}"><div class="viz-bar-fill" style="width:${pct}%"></div></div><strong>${Math.round(e.val)}</strong></div>`;
       }).join('')}</div>`;
     }
 
@@ -156,7 +164,12 @@
       return `<div style="position:relative;max-width:720px;margin:0 auto"><img src="${esc(slide.content.imageUrl)}" alt="" style="max-width:100%;border-radius:12px">${pins.map((p) => `<span style="position:absolute;left:${p.x}%;top:${p.y}%;transform:translate(-50%,-50%);font-size:1.5rem">📍</span>`).join('')}</div>`;
     }
 
-    return `<div style="color:#94a3b8">${agg.total || 0} Antworten</div>`;
+    if (agg.type === 'content' || agg.type === 'section') {
+      return `<div style="color:${light ? 'var(--muted)' : '#64748b'}">Inhaltsfolie</div>`;
+    }
+
+    const emptyColor = light ? 'var(--muted)' : '#94a3b8';
+    return `<div style="color:${emptyColor}">${agg.total || 0} Antworten</div>`;
   }
 
   window.LPViz = { aggregateResponses, renderViz, esc };

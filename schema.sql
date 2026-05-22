@@ -197,7 +197,25 @@ create policy lp_versions_insert on public.lp_presentation_versions for insert
 create policy lp_versions_delete on public.lp_presentation_versions for delete
   using (public.lp_is_presentation_owner(presentation_id));
 
--- Realtime
+drop policy if exists lp_participants_update on public.lp_participants;
+create policy lp_participants_update on public.lp_participants
+  for update using (public.lp_session_is_joinable(session_id))
+  with check (public.lp_session_is_joinable(session_id));
+
+drop policy if exists lp_responses_update_live on public.lp_responses;
+create policy lp_responses_update_live on public.lp_responses
+  for update using (
+    exists (select 1 from public.lp_sessions s where s.id = session_id and s.status in ('live', 'paused'))
+  )
+  with check (
+    exists (select 1 from public.lp_sessions s where s.id = session_id and s.status in ('live', 'paused'))
+  );
+
+drop policy if exists lp_responses_delete on public.lp_responses;
+create policy lp_responses_delete on public.lp_responses
+  for delete using (
+    exists (select 1 from public.lp_sessions s where s.id = session_id and s.host_id = auth.uid())
+  );
 do $$ begin
   if not exists (
     select 1 from pg_publication_tables
