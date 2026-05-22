@@ -301,6 +301,40 @@ html.lp-join-route #screen-participant{display:flex!important}
 .participant-sop-section .sop-menti-section{width:100%;padding:1.5rem 1rem;text-align:left}
 .participant-sop-section .sop-menti-pills{justify-content:flex-start}
 .participant-sop-wait{text-align:center;color:var(--muted);font-size:.85rem;margin-top:1rem;padding-top:.75rem;border-top:1px solid var(--line)}
+.sop-menti-body{font-size:1rem;color:var(--muted);line-height:1.65;max-width:680px;margin:0 auto 1.5rem;text-align:left}
+.sop-board-preview{width:100%;margin-top:1.5rem;text-align:left;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--bg);box-shadow:var(--shadow-dash)}
+.sop-board-track-header{display:flex;align-items:center;gap:.75rem;padding:.85rem 1rem;border-bottom:1px solid var(--line);background:var(--sop-soft,#eff6ff)}
+.sop-board-track-badge{display:inline-flex;padding:.25rem .65rem;border-radius:999px;font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+.sop-board-track-name{font-size:1rem;font-weight:700;color:var(--ink)}
+.sop-board-phases-row{display:flex;gap:.75rem;padding:1rem;overflow-x:auto}
+.sop-board-phase{min-width:180px;flex:1}
+.sop-board-phase-label{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--sop-accent,#206efb);margin-bottom:.5rem;padding-bottom:.35rem;border-bottom:2px solid var(--sop-accent,#206efb)}
+.sop-board-cards{display:flex;flex-direction:column;gap:.45rem}
+.sop-board-card{display:flex;align-items:flex-start;gap:.45rem;padding:.55rem .65rem;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:.78rem;font-weight:600;line-height:1.35;color:var(--ink)}
+.sop-board-card i{color:var(--sop-accent,#206efb);margin-top:.1rem;flex-shrink:0}
+.sop-board-card.active{border-color:var(--sop-accent,#206efb);background:rgba(32,110,251,.08);box-shadow:var(--shadow-focus)}
+.track-pre .sop-board-phase-label,.track-pre .sop-board-card i{color:#206efb}
+.track-pre .sop-board-phase-label{border-color:#206efb}
+.track-ops .sop-board-phase-label,.track-ops .sop-board-card i{color:#0f6b57}
+.track-ops .sop-board-phase-label{border-color:#0f6b57}
+.track-post .sop-board-phase-label,.track-post .sop-board-card i{color:#5b21b6}
+.track-post .sop-board-phase-label{border-color:#5b21b6}
+.sop-card-slide{width:min(920px,92vw);padding:2rem;border-radius:24px;background:linear-gradient(180deg,var(--bg) 0%,var(--sop-soft,#eff6ff) 100%);border:1px solid var(--line);box-shadow:var(--shadow-lg);text-align:center}
+.sop-card-visual{width:56px;height:56px;border-radius:14px;background:var(--bg);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;margin:0 auto .85rem;color:var(--sop-accent,#206efb);font-size:1.35rem;box-shadow:var(--shadow-dash)}
+.sop-card-title{font-size:clamp(1.5rem,3.5vw,2.25rem);font-weight:800;margin:0 0 .35rem}
+.sop-card-sub{font-size:.9rem;color:var(--muted);margin:0 0 .75rem}
+.sop-card-body{font-size:1rem;color:var(--muted);line-height:1.6;max-width:640px;margin:0 auto 1rem;text-align:left}
+.sop-track-results-wrap{width:100%;max-width:960px;margin-top:1rem;text-align:left}
+.sop-track-results{display:flex;flex-direction:column;gap:.75rem}
+.sop-track-result-group{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:.85rem 1rem;box-shadow:var(--shadow-dash)}
+.sop-track-result-head{display:flex;flex-wrap:wrap;gap:.35rem .75rem;font-size:.78rem;color:var(--muted);margin-bottom:.5rem}
+.sop-track-result-head strong{color:var(--ink);font-size:.88rem}
+.sop-track-result-items{display:flex;flex-direction:column;gap:.4rem}
+.sop-track-result-item{padding:.55rem .75rem;border-radius:10px;background:var(--surface);border:1px solid var(--line);font-size:.88rem;line-height:1.4}
+.sop-track-result-total{margin-top:.5rem;font-size:.78rem;font-weight:700;color:var(--brand);text-align:center}
+.sop-track-results-slide .sop-track-results-wrap{margin-top:1.25rem}
+.participant-sop-section .sop-board-preview,.participant-sop-section .sop-board-phases-row{overflow-x:auto}
+.participant-sop-section .sop-menti-body,.participant-sop-section .sop-card-body{text-align:left}
 .toast-container{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:10px;pointer-events:none}
 .toast{pointer-events:auto;background:var(--bg);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:12px;padding:.75rem 1rem;box-shadow:var(--shadow-lg);font-size:.85rem;animation:toastIn .25s ease}
 .toast.error{border-left-color:var(--danger)}

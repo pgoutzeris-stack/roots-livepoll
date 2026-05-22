@@ -1,7 +1,7 @@
 /* ROOTS Live Poll – Hauptanwendung */
 const SUPABASE_URL = 'https://csmguwcvzreefluhahyu.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNzbWd1d2N2enJlZWZsdWhhaHl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjM0ODcsImV4cCI6MjA5MjUzOTQ4N30.Fiafx7XBaQZXUX3bKQIBH7znBHx3B51yL-bftOHsL4Q';
-const APP_VERSION = '20260520-sop3';
+const APP_VERSION = '20260520-sop4';
 const JOIN_BASE = `${location.origin}${location.pathname}`;
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
@@ -141,33 +141,170 @@ function sopTrackTheme(trackClass) {
   return themes[trackClass] || themes['track-pre'];
 }
 
-function renderSopSectionHtml(c) {
+function renderSopQuestionBadge(c) {
+  if (!c.sopPhaseName && !c.sopCardName) return '';
   const theme = sopTrackTheme(c.sopTrackClass);
-  const pills = (c.sopPills || []).map((p) => `<span class="sop-pill">${esc(p)}</span>`).join('');
+  const parts = [c.sopTrackLabel, c.sopPhaseName, c.sopCardName].filter(Boolean);
+  return `<div class="sop-menti-q-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(parts.join(' · '))}</div>`;
+}
+
+function getTrackBrainstormSlides(trackKey) {
+  if (!trackKey || !State.slides?.length) return [];
+  return State.slides.filter((s) => s.slide_type === 'brainstorm' && s.content?.sopTrackKey === trackKey);
+}
+
+function aggregateTrackUseCases(trackKey) {
+  const slides = getTrackBrainstormSlides(trackKey);
+  const byCard = [];
+  const allItems = [];
+  slides.forEach((slide) => {
+    const visible = (State.responses || []).filter((r) => r.slide_id === slide.id && !r.is_hidden);
+    const items = visible.map((r) => String(r.response?.text || '').trim()).filter(Boolean);
+    byCard.push({
+      phase: slide.content?.sopPhaseName || '',
+      card: slide.content?.sopCardName || slide.content?.title || 'Karte',
+      items,
+    });
+    items.forEach((text) => allItems.push({
+      text,
+      phase: slide.content?.sopPhaseName || '',
+      card: slide.content?.sopCardName || '',
+    }));
+  });
+  const seen = new Set();
+  const unique = allItems.filter((item) => {
+    const key = item.text.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return { byCard, allItems, unique };
+}
+
+function getTrackVoteOptions(slide) {
+  const key = slide.content?.sopTrackKey;
+  if (!slide.settings?.sopTrackVote || !key) return slide.content?.options || [];
+  const { unique } = aggregateTrackUseCases(key);
+  if (!unique.length) return slide.content?.options || [{ id: 'a', text: 'Noch keine Use Cases gesammelt' }];
+  return unique.slice(0, 12).map((item, i) => ({ id: `uc${i}`, text: item.text }));
+}
+
+function renderSopBoardPreview(c, editable = false) {
+  const board = c.sopBoard || [];
+  if (!board.length) return '';
+  const theme = sopTrackTheme(c.sopTrackClass);
+  const trackIdx = c.sopTrackIndex || 1;
+  const ed = (field, val, cls) => editable
+    ? `<span class="canvas-editable ${cls}" contenteditable="true" data-field="${field}">${esc(val)}</span>`
+    : esc(val);
+  const cols = board.map((phase) => `
+    <div class="sop-board-phase">
+      <div class="sop-board-phase-label">${ed('phase', phase.name, 'sop-board-phase-name')}</div>
+      <div class="sop-board-cards">${(phase.cards || []).map((card) => `
+        <div class="sop-board-card ${c.sopKind === 'card' && card === c.title ? 'active' : ''}">
+          <i class="fa-solid fa-file-lines"></i><span>${esc(card)}</span>
+        </div>`).join('')}</div>
+    </div>`).join('');
+  return `
+    <div class="sop-board-preview ${esc(c.sopTrackClass || '')} ${esc(c.sopKind || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+      <div class="sop-board-track-header">
+        <span class="sop-board-track-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">Track ${trackIdx}</span>
+        <span class="sop-board-track-name">${ed('title', c.title, 'sop-board-track-title')}</span>
+      </div>
+      <div class="sop-board-phases-row">${cols}</div>
+    </div>`;
+}
+
+function renderSopSectionHtml(c, editable = false) {
+  const theme = sopTrackTheme(c.sopTrackClass);
   const isTrack = c.sopKind === 'track';
+  const titleEl = editable
+    ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title" data-placeholder="Titel…">${esc(c.title || '')}</div>`
+    : `<h1 class="sop-menti-title">${esc(c.title)}</h1>`;
+  const subEl = editable
+    ? `<div class="canvas-editable sop-menti-sub" contenteditable="true" data-field="subtitle" data-placeholder="Untertitel…">${esc(c.subtitle || '')}</div>`
+    : (c.subtitle ? `<p class="sop-menti-sub">${esc(c.subtitle)}</p>` : '');
+  const bodyEl = editable
+    ? `<div class="canvas-editable sop-menti-body" contenteditable="true" data-field="body" data-placeholder="Einleitungstext…">${esc(c.body || '')}</div>`
+    : (c.body ? `<p class="sop-menti-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
   return `
     <div class="sop-menti-section ${isTrack ? 'sop-menti-track' : 'sop-menti-phase'} ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
       <div class="sop-menti-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel || 'SOP')}</div>
-      <h1 class="sop-menti-title">${esc(c.title)}</h1>
-      ${c.subtitle ? `<p class="sop-menti-sub">${esc(c.subtitle)}</p>` : ''}
-      <div class="sop-menti-cards-label">${isTrack ? 'Unterphasen' : 'SOP-Karten'}</div>
-      <div class="sop-menti-pills">${pills}</div>
+      ${titleEl}
+      ${subEl}
+      ${bodyEl}
+      ${renderSopBoardPreview(c, editable)}
     </div>`;
 }
 
-function renderMentiHeroHtml(c) {
+function renderSopCardHtml(c, editable = false) {
+  const theme = sopTrackTheme(c.sopTrackClass);
+  const titleEl = editable
+    ? `<div class="canvas-editable sop-card-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+    : `<h1 class="sop-card-title">${esc(c.title)}</h1>`;
+  const subEl = editable
+    ? `<div class="canvas-editable sop-card-sub" contenteditable="true" data-field="subtitle">${esc(c.subtitle || '')}</div>`
+    : (c.subtitle ? `<p class="sop-card-sub">${esc(c.subtitle)}</p>` : '');
+  const bodyEl = editable
+    ? `<div class="canvas-editable sop-card-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+    : `<p class="sop-card-body">${esc(c.body || '').replace(/\n/g, '<br>')}</p>`;
+  return `
+    <div class="sop-card-slide ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+      <div class="sop-menti-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel)} · ${esc(c.sopPhaseName)}</div>
+      <div class="sop-card-visual"><i class="fa-solid fa-file-lines"></i></div>
+      ${titleEl}
+      ${subEl}
+      ${bodyEl}
+      ${renderSopBoardPreview(c, editable)}
+    </div>`;
+}
+
+function renderSopTrackResultsHtml(trackKey) {
+  const { byCard, allItems } = aggregateTrackUseCases(trackKey);
+  if (!allItems.length) return '<div class="present-wait-msg">Noch keine Use Cases in diesem Track gesammelt.</div>';
+  return `<div class="sop-track-results">${byCard.filter((g) => g.items.length).map((group) => `
+    <div class="sop-track-result-group">
+      <div class="sop-track-result-head"><span>${esc(group.phase)}</span><strong>${esc(group.card)}</strong></div>
+      <div class="sop-track-result-items">${group.items.map((t) => `<div class="sop-track-result-item">${esc(t)}</div>`).join('')}</div>
+    </div>`).join('')}<div class="sop-track-result-total">${allItems.length} Use Cases gesammelt</div></div>`;
+}
+
+function renderSopContentHtml(c, editable = false) {
+  if (c.sopKind === 'card') return renderSopCardHtml(c, editable);
+  if (c.sopTrackResults) {
+    const theme = sopTrackTheme(c.sopTrackClass);
+    const titleEl = editable
+      ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+      : `<h1 class="sop-menti-title">${esc(c.title)}</h1>`;
+    const bodyEl = editable
+      ? `<div class="canvas-editable sop-menti-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+      : (c.body ? `<p class="sop-menti-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+    const results = State.session ? renderSopTrackResultsHtml(c.sopTrackKey) : '<div class="present-wait-msg">Ergebnisse erscheinen in der Live-Session.</div>';
+    return `
+      <div class="sop-menti-section sop-track-results-slide ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+        <div class="sop-menti-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel || 'Track')}</div>
+        ${titleEl}
+        ${bodyEl}
+        ${renderSopBoardPreview(c, editable)}
+        <div class="sop-track-results-wrap">${results}</div>
+      </div>`;
+  }
+  return '';
+}
+
+function renderMentiHeroHtml(c, editable = false) {
+  const titleEl = editable
+    ? `<div class="canvas-editable menti-hero-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+    : `<h1 class="menti-hero-title">${esc(c.title)}</h1>`;
+  const bodyEl = editable
+    ? `<div class="canvas-editable menti-hero-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+    : `<p class="menti-hero-body">${esc(c.body || '').replace(/\n/g, '<br>')}</p>`;
   return `
     <div class="menti-hero">
       <div class="menti-hero-icon"><i class="fa-solid fa-signal"></i></div>
-      <h1 class="menti-hero-title">${esc(c.title)}</h1>
-      <p class="menti-hero-body">${esc(c.body || '').replace(/\n/g, '<br>')}</p>
+      ${titleEl}
+      ${bodyEl}
     </div>`;
-}
-
-function renderSopQuestionBadge(c) {
-  if (!c.sopPhaseName) return '';
-  const theme = sopTrackTheme(c.sopTrackClass);
-  return `<div class="sop-menti-q-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel)} · ${esc(c.sopPhaseName)}</div>`;
 }
 
 function renderPresentParticipants() {
@@ -502,12 +639,17 @@ function renderEditorCanvas() {
 
   let body = '';
   if (slide.slide_type === 'section' && c.sopTrackClass) {
-    canvas.innerHTML = renderSopSectionHtml(c);
+    canvas.innerHTML = `${renderSopSectionHtml(c, true)}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel, Text und Einleitung direkt bearbeiten</div>`;
+    bindCanvasInlineEdit();
     return;
   }
-  if (slide.slide_type === 'content' && c.mentiHero) {
-    canvas.innerHTML = renderMentiHeroHtml(c);
-    return;
+  if (slide.slide_type === 'content' && (c.mentiHero || c.sopKind || c.sopTrackResults)) {
+    const html = c.mentiHero ? renderMentiHeroHtml(c, true) : renderSopContentHtml(c, true);
+    if (html) {
+      canvas.innerHTML = `${html}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel und Text direkt bearbeiten</div>`;
+      bindCanvasInlineEdit();
+      return;
+    }
   }
   if (slide.slide_type === 'content' || slide.slide_type === 'section') {
     body = `
@@ -540,11 +682,14 @@ function bindCanvasInlineEdit() {
       if (field === 'title') slide.content.title = val;
       else if (field === 'prompt') slide.content.prompt = val;
       else if (field === 'body') slide.content.body = val;
+      else if (field === 'subtitle') slide.content.subtitle = val;
       void persistSlide(slide);
       const propTitle = $('#prop-title');
       const propPrompt = $('#prop-prompt');
       if (field === 'title' && propTitle) propTitle.value = val;
       if ((field === 'prompt' || field === 'body') && propPrompt) propPrompt.value = val;
+      if (field === 'subtitle' && $('#prop-subtitle')) $('#prop-subtitle').value = val;
+      if (field === 'body' && propPrompt) propPrompt.value = val;
       renderSlideList();
     }, 600));
     el.addEventListener('focus', () => el.classList.add('editing'));
@@ -614,7 +759,8 @@ function renderEditorProps() {
     </div>
     <div class="props-section">Inhalt</div>
     <div class="props-label">Titel</div><input id="prop-title" value="${esc(c.title || '')}" />
-    <div class="props-label">Frage / Text</div><textarea id="prop-prompt">${esc(c.prompt || c.body || '')}</textarea>
+    ${slide.slide_type === 'section' || c.sopKind ? `<div class="props-label">Untertitel</div><input id="prop-subtitle" value="${esc(c.subtitle || '')}" />` : ''}
+    <div class="props-label">${slide.slide_type === 'section' || c.sopKind === 'card' || c.sopTrackResults ? 'Einleitung / Beschreibung' : 'Frage / Text'}</div><textarea id="prop-prompt">${esc(c.prompt || c.body || '')}</textarea>
     ${slide.slide_type === 'content' || slide.slide_type === 'pin_image' ? `<div class="props-label">Bild-URL</div><input id="prop-image" value="${esc(c.imageUrl || '')}" placeholder="https://…" />` : ''}
     ${slide.slide_type === 'scale' ? `
       <div class="props-label">Skala</div>
@@ -642,8 +788,11 @@ function renderEditorProps() {
       ...defaultStyle(),
       ...slideObj.content,
       title: $('#prop-title')?.value || '',
+      subtitle: $('#prop-subtitle')?.value ?? slideObj.content.subtitle,
       prompt: $('#prop-prompt')?.value || '',
-      body: slideObj.slide_type === 'content' ? ($('#prop-prompt')?.value || slideObj.content.body) : slideObj.content.body,
+      body: ['content', 'section'].includes(slideObj.slide_type) || slideObj.content.sopKind
+        ? ($('#prop-prompt')?.value || slideObj.content.body)
+        : slideObj.content.body,
       imageUrl: $('#prop-image')?.value ?? slideObj.content.imageUrl,
       min: Number($('#prop-min')?.value ?? slideObj.content.min ?? 1),
       max: Number($('#prop-max')?.value ?? slideObj.content.max ?? 10),
@@ -931,11 +1080,16 @@ function renderPresent() {
   const interactive = isInteractive(slide.slide_type);
   const visible = getVisibleResponses(slide.id);
   const pending = getPendingResponses(slide.id);
-  const agg = window.LPViz.aggregateResponses(slide, visible);
+  const displaySlide = (slide.settings?.sopTrackVote && slide.content?.sopTrackKey)
+    ? { ...slide, content: { ...slide.content, options: getTrackVoteOptions(slide) } }
+    : slide;
+  const agg = window.LPViz.aggregateResponses(displaySlide, visible);
 
   let viz = '';
   if (!interactive) {
-    if (slide.settings?.showPreviousSlideResults) {
+    if (c.sopTrackResults && c.sopTrackKey) {
+      viz = `<div class="sop-track-results-wrap">${renderSopTrackResultsHtml(c.sopTrackKey)}</div>`;
+    } else if (slide.settings?.showPreviousSlideResults) {
       const prevSlide = State.slides[(State.session.current_slide_index || 0) - 1];
       if (prevSlide) {
         const prevVisible = getVisibleResponses(prevSlide.id);
@@ -947,7 +1101,7 @@ function renderPresent() {
     }
   } else if (slide.settings?.showResultsLive !== false) {
     if (agg.total > 0 || !State.session.question_open) {
-      viz = window.LPViz.renderViz(slide, agg, 'present');
+      viz = window.LPViz.renderViz(displaySlide, agg, 'present');
     } else {
       viz = '<div class="present-wait-msg">Antworten werden gesammelt…</div>';
     }
@@ -985,15 +1139,18 @@ function renderPresent() {
     return;
   }
 
-  if (slide.slide_type === 'content' && c.mentiHero) {
-    stage.innerHTML = `
-      <div class="present-slide-meta">Folie ${(State.session.current_slide_index || 0) + 1} / ${State.slides.length}</div>
-      ${renderMentiHeroHtml(c)}`;
-    updatePresentHeader();
-    updatePresentStats();
-    renderPresentParticipants();
-    void renderQrCode();
-    return;
+  if (slide.slide_type === 'content' && (c.mentiHero || c.sopKind || c.sopTrackResults)) {
+    const html = c.mentiHero ? renderMentiHeroHtml(c) : renderSopContentHtml(c);
+    if (html) {
+      stage.innerHTML = `
+        <div class="present-slide-meta">Folie ${(State.session.current_slide_index || 0) + 1} / ${State.slides.length}</div>
+        ${html}`;
+      updatePresentHeader();
+      updatePresentStats();
+      renderPresentParticipants();
+      void renderQrCode();
+      return;
+    }
   }
 
   const sopBadge = renderSopQuestionBadge(c);
@@ -1264,9 +1421,12 @@ function renderParticipantQuestion() {
       root.innerHTML = `<div class="participant-card participant-sop-section">${renderSopSectionHtml(slide.content)}<p class="participant-sop-wait">Bitte auf den Vortragenden achten…</p></div>`;
       return;
     }
-    if (slide.slide_type === 'content' && slide.content?.mentiHero) {
-      root.innerHTML = `<div class="participant-card">${renderMentiHeroHtml(slide.content)}<p class="participant-sop-wait">Bitte auf den Vortragenden achten…</p></div>`;
-      return;
+    if (slide.slide_type === 'content' && (slide.content?.mentiHero || slide.content?.sopKind || slide.content?.sopTrackResults)) {
+      const html = slide.content.mentiHero ? renderMentiHeroHtml(slide.content) : renderSopContentHtml(slide.content);
+      if (html) {
+        root.innerHTML = `<div class="participant-card participant-sop-section">${html}<p class="participant-sop-wait">Bitte auf den Vortragenden achten…</p></div>`;
+        return;
+      }
     }
     root.innerHTML = `<div class="participant-card"><h1>${esc(slide.content?.title || 'Folie')}</h1><p>${esc(slide.content?.body || slide.content?.prompt || '')}</p><p style="color:var(--muted);margin-top:1rem">Bitte auf den Vortragenden achten…</p></div>`;
     return;
@@ -1284,7 +1444,7 @@ function renderParticipantQuestion() {
   if (type === 'mc_single' || type === 'quiz' || type === 'yesno') {
     const opts = type === 'yesno'
       ? [{ id: 'yes', text: 'Ja' }, { id: 'no', text: 'Nein' }]
-      : (c.options || []);
+      : (slide.settings?.sopTrackVote ? getTrackVoteOptions(slide) : (c.options || []));
     input = opts.map((o) => `<button type="button" class="participant-option" data-val="${esc(o.id)}" style="border-color:${esc(o.color || c.accentColor || 'var(--line)')}">${esc(o.text)}</button>`).join('');
   } else if (type === 'mc_multi') {
     input = `<div id="multi-wrap">${(c.options || []).map((o) => `<label class="props-check"><input type="checkbox" value="${esc(o.id)}"> ${esc(o.text)}</label>`).join('')}</div><button type="button" class="btn-primary participant-submit" id="submit-multi">Senden</button>`;

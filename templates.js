@@ -14,102 +14,219 @@ const SOP_TOOL_TRACKS = [
   {
     title: 'Track 1: Pre-Engagement',
     class: 'track-pre',
+    intro: 'Alles vor Projektstart: vom Erstkontakt über Bedarfsanalyse bis zum Pitch. Hier identifizieren wir KI-Potenziale entlang der frühen SOP-Schritte.',
     phases: [
-      { name: 'Anbahnung', cards: ['ROOTS Vorstellung', 'Zielstellung klären', 'Initiale Analyse'] },
-      { name: 'Exploration', cards: ['Bedarfsanalyse / Problem Framing', 'Onboarding-Skizze & Aufwand', 'Website & Online-Analyse', 'Initiale Spezifikationen'] },
-      { name: 'Pitch', cards: ['Angebotsgestaltung & Präsentation', 'Pitch Benchmarking', 'Onboarding Admin & Vertrag'] },
+      {
+        name: 'Anbahnung',
+        intro: 'Frühe Anbahnung: ROOTS vorstellen, Zielstellung klären und eine erste Analyse durchführen.',
+        cards: [
+          { name: 'ROOTS Vorstellung', intro: 'Erster Kontakt mit dem Kunden – ROOTS Positionierung, Team und Arbeitsweise vorstellen.' },
+          { name: 'Zielstellung klären', intro: 'Gemeinsame Ziele, Erfolgskriterien und Erwartungen des Kunden definieren.' },
+          { name: 'Initiale Analyse', intro: 'Erste Einschätzung von Markt, Wettbewerb und Ist-Situation des Kunden.' },
+        ],
+      },
+      {
+        name: 'Exploration',
+        intro: 'Vertiefende Exploration: Bedarf verstehen, Onboarding skizzieren und digitale Präsenz analysieren.',
+        cards: [
+          { name: 'Bedarfsanalyse / Problem Framing', intro: 'Kernprobleme und Herausforderungen des Kunden strukturiert erfassen.' },
+          { name: 'Onboarding-Skizze & Aufwand', intro: 'Groben Projekt- und Onboarding-Rahmen mit Aufwandsindikation skizzieren.' },
+          { name: 'Website & Online-Analyse', intro: 'Digitale Touchpoints, Website und Online-Auftritt des Kunden bewerten.' },
+          { name: 'Initiale Spezifikationen', intro: 'Erste Anforderungen und Spezifikationen für das Projekt dokumentieren.' },
+        ],
+      },
+      {
+        name: 'Pitch',
+        intro: 'Pitch-Phase: Angebot gestalten, präsentieren und Vertragsabschluss vorbereiten.',
+        cards: [
+          { name: 'Angebotsgestaltung & Präsentation', intro: 'Angebot erstellen und überzeugend beim Kunden präsentieren.' },
+          { name: 'Pitch Benchmarking', intro: 'Pitch gegen Wettbewerb und Best Practices spiegeln und schärfen.' },
+          { name: 'Onboarding Admin & Vertrag', intro: 'Vertrag, Admin und organisatorisches Onboarding nach Pitch-Abschluss.' },
+        ],
+      },
     ],
   },
   {
     title: 'Track 2: Execution',
     class: 'track-ops',
+    intro: 'Projektdurchführung von Ramp-up bis Implementierung – hier liegt das größte operative KI-Potenzial im Tagesgeschäft.',
     phases: [
-      { name: 'Ramp-up', cards: ['Projektstruktur aufbauen', 'Briefing & Content-Plan'] },
-      { name: 'Analyse', cards: ['Performance-Analyse', 'Zielgruppen-Insights'] },
-      { name: 'Synthese', cards: ['Erkenntnisse bündeln', 'Strategie-Update'] },
-      { name: 'Delivery', cards: ['Content-Produktion', 'Ausspielung & Community Management'] },
-      { name: 'Implementierung', cards: ['Kampagnen-Setup', 'Tool-Integration & Automatisierung'] },
+      {
+        name: 'Ramp-up',
+        intro: 'Projektstart: Struktur aufbauen und Briefing sowie Content-Plan definieren.',
+        cards: [
+          { name: 'Projektstruktur aufbauen', intro: 'Team, Rollen, Timelines und Projekt-Setup etablieren.' },
+          { name: 'Briefing & Content-Plan', intro: 'Briefings erstellen und Content-Planung für das Projekt festlegen.' },
+        ],
+      },
+      {
+        name: 'Analyse',
+        intro: 'Datengetriebene Analyse: Performance und Zielgruppen verstehen.',
+        cards: [
+          { name: 'Performance-Analyse', intro: 'Kampagnen- und Marketing-Performance auswerten.' },
+          { name: 'Zielgruppen-Insights', intro: 'Zielgruppenverhalten und Insights ableiten.' },
+        ],
+      },
+      {
+        name: 'Synthese',
+        intro: 'Erkenntnisse bündeln und die Strategie auf Basis der Analyse aktualisieren.',
+        cards: [
+          { name: 'Erkenntnisse bündeln', intro: 'Analyseergebnisse zusammenführen und Muster identifizieren.' },
+          { name: 'Strategie-Update', intro: 'Strategie auf Basis der Erkenntnisse anpassen und dokumentieren.' },
+        ],
+      },
+      {
+        name: 'Delivery',
+        intro: 'Content produzieren, ausspielen und Community betreuen.',
+        cards: [
+          { name: 'Content-Produktion', intro: 'Inhalte erstellen – Texte, Visuals, Formate gemäß Plan.' },
+          { name: 'Ausspielung & Community Management', intro: 'Content veröffentlichen und Community aktiv betreuen.' },
+        ],
+      },
+      {
+        name: 'Implementierung',
+        intro: 'Kampagnen live schalten und Tools integrieren.',
+        cards: [
+          { name: 'Kampagnen-Setup', intro: 'Kampagnen in Plattformen konfigurieren und launchen.' },
+          { name: 'Tool-Integration & Automatisierung', intro: 'Tools verbinden, Workflows automatisieren und skalieren.' },
+        ],
+      },
     ],
   },
   {
     title: 'Track 3: Post-Engagement',
     class: 'track-post',
+    intro: 'Nach Projektende: Ergebnisse übergeben, lernen und Beziehung pflegen.',
     phases: [
-      { name: 'Closeout', cards: ['Finales Reporting & Übergabe', 'Interne Retro & Learnings', 'Kundenfeedback einholen'] },
-      { name: 'Follow-Up', cards: ['Beziehungspflege & Check-ins', 'Upsell & Folgeauftrag', 'Case Study & Referenz'] },
+      {
+        name: 'Closeout',
+        intro: 'Projektabschluss: Reporting, Retro und Kundenfeedback.',
+        cards: [
+          { name: 'Finales Reporting & Übergabe', intro: 'Ergebnisse dokumentieren und an den Kunden übergeben.' },
+          { name: 'Interne Retro & Learnings', intro: 'Interne Retrospektive und Learnings festhalten.' },
+          { name: 'Kundenfeedback einholen', intro: 'Feedback vom Kunden strukturiert einholen und auswerten.' },
+        ],
+      },
+      {
+        name: 'Follow-Up',
+        intro: 'Langfristige Beziehungspflege und Wachstum nach Projektende.',
+        cards: [
+          { name: 'Beziehungspflege & Check-ins', intro: 'Regelmäßige Check-ins und Beziehungspflege mit dem Kunden.' },
+          { name: 'Upsell & Folgeauftrag', intro: 'Folgeprojekte und Upsell-Potenziale identifizieren und ansprechen.' },
+          { name: 'Case Study & Referenz', intro: 'Erfolgsgeschichte als Case Study und Referenz aufbereiten.' },
+        ],
+      },
     ],
   },
 ];
 
-function sopTrackSection(track) {
+function sopMeta(track, phase, card) {
+  const label = track.title.replace(/^Track \d+: /, '');
+  return {
+    sopTrackKey: track.class,
+    sopTrackClass: track.class,
+    sopTrackLabel: label,
+    sopPhaseName: phase?.name || '',
+    sopCardName: card?.name || '',
+  };
+}
+
+function sopBoardData(track, phaseFilter) {
+  const phases = phaseFilter
+    ? track.phases.filter((p) => p.name === phaseFilter.name)
+    : track.phases;
+  return phases.map((p) => ({
+    name: p.name,
+    cards: p.cards.map((c) => c.name),
+  }));
+}
+
+function sopTrackIntro(track, trackIndex) {
   return tplSlide('section', {
     title: track.title,
     subtitle: track.phases.map((p) => p.name).join(' · '),
+    body: track.intro,
     sopKind: 'track',
-    sopTrackClass: track.class,
-    sopTrackLabel: track.title.replace(/^Track \d+: /, ''),
-    sopPills: track.phases.map((p) => p.name),
-    bgColor: '#ffffff',
-    accentColor: track.class === 'track-pre' ? '#206efb' : track.class === 'track-ops' ? '#0f6b57' : '#5b21b6',
+    sopTrackIndex: trackIndex + 1,
+    sopBoard: sopBoardData(track),
+    ...sopMeta(track),
   });
 }
 
-function sopPhaseSection(track, phase) {
+function sopPhaseIntro(track, phase) {
   return tplSlide('section', {
     title: phase.name,
     subtitle: track.title,
+    body: phase.intro,
     sopKind: 'phase',
-    sopTrackClass: track.class,
-    sopTrackLabel: track.title.replace(/^Track \d+: /, ''),
-    sopPhaseName: phase.name,
-    sopPills: phase.cards,
-    bgColor: '#ffffff',
-    accentColor: track.class === 'track-pre' ? '#206efb' : track.class === 'track-ops' ? '#0f6b57' : '#5b21b6',
+    sopBoard: sopBoardData(track, phase),
+    ...sopMeta(track, phase),
   });
 }
 
-function sopBrainstormSlide(track, phase) {
+function sopCardIntro(track, phase, card) {
+  return tplSlide('content', {
+    title: card.name,
+    body: card.intro,
+    subtitle: `${phase.name} · ${track.title.replace(/^Track \d+: /, '')}`,
+    sopKind: 'card',
+    sopBoard: [{ name: phase.name, cards: [card.name] }],
+    ...sopMeta(track, phase, card),
+  });
+}
+
+function sopCardBrainstorm(track, phase, card) {
   return tplSlide('brainstorm', {
-    title: `KI Use Cases · ${phase.name}`,
-    prompt: `Welche KI Use Cases siehst du in „${phase.name}“?\nFreitext · Was? Wer? Welches Tool?`,
-    sopTrackClass: track.class,
-    sopTrackLabel: track.title.replace(/^Track \d+: /, ''),
-    sopPhaseName: phase.name,
+    title: `KI Use Cases · ${card.name}`,
+    prompt: `Welche KI Use Cases siehst du für „${card.name}“?\nFreitext · Was? Wer? Welches Tool?`,
     mentiQuestion: true,
+    ...sopMeta(track, phase, card),
   }, { showResultsLive: true, moderation: true });
 }
 
-function sopPrioritizeSlide(track, phase) {
-  return tplSlide('ranking', {
-    title: `Use Cases priorisieren · ${phase.name}`,
-    prompt: 'Ordne die KI Use Cases nach Priorität (1 = zuerst umsetzen).\nModerator:in trägt die Top-Ideen aus dem Brainstorming in die Optionen ein.',
-    sopTrackClass: track.class,
-    sopTrackLabel: track.title.replace(/^Track \d+: /, ''),
-    sopPhaseName: phase.name,
-    mentiQuestion: true,
-    options: [
-      { id: 'a', text: 'Use Case 1' },
-      { id: 'b', text: 'Use Case 2' },
-      { id: 'c', text: 'Use Case 3' },
-      { id: 'd', text: 'Use Case 4' },
-      { id: 'e', text: 'Use Case 5' },
-    ],
+function sopTrackResults(track) {
+  return tplSlide('content', {
+    title: `Alle Use Cases · ${track.title.replace(/^Track \d+: /, '')}`,
+    body: 'Gesammelte KI Use Cases aus allen SOP-Karten dieses Tracks – gruppiert nach Karte.',
+    subtitle: track.title,
+    sopKind: 'track-results',
+    sopTrackResults: true,
+    sopBoard: sopBoardData(track),
+    ...sopMeta(track),
   }, { showResultsLive: true });
 }
 
+function sopTrackVote(track) {
+  return tplSlide('mc_single', {
+    title: `Top Use Case · ${track.title.replace(/^Track \d+: /, '')}`,
+    prompt: 'Stimme für den wichtigsten KI Use Case in diesem Track ab.',
+    mentiQuestion: true,
+    options: [
+      { id: 'a', text: 'Use Case 1 (wird aus Brainstorming geladen)' },
+      { id: 'b', text: 'Use Case 2' },
+      { id: 'c', text: 'Use Case 3' },
+    ],
+    ...sopMeta(track),
+  }, { showResultsLive: true, sopTrackVote: true });
+}
+
 function buildSopKiWorkshopSlides() {
-  const trackSlides = SOP_TOOL_TRACKS.flatMap((track) => [
-    sopTrackSection(track),
+  const trackSlides = SOP_TOOL_TRACKS.flatMap((track, trackIndex) => [
+    sopTrackIntro(track, trackIndex),
     ...track.phases.flatMap((phase) => [
-      sopPhaseSection(track, phase),
-      sopBrainstormSlide(track, phase),
-      sopPrioritizeSlide(track, phase),
+      sopPhaseIntro(track, phase),
+      ...phase.cards.flatMap((card) => [
+        sopCardIntro(track, phase, card),
+        sopCardBrainstorm(track, phase, card),
+      ]),
     ]),
+    sopTrackResults(track),
+    sopTrackVote(track),
   ]);
   return [
     tplSlide('content', {
       title: 'SOP · KI Use-Case Workshop',
-      body: 'Wir gehen alle SOP-Tracks und Unterphasen durch – wie im SOP-Dashboard.\n\nPro Unterphase: KI Use Cases sammeln → priorisieren.\n\nScannt den QR-Code · Name + Avatar wählen.',
+      body: 'Wir gehen alle SOP-Tracks, Unterphasen und Karten durch – exakt wie im SOP-Dashboard.\n\nPro SOP-Karte: KI Use Cases sammeln.\nPro Track: alle Use Cases sammeln & Leader abstimmen.\n\nScannt den QR-Code · Name + Avatar wählen.',
       mentiHero: true,
     }),
     ...trackSlides,
@@ -126,10 +243,10 @@ window.LP_TEMPLATES = [
     key: 'roots-sop-ki-workshop',
     category: 'ROOTS · SOP & KI',
     name: 'SOP-Brainstorming & KI Use Cases',
-    desc: 'Exakt wie im SOP-Tool: 3 Tracks, 10 Unterphasen – pro Phase Brainstorming + Priorisierung.',
-    duration: '90–120 Min.',
+    desc: 'Wie im SOP-Tool: 3 Tracks, 10 Phasen, 26 Karten – pro Karte Brainstorming, pro Track Sammelübersicht & Abstimmung.',
+    duration: '120–180 Min.',
     group: '6–25',
-    tips: 'Tracks/Phasen wie SOP-Dashboard. Pro Unterphase: erst KI Use Cases sammeln, dann Optionen im Editor mit den Top-Ideen aus dem Brainstorming füllen und priorisieren lassen.',
+    tips: 'Pro SOP-Karte Brainstorming. Am Track-Ende alle Use Cases gesammelt anzeigen und Leader abstimmen. Einleitungstexte im Folien-Editor bearbeiten.',
     slides: buildSopKiWorkshopSlides(),
   },
   {
