@@ -23,7 +23,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-<link rel="stylesheet" href="styles.css?v=20260520-sop7" />
+<link rel="stylesheet" href="styles.css?v=20260520-sop8" />
 </head>
 <body>
 <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -109,7 +109,10 @@
       <div id="editor-slides" class="editor-slides-list"></div>
     </aside>
     <div class="editor-center">
-      <div id="editor-canvas" class="editor-canvas"></div>
+      <div class="editor-stage-wrap">
+        <div id="editor-canvas" class="editor-canvas"></div>
+        <aside id="editor-sop-panel" class="workshop-slide-sop hidden" aria-label="SOP Übersicht"></aside>
+      </div>
     </div>
     <aside id="editor-props" class="props-panel visible"></aside>
   </div>
@@ -130,10 +133,11 @@
       </div>
     </header>
     <div class="present-body">
-      <aside id="present-sop-sidebar" class="sop-workshop-sidebar hidden" aria-label="SOP Navigation"></aside>
       <div class="present-main">
-        <div id="present-stage" class="present-stage"></div>
-        <div id="present-sop-board" class="sop-workshop-board-wrap hidden"></div>
+        <div class="present-stage-wrap">
+          <div id="present-stage" class="present-stage"></div>
+          <aside id="present-sop-panel" class="workshop-slide-sop hidden" aria-label="SOP Übersicht"></aside>
+        </div>
       </div>
     </div>
   </div>
@@ -164,8 +168,10 @@
 <!-- PARTICIPANT -->
 <section id="screen-participant" class="screen">
   <div class="participant-workshop-layout">
-    <aside id="participant-sop-sidebar" class="sop-workshop-sidebar hidden" aria-label="SOP Navigation"></aside>
-    <div id="participant-root" class="participant-root"></div>
+    <div class="participant-main-wrap">
+      <aside id="participant-sop-panel" class="workshop-slide-sop hidden" aria-label="SOP Übersicht"></aside>
+      <div id="participant-root" class="participant-root"></div>
+    </div>
   </div>
 </section>
 
@@ -203,8 +209,8 @@
 </div>
 
 <script src="https://pgoutzeris-stack.github.io/ROOTS_Intranet/roots-user-bridge.js?v=20260522-hover"></script>
-<script src="templates.js?v=20260520-sop7"></script>
-<script src="viz.js?v=20260520-sop7"></script>
-<script src="app.js?v=20260520-sop7"></script>
+<script src="templates.js?v=20260520-sop8"></script>
+<script src="viz.js?v=20260520-sop8"></script>
+<script src="app.js?v=20260520-sop8"></script>
 </body>
 </html>

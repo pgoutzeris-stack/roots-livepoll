@@ -1,7 +1,7 @@
 /* ROOTS Live Poll – Hauptanwendung */
 const SUPABASE_URL = 'https://csmguwcvzreefluhahyu.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNzbWd1d2N2enJlZWZsdWhhaHl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjM0ODcsImV4cCI6MjA5MjUzOTQ4N30.Fiafx7XBaQZXUX3bKQIBH7znBHx3B51yL-bftOHsL4Q';
-const APP_VERSION = '20260520-sop7';
+const APP_VERSION = '20260520-sop8';
 const JOIN_BASE = `${location.origin}${location.pathname}`;
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
@@ -269,8 +269,7 @@ function getActiveTrackKey(slideIndex) {
     const c = getSopSlideContext(State.slides[i]);
     if (c?.trackKey) return c.trackKey;
   }
-  const tracks = window.SOP_TOOL_TRACKS || [];
-  return tracks[0]?.class || null;
+  return null;
 }
 
 function getTrackCardSlideIndexes(trackKey) {
@@ -467,96 +466,77 @@ function renderParticipantTrackVoteHtml(slide) {
     <button type="button" class="btn-primary participant-submit" id="submit-top3">Top 3 senden</button>`;
 }
 
-function renderSopFullBoardHtml(ctx = {}) {
-  const tracks = window.SOP_TOOL_TRACKS || [];
-  const { trackKey, phaseName, cardName } = ctx;
-  if (!tracks.length) return '';
-  let html = '<div class="sop-workshop-board-inner">';
-  tracks.forEach((track, tIdx) => {
-    if (trackKey && track.class !== trackKey) return;
-    html += `<div class="track ${esc(track.class)}" data-track-index="${tIdx}">
-      <div class="track-header">
-        <span class="track-badge">Track ${tIdx + 1}</span>
-        <span class="track-name">${esc(track.title)}</span>
-      </div>
-      <div class="phases-wrapper"><div class="phases-row">`;
-    (track.phases || []).forEach((phase, pIdx) => {
-      const hidePhase = phaseName && phase.name !== phaseName;
-      html += `<div class="phase-col ${hidePhase ? 'sop-nav-filter-hidden' : ''}" data-phase-index="${pIdx}">
-        <div class="phase-label">${esc(phase.name)}</div>
-        <div class="phase-cards">`;
-      (phase.cards || []).forEach((card) => {
-        const active = track.class === trackKey && phase.name === phaseName && card.name === cardName;
-        html += `<div class="sop-card sop-card-readonly ${active ? 'sop-card-active' : ''}">
-          <div class="card-trigger">
-            <div class="card-header-main"><div class="card-title-wrap"><div class="card-title">${esc(card.name)}</div></div></div>
-            <div class="card-meta-chips"><span class="card-chip"><i class="fa-solid fa-lightbulb"></i> KI Use Cases</span></div>
-          </div>
-        </div>`;
-      });
-      html += '</div></div>';
+function bindSopWorkshopPanelClicks(container, onNavigate) {
+  if (!container || !onNavigate) return;
+  container.querySelectorAll('[data-slide-index]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.slideIndex, 10);
+      if (Number.isFinite(idx) && idx >= 0) onNavigate(idx);
     });
-    html += '</div></div></div>';
   });
-  html += '</div>';
-  return html;
 }
 
-function renderSopWorkshopNavHtml(currentIndex, { clickable = false, onNavigate } = {}) {
+function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigate } = {}) {
   const tracks = window.SOP_TOOL_TRACKS || [];
   const ctx = getSopSlideContext(State.slides[currentIndex]);
   const activeTrackKey = getActiveTrackKey(currentIndex);
-  let html = '<div class="dash-nav-section">Workshop</div>';
-  tracks.forEach((track) => {
-    const navClass = SOP_TRACK_NAV_CLASS[track.class] || '';
-    const trackIdx = findSlideIndexForSopStep(track.class, null, null, 'track-intro');
-    const isActiveTrack = track.class === activeTrackKey;
-    const trackStarted = trackIdx >= 0 && currentIndex >= trackIdx;
-    const trackDone = (() => {
-      const voteIdx = findSlideIndexForSopStep(track.class, null, null, 'track-vote');
-      return voteIdx >= 0 && currentIndex > voteIdx;
-    })();
+  const activeTrack = tracks.find((t) => t.class === activeTrackKey);
+  if (!activeTrack) return { html: '', bind() {} };
 
-    if (!isActiveTrack) {
-      const label = trackDone ? 'Abgeschlossen' : trackStarted ? 'Später' : 'Noch nicht gestartet';
-      html += `<button type="button" class="dash-nav-item sop-nav-track-collapsed ${navClass}" disabled>
-        <i class="fa-solid fa-folder-tree"></i><span>${esc(track.title.replace(/^Track \d+: /, ''))}</span>
-        <small>${label}</small>
+  const navClass = SOP_TRACK_NAV_CLASS[activeTrack.class] || '';
+  const trackIdx = findSlideIndexForSopStep(activeTrack.class, null, null, 'track-intro');
+  const trackIdxNum = tracks.findIndex((t) => t.class === activeTrack.class);
+  let html = `<div class="workshop-sop-panel ${esc(activeTrack.class)} ${esc(navClass)}">`;
+  html += `<button type="button" class="workshop-sop-panel-track${ctx?.kind === 'track-intro' ? ' active' : ''}" data-slide-index="${trackIdx}" ${trackIdx < 0 ? 'disabled' : ''}>
+    <span class="workshop-sop-panel-badge">Track ${trackIdxNum + 1}</span>
+    <span class="workshop-sop-panel-title">${esc(activeTrack.title.replace(/^Track \d+: /, ''))}</span>
+  </button>`;
+
+  (activeTrack.phases || []).forEach((phase) => {
+    html += `<div class="workshop-sop-phase"><div class="workshop-sop-phase-label">${esc(phase.name)}</div>`;
+    (phase.cards || []).forEach((card) => {
+      const cardIdx = findSlideIndexForSopStep(activeTrack.class, phase.name, card.name, 'card');
+      const status = getCardNavStatus(activeTrack.class, phase.name, card.name, currentIndex);
+      html += `<button type="button" class="workshop-sop-card status-${status}${status === 'active' ? ' active' : ''}" data-slide-index="${cardIdx}" ${cardIdx < 0 ? 'disabled' : ''}>
+        ${cardNavStatusIcon(status)}<span>${esc(card.name)}</span>
       </button>`;
-      return;
-    }
-
-    html += `<div class="sop-nav-track-group">
-      <button type="button" class="dash-nav-item ${navClass}${ctx?.kind === 'track-intro' ? ' active' : ' sop-nav-parent-active active'}" data-slide-index="${trackIdx}" ${trackIdx < 0 ? 'disabled' : ''}>
-        <i class="fa-solid fa-folder-tree"></i><span>${esc(track.title.replace(/^Track \d+: /, ''))}</span>
-      </button>
-      <div class="sop-nav-phases">`;
-    (track.phases || []).forEach((phase) => {
-      html += `<div class="sop-nav-phase-group"><div class="sop-nav-phase-label">${esc(phase.name)}</div>`;
-      (phase.cards || []).forEach((card) => {
-        const cardIdx = findSlideIndexForSopStep(track.class, phase.name, card.name, 'card');
-        const status = getCardNavStatus(track.class, phase.name, card.name, currentIndex);
-        html += `<button type="button" class="dash-nav-item dash-nav-item--card ${navClass}${status === 'active' ? ' active' : ''}${status === 'done' ? ' done' : ''}" data-slide-index="${cardIdx}" ${cardIdx < 0 ? 'disabled' : ''}>
-          ${cardNavStatusIcon(status)}<span>${esc(card.name)}</span>
-        </button>`;
-      });
-      html += '</div>';
     });
-    const voteIdx = findSlideIndexForSopStep(track.class, null, null, 'track-vote');
-    const voteActive = ctx?.kind === 'track-vote';
-    html += `<button type="button" class="dash-nav-item dash-nav-item--vote ${navClass}${voteActive ? ' active' : ''}" data-slide-index="${voteIdx}" ${voteIdx < 0 ? 'disabled' : ''}>
-      <i class="fa-solid fa-chart-pie"></i><span>Priorisierung · Top 3</span>
-    </button></div></div>`;
+    html += '</div>';
   });
-  return { html, bind(container) {
-    if (!clickable || !onNavigate || !container) return;
-    container.querySelectorAll('[data-slide-index]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const idx = parseInt(btn.dataset.slideIndex, 10);
-        if (Number.isFinite(idx) && idx >= 0) onNavigate(idx);
-      });
+
+  const voteIdx = findSlideIndexForSopStep(activeTrack.class, null, null, 'track-vote');
+  const voteActive = ctx?.kind === 'track-vote';
+  html += `<button type="button" class="workshop-sop-vote${voteActive ? ' active' : ''}" data-slide-index="${voteIdx}" ${voteIdx < 0 ? 'disabled' : ''}>
+    <i class="fa-solid fa-chart-pie"></i><span>Priorisierung · Top 3</span>
+  </button>`;
+
+  const laterTracks = tracks.filter((t) => t.class !== activeTrackKey);
+  if (laterTracks.length) {
+    html += '<div class="workshop-sop-later">';
+    laterTracks.forEach((track) => {
+      const tIdx = findSlideIndexForSopStep(track.class, null, null, 'track-intro');
+      const done = (() => {
+        const v = findSlideIndexForSopStep(track.class, null, null, 'track-vote');
+        return v >= 0 && currentIndex > v;
+      })();
+      const label = done ? 'Abgeschlossen' : currentIndex >= tIdx && tIdx >= 0 ? 'Später' : 'Noch nicht gestartet';
+      html += `<div class="workshop-sop-later-item">${esc(track.title.replace(/^Track \d+: /, ''))} · ${label}</div>`;
     });
-  } };
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return {
+    html,
+    bind(container) {
+      if (!clickable || !onNavigate) return;
+      bindSopWorkshopPanelClicks(container, onNavigate);
+    },
+  };
+}
+
+function renderSopWorkshopNavHtml(currentIndex, options = {}) {
+  return renderSopWorkshopPanelHtml(currentIndex, options);
 }
 
 function syncSopWorkshopShell(mode, slideIndex) {
@@ -575,62 +555,48 @@ function syncSopWorkshopShell(mode, slideIndex) {
   document.body.classList.toggle('workshop-decide', modeName === 'decide');
 
   const editorNav = $('#editor-sop-nav');
-  const editorList = $('#editor-slides');
-  const presentSidebar = $('#present-sop-sidebar');
-  const presentBoard = $('#present-sop-board');
-  const participantSidebar = $('#participant-sop-sidebar');
+  const editorPanel = $('#editor-sop-panel');
+  const presentPanel = $('#present-sop-panel');
+  const participantPanel = $('#participant-sop-panel');
 
   if (!isSop) {
     editorNav?.classList.add('hidden');
-    editorList?.classList.remove('hidden');
-    presentSidebar?.classList.add('hidden');
-    presentBoard?.classList.add('hidden');
-    participantSidebar?.classList.add('hidden');
+    editorPanel?.classList.add('hidden');
+    presentPanel?.classList.add('hidden');
+    participantPanel?.classList.add('hidden');
     return;
   }
 
   const idx = slideIndex ?? 0;
-  const boardCtx = getSopBoardContextFromSlide(slide);
-  const nav = renderSopWorkshopNavHtml(idx, {
+  const onNavigate = (targetIdx) => {
+    if (mode === 'editor') {
+      State.selectedSlideId = State.slides[targetIdx]?.id;
+      renderEditor();
+    } else if (mode === 'present') {
+      void goToSlide(targetIdx);
+    }
+  };
+  const panel = renderSopWorkshopPanelHtml(idx, {
     clickable: mode === 'editor' || mode === 'present',
-    onNavigate: (targetIdx) => {
-      if (mode === 'editor') {
-        State.selectedSlideId = State.slides[targetIdx]?.id;
-        renderEditor();
-      } else if (mode === 'present') {
-        void goToSlide(targetIdx);
-      }
-    },
+    onNavigate,
   });
 
-  if (mode === 'editor') {
-    editorNav?.classList.remove('hidden');
-    editorList?.classList.add('hidden');
-    if (editorNav) {
-      editorNav.innerHTML = nav.html;
-      nav.bind(editorNav);
-    }
-  }
+  const mountPanel = (el) => {
+    if (!el) return;
+    el.classList.remove('hidden');
+    el.innerHTML = panel.html;
+    panel.bind(el);
+  };
 
-  if (mode === 'present') {
-    presentSidebar?.classList.remove('hidden');
-    if (presentSidebar) {
-      presentSidebar.innerHTML = nav.html;
-      nav.bind(presentSidebar);
-    }
-    if (boardCtx.show && presentBoard) {
-      presentBoard.classList.remove('hidden');
-      presentBoard.innerHTML = renderSopFullBoardHtml(boardCtx);
-    } else {
-      presentBoard?.classList.add('hidden');
-      if (presentBoard) presentBoard.innerHTML = '';
-    }
-  }
+  editorNav?.classList.add('hidden');
+  if (mode === 'editor') mountPanel(editorPanel);
+  else editorPanel?.classList.add('hidden');
 
-  if (mode === 'participant') {
-    participantSidebar?.classList.remove('hidden');
-    if (participantSidebar) participantSidebar.innerHTML = nav.html;
-  }
+  if (mode === 'present') mountPanel(presentPanel);
+  else presentPanel?.classList.add('hidden');
+
+  if (mode === 'participant') mountPanel(participantPanel);
+  else participantPanel?.classList.add('hidden');
 }
 
 function renderSopBoardPreview(c, editable = false) {
@@ -1008,10 +974,6 @@ function currentSlide() {
 function renderSlideList() {
   const list = $('#editor-slides');
   if (!list) return;
-  if (isSopWorkshopPresentation()) {
-    list.innerHTML = '';
-    return;
-  }
   list.innerHTML = State.slides.map((s, i) => `
     <div class="slide-thumb ${s.id === State.selectedSlideId ? 'active' : ''}" draggable="true" data-id="${s.id}">
       <div class="slide-thumb-row">
@@ -1080,11 +1042,8 @@ async function deleteSlide(id) {
   renderEditor();
 }
 
-function renderEditorSopBoardAppend(slide) {
-  if (!isSopWorkshopPresentation()) return '';
-  const boardCtx = getSopBoardContextFromSlide(slide);
-  if (!boardCtx.show) return '';
-  return `<div class="sop-workshop-board-wrap editor-board-preview">${renderSopFullBoardHtml(boardCtx)}</div>`;
+function renderEditorSopBoardAppend() {
+  return '';
 }
 
 function renderEditorCanvas() {
@@ -1098,7 +1057,7 @@ function renderEditorCanvas() {
 
   let body = '';
   if (slide.slide_type === 'section' && c.sopTrackClass) {
-    canvas.innerHTML = `${renderWorkshopModeBadge('orient')}${renderSopSectionHtml(c, true)}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel, Text und Einleitung direkt bearbeiten</div>${renderEditorSopBoardAppend(slide)}`;
+    canvas.innerHTML = `${renderWorkshopModeBadge('orient')}${renderSopSectionHtml(c, true)}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel, Text und Einleitung direkt bearbeiten</div>`;
     bindCanvasInlineEdit();
     return;
   }
@@ -1121,7 +1080,7 @@ function renderEditorCanvas() {
   if (slide.slide_type === 'content' && (c.mentiHero || c.sopKind || c.sopTrackResults)) {
     const html = c.mentiHero ? renderMentiHeroHtml(c, true) : renderSopContentHtml(c, true);
     if (html) {
-      canvas.innerHTML = `${html}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel und Text direkt bearbeiten</div>${renderEditorSopBoardAppend(slide)}`;
+      canvas.innerHTML = `${html}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel und Text direkt bearbeiten</div>`;
       bindCanvasInlineEdit();
       return;
     }
@@ -1143,7 +1102,7 @@ function renderEditorCanvas() {
     ${renderSopQuestionBadge(c)}
     <div class="canvas-editable canvas-title ${c.mentiQuestion ? 'menti-q-title' : ''}" contenteditable="true" data-field="title" data-placeholder="Titel…">${esc(c.title || c.prompt || 'Folie')}</div>
     ${body}
-    <div class="canvas-hint"><i class="fa-solid fa-pen"></i> Direkt auf der Folie tippen zum Bearbeiten</div>${renderEditorSopBoardAppend(slide)}`;
+    <div class="canvas-hint"><i class="fa-solid fa-pen"></i> Direkt auf der Folie tippen zum Bearbeiten</div>`;
   bindCanvasInlineEdit();
 }
 
