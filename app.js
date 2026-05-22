@@ -166,7 +166,7 @@ async function onAuthSession(session) {
   mountRootsUser();
   if (location.hash.startsWith('#join')) {
     showScreen('participant');
-    renderParticipantEntry(location.hash.split('/')[1] || '');
+    renderParticipantEntry(parseJoinCodeFromHash());
     return;
   }
   if (location.hash.startsWith('#editor/') || location.hash.startsWith('#present/') || location.hash.startsWith('#results/')) {
@@ -951,6 +951,8 @@ function markAnswered(slideId) {
 
 function renderParticipantEntry(codePrefill) {
   const saved = JSON.parse(localStorage.getItem('lp_join_profile') || '{}');
+  const code = (codePrefill || '').trim().toUpperCase();
+  const hasCode = Boolean(code);
   State.joinProfile = {
     name: saved.name || '',
     emoji: saved.emoji || LP_AVATAR_EMOJIS()[0],
@@ -960,18 +962,21 @@ function renderParticipantEntry(codePrefill) {
   root.innerHTML = `
     <div class="participant-card participant-join-card">
       <h1>Live teilnehmen</h1>
-      <p>Code, Name und Avatar – dann bist du dabei.</p>
-      <label class="join-label">Session-Code</label>
-      <input class="participant-code-input" id="join-code" maxlength="8" placeholder="CODE" value="${esc(codePrefill || '')}" />
+      <p>${hasCode ? 'Willkommen! Wähle Name und Avatar – der Code ist bereits hinterlegt.' : 'Code, Name und Avatar – dann bist du dabei.'}</p>
+      ${hasCode ? `
+        <div class="join-code-badge"><i class="fa-solid fa-qrcode"></i> Session <strong>${esc(code)}</strong></div>
+        <input type="hidden" id="join-code" value="${esc(code)}" />`
+      : `<label class="join-label">Session-Code</label>
+        <input class="participant-code-input" id="join-code" maxlength="8" placeholder="CODE" autocomplete="one-time-code" />`}
       <label class="join-label">Dein Name <span class="req">*</span></label>
-      <input id="join-name" placeholder="Vorname oder Nickname" class="participant-name-input" value="${esc(State.joinProfile.name)}" required />
+      <input id="join-name" placeholder="Vorname oder Nickname" class="participant-name-input" value="${esc(State.joinProfile.name)}" required autocomplete="name" />
       <label class="join-label">Dein Avatar <span class="req">*</span></label>
       <div class="avatar-preview-wrap">
         <div id="avatar-preview" class="avatar-preview" style="background:${esc(State.joinProfile.color)}">${State.joinProfile.emoji}</div>
         <div class="avatar-preview-name" id="avatar-preview-name">${esc(State.joinProfile.name || 'Dein Name')}</div>
       </div>
       <div class="avatar-color-row">${LP_AVATAR_COLORS().map((c) => `<button type="button" class="avatar-color-btn ${c === State.joinProfile.color ? 'active' : ''}" data-color="${c}" style="background:${c}" aria-label="Farbe"></button>`).join('')}</div>
-      <div class="avatar-emoji-grid">${LP_AVATAR_EMOJIS().map((e) => `<button type="button" class="avatar-emoji-btn ${e === State.joinProfile.emoji ? 'active' : ''}" data-emoji="${e}">${e}</button>`).join('')}</div>
+      <div class="avatar-emoji-grid">${LP_AVATAR_EMOJIS().map((e) => `<button type="button" class="avatar-emoji-btn ${e === State.joinProfile.emoji ? 'active' : ''}" data-emoji="${e}" aria-pressed="${e === State.joinProfile.emoji}">${e}</button>`).join('')}</div>
       <button type="button" class="btn-primary participant-submit" id="join-submit"><i class="fa-solid fa-arrow-right"></i> Beitreten</button>
     </div>`;
 
@@ -985,7 +990,10 @@ function renderParticipantEntry(codePrefill) {
   $('#join-name').addEventListener('input', updatePreview);
   root.querySelectorAll('.avatar-emoji-btn').forEach((btn) => btn.addEventListener('click', () => {
     State.joinProfile.emoji = btn.dataset.emoji;
-    root.querySelectorAll('.avatar-emoji-btn').forEach((b) => b.classList.toggle('active', b.dataset.emoji === State.joinProfile.emoji));
+    root.querySelectorAll('.avatar-emoji-btn').forEach((b) => {
+      b.classList.toggle('active', b.dataset.emoji === State.joinProfile.emoji);
+      b.setAttribute('aria-pressed', b.dataset.emoji === State.joinProfile.emoji ? 'true' : 'false');
+    });
     updatePreview();
   }));
   root.querySelectorAll('.avatar-color-btn').forEach((btn) => btn.addEventListener('click', () => {
@@ -1002,7 +1010,8 @@ function renderParticipantEntry(codePrefill) {
     localStorage.setItem('lp_join_profile', JSON.stringify({ name, emoji: State.joinProfile.emoji, color: State.joinProfile.color }));
     void joinSession(code, name, State.joinProfile.emoji, State.joinProfile.color);
   };
-  $('#join-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#join-submit').click(); });
+  $('#join-code')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#join-name')?.focus(); });
+  setTimeout(() => $('#join-name')?.focus(), 120);
 }
 
 async function joinSession(code, name, emoji, color) {
@@ -1332,6 +1341,11 @@ function openModal(id) { document.getElementById(id)?.classList.add('visible'); 
 function closeModal(id) { document.getElementById(id)?.classList.remove('visible'); }
 window.closeModal = closeModal;
 
+function parseJoinCodeFromHash() {
+  const raw = location.hash.replace(/^#join\/?/i, '');
+  return raw.split('/')[0]?.trim() || '';
+}
+
 async function routeFromHash() {
   const hash = location.hash.replace(/^#/, '');
   if (!hash || hash === 'dashboard') {
@@ -1343,7 +1357,7 @@ async function routeFromHash() {
   }
   if (hash.startsWith('join')) {
     showScreen('participant');
-    renderParticipantEntry(hash.split('/')[1] || '');
+    renderParticipantEntry(parseJoinCodeFromHash());
     return;
   }
   if (hash.startsWith('present/')) {
@@ -1414,7 +1428,12 @@ sb.auth.onAuthStateChange((_ev, session) => { if (session) void onAuthSession(se
 
 bindUi();
 void flushPendingQueue();
-void routeFromHash();
+if (location.hash.startsWith('#join')) {
+  showScreen('participant');
+  renderParticipantEntry(parseJoinCodeFromHash());
+} else {
+  void routeFromHash();
+}
 if (document.documentElement.classList.contains('in-iframe')) {
   const loginCard = $('#screen-login .login-card');
   if (loginCard) loginCard.innerHTML = '<p style="text-align:center;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> Anmeldung über Intranet…</p>';

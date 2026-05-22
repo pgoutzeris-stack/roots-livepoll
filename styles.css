@@ -249,6 +249,8 @@ button,input,select,textarea{font-family:inherit;color:inherit}
 .present-activity-item{display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:rgba(15,23,42,.92);border:1px solid rgba(255,255,255,.12);border-radius:12px;color:#fff;font-size:.78rem;backdrop-filter:blur(8px);box-shadow:var(--shadow-lg)}
 .join-label{display:block;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.35rem}
 .join-label .req{color:var(--danger)}
+.join-code-badge{display:flex;align-items:center;justify-content:center;gap:.5rem;padding:.85rem 1rem;margin-bottom:1rem;background:var(--brand-light);border:2px solid var(--brand);border-radius:12px;font-size:1.1rem;color:var(--brand);font-weight:600}
+.join-code-badge strong{font-size:1.35rem;letter-spacing:.15em}
 .participant-join-card{max-width:420px}
 .avatar-preview-wrap{display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;padding:.75rem;background:var(--surface);border-radius:12px;border:1px solid var(--line)}
 .avatar-preview{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.75rem;border:3px solid var(--bg);box-shadow:var(--shadow)}
