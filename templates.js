@@ -217,41 +217,301 @@ function sopTrackVote(track) {
   }, { showResultsLive: true, sopTrackVote: true, sopVoteMode: 'top3', workshopMode: 'decide' });
 }
 
-function buildSopKiWorkshopSlides() {
-  const trackSlides = SOP_TOOL_TRACKS.flatMap((track, trackIndex) => [
-    sopTrackIntro(track, trackIndex),
-    ...track.phases.flatMap((phase) => phase.cards.flatMap((card) => [
-      sopCardBrainstorm(track, phase, card),
-      sopCardVote(track, phase, card),
-      sopCardResults(track, phase, card),
-    ])),
-  ]);
+// ─── NEW v2 HELPERS (modulare SOP-Templates) ─────────
+const TIME = { xs: '⏱ 2 Min', s: '⏱ 3 Min', m: '⏱ 5 Min', l: '⏱ 8 Min', br: '⏱ 10 Min Pause' };
+
+function sopOpener(workshopTitle, workshopSubtitle) {
   return [
     tplSlide('content', {
-      title: 'SOP · KI Use-Case Workshop',
-      body: 'Pro SOP-Karte: Brainstorming → 2 Favoriten wählen → Ergebnis mit Prozenten und Gewinnern.\n\nQR scannen · Name + Avatar wählen.',
+      title: workshopTitle || 'SOP & KI Use Cases',
+      body: workshopSubtitle || 'Willkommen zum Workshop.\n\nZiel:\n• KI-Potenziale entlang der SOP identifizieren\n• Top-Use-Cases priorisieren\n• Konkrete Next Steps definieren\n\n📱 Per QR beitreten · Name + Avatar wählen.',
       mentiHero: true,
     }),
-    ...trackSlides,
+    tplSlide('reaction', {
+      title: 'Stimmungscheck',
+      subtitle: TIME.xs,
+      prompt: 'Wie startest du heute? Tipp deine aktuelle Stimmung an.',
+    }, { anonymous: true }),
+    tplSlide('wordcloud', {
+      title: 'Erwartung in einem Wort',
+      subtitle: TIME.s,
+      prompt: 'Was erhoffst du dir von diesem Workshop?',
+    }, { anonymous: true, profanityFilter: true }),
     tplSlide('content', {
-      title: 'Workshop abgeschlossen',
-      body: 'Top Use Cases in SOP-Karten überführen → Pilot starten → Retro.',
+      title: 'Wie wir arbeiten',
+      body: '1. Pro SOP-Karte sammeln wir KI-Ideen\n2. Wir voten unsere Favoriten\n3. Pro Track: Top-Aggregation\n4. Am Ende: konkrete Action Items\n\n💡 Tipp: Beim Brainstormen kurze, konkrete Use Cases — "Was · Wer · Welches Tool"',
+    }),
+  ];
+}
+
+function sopPhaseTransition(track, phase, phaseIndex, totalPhases) {
+  return tplSlide('section', {
+    title: phase.name,
+    subtitle: `Phase ${phaseIndex + 1}/${totalPhases} · ${track.title.replace(/^Track \d+: /, '')} · ${TIME.m}`,
+    body: phase.intro,
+    sopKind: 'phase',
+    ...sopMeta(track, phase),
+  });
+}
+
+// Optimized: 2-slide card flow (Brainstorm + Vote), result aggregiert auf Track-Ebene
+function sopCardCompact(track, phase, card) {
+  return [
+    tplSlide('brainstorm', {
+      title: card.name,
+      body: card.intro,
+      subtitle: `${phase.name} · ${TIME.m}`,
+      prompt: 'Welche KI Use Cases siehst du hier?\n💡 Was · 👤 Wer · 🛠 Welches Tool?',
+      mentiQuestion: true,
+      sopKind: 'card-workshop',
+      ...sopMeta(track, phase, card),
+    }, { showResultsLive: true, workshopMode: 'collect', profanityFilter: true, timer: { seconds: 300, autoClose: false } }),
+    tplSlide('mc_multi', {
+      title: `Top 2 · ${card.name}`,
+      prompt: 'Wähle deine 2 stärksten Use Cases',
+      subtitle: `${phase.name} · ${TIME.s}`,
+      mentiQuestion: true,
+      maxSelections: 2,
+      options: [],
+      ...sopMeta(track, phase, card),
+    }, { showResultsLive: true, sopCardVote: true, sopVoteMax: 2, workshopMode: 'decide', timer: { seconds: 180, autoClose: true } }),
+  ];
+}
+
+function sopTrackReflection(track, trackIndex) {
+  return [
+    tplSlide('open', {
+      title: 'Track-Highlight',
+      subtitle: `${track.title} · ${TIME.s}`,
+      prompt: 'In einem Satz: Was war für dich das wichtigste Aha aus diesem Track?',
+    }, { anonymous: false, profanityFilter: true }),
+    tplSlide('percent_split', {
+      title: `Top-Aggregation · Track ${trackIndex + 1}`,
+      prompt: 'Verteile 100 Punkte auf die Use Cases, die du wirklich umsetzen würdest.',
+      subtitle: `${track.title.replace(/^Track \d+: /, '')} · ${TIME.m}`,
+      mentiQuestion: true,
+      options: [],
+      ...sopMeta(track),
+    }, { showResultsLive: true, sopTrackVote: true, sopVoteMode: 'top3', workshopMode: 'decide', timer: { seconds: 300, autoClose: true } }),
+  ];
+}
+
+const ENERGIZERS = [
+  { title: 'Energizer · Standing Wave', body: '1. Aufstehen 🧍\n2. Hände hoch strecken 🙌\n3. Tief einatmen 🌬\n4. Langsam ausatmen\n5. Setzen' },
+  { title: 'Energizer · 5-4-3-2-1', body: 'In Gedanken nennen:\n5 Dinge die du siehst\n4 Dinge die du hörst\n3 Dinge die du fühlst\n2 Dinge die du riechst\n1 Ding das du schmeckst' },
+  { title: 'Energizer · Power-Pose', body: '30 Sek lang eine Power-Pose deiner Wahl.\n(Wonder-Woman, Sieger-Arme, Yoga-Baum)' },
+  { title: 'Energizer · Schüttel-Tanz', body: 'Lieblingssong (30 Sek): rechte Hand, linke Hand, rechtes Bein, linkes Bein, alles.' },
+];
+
+function sopEnergizer(index) {
+  const e = ENERGIZERS[(index || 0) % ENERGIZERS.length];
+  return tplSlide('content', { title: e.title, body: e.body, subtitle: TIME.s });
+}
+
+function sopBreak(label = 'Kaffee, Wasser, Fenster auf.') {
+  return tplSlide('content', {
+    title: '☕ Pause',
+    body: `${label}\n\nWir sehen uns in 10 Min.`,
+    subtitle: TIME.br,
+    mentiHero: true,
+  }, { timer: { seconds: 600, autoClose: false } });
+}
+
+function sopWorkshopClose() {
+  return [
+    tplSlide('section', { title: 'Abschluss', subtitle: 'Action Items & Feedback · ⏱ 10 Min' }),
+    tplSlide('open', {
+      title: 'Mein Take-Away',
+      subtitle: TIME.s,
+      prompt: 'Welcher Use Case bleibt bei dir hängen? Warum?',
+    }, { profanityFilter: true }),
+    tplSlide('open', {
+      title: 'Action Item für mich',
+      subtitle: TIME.s,
+      prompt: 'Was werde ich konkret in den nächsten 14 Tagen tun?',
+    }, { profanityFilter: true }),
+    tplSlide('scale', {
+      title: 'Workshop-Bewertung (NPS)',
+      subtitle: 'Wie wahrscheinlich würdest du das einem Kollegen empfehlen?',
+      prompt: '0 = gar nicht · 10 = absolut',
+      min: 0, max: 10,
+      minLabel: 'gar nicht',
+      maxLabel: 'absolut',
+    }, { anonymous: true }),
+    tplSlide('open', {
+      title: 'Eine Sache, die wir besser machen können',
+      subtitle: TIME.s,
+      prompt: 'Konstruktives Feedback?',
+    }, { anonymous: true, profanityFilter: true }),
+    tplSlide('content', {
+      title: 'Danke! 🙌',
+      body: 'Die Top-Use-Cases übergeben wir an die SOP-Owner.\nDokumentation kommt per Mail.\n\nLet\'s build the future of ROOTS.',
       mentiHero: true,
     }),
   ];
+}
+
+// ─── 3 OPTIMIZED VARIANTS ─────────────────────────────
+
+function buildSopQuickScan(trackKey) {
+  const track = SOP_TOOL_TRACKS.find((t) => t.class === trackKey) || SOP_TOOL_TRACKS[0];
+  const trackIndex = SOP_TOOL_TRACKS.indexOf(track);
+  return [
+    ...sopOpener(`Quick-Scan: ${track.title}`, `Fokus auf ${track.title}.\n\n45-60 Min · pro Karte ein Brainstorm.\nDanach Track-Aggregation und Action Items.`),
+    sopTrackIntro(track, trackIndex),
+    ...track.phases.flatMap((phase, phaseIdx) => [
+      sopPhaseTransition(track, phase, phaseIdx, track.phases.length),
+      ...phase.cards.map((card) => tplSlide('brainstorm', {
+        title: card.name,
+        body: card.intro,
+        subtitle: `${phase.name} · ${TIME.s}`,
+        prompt: 'KI Use Cases? 💡 Was · 👤 Wer · 🛠 Tool',
+        mentiQuestion: true,
+        sopKind: 'card-workshop',
+        ...sopMeta(track, phase, card),
+      }, { showResultsLive: true, workshopMode: 'collect', profanityFilter: true, timer: { seconds: 180, autoClose: false } })),
+    ]),
+    sopEnergizer(0),
+    ...sopTrackReflection(track, trackIndex),
+    ...sopWorkshopClose(),
+  ];
+}
+
+function buildSopDeepDive(trackKey) {
+  const track = SOP_TOOL_TRACKS.find((t) => t.class === trackKey) || SOP_TOOL_TRACKS[0];
+  const trackIndex = SOP_TOOL_TRACKS.indexOf(track);
+  return [
+    ...sopOpener(`Deep-Dive: ${track.title}`, `Tiefe Auseinandersetzung mit ${track.title}.\n\n90-120 Min · Brainstorm + Vote pro Karte.\nTrack-Aggregation & Action Items am Schluss.`),
+    sopTrackIntro(track, trackIndex),
+    ...track.phases.flatMap((phase, phaseIdx, arr) => {
+      const slides = [
+        sopPhaseTransition(track, phase, phaseIdx, arr.length),
+        ...phase.cards.flatMap((card) => sopCardCompact(track, phase, card)),
+      ];
+      // Energizer in der Mitte
+      if (phaseIdx === Math.floor(arr.length / 2) - 1) slides.push(sopEnergizer(1));
+      return slides;
+    }),
+    sopBreak(),
+    ...sopTrackReflection(track, trackIndex),
+    ...sopWorkshopClose(),
+  ];
+}
+
+function buildSopFullDay() {
+  let energizerIdx = 0;
+  const slides = [...sopOpener('SOP & KI Workshop · Halbtag-Programm', 'Alle 3 Tracks · 3-4 Std · mit Pausen und Energizern.\n\nWir gehen die komplette SOP entlang und sammeln + priorisieren KI-Use-Cases je Phase.')];
+  SOP_TOOL_TRACKS.forEach((track, ti) => {
+    slides.push(sopTrackIntro(track, ti));
+    track.phases.forEach((phase, pi) => {
+      slides.push(sopPhaseTransition(track, phase, pi, track.phases.length));
+      phase.cards.forEach((card) => slides.push(...sopCardCompact(track, phase, card)));
+    });
+    slides.push(...sopTrackReflection(track, ti));
+    if (ti < SOP_TOOL_TRACKS.length - 1) {
+      slides.push(sopBreak());
+      slides.push(sopEnergizer(energizerIdx++));
+    }
+  });
+  // Final aggregation across all tracks
+  slides.push(tplSlide('section', { title: 'Gesamt-Aggregation', subtitle: 'Top Use Cases aus allen Tracks · ⏱ 10 Min' }));
+  slides.push(tplSlide('percent_split', {
+    title: 'Top-3 für die nächsten 90 Tage',
+    prompt: 'Verteile 100 Punkte auf die Use Cases, die ROOTS als Erstes pilotieren sollte.',
+    subtitle: TIME.m,
+    mentiQuestion: true,
+    options: [],
+  }, { showResultsLive: true, workshopMode: 'decide', timer: { seconds: 300, autoClose: true } }));
+  slides.push(...sopWorkshopClose());
+  return slides;
+}
+
+// Backwards-compat (alte Template-Key bleibt aufrufbar):
+function buildSopKiWorkshopSlides() {
+  return buildSopFullDay();
 }
 
 window.SOP_TOOL_TRACKS = SOP_TOOL_TRACKS;
 
 window.LP_TEMPLATES = [
   {
+    key: 'roots-sop-quick-pre',
+    category: 'ROOTS · SOP & KI',
+    name: 'SOP Quick-Scan · Pre-Engagement',
+    desc: 'Schneller 45-Min-Sprint: KI-Potenziale entlang Anbahnung, Exploration und Pitch sammeln. Brainstorming pro Karte, Track-Aggregation am Ende.',
+    duration: '45–60 Min.',
+    group: '5–20',
+    tips: 'Ideal für Sales-Team-Kickoff oder Pitch-Coachings. 3 Min Brainstorm pro Karte (Timer eingebaut), danach gemeinsame Priorisierung.',
+    slides: buildSopQuickScan('track-pre'),
+  },
+  {
+    key: 'roots-sop-quick-ops',
+    category: 'ROOTS · SOP & KI',
+    name: 'SOP Quick-Scan · Execution',
+    desc: 'Schneller 45-Min-Sprint durch Ramp-up bis Implementierung. Operativstes SOP-Track mit größtem KI-Potenzial im Tagesgeschäft.',
+    duration: '45–60 Min.',
+    group: '5–20',
+    tips: 'Empfohlen für Consulting-Teams und Delivery-Manager. Fokus auf wiederkehrende Aufgaben in Content-Produktion und Analyse.',
+    slides: buildSopQuickScan('track-ops'),
+  },
+  {
+    key: 'roots-sop-quick-post',
+    category: 'ROOTS · SOP & KI',
+    name: 'SOP Quick-Scan · Post-Engagement',
+    desc: 'Schneller 45-Min-Sprint durch Closeout und Follow-Up. Welche KI hilft bei Reporting, Retros und Beziehungspflege?',
+    duration: '45–60 Min.',
+    group: '5–20',
+    tips: 'Gut für Account-Manager und Customer-Success. Fokus auf Reporting-Automatisierung und Case-Study-Erstellung.',
+    slides: buildSopQuickScan('track-post'),
+  },
+  {
+    key: 'roots-sop-deep-dive-pre',
+    category: 'ROOTS · SOP & KI',
+    name: 'SOP Deep-Dive · Pre-Engagement',
+    desc: 'Vertiefter 90-Min-Workshop zu Pre-Engagement. Pro Karte: Brainstorm + Vote der Top 2. Reflexion und Aggregation am Ende.',
+    duration: '90–120 Min.',
+    group: '6–25',
+    tips: 'Inkl. Energizer in der Mitte und 10-Min-Pause vor der Reflexion. Pro Karte 5 Min Brainstorm, 3 Min Vote.',
+    slides: buildSopDeepDive('track-pre'),
+  },
+  {
+    key: 'roots-sop-deep-dive-ops',
+    category: 'ROOTS · SOP & KI',
+    name: 'SOP Deep-Dive · Execution',
+    desc: 'Vertiefter 90-Min-Workshop zur Projektdurchführung. Brainstorm + Vote pro Karte mit Track-Aggregation.',
+    duration: '90–120 Min.',
+    group: '6–25',
+    tips: 'Größter SOP-Track (5 Phasen, 11 Karten). Empfehlung: vorher Pause einplanen.',
+    slides: buildSopDeepDive('track-ops'),
+  },
+  {
+    key: 'roots-sop-deep-dive-post',
+    category: 'ROOTS · SOP & KI',
+    name: 'SOP Deep-Dive · Post-Engagement',
+    desc: 'Vertiefter 90-Min-Workshop zu Projektabschluss und Beziehungspflege. Brainstorm + Vote + Aggregation.',
+    duration: '60–90 Min.',
+    group: '6–25',
+    tips: 'Kompakter Track – ideal als 2. Workshop nach Quick-Scan.',
+    slides: buildSopDeepDive('track-post'),
+  },
+  {
+    key: 'roots-sop-full-day',
+    category: 'ROOTS · SOP & KI',
+    name: 'SOP Halbtag-Workshop · Alle 3 Tracks',
+    desc: 'Vollumfänglicher Halbtags-Workshop mit allen 3 Tracks. Pausen, Energizer, Track-Übergänge und finale Gesamt-Aggregation der Top-3 Use Cases.',
+    duration: '3–4 Std.',
+    group: '8–30',
+    tips: 'Empfehlung: Vormittag 09:00–13:00 mit zwei 10-Min-Pausen. Vorher Avatare und Names testen lassen. Action Items am Ende DOKUMENTIEREN.',
+    slides: buildSopFullDay(),
+  },
+  {
     key: 'roots-sop-ki-workshop',
     category: 'ROOTS · SOP & KI',
-    name: 'SOP-Brainstorming & KI Use Cases',
-    desc: 'Fokussierter SOP-Workshop: pro Karte Brainstorming, 2 Favoriten wählen, Ergebnis mit Prozenten und Gewinnern.',
+    name: 'SOP-Brainstorming · Vollprogramm (legacy)',
+    desc: 'Klassisches SOP-Format: pro Karte Brainstorm → Vote → Ergebnis. Alias für "Halbtag-Workshop".',
     duration: '90–150 Min.',
     group: '6–25',
-    tips: 'Pro Unterphase (z. B. ROOTS Vorstellung): sammeln → max. 2 Favoriten → Ergebnisfolie. Live-Ansicht zeigt Abstimmungsfortschritt.',
+    tips: 'Backwards-compat. Empfehlung: verwende stattdessen "SOP Quick-Scan" oder "SOP Halbtag-Workshop".',
     slides: buildSopKiWorkshopSlides(),
   },
   {
