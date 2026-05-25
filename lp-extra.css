@@ -135,3 +135,49 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-error-banner{background:#fef2f2;border-left:4px solid #dc2626;color:#7f1d1d;padding:.85rem 1rem;border-radius:8px;display:flex;gap:8px;align-items:flex-start;margin:1rem 0}
 .lp-warning-banner{background:#fffbeb;border-left:4px solid #f59e0b;color:#78350f;padding:.85rem 1rem;border-radius:8px;display:flex;gap:8px;align-items:flex-start;margin:1rem 0}
 .lp-info-banner{background:#eff6ff;border-left:4px solid #206efb;color:#1e3a8a;padding:.85rem 1rem;border-radius:8px;display:flex;gap:8px;align-items:flex-start;margin:1rem 0}
+
+/* ═══════ #13 SOP TRACK-FARB-CODING (Präsentations-Modus) ═══════ */
+/* Sichtbare Track-Verankerung — Teilnehmer wissen jederzeit visuell,
+   in welchem SOP-Track sie sich gerade bewegen. */
+.present-stage-wrap[data-track-class="track-pre"]::before,
+.present-stage[data-track-class="track-pre"]::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:4px;
+  background:linear-gradient(90deg, #206efb 0%, #60a5fa 100%); z-index:10;
+}
+.present-stage-wrap[data-track-class="track-ops"]::before,
+.present-stage[data-track-class="track-ops"]::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:4px;
+  background:linear-gradient(90deg, #0f6b57 0%, #34d399 100%); z-index:10;
+}
+.present-stage-wrap[data-track-class="track-post"]::before,
+.present-stage[data-track-class="track-post"]::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:4px;
+  background:linear-gradient(90deg, #5b21b6 0%, #a855f7 100%); z-index:10;
+}
+.present-stage-wrap{position:relative}
+.present-stage{position:relative}
+
+/* Subtle background tint per track */
+.present-stage-wrap[data-track-class="track-pre"] .present-stage{background:linear-gradient(180deg, rgba(32,110,251,.02) 0%, transparent 200px)}
+.present-stage-wrap[data-track-class="track-ops"] .present-stage{background:linear-gradient(180deg, rgba(15,107,87,.025) 0%, transparent 200px)}
+.present-stage-wrap[data-track-class="track-post"] .present-stage{background:linear-gradient(180deg, rgba(91,33,182,.025) 0%, transparent 200px)}
+
+/* Track-Badge sichtbar in Subtitle wenn vorhanden */
+.present-stage-wrap[data-track-class="track-pre"] .present-slide-subtitle::before{content:'●'; color:#206efb; margin-right:6px; font-size:.7em}
+.present-stage-wrap[data-track-class="track-ops"] .present-slide-subtitle::before{content:'●'; color:#0f6b57; margin-right:6px; font-size:.7em}
+.present-stage-wrap[data-track-class="track-post"] .present-slide-subtitle::before{content:'●'; color:#5b21b6; margin-right:6px; font-size:.7em}
+
+@media (prefers-color-scheme:dark){
+  .present-stage-wrap[data-track-class="track-pre"] .present-stage{background:linear-gradient(180deg, rgba(32,110,251,.08) 0%, transparent 200px)}
+  .present-stage-wrap[data-track-class="track-ops"] .present-stage{background:linear-gradient(180deg, rgba(52,211,153,.08) 0%, transparent 200px)}
+  .present-stage-wrap[data-track-class="track-post"] .present-stage{background:linear-gradient(180deg, rgba(168,85,247,.08) 0%, transparent 200px)}
+}
+
+/* ═══════ MATRIX 2x2 — Effort/Impact ═══════ */
+/* Pre-tag content-slides with matrix-2x2 sopKind for monospace layout */
+.present-stage [data-sop-kind="matrix-2x2"] .present-slide-body,
+.editor-canvas [data-sop-kind="matrix-2x2"] .canvas-body,
+.workshop-slide-body[data-sop-kind="matrix-2x2"]{
+  font-family:'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-size:.85rem; line-height:1.5; white-space:pre;
+}

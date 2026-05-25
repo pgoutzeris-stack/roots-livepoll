@@ -2920,6 +2920,12 @@ function renderPresent() {
   const stage = $('#present-stage');
   if (!slide) { stage.innerHTML = '<h1>Keine Folien</h1>'; return; }
   const c = slide.content || {};
+  // #13 Track-Farb-Coding: propagiere SOP-Track-Class auf Stage-Wrapper,
+  // damit CSS-Akzente (Header-Border, Badge-Farben) automatisch zur Geltung kommen.
+  const trackClass = c.sopTrackClass || c.sopTrackKey || '';
+  stage.dataset.trackClass = trackClass;
+  const stageWrap = stage.closest('.present-stage-wrap') || stage.parentElement;
+  if (stageWrap) stageWrap.dataset.trackClass = trackClass;
   const interactive = isInteractive(slide.slide_type);
   const visible = getVisibleResponses(slide.id);
   const pending = getPendingResponses(slide.id);
