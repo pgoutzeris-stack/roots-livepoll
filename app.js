@@ -205,6 +205,68 @@ function aggregateTrackUseCases(trackKey) {
   return { byCard, allItems, unique };
 }
 
+function aggregateAllTracksUseCases() {
+  // Sammelt Use Cases aller Brainstorm-Slides mit SOP-Track-Info, gruppiert
+  // nach Track -> Phase. Wird für Cross-Track-Summary und Final-Vote benutzt.
+  const slides = (State.slides || []).filter((s) =>
+    s.slide_type === 'brainstorm' && (s.content?.sopTrackClass || s.content?.sopTrackKey)
+  );
+  const trackOrder = []; // preserve order of first appearance
+  const byTrackKey = new Map();
+  const allItems = [];
+  slides.forEach((slide) => {
+    const c = slide.content || {};
+    const trackKey = c.sopTrackClass || c.sopTrackKey;
+    const trackLabel = c.sopTrackLabel || trackKey;
+    const phaseName = c.sopPhaseName || c.title || '';
+    if (!byTrackKey.has(trackKey)) {
+      byTrackKey.set(trackKey, { trackKey, trackLabel, phases: [] });
+      trackOrder.push(trackKey);
+    }
+    const items = (State.responses || [])
+      .filter((r) => r.slide_id === slide.id && !r.is_hidden)
+      .map((r) => ({ id: r.id, text: String(r.response?.text || '').trim() }))
+      .filter((item) => item.text);
+    byTrackKey.get(trackKey).phases.push({ phase: phaseName, items, slideId: slide.id });
+    items.forEach((item) => allItems.push({
+      ...item, trackKey, trackLabel, phase: phaseName,
+    }));
+  });
+  const byTrack = trackOrder.map((k) => byTrackKey.get(k));
+  const seen = new Set();
+  const unique = allItems.filter((item) => {
+    const k = item.text.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  return { byTrack, allItems, unique };
+}
+
+function renderAllTracksResultsHtml() {
+  const { byTrack, allItems } = aggregateAllTracksUseCases();
+  if (!allItems.length) {
+    return '<div class="present-wait-msg">Noch keine Use Cases gesammelt. Bitte zuerst die Phase-Brainstormings durchgehen.</div>';
+  }
+  return `<div class="sop-all-tracks-results">${byTrack.map((trk) => {
+    const theme = sopTrackTheme(trk.trackKey);
+    const phasesHtml = trk.phases.filter((p) => p.items.length).map((p) => `
+      <div class="sop-all-track-phase">
+        <div class="sop-all-track-phase-head">${esc(p.phase)}</div>
+        <div class="sop-all-track-phase-items">${p.items.map((it) =>
+          `<div class="sop-all-track-item">${esc(it.text)}</div>`
+        ).join('')}</div>
+      </div>`).join('');
+    if (!phasesHtml) return '';
+    return `<div class="sop-all-track-group ${esc(trk.trackKey || '')}" style="--track-accent:${theme.accent};--track-soft:${theme.soft}">
+      <div class="sop-all-track-head" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(trk.trackLabel || '')}</div>
+      ${phasesHtml}
+    </div>`;
+  }).join('')}
+  <div class="sop-all-track-total">${allItems.length} Use Cases gesammelt · über alle Tracks</div>
+</div>`;
+}
+
 function aggregateCardUseCases(trackKey, phaseName, cardName) {
   const slide = State.slides.find((s) => {
     const c = s.content || {};
@@ -236,6 +298,9 @@ function getVoteSlideScope(slide) {
   }
   if (st.sopTrackVote && key) {
     return { kind: 'track', key, maxSelections: 3 };
+  }
+  if (st.sopAllTracksVote) {
+    return { kind: 'all-tracks', key: null, maxSelections: 5 };
   }
   return null;
 }
@@ -856,6 +921,22 @@ function getTrackVoteOptionsGrouped(slide) {
       options: opts,
     }];
   }
+  if (scope?.kind === 'all-tracks') {
+    const { byTrack } = aggregateAllTracksUseCases();
+    const groups = [];
+    byTrack.forEach((trk) => {
+      trk.phases.forEach((p) => {
+        if (p.items.length) {
+          groups.push({
+            phase: `${trk.trackLabel} · ${p.phase}`,
+            card: '',
+            options: p.items.map((item) => ({ id: `resp-${item.id}`, text: item.text })),
+          });
+        }
+      });
+    });
+    return groups;
+  }
   const key = slide.content?.sopTrackKey || slide.content?.sopTrackClass;
   if (!key) return [];
   const { byCard } = aggregateTrackUseCases(key);
@@ -1049,6 +1130,26 @@ function renderBrainstormPresentViz(slide, visible) {
 }
 
 function renderTrackVotePresentHtml(slide, visible) {
+  // Cross-Track-Voting (Workshop-Finale): aggregiert aus allen Tracks.
+  const scope = getVoteSlideScope(slide);
+  if (scope?.kind === 'all-tracks') {
+    const { allItems } = aggregateAllTracksUseCases();
+    if (!allItems.length) {
+      return '<div class="present-wait-msg">Noch keine Use Cases gesammelt. Bitte zuerst die Phase-Brainstormings durchführen.</div>';
+    }
+    const newIds = markNewBubbleIds('all-tracks-vote', allItems);
+    const bubbleHtml = window.LPViz.renderBrainstormBubbles(allItems, { mode: 'present', maxItems: 200, newIds });
+    const hasVotes = visible.length > 0 || !State.session.question_open;
+    return `<div class="track-vote-present">
+      <div class="track-vote-present-head">
+        <span class="track-vote-count">${allItems.length} Use Cases</span>
+        <span class="track-vote-hint">Alle Tracks zusammen · ${State.session.question_open ? 'Teilnehmer priorisieren jetzt die Top-5' : 'Priorisierung abgeschlossen'}</span>
+      </div>
+      ${renderCardVoteParticipationHtml(slide)}
+      ${bubbleHtml}
+      ${hasVotes ? `<div class="track-vote-live-ranking"><div class="track-vote-live-label">Live-Ergebnis</div>${renderVoteResultsHtml(slide, visible)}</div>` : ''}
+    </div>`;
+  }
   const key = slide.content?.sopTrackKey || slide.content?.sopTrackClass;
   const { allItems } = aggregateTrackUseCases(key);
   if (!allItems.length) {
@@ -1394,6 +1495,22 @@ function renderSopTrackResultsHtml(trackKey) {
 
 function renderSopContentHtml(c, editable = false) {
   if (c.sopKind === 'card') return renderSopCardHtml(c, editable);
+  if (c.sopAllTracksResults) {
+    const titleEl = editable
+      ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+      : `<h1 class="sop-menti-title">${esc(c.title)}</h1>`;
+    const bodyEl = editable
+      ? `<div class="canvas-editable sop-menti-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+      : (c.body ? `<p class="sop-menti-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+    const results = State.session ? renderAllTracksResultsHtml() : '<div class="present-wait-msg">Ergebnisse erscheinen in der Live-Session.</div>';
+    return `
+      <div class="sop-menti-section sop-all-tracks-results-slide">
+        <div class="sop-menti-badge" style="background:#0f172a;color:#fff">Alle Tracks</div>
+        ${titleEl}
+        ${bodyEl}
+        <div class="sop-track-results-wrap">${results}</div>
+      </div>`;
+  }
   if (c.sopTrackResults) {
     const theme = sopTrackTheme(c.sopTrackClass);
     const titleEl = editable
@@ -2934,7 +3051,9 @@ function renderPresent() {
 
   let viz = '';
   if (!interactive) {
-    if (c.sopTrackResults && c.sopTrackKey) {
+    if (c.sopAllTracksResults || slide.settings?.sopAllTracksResults) {
+      viz = `<div class="sop-track-results-wrap">${renderAllTracksResultsHtml()}</div>`;
+    } else if (c.sopTrackResults && c.sopTrackKey) {
       viz = `<div class="sop-track-results-wrap">${renderSopTrackResultsHtml(c.sopTrackKey)}</div>`;
     } else if (slide.settings?.showPreviousSlideResults) {
       const prevSlide = State.slides[(State.session.current_slide_index || 0) - 1];
@@ -2953,7 +3072,7 @@ function renderPresent() {
     // "Antworten werden gesammelt…" für Brainstorm/Open).
     if (slide.settings?.sopCardVote || slide.settings?.brainstormVote) {
       viz = renderCardVotePresentHtml(displaySlide, visible);
-    } else if (slide.settings?.sopTrackVote) {
+    } else if (slide.settings?.sopTrackVote || slide.settings?.sopAllTracksVote) {
       viz = renderTrackVotePresentHtml(displaySlide, visible);
     } else if (slide.slide_type === 'open' || slide.slide_type === 'brainstorm') {
       viz = renderBrainstormPresentViz(slide, visible);

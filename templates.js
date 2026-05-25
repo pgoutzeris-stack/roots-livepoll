@@ -14,11 +14,11 @@ const SOP_TOOL_TRACKS = [
   {
     title: 'Track 1: Pre-Engagement',
     class: 'track-pre',
-    intro: 'Alles vor Projektstart: vom Erstkontakt über Bedarfsanalyse bis zum Pitch. Hier identifizieren wir KI-Potenziale entlang der frühen SOP-Schritte.',
+    intro: 'Vom Erstkontakt bis zum Vertragsabschluss. 3 Phasen.',
     phases: [
       {
         name: 'Anbahnung',
-        intro: 'Frühe Anbahnung: ROOTS vorstellen, Zielstellung klären und eine erste Analyse durchführen.',
+        intro: 'Erstkontakt mit dem Kunden — vorstellen, Ziele klären, Markt einschätzen.',
         cards: [
           {
             name: 'ROOTS Vorstellung',
@@ -42,7 +42,7 @@ const SOP_TOOL_TRACKS = [
       },
       {
         name: 'Exploration',
-        intro: 'Vertiefende Exploration: Bedarf verstehen, Onboarding skizzieren und digitale Präsenz analysieren.',
+        intro: 'Tiefer eintauchen — Bedarf verstehen, Online-Auftritt prüfen, erste Specs erfassen.',
         cards: [
           {
             name: 'Bedarfsanalyse / Problem Framing',
@@ -73,7 +73,7 @@ const SOP_TOOL_TRACKS = [
       },
       {
         name: 'Pitch',
-        intro: 'Pitch-Phase: Angebot gestalten, präsentieren und Vertragsabschluss vorbereiten.',
+        intro: 'Angebot bauen, präsentieren, Vertrag schließen.',
         cards: [
           {
             name: 'Angebotsgestaltung & Präsentation',
@@ -101,11 +101,11 @@ const SOP_TOOL_TRACKS = [
   {
     title: 'Track 2: Execution',
     class: 'track-ops',
-    intro: 'Projektdurchführung von Ramp-up bis Implementierung – hier liegt das größte operative KI-Potenzial im Tagesgeschäft.',
+    intro: 'Projekt-Operations vom Start bis zur Live-Schaltung. 4 Phasen — größter SOP-Bereich.',
     phases: [
       {
         name: 'Ramp-up',
-        intro: 'Projektstart: Struktur aufbauen und Briefing sowie Content-Plan definieren.',
+        intro: 'Projekt aufgleisen — Team, Struktur, Briefing, Content-Plan.',
         cards: [
           {
             name: 'Projektstruktur aufbauen',
@@ -123,7 +123,7 @@ const SOP_TOOL_TRACKS = [
       },
       {
         name: 'Analyse & Synthese',
-        intro: 'Datengetriebene Auswertung und strategische Verdichtung – Performance verstehen, Muster erkennen, Strategie schärfen.',
+        intro: 'Daten verstehen, Muster erkennen, Strategie schärfen.',
         cards: [
           {
             name: 'Performance-Analyse',
@@ -148,7 +148,7 @@ const SOP_TOOL_TRACKS = [
       },
       {
         name: 'Delivery',
-        intro: 'Content produzieren, ausspielen und Community betreuen.',
+        intro: 'Content produzieren, ausspielen, Community pflegen.',
         cards: [
           {
             name: 'Content-Produktion',
@@ -166,7 +166,7 @@ const SOP_TOOL_TRACKS = [
       },
       {
         name: 'Implementierung',
-        intro: 'Kampagnen live schalten und Tools integrieren.',
+        intro: 'Kampagnen launchen, Tools integrieren, Workflows automatisieren.',
         cards: [
           {
             name: 'Kampagnen-Setup',
@@ -188,11 +188,11 @@ const SOP_TOOL_TRACKS = [
   {
     title: 'Track 3: Post-Engagement',
     class: 'track-post',
-    intro: 'Nach Projektende: Ergebnisse übergeben, lernen und Beziehung pflegen.',
+    intro: 'Projektabschluss und langfristige Kunden-Beziehung. 2 Phasen.',
     phases: [
       {
         name: 'Closeout',
-        intro: 'Projektabschluss: Reporting, Retro und Kundenfeedback.',
+        intro: 'Sauberer Abschluss — Reporting, interne Retro, Kundenfeedback.',
         cards: [
           {
             name: 'Finales Reporting & Übergabe',
@@ -216,7 +216,7 @@ const SOP_TOOL_TRACKS = [
       },
       {
         name: 'Follow-Up',
-        intro: 'Langfristige Beziehungspflege und Wachstum nach Projektende.',
+        intro: 'Beziehung pflegen, Upsell finden, Case Study produzieren.',
         cards: [
           {
             name: 'Beziehungspflege & Check-ins',
@@ -274,126 +274,70 @@ function sopTrackIntro(track, trackIndex) {
   }, { workshopMode: 'orient' });
 }
 
-function sopPhaseIntro(track, phase) {
+function sopPhaseIntro(track, phase, phaseIndex, totalPhases) {
   return tplSlide('section', {
     title: phase.name,
-    subtitle: track.title,
+    subtitle: `${track.title.replace(/^Track \d+: /, '')} · Phase ${phaseIndex + 1} von ${totalPhases}`,
     body: phase.intro,
     sopKind: 'phase',
     ...sopMeta(track, phase),
   });
 }
 
-function sopCardIntro(track, phase, card) {
-  return tplSlide('content', {
-    title: card.name,
-    body: card.intro,
-    subtitle: `${phase.name} · ${track.title.replace(/^Track \d+: /, '')}`,
-    sopKind: 'card',
-    sopBoard: [{ name: phase.name, cards: [card.name] }],
-    ...sopMeta(track, phase, card),
-  });
-}
+// ─── SOP PHASE BRAINSTORM ─────────────────────────────
+// Statt pro Karte wird pro Phase gesammelt — die Karten dienen als
+// Inspiration im Slide-Body. Use Cases werden Track-weit aggregiert.
 
-// ─── SOP CARD-LEVEL HELPERS (Brainstorm + Vote) ───────
-// Card-Result-Slide entfällt — der Live-View des Vote-Slides zeigt
-// die Ergebnisse direkt. Aggregation erfolgt auf Track-Ebene.
-
-function sopCardBrainstorm(track, phase, card) {
+function sopPhaseBrainstorm(track, phase) {
+  const cardsHint = phase.cards.map((c) => c.name).join(' · ');
   return tplSlide('brainstorm', {
-    title: card.name,
-    body: card.intro,
-    subtitle: `${phase.name} · ${track.title.replace(/^Track \d+: /, '')}`,
-    prompt: card.prompt || 'Welche KI Use Cases siehst du hier?\nFormat: Was · Wer · Welches Tool',
+    title: `KI in ${phase.name}`,
+    body: cardsHint,
+    subtitle: track.title.replace(/^Track \d+: /, ''),
+    prompt: 'Wo seht ihr KI-Potenzial in dieser Phase? Sammelt eure Ideen — konkrete Tools, Workflows, Aufgaben die KI übernehmen könnte.',
     mentiQuestion: true,
-    sopKind: 'card-workshop',
-    ...sopMeta(track, phase, card),
-  }, { showResultsLive: true, workshopMode: 'collect' });
+    sopKind: 'phase-workshop',
+    sopBoard: [{ name: phase.name, cards: phase.cards.map((c) => c.name) }],
+    ...sopMeta(track, phase),
+  }, { showResultsLive: true, workshopMode: 'collect', profanityFilter: true });
 }
 
-function sopCardVote(track, phase, card) {
-  const voteMax = card.voteMax || 2;
-  const pluralS = voteMax === 1 ? '' : 's';
-  return tplSlide('mc_multi', {
-    title: `Priorisierung · ${card.name}`,
-    prompt: `Wähle deine ${voteMax} Lieblings-Use-Case${pluralS} aus dem Brainstorming dieser Karte.`,
-    subtitle: `${phase.name} · ${track.title.replace(/^Track \d+: /, '')}`,
-    mentiQuestion: true,
-    maxSelections: voteMax,
-    options: [],
-    ...sopMeta(track, phase, card),
-  }, { showResultsLive: true, sopCardVote: true, sopVoteMax: voteMax, workshopMode: 'decide' });
-}
+// ─── SOP TRACK SUMMARY (zeigt alle Phase-Use-Cases) ──────
 
-// ─── SOP TRACK-LEVEL HELPERS (Cluster, Vote, Matrix, Owner) ───────
-
-function sopTrackThemeCluster(track) {
-  const label = track.title.replace(/^Track \d+: /, '');
-  return tplSlide('mc_multi', {
-    title: `Themen-Cluster · ${label}`,
-    prompt: 'Welche Themen ziehen sich durch die Top-Use-Cases dieses Tracks?\n(Mehrfachauswahl)',
-    subtitle: 'Hilft uns, die Vielzahl zu gruppieren',
-    options: [
-      { id: 'content', text: 'Content & Texterstellung' },
-      { id: 'analytics', text: 'Analytics & Insights' },
-      { id: 'communication', text: 'Kommunikation & Outreach' },
-      { id: 'research', text: 'Research & Discovery' },
-      { id: 'automation', text: 'Automatisierung & Workflows' },
-      { id: 'design', text: 'Design & Visuals' },
-      { id: 'admin', text: 'Admin & Operations' },
-      { id: 'other', text: 'Sonstiges' },
-    ],
-    maxSelections: 4,
-    mentiQuestion: true,
-    sopKind: 'theme-cluster',
-    ...sopMeta(track),
-  }, { showResultsLive: true, workshopMode: 'decide' });
-}
-
-function sopTrackVote(track) {
-  const label = track.title.replace(/^Track \d+: /, '');
-  return tplSlide('percent_split', {
-    title: `Priorisierung · ${label}`,
-    prompt: 'Verteile 100 Punkte auf die Use Cases dieses Tracks, die du wirklich umsetzen würdest.\n(Optionen werden aus den Karten-Votes aggregiert)',
-    mentiQuestion: true,
-    options: [],
-    ...sopMeta(track),
-  }, { showResultsLive: true, sopTrackVote: true, sopVoteMode: 'top3', workshopMode: 'decide' });
-}
-
-function sopTrackMatrix(track) {
+function sopTrackSummary(track, trackIndex) {
   const label = track.title.replace(/^Track \d+: /, '');
   return tplSlide('content', {
-    title: `Effort vs. Impact · ${label}`,
-    subtitle: 'Plenums-Diskussion · ⏱ 5 Min',
-    body: 'Wo positionieren wir die Top-Use-Cases dieses Tracks?\n\n  HOHER IMPACT\n  ┌──────────────────┬──────────────────┐\n  │ ⭐ STRATEGIC BET │ 🚀 QUICK WIN     │\n  │ langfristig wert │ jetzt umsetzbar  │\n  ├──────────────────┼──────────────────┤\n  │ ❌ DROP          │ 🔧 TIME SINK     │\n  │ nicht weiter     │ Aufwand zu hoch  │\n  └──────────────────┴──────────────────┘\n  hoher Aufwand ←——————→ niedriger Aufwand\n\nDiskutiert pro Top-Use-Case: in welchen Quadranten gehört er?\nDer Host hält das Ergebnis fest (Miro / Notion).',
-    sopKind: 'matrix-2x2',
+    title: `Übersicht · ${label}`,
+    subtitle: `Alle KI-Use-Cases aus Track ${trackIndex + 1}`,
+    body: 'Hier seht ihr alle Ideen aus diesem Track — strukturiert nach Phasen.\nWeiter zum nächsten Track.',
+    sopKind: 'track-summary',
+    sopTrackResults: true,
     ...sopMeta(track),
   }, { workshopMode: 'orient' });
 }
 
-function sopTrackOwner(track) {
-  const label = track.title.replace(/^Track \d+: /, '');
-  return tplSlide('open', {
-    title: `Owner-Nominierung · ${label}`,
-    prompt: 'Wer übernimmt den Lead für den TOP-Use-Case dieses Tracks?\nSelbst-Nominierung erlaubt — gerne mit Backup.',
-    subtitle: 'Format: Name · ggf. Backup · Tag-Limit für Kickoff',
-    sopKind: 'owner-nomination',
-    ...sopMeta(track),
-  }, { workshopMode: 'decide' });
+// ─── WORKSHOP-LEVEL HELPERS (Cross-Track Summary + Final Vote + Closing) ───────
+
+function sopAllTracksSummary() {
+  return tplSlide('content', {
+    title: 'Alle KI-Use-Cases',
+    subtitle: 'Über alle 3 Tracks zusammengefasst',
+    body: 'Hier seht ihr alle Use Cases aus dem gesamten Workshop — strukturiert nach Track und Phase.\nIm nächsten Schritt priorisiert ihr die Top-5 für die nächsten 90 Tage.',
+    sopKind: 'all-tracks-summary',
+    sopAllTracksResults: true,
+    mentiHero: true,
+  }, { workshopMode: 'orient' });
 }
 
-// ─── WORKSHOP-LEVEL HELPERS (Final + Closing) ───────
-
-function sopCrossTrackFinal() {
+function sopFinalVote() {
   return tplSlide('percent_split', {
     title: 'Top-5 für die nächsten 90 Tage',
-    prompt: 'Verteile 100 Punkte. Welche 5 Use Cases pilotiert ROOTS zuerst — über alle Tracks hinweg?\n(Optionen werden aus den Track-Votes aggregiert)',
+    prompt: 'Verteile 100 Punkte. Welche 5 Use Cases pilotiert ROOTS zuerst — über alle Tracks hinweg?',
     subtitle: 'Workshop-Finale · alle Tracks zusammen',
-    options: [],
     mentiQuestion: true,
-    sopKind: 'final-aggregation',
-  }, { showResultsLive: true, workshopMode: 'decide' });
+    options: [],
+    sopKind: 'final-vote',
+  }, { showResultsLive: true, sopAllTracksVote: true, workshopMode: 'decide' });
 }
 
 function sopWorkshopClose() {
@@ -441,38 +385,25 @@ function buildSopKiWorkshopSlides() {
   // 1. Opener
   slides.push(tplSlide('content', {
     title: 'SOP · KI Use-Case Workshop',
-    body: 'Pro SOP-Karte: Brainstorming → Top-Favoriten wählen.\nPro Track: Themen-Cluster · Priorisierung · Effort/Impact · Owner.\nFinale: Top-5 Use Cases für die nächsten 90 Tage.\n\nQR scannen · Name + Avatar wählen.',
+    body: 'Wir gehen die ROOTS-SOP Track für Track durch.\nPro Phase sammeln wir KI-Use-Cases.\nAm Track-Ende seht ihr alle Ideen strukturiert.\nAm Workshop-Ende priorisiert ihr die Top-5 für die nächsten 90 Tage.\n\nQR scannen · Name + Avatar wählen.',
     mentiHero: true,
   }));
 
-  // 2. Per Track
+  // 2. Per Track: Intro → Phasen (Intro + Brainstorm) → Track-Übersicht
   SOP_TOOL_TRACKS.forEach((track, ti) => {
     slides.push(sopTrackIntro(track, ti));
-
-    track.phases.forEach((phase) => {
-      slides.push(sopPhaseIntro(track, phase));
-
-      phase.cards.forEach((card) => {
-        if (card.requiresIntro) {
-          slides.push(sopCardIntro(track, phase, card));
-        }
-        slides.push(sopCardBrainstorm(track, phase, card));
-        slides.push(sopCardVote(track, phase, card));
-        // (sopCardResults entfernt — Live-Vote-View ersetzt es)
-      });
+    track.phases.forEach((phase, pi, allPhases) => {
+      slides.push(sopPhaseIntro(track, phase, pi, allPhases.length));
+      slides.push(sopPhaseBrainstorm(track, phase));
     });
-
-    // End of Track: Cluster, Vote, Matrix, Owner
-    slides.push(sopTrackThemeCluster(track));
-    slides.push(sopTrackVote(track));
-    slides.push(sopTrackMatrix(track));
-    slides.push(sopTrackOwner(track));
+    slides.push(sopTrackSummary(track, ti));
   });
 
-  // 3. Cross-Track Finale
-  slides.push(sopCrossTrackFinal());
+  // 3. Workshop-Finale
+  slides.push(sopAllTracksSummary());
+  slides.push(sopFinalVote());
 
-  // 4. Workshop Closing
+  // 4. Closing
   slides.push(...sopWorkshopClose());
 
   return slides;
