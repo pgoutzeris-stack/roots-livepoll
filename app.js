@@ -2941,16 +2941,18 @@ function renderPresent() {
       viz = `<img src="${esc(c.imageUrl)}" alt="" style="max-width:min(720px,90vw);border-radius:16px;margin-top:1rem">`;
     }
   } else if (slide.settings?.showResultsLive !== false) {
+    // Live-Ergebnisse für ALLE Slide-Typen (einheitlich wie SOP): Visualisierung
+    // immer rendern, auch wenn noch keine Antwort vorliegt. Die einzelnen
+    // Renderer (viz.js) zeigen leere Zustände passend an (Skelett-Balken,
+    // "Antworten werden gesammelt…" für Brainstorm/Open).
     if (slide.settings?.sopCardVote || slide.settings?.brainstormVote) {
       viz = renderCardVotePresentHtml(displaySlide, visible);
     } else if (slide.settings?.sopTrackVote) {
       viz = renderTrackVotePresentHtml(displaySlide, visible);
     } else if (slide.slide_type === 'open' || slide.slide_type === 'brainstorm') {
       viz = renderBrainstormPresentViz(slide, visible);
-    } else if (agg.total > 0 || !State.session.question_open) {
-      viz = window.LPViz.renderViz(displaySlide, agg, 'present', { displayMode: getResultsDisplayMode() });
     } else {
-      viz = '<div class="present-wait-msg">Antworten werden gesammelt…</div>';
+      viz = window.LPViz.renderViz(displaySlide, agg, 'present', { displayMode: getResultsDisplayMode() });
     }
   } else {
     viz = `<div class="present-wait-msg">${State.session.question_open ? 'Antworten werden gesammelt…' : 'Frage geschlossen'}</div>`;
