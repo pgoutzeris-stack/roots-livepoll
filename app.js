@@ -125,6 +125,8 @@ function genCode() {
 }
 
 function filterProfanity(text, enabled) {
+  // Prefer the comprehensive filter from lp-core.js (DE+EN list, partial-word match)
+  if (typeof window.LP_filterProfanity === 'function') return window.LP_filterProfanity(text, enabled);
   if (!enabled || !text) return text;
   let out = text;
   PROFANITY.forEach((w) => { out = out.replace(new RegExp(w, 'gi'), '***'); });
@@ -2854,27 +2856,33 @@ function startParticipantSync() {
 
 function subscribeSessionChannel() {
   if (State.sessionChannel) sb.removeChannel(State.sessionChannel);
-  State.sessionChannel = sb.channel(sessionChannelName(State.session.id))
+  const chName = sessionChannelName(State.session.id);
+  State.sessionChannel = sb.channel(chName)
     .on('broadcast', { event: 'session_sync' }, ({ payload }) => {
+      window.LP?.channelHeartbeat(chName);
       applySessionPatch(payload || {});
       renderPresent();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'lp_sessions', filter: `id=eq.${State.session.id}` }, (payload) => {
+      window.LP?.channelHeartbeat(chName);
       State.session = { ...State.session, ...payload.new };
       renderPresent();
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lp_responses', filter: `session_id=eq.${State.session.id}` }, (payload) => {
+      window.LP?.channelHeartbeat(chName);
       State.responses.push(payload.new);
       if (payload.new.participant_id) pushPresentActivity(payload.new.participant_id);
       renderPresent();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lp_responses', filter: `session_id=eq.${State.session.id}` }, (payload) => {
+      window.LP?.channelHeartbeat(chName);
       const idx = State.responses.findIndex((r) => r.id === payload.new.id);
       if (idx >= 0) State.responses[idx] = payload.new;
       else State.responses.push(payload.new);
       renderPresent();
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lp_participants', filter: `session_id=eq.${State.session.id}` }, (payload) => {
+      window.LP?.channelHeartbeat(chName);
       if (!State.participants.find((p) => p.id === payload.new.id)) {
         State.participants.push(payload.new);
         pushPresentActivity(payload.new.id, 'ist beigetreten');
@@ -2883,7 +2891,11 @@ function subscribeSessionChannel() {
       renderPresentParticipants();
       renderPresent();
     })
-    .subscribe();
+    .on('system', {}, () => window.LP?.channelHeartbeat(chName))
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') window.LP?.channelHeartbeat(chName);
+    });
+  window.LP?.registerChannel(chName, () => subscribeSessionChannel());
 }
 
 function currentSessionSlide() {

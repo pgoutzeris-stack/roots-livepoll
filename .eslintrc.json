@@ -1,0 +1,31 @@
+{
+  "env": { "browser": true, "es2022": true },
+  "parserOptions": { "ecmaVersion": 2022, "sourceType": "script" },
+  "globals": {
+    "supabase": "readonly",
+    "QRCode": "readonly",
+    "LP_BUILD": "readonly",
+    "LP": "readonly",
+    "LP_INTERACTIVE_TYPES": "readonly",
+    "LP_DEFAULT_STYLE": "readonly",
+    "LP_TEMPLATES": "readonly",
+    "RootsUser": "readonly",
+    "renderPresent": "writable",
+    "renderParticipantQuestion": "writable",
+    "currentSessionSlide": "readonly",
+    "nextSlide": "readonly",
+    "broadcastSessionPatch": "readonly",
+    "State": "readonly",
+    "sb": "readonly",
+    "toast": "readonly"
+  },
+  "rules": {
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "no-console": ["warn", { "allow": ["warn", "error", "info"] }],
+    "no-var": "error",
+    "prefer-const": "warn",
+    "eqeqeq": ["warn", "always", { "null": "ignore" }],
+    "curly": ["warn", "multi-line"],
+    "no-empty": ["warn", { "allowEmptyCatch": true }]
+  }
+}

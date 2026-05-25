@@ -1,0 +1,137 @@
+/* ROOTS Live Poll – Additional Styles
+   Wird NACH styles.css geladen.
+   Enthält: Skeleton, Empty States, Tooltips, Timer, Leaderboard,
+   Reactions, Sync-Status, Focus-Rings, Reduce-Motion. */
+
+/* ═══════ SYNC STATUS BADGE ═══════ */
+.lp-sync-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:.72rem;font-weight:600;line-height:1}
+.lp-sync-pill i{font-size:.5rem}
+.lp-sync-live{background:rgba(16,185,129,.12);color:#10b981}
+.lp-sync-live i{color:#10b981}
+.lp-sync-reconnecting{background:rgba(245,158,11,.14);color:#b45309}
+.lp-sync-offline{background:rgba(220,38,38,.14);color:#dc2626}
+.lp-sync-idle{display:none}
+
+/* ═══════ SKELETON LOADER ═══════ */
+@keyframes lp-shimmer{0%{background-position:-300px 0}100%{background-position:calc(300px + 100%) 0}}
+.lp-skel{background:linear-gradient(90deg,#eef2f7 0%,#f8fafc 50%,#eef2f7 100%);background-size:300px 100%;background-repeat:no-repeat;animation:lp-shimmer 1.4s infinite linear;border-radius:6px;color:transparent!important;user-select:none}
+.lp-skel-card{height:140px;border-radius:14px;margin-bottom:.75rem}
+.lp-skel-line{height:14px;margin:6px 0;border-radius:4px}
+.lp-skel-line.w-60{width:60%}.lp-skel-line.w-40{width:40%}.lp-skel-line.w-80{width:80%}
+@media (prefers-color-scheme:dark){
+  .lp-skel{background:linear-gradient(90deg,#1e293b 0%,#334155 50%,#1e293b 100%)}
+}
+
+/* ═══════ EMPTY STATES ═══════ */
+.lp-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem 1.5rem;text-align:center;color:var(--muted);gap:.5rem}
+.lp-empty-icon{width:64px;height:64px;border-radius:16px;background:var(--brand-light);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin-bottom:.5rem}
+.lp-empty-title{font-size:1rem;font-weight:700;color:var(--ink);margin:0}
+.lp-empty-text{font-size:.88rem;color:var(--muted);max-width:380px;line-height:1.45;margin:0}
+.lp-empty-cta{margin-top:.85rem}
+
+/* ═══════ TOOLTIPS ═══════ */
+[data-tooltip]{position:relative}
+[data-tooltip]::after{content:attr(data-tooltip);position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%) translateY(4px);background:#0f172a;color:#fff;padding:5px 10px;border-radius:6px;font-size:.72rem;font-weight:500;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;z-index:1000}
+[data-tooltip]:hover::after,[data-tooltip]:focus-visible::after{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ═══════ TIMER BAR ═══════ */
+.lp-timer-bar{position:absolute;top:0;left:0;right:0;height:32px;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 12px;gap:10px;z-index:30}
+.lp-timer-fill{flex:1;height:6px;background:linear-gradient(90deg,#10b981,#206efb);border-radius:99px;transition:width .25s linear,background .3s}
+.lp-timer-fill.warn{background:linear-gradient(90deg,#f59e0b,#dc2626)}
+.lp-timer-fill.danger{background:#dc2626;animation:lp-pulse 1s infinite}
+.lp-timer-label{font-family:'SF Mono',Menlo,monospace;font-size:.88rem;font-weight:700;color:var(--ink);min-width:48px;text-align:right}
+@keyframes lp-pulse{0%,100%{opacity:1}50%{opacity:.6}}
+
+/* ═══════ LEADERBOARD ═══════ */
+.lp-leaderboard{position:absolute;right:20px;bottom:20px;width:340px;max-width:42vw;background:rgba(255,255,255,.96);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 30px rgba(15,23,42,.12);overflow:hidden;animation:lp-slide-in .35s ease;z-index:25}
+.lp-lb-head{padding:.75rem 1rem;background:var(--brand);color:#fff;font-weight:700;font-size:.92rem;display:flex;align-items:center;gap:8px}
+.lp-lb-body{display:flex;flex-direction:column;max-height:60vh;overflow:auto}
+.lp-lb-row{display:grid;grid-template-columns:32px 32px 1fr auto auto;gap:8px;align-items:center;padding:.55rem .85rem;border-bottom:1px solid var(--line);font-size:.85rem}
+.lp-lb-row:last-child{border-bottom:none}
+.lp-lb-row[data-rank="1"]{background:linear-gradient(90deg,rgba(254,243,199,.6),transparent)}
+.lp-lb-row[data-rank="2"]{background:linear-gradient(90deg,rgba(226,232,240,.6),transparent)}
+.lp-lb-row[data-rank="3"]{background:linear-gradient(90deg,rgba(254,215,170,.5),transparent)}
+.lp-lb-medal{font-size:1.1rem;text-align:center}
+.lp-lb-rank{display:inline-block;width:24px;height:24px;line-height:24px;text-align:center;border-radius:50%;background:var(--surface,#f8fafc);font-weight:700;font-size:.72rem;color:var(--muted)}
+.lp-lb-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1rem;color:#fff;font-weight:700}
+.lp-lb-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.lp-lb-stats{font-size:.7rem;color:var(--muted);white-space:nowrap}
+.lp-lb-score{font-weight:700;color:var(--brand);font-variant-numeric:tabular-nums}
+@keyframes lp-slide-in{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+
+/* ═══════ REACTION STREAM ═══════ */
+.lp-reaction-stream{position:fixed;inset:0;pointer-events:none;z-index:90}
+.lp-reaction{position:absolute;bottom:-40px;animation:lp-float-up 2.8s ease-out forwards;will-change:transform,opacity}
+@keyframes lp-float-up{
+  0%{transform:translateY(0) scale(.6) rotate(0);opacity:0}
+  10%{opacity:1;transform:translateY(-20px) scale(1) rotate(-8deg)}
+  60%{opacity:.95;transform:translateY(-60vh) scale(1.05) rotate(8deg)}
+  100%{transform:translateY(-100vh) scale(.85) rotate(-4deg);opacity:0}
+}
+
+/* ═══════ Q&A UPVOTING ═══════ */
+.lp-qna-list{display:flex;flex-direction:column;gap:.5rem;width:100%;max-width:680px;margin:0 auto}
+.lp-qna-item{display:flex;align-items:flex-start;gap:.75rem;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:.75rem 1rem}
+.lp-qna-item.popular{border-color:var(--brand)}
+.lp-qna-body{flex:1;min-width:0}
+.lp-qna-text{font-size:.95rem;color:var(--ink);line-height:1.4;margin:0;word-wrap:break-word}
+.lp-qna-meta{font-size:.7rem;color:var(--muted);margin-top:.35rem}
+.lp-upvote-btn{display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:1.5px solid var(--line);border-radius:10px;padding:6px 10px;cursor:pointer;color:var(--muted);transition:all .15s;min-width:48px;font:inherit}
+.lp-upvote-btn:hover{border-color:var(--brand);color:var(--brand);transform:translateY(-1px)}
+.lp-upvote-btn.voted{border-color:var(--brand);background:var(--brand-light);color:var(--brand)}
+.lp-upvote-btn i{font-size:.8rem}
+.lp-upvote-btn .upvote-count{font-size:.78rem;font-weight:700}
+
+/* ═══════ TOAST UPDATE PROMPT ═══════ */
+.toast.toast-update{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border-left-color:var(--brand)}
+.toast.toast-update .btn-toast-update{background:var(--brand);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:.78rem;font-weight:600;cursor:pointer}
+.toast.toast-update .btn-toast-dismiss{background:transparent;color:rgba(255,255,255,.65);border:none;cursor:pointer;padding:4px;font-size:.85rem}
+
+/* ═══════ PARTICIPANT SUBMIT CONFIRMATION ═══════ */
+.lp-submit-confirm{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:var(--success,#10b981);color:#fff;padding:.6rem 1.2rem;border-radius:99px;font-weight:600;font-size:.88rem;box-shadow:0 8px 24px rgba(16,185,129,.35);z-index:200;animation:lp-pop-up .35s ease,lp-pop-out .35s ease 1.4s forwards;display:flex;align-items:center;gap:6px}
+@keyframes lp-pop-up{from{transform:translateX(-50%) translateY(20px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
+@keyframes lp-pop-out{to{transform:translateX(-50%) translateY(20px);opacity:0}}
+
+/* ═══════ FOCUS RINGS ═══════ */
+:focus-visible{outline:3px solid rgba(32,110,251,.45);outline-offset:2px;border-radius:6px}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[role="button"]:focus-visible{outline:3px solid rgba(32,110,251,.45);outline-offset:2px}
+.btn-primary:focus-visible,.btn-secondary:focus-visible{outline-offset:3px}
+
+/* ═══════ SCREEN-READER-ONLY ═══════ */
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+
+/* ═══════ MINIMUM TOUCH TARGETS (mobile) ═══════ */
+@media (max-width:760px){
+  button:not(.lp-icon-only),.btn-primary,.btn-secondary,.btn-ghost,input[type="button"],input[type="submit"]{min-height:44px}
+  .dash-nav-item{min-height:44px}
+}
+
+/* ═══════ REDUCE MOTION ═══════ */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.001s!important;animation-iteration-count:1!important;
+    transition-duration:.001s!important;scroll-behavior:auto!important
+  }
+  .lp-reaction{animation:none;display:none}
+}
+
+/* ═══════ TIMER SETTINGS UI (Editor Props) ═══════ */
+.lp-timer-props{display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:center;background:var(--surface,#f8fafc);padding:.6rem .8rem;border-radius:10px;margin:.5rem 0}
+.lp-timer-props input[type=number]{width:80px;padding:5px 8px;border:1.5px solid var(--line);border-radius:6px;background:var(--bg);font-size:.85rem}
+.lp-timer-props label{font-size:.82rem;color:var(--ink);font-weight:500;display:flex;align-items:center;gap:6px}
+
+/* ═══════ PRESENT MODE: data-state hooks ═══════ */
+body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
+
+/* ═══════ DARK MODE ADJUSTMENTS for new components ═══════ */
+@media (prefers-color-scheme:dark){
+  .lp-leaderboard{background:rgba(15,23,42,.92)}
+  .lp-timer-bar{background:rgba(15,23,42,.92);border-bottom-color:var(--line)}
+  [data-tooltip]::after{background:#1e293b;color:#f8fafc}
+  .lp-qna-item{background:var(--surface,#1e293b)}
+}
+
+/* ═══════ HIGH-CONTRAST WINS ═══════ */
+.lp-error-banner{background:#fef2f2;border-left:4px solid #dc2626;color:#7f1d1d;padding:.85rem 1rem;border-radius:8px;display:flex;gap:8px;align-items:flex-start;margin:1rem 0}
+.lp-warning-banner{background:#fffbeb;border-left:4px solid #f59e0b;color:#78350f;padding:.85rem 1rem;border-radius:8px;display:flex;gap:8px;align-items:flex-start;margin:1rem 0}
+.lp-info-banner{background:#eff6ff;border-left:4px solid #206efb;color:#1e3a8a;padding:.85rem 1rem;border-radius:8px;display:flex;gap:8px;align-items:flex-start;margin:1rem 0}

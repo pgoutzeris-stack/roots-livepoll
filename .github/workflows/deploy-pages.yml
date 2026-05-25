@@ -22,6 +22,19 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+
+      # Inject deterministic build identifier (short SHA) into all __BUILD__ placeholders.
+      # This auto-busts caches on every push without manual ?v= updates.
+      - name: Inject build identifier
+        run: |
+          BUILD_ID="$(git rev-parse --short HEAD)"
+          echo "Build ID: $BUILD_ID"
+          find . -maxdepth 3 -type f \( -name "*.html" -o -name "*.js" -o -name "*.json" -o -name "*.css" \) \
+            ! -path "./.git/*" \
+            ! -path "./node_modules/*" \
+            -exec sed -i "s|__BUILD__|$BUILD_ID|g" {} +
+          echo "✓ Build ID $BUILD_ID injected"
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true
