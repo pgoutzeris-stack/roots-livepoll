@@ -202,30 +202,24 @@
     return out;
   };
 
-  // ─── PWA SERVICE WORKER REGISTRATION ─────────────────
+  // ─── PWA SERVICE WORKER ──────────────────────────────
+  // DEAKTIVIERT: SW hatte Probleme mit Cross-Origin-Auth-Bridge-Cache
+  // (Login-Popups trotz aktiver Intranet-Session). Live-Poll braucht keinen
+  // Offline-Modus — alles ist eh Realtime. SWs aus aelteren Versionen
+  // werden hier proaktiv abgemeldet und ihre Caches geleert.
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').then((reg) => {
-        // Update prompt when new SW is ready
-        reg.addEventListener('updatefound', () => {
-          const sw = reg.installing;
-          if (!sw) return;
-          sw.addEventListener('statechange', () => {
-            if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-              showUpdatePrompt(reg);
-            }
-          });
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+      regs.forEach((reg) => reg.unregister().catch(() => {}));
+      if (regs.length) console.info(`[LP] ${regs.length} alte(r) Service Worker abgemeldet.`);
+    }).catch(() => {});
+    if (typeof caches !== 'undefined' && caches.keys) {
+      caches.keys().then((keys) => {
+        const lpKeys = keys.filter((k) => k.startsWith('lp-cache-'));
+        return Promise.all(lpKeys.map((k) => caches.delete(k))).then(() => {
+          if (lpKeys.length) console.info(`[LP] ${lpKeys.length} alte(r) Cache(s) geleert.`);
         });
-      }).catch((e) => reportError(e, { kind: 'sw-register' }));
-
-      // Listen for controlling SW change → soft reload
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (refreshing) return;
-        refreshing = true;
-        location.reload();
-      });
-    });
+      }).catch(() => {});
+    }
   }
 
   function showUpdatePrompt(reg) {
