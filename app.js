@@ -2893,6 +2893,7 @@ async function startPresentation() {
   State.session = session;
   State.responses = [];
   State.participants = [];
+  State._debugSeeded = false; // ← Re-Seed erlauben bei jeder neuen Session
   location.hash = `#present/${session.id}`;
   showScreen('present');
   await loadSessionData();
@@ -2917,7 +2918,8 @@ async function loadSessionData() {
   State.participants = participants || [];
   // ─── DEBUG-Modus: Wenn Präsentations-Titel mit [DEBUG] beginnt, injiziere
   //     simulierte Teilnehmer + Antworten lokal (keine DB-Schreibvorgänge).
-  if (State.presentation?.title?.startsWith('[DEBUG]')) {
+  const t = String(State.presentation?.title || '');
+  if (t.toUpperCase().includes('[DEBUG]') || State.presentation?.settings?.debug) {
     seedDebugSession();
   }
 }
@@ -2931,8 +2933,15 @@ function sessionChannelName(sessionId) {
 // Wird ausschließlich client-seitig in State injiziert, keine DB.
 // ════════════════════════════════════════════════════════════════
 function seedDebugSession() {
-  if (State._debugSeeded) return;
-  if (!State.session || !Array.isArray(State.slides)) return;
+  if (State._debugSeeded) {
+    console.info('[DEBUG-Seed] bereits geseedet — übersprungen. Reset mit LP_resetDebug().');
+    return;
+  }
+  if (!State.session) { console.warn('[DEBUG-Seed] keine Session'); return; }
+  if (!Array.isArray(State.slides) || !State.slides.length) {
+    console.warn('[DEBUG-Seed] keine Slides geladen');
+    return;
+  }
   State._debugSeeded = true;
 
   const PARTICIPANTS_DEF = window.LP_DEBUG_PARTICIPANTS || [];
@@ -3119,8 +3128,25 @@ function seedDebugSession() {
     });
   });
 
-  console.info(`[DEBUG-Seed] ${fakeParticipants.length} Teilnehmer, ${State.responses.filter((r) => r.id.startsWith('debug-r-')).length} simulierte Antworten injiziert.`);
+  const totalSeeded = State.responses.filter((r) => String(r.id).startsWith('debug-r-')).length;
+  console.info(`[DEBUG-Seed] ${fakeParticipants.length} Teilnehmer, ${totalSeeded} simulierte Antworten injiziert.`);
+  try { toast(`🛠 DEBUG-Modus aktiv: ${fakeParticipants.length} Fake-Teilnehmer · ${totalSeeded} Antworten simuliert`, 'info'); } catch {}
+  // Re-render present screen so seeded data appears immediately
+  try { if (typeof renderPresent === 'function') renderPresent(); } catch {}
+  try { if (typeof renderPresentParticipants === 'function') renderPresentParticipants(); } catch {}
+  try { if (typeof updatePresentStats === 'function') updatePresentStats(); } catch {}
 }
+
+// Manual debug helpers exposed on window for console access
+window.LP_seedDebug = function () { State._debugSeeded = false; seedDebugSession(); };
+window.LP_resetDebug = function () {
+  State.responses = (State.responses || []).filter((r) => !String(r.id).startsWith('debug-r-'));
+  State.participants = (State.participants || []).filter((p) => !String(p.id).startsWith('debug-p-'));
+  State._debugSeeded = false;
+  if (typeof renderPresent === 'function') renderPresent();
+  if (typeof renderPresentParticipants === 'function') renderPresentParticipants();
+  console.info('[DEBUG-Seed] zurückgesetzt');
+};
 
 function applySessionPatch(patch) {
   if (!State.session) return;
