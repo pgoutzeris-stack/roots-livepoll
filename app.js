@@ -4675,3 +4675,31 @@ if (document.documentElement.classList.contains('in-iframe')) {
   if (loginCard) loginCard.innerHTML = '<p style="text-align:center;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> Anmeldung über Intranet…</p>';
   void window.RootsUserBridge?.syncAuthFromParentStorage?.();
 }
+
+// ─── EXPLIZITER INITIAL-AUTH-CHECK ───────────────────────────────
+// onAuthStateChange feuert INITIAL_SESSION nicht immer zuverlaessig
+// (besonders in iframes). Hier holen wir die Session aktiv und routen
+// in das Dashboard, falls vorhanden. Verhindert das spurious Login-Popup
+// trotz aktiver Intranet-Session.
+(async function initAuthCheck() {
+  try {
+    // Geben dem Auth-Bridge bis zu 2.5s Zeit, die Session zu synchen
+    for (let i = 0; i < 25; i++) {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        if (!State.user) await onAuthSession(session);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    // Nach 2.5s ohne Session: Login-Card auf den normalen Login-Stand zurueck
+    if (document.documentElement.classList.contains('in-iframe')) {
+      const card = $('#screen-login .login-card');
+      if (card && card.querySelector('.fa-spinner')) {
+        card.innerHTML = '<h1 class="login-title" style="text-align:center">Nicht angemeldet</h1><p class="login-sub" style="text-align:center">Bitte melde dich zuerst im ROOTS Intranet an, dann öffne das Tool dort erneut.</p>';
+      }
+    }
+  } catch (e) {
+    console.warn('[LP] initAuthCheck error:', e);
+  }
+})();
