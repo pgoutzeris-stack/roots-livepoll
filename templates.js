@@ -340,6 +340,27 @@ function sopFinalVote() {
   }, { showResultsLive: true, sopAllTracksVote: true, workshopMode: 'decide' });
 }
 
+function sopPriorityMatrix() {
+  return tplSlide('priority_matrix', {
+    title: 'Priorisierungs-Matrix',
+    prompt: 'Ziehe jeden Use Case in den passenden Quadranten. Du kannst beliebig oft umsortieren.',
+    subtitle: 'Effort vs. Impact · alle Tracks',
+    xAxisLabel: 'Aufwand',
+    xAxisLow: 'niedrig',
+    xAxisHigh: 'hoch',
+    yAxisLabel: 'Impact',
+    yAxisLow: 'niedrig',
+    yAxisHigh: 'hoch',
+    quadrants: {
+      qw: { label: 'Quick Win', icon: '🚀', desc: 'hoher Impact · niedriger Aufwand' },
+      sb: { label: 'Strategic Bet', icon: '⭐', desc: 'hoher Impact · hoher Aufwand' },
+      ts: { label: 'Time Sink', icon: '🔧', desc: 'niedriger Impact · hoher Aufwand' },
+      dr: { label: 'Drop', icon: '❌', desc: 'niedriger Impact · niedriger Aufwand' },
+    },
+    sopKind: 'final-matrix',
+  }, { showResultsLive: true, sopAllTracksMatrix: true, workshopMode: 'decide' });
+}
+
 function sopWorkshopClose() {
   return [
     tplSlide('section', {
@@ -399,12 +420,10 @@ function buildSopKiWorkshopSlides() {
     slides.push(sopTrackSummary(track, ti));
   });
 
-  // 3. Workshop-Finale
+  // 3. Workshop-Finale: Übersicht aller Use Cases, Top-5 Vote, Priorisierungs-Matrix
   slides.push(sopAllTracksSummary());
   slides.push(sopFinalVote());
-
-  // 4. Closing
-  slides.push(...sopWorkshopClose());
+  slides.push(sopPriorityMatrix());
 
   return slides;
 }
@@ -441,6 +460,7 @@ window.LP_SLIDE_TYPES = [
   { type: 'number_guess', label: 'Zahl schätzen', icon: 'fa-hashtag', desc: 'Durchschnitt/Median' },
   { type: 'percent_split', label: '100 Punkte', icon: 'fa-chart-pie', desc: 'Prozent verteilen' },
   { type: 'pin_image', label: 'Pin auf Bild', icon: 'fa-location-dot', desc: 'Marker setzen' },
+  { type: 'priority_matrix', label: 'Priorisierungs-Matrix', icon: 'fa-table-cells-large', desc: 'Items per Drag-and-Drop in 2×2-Matrix einordnen' },
 ];
 
 window.LP_DEFAULT_STYLE = {
@@ -451,7 +471,7 @@ window.LP_DEFAULT_STYLE = {
 
 window.LP_INTERACTIVE_TYPES = new Set([
   'mc_single', 'mc_multi', 'yesno', 'wordcloud', 'open', 'scale', 'ranking',
-  'quiz', 'qa', 'brainstorm', 'reaction', 'number_guess', 'percent_split', 'pin_image',
+  'quiz', 'qa', 'brainstorm', 'reaction', 'number_guess', 'percent_split', 'pin_image', 'priority_matrix',
 ]);
 
 window.LP_AVATAR_EMOJIS = ['🦊', '🐼', '🦁', '🐸', '🦄', '🐙', '🦋', '🐳', '🌟', '🔥', '💎', '🎯', '🚀', '🌈', '🎨', '⚡'];
@@ -474,6 +494,18 @@ window.LP_DEFAULT_CONTENT = {
   number_guess: { title: 'Schätzfrage', prompt: 'Gib eine Zahl ein' },
   percent_split: { title: 'Verteile 100 Punkte', prompt: '', options: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }] },
   pin_image: { title: 'Pin auf Bild', prompt: 'Tippe auf das Bild', imageUrl: '' },
+  priority_matrix: {
+    title: 'Priorisierungs-Matrix',
+    prompt: 'Ziehe jeden Use Case in den passenden Quadranten.',
+    xAxisLabel: 'Aufwand', xAxisLow: 'niedrig', xAxisHigh: 'hoch',
+    yAxisLabel: 'Impact', yAxisLow: 'niedrig', yAxisHigh: 'hoch',
+    quadrants: {
+      qw: { label: 'Quick Win', icon: '🚀', desc: 'hoher Impact · niedriger Aufwand' },
+      sb: { label: 'Strategic Bet', icon: '⭐', desc: 'hoher Impact · hoher Aufwand' },
+      ts: { label: 'Time Sink', icon: '🔧', desc: 'niedriger Impact · hoher Aufwand' },
+      dr: { label: 'Drop', icon: '❌', desc: 'niedriger Impact · niedriger Aufwand' },
+    },
+  },
 };
 
 window.LP_DEFAULT_SETTINGS = {

@@ -3672,6 +3672,8 @@ async function renderParticipantQuestion() {
     input = c.imageUrl
       ? `<div class="pin-wrap" id="pin-wrap"><img src="${esc(c.imageUrl)}" alt="" id="pin-img" /><div id="pin-marker" class="pin-marker hidden">📍</div></div><button type="button" class="btn-primary participant-submit" id="submit-pin" disabled>Pin setzen & senden</button>`
       : `<p style="color:var(--muted)">Kein Bild konfiguriert.</p>`;
+  } else if (type === 'priority_matrix') {
+    input = renderParticipantMatrixHtml(slide);
   }
 
   const isWorkshop = isSopWorkshopPresentation() || hasBrainstormChain(slide) || isBrainstormVoteSlide(slide) || isBrainstormResultsSlide(slide);
@@ -3715,6 +3717,252 @@ function startQuestionTimer(sec) {
       $('#participant-root').innerHTML = '<div class="participant-card"><h1>Zeit abgelaufen</h1><p>Warte auf die nächste Frage…</p></div>';
     }
   }, 1000);
+}
+
+function getMatrixItems(slide) {
+  // Wenn sopAllTracksMatrix: ziehe aus allen Brainstorms aller Tracks (unique)
+  if (slide?.settings?.sopAllTracksMatrix) {
+    const { unique } = aggregateAllTracksUseCases();
+    return unique.map((u, i) => ({ id: u.id || `it-${i}`, text: u.text, phase: u.phase, trackLabel: u.trackLabel }));
+  }
+  // Manuelle Items aus slide.content.manualItems
+  return (slide?.content?.manualItems || []).map((t, i) => ({ id: `it-${i}`, text: typeof t === 'string' ? t : (t.text || ''), phase: '', trackLabel: '' }));
+}
+
+function getMatrixLocalKey(slideId) {
+  return `lp_matrix_${State.session?.id || ''}_${slideId}_${State.deviceId}`;
+}
+
+function loadMatrixLocal(slideId) {
+  try { return JSON.parse(localStorage.getItem(getMatrixLocalKey(slideId)) || '{}'); }
+  catch { return {}; }
+}
+
+function saveMatrixLocal(slideId, placements) {
+  try { localStorage.setItem(getMatrixLocalKey(slideId), JSON.stringify(placements || {})); }
+  catch {}
+}
+
+function renderParticipantMatrixHtml(slide) {
+  const c = slide.content || {};
+  const items = getMatrixItems(slide);
+  const quadrants = c.quadrants || {
+    qw: { label: 'Quick Win', icon: '🚀', desc: 'hoher Impact · niedriger Aufwand' },
+    sb: { label: 'Strategic Bet', icon: '⭐', desc: 'hoher Impact · hoher Aufwand' },
+    ts: { label: 'Time Sink', icon: '🔧', desc: 'niedriger Impact · hoher Aufwand' },
+    dr: { label: 'Drop', icon: '❌', desc: 'niedriger Impact · niedriger Aufwand' },
+  };
+  if (!items.length) {
+    return '<div class="participant-wait-block"><p class="participant-sop-wait"><i class="fa-solid fa-clock"></i> Noch keine Use Cases gesammelt. Bitte warte auf den Vortragenden.</p></div>';
+  }
+  const placements = loadMatrixLocal(slide.id);
+  const inQuadrant = (q) => items.filter((it) => placements[it.id] === q);
+  const inPool = items.filter((it) => !placements[it.id]);
+  const itemCard = (it) => `<div class="lp-mx-item" data-item-id="${esc(it.id)}" data-text="${esc(it.text)}">
+    <span class="lp-mx-item-text">${esc(it.text)}</span>
+  </div>`;
+  return `<div class="lp-mx-wrap" data-slide-id="${esc(slide.id)}">
+    <div class="lp-mx-instructions">
+      <i class="fa-solid fa-hand-pointer"></i>
+      <span>Halten und ziehen, um Use Cases in Quadranten zu schieben. Tippen zum schnellen Setzen.</span>
+    </div>
+    <div class="lp-mx-grid-wrap">
+      <div class="lp-mx-y-label">${esc(c.yAxisLabel || 'Impact')}</div>
+      <div class="lp-mx-y-high">↑ hoch</div>
+      <div class="lp-mx-y-low">↓ niedrig</div>
+      <div class="lp-mx-grid">
+        <div class="lp-mx-cell lp-q-sb" data-drop="sb">
+          <div class="lp-mx-cell-head"><span class="lp-mx-cell-icon">${quadrants.sb.icon}</span><strong>${esc(quadrants.sb.label)}</strong></div>
+          <div class="lp-mx-cell-items">${inQuadrant('sb').map(itemCard).join('')}</div>
+        </div>
+        <div class="lp-mx-cell lp-q-qw" data-drop="qw">
+          <div class="lp-mx-cell-head"><span class="lp-mx-cell-icon">${quadrants.qw.icon}</span><strong>${esc(quadrants.qw.label)}</strong></div>
+          <div class="lp-mx-cell-items">${inQuadrant('qw').map(itemCard).join('')}</div>
+        </div>
+        <div class="lp-mx-cell lp-q-dr" data-drop="dr">
+          <div class="lp-mx-cell-head"><span class="lp-mx-cell-icon">${quadrants.dr.icon}</span><strong>${esc(quadrants.dr.label)}</strong></div>
+          <div class="lp-mx-cell-items">${inQuadrant('dr').map(itemCard).join('')}</div>
+        </div>
+        <div class="lp-mx-cell lp-q-ts" data-drop="ts">
+          <div class="lp-mx-cell-head"><span class="lp-mx-cell-icon">${quadrants.ts.icon}</span><strong>${esc(quadrants.ts.label)}</strong></div>
+          <div class="lp-mx-cell-items">${inQuadrant('ts').map(itemCard).join('')}</div>
+        </div>
+      </div>
+      <div class="lp-mx-x-label">${esc(c.xAxisLabel || 'Aufwand')}: hoch ← → niedrig</div>
+    </div>
+    <div class="lp-mx-pool" data-drop="pool">
+      <div class="lp-mx-pool-head"><strong>Use Cases</strong> <span class="lp-mx-pool-count" id="lp-mx-pool-count">${inPool.length} / ${items.length}</span></div>
+      <div class="lp-mx-pool-items">${inPool.map(itemCard).join('')}</div>
+    </div>
+    <div class="lp-mx-actions">
+      <button type="button" class="btn-ghost" id="lp-mx-reset"><i class="fa-solid fa-rotate-left"></i> Zurücksetzen</button>
+      <button type="button" class="btn-primary participant-submit" id="lp-mx-submit"><i class="fa-solid fa-paper-plane"></i> Auswahl absenden <span class="lp-mx-progress">(<span id="lp-mx-progress-n">${items.length - inPool.length}</span>/${items.length})</span></button>
+    </div>
+  </div>`;
+}
+
+// ─── DRAG-AND-DROP MATRIX (pointer events, mobile+desktop) ─────────
+function setupMatrixDragDrop(slide) {
+  const wrap = document.querySelector('.lp-mx-wrap[data-slide-id="' + slide.id + '"]');
+  if (!wrap) return;
+  const items = getMatrixItems(slide);
+  const itemMeta = {};
+  items.forEach((it) => { itemMeta[it.id] = { text: it.text, phase: it.phase, trackLabel: it.trackLabel }; });
+
+  let placements = loadMatrixLocal(slide.id);
+
+  function updateProgress() {
+    const placed = Object.keys(placements).filter((k) => placements[k]).length;
+    const total = items.length;
+    const n = document.getElementById('lp-mx-progress-n'); if (n) n.textContent = placed;
+    const pool = document.getElementById('lp-mx-pool-count'); if (pool) pool.textContent = `${total - placed} / ${total}`;
+    const submit = document.getElementById('lp-mx-submit');
+    if (submit) submit.disabled = placed === 0;
+  }
+  updateProgress();
+
+  function moveItemToDom(itemEl, quadrant) {
+    const target = quadrant === 'pool'
+      ? wrap.querySelector('.lp-mx-pool-items')
+      : wrap.querySelector('[data-drop="' + quadrant + '"] .lp-mx-cell-items');
+    if (target) {
+      target.appendChild(itemEl);
+      itemEl.classList.add('lp-mx-item--just-dropped');
+      setTimeout(() => itemEl.classList.remove('lp-mx-item--just-dropped'), 350);
+    }
+  }
+
+  function setPlacement(itemId, quadrant) {
+    if (quadrant === 'pool') {
+      delete placements[itemId];
+    } else {
+      placements[itemId] = quadrant;
+    }
+    saveMatrixLocal(slide.id, placements);
+    updateProgress();
+    try { if (navigator.vibrate) navigator.vibrate(20); } catch {}
+  }
+
+  // Pointer drag implementation
+  let dragging = null; // { el, ghost, offsetX, offsetY, startX, startY, moved }
+  const LONGPRESS_MS = 220;
+  let longpressTimer = null;
+
+  function startDrag(item, e) {
+    if (dragging) return;
+    const rect = item.getBoundingClientRect();
+    const ghost = item.cloneNode(true);
+    ghost.classList.add('lp-mx-ghost');
+    ghost.style.position = 'fixed';
+    ghost.style.left = rect.left + 'px';
+    ghost.style.top = rect.top + 'px';
+    ghost.style.width = rect.width + 'px';
+    ghost.style.height = rect.height + 'px';
+    ghost.style.zIndex = '9999';
+    ghost.style.pointerEvents = 'none';
+    document.body.appendChild(ghost);
+    item.classList.add('lp-mx-item--dragging');
+    dragging = {
+      el: item, ghost,
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+      startX: e.clientX, startY: e.clientY, moved: false,
+    };
+    try { item.setPointerCapture(e.pointerId); } catch {}
+  }
+
+  function moveDrag(e) {
+    if (!dragging) return;
+    e.preventDefault();
+    dragging.moved = Math.hypot(e.clientX - dragging.startX, e.clientY - dragging.startY) > 6 || dragging.moved;
+    dragging.ghost.style.left = (e.clientX - dragging.offsetX) + 'px';
+    dragging.ghost.style.top = (e.clientY - dragging.offsetY) + 'px';
+    // Highlight drop target
+    const target = document.elementFromPoint(e.clientX, e.clientY);
+    const dropEl = target?.closest('[data-drop]');
+    wrap.querySelectorAll('[data-drop]').forEach((z) => z.classList.toggle('lp-mx-drop-active', z === dropEl));
+  }
+
+  function endDrag(e) {
+    if (!dragging) return;
+    const target = document.elementFromPoint(e.clientX, e.clientY);
+    const dropEl = target?.closest('[data-drop]');
+    dragging.el.classList.remove('lp-mx-item--dragging');
+    wrap.querySelectorAll('[data-drop]').forEach((z) => z.classList.remove('lp-mx-drop-active'));
+    dragging.ghost?.remove();
+    if (dropEl && dragging.moved) {
+      const q = dropEl.dataset.drop;
+      moveItemToDom(dragging.el, q);
+      setPlacement(dragging.el.dataset.itemId, q);
+    }
+    dragging = null;
+  }
+
+  wrap.querySelectorAll('.lp-mx-item').forEach((item) => {
+    item.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 && e.pointerType === 'mouse') return;
+      e.preventDefault();
+      // On touch: small long-press to feel intentional; on mouse: immediate
+      if (e.pointerType === 'touch') {
+        longpressTimer = setTimeout(() => startDrag(item, e), LONGPRESS_MS);
+      } else {
+        startDrag(item, e);
+      }
+    });
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    if (longpressTimer && !dragging) {
+      // canceled long-press if moved before threshold
+      clearTimeout(longpressTimer); longpressTimer = null;
+    }
+    moveDrag(e);
+  });
+
+  window.addEventListener('pointerup', (e) => {
+    if (longpressTimer) { clearTimeout(longpressTimer); longpressTimer = null; }
+    if (dragging) endDrag(e);
+  });
+  window.addEventListener('pointercancel', (e) => {
+    if (longpressTimer) { clearTimeout(longpressTimer); longpressTimer = null; }
+    if (dragging) endDrag(e);
+  });
+
+  // Tap-to-cycle: tap an item to move it through quadrants (Mobile-friendly fallback)
+  // Convention: pool -> qw -> sb -> ts -> dr -> pool
+  const ORDER = ['pool', 'qw', 'sb', 'ts', 'dr'];
+  wrap.querySelectorAll('.lp-mx-item').forEach((item) => {
+    let downX = 0, downY = 0, downT = 0;
+    item.addEventListener('pointerdown', (e) => { downX = e.clientX; downY = e.clientY; downT = Date.now(); });
+    item.addEventListener('pointerup', (e) => {
+      const elapsed = Date.now() - downT;
+      const moved = Math.hypot(e.clientX - downX, e.clientY - downY);
+      // Treat as tap if quick and didn't move much
+      if (!dragging && moved < 6 && elapsed < 180) {
+        const cur = placements[item.dataset.itemId] || 'pool';
+        const next = ORDER[(ORDER.indexOf(cur) + 1) % ORDER.length];
+        moveItemToDom(item, next);
+        setPlacement(item.dataset.itemId, next);
+      }
+    });
+  });
+
+  // Reset
+  document.getElementById('lp-mx-reset')?.addEventListener('click', () => {
+    placements = {};
+    saveMatrixLocal(slide.id, placements);
+    // Move all items back to pool
+    const pool = wrap.querySelector('.lp-mx-pool-items');
+    wrap.querySelectorAll('.lp-mx-item').forEach((it) => pool.appendChild(it));
+    updateProgress();
+  });
+
+  // Submit
+  document.getElementById('lp-mx-submit')?.addEventListener('click', () => {
+    const placed = Object.keys(placements).filter((k) => placements[k]).length;
+    if (!placed) { toast('Bitte mindestens 1 Use Case einsortieren', 'warn'); return; }
+    submitResponse({ matrix: placements, meta: itemMeta });
+  });
 }
 
 function bindParticipantHandlers(slide) {
@@ -3824,6 +4072,9 @@ function bindParticipantHandlers(slide) {
   });
 
   if (type === 'qa') void renderQaList(slide);
+
+  // Priority Matrix Drag-and-Drop Setup
+  if (type === 'priority_matrix') setupMatrixDragDrop(slide);
 }
 
 async function renderQaList(slide) {

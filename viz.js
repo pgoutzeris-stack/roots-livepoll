@@ -135,6 +135,23 @@
       return { ...base, pins: visible.map((r) => r.response?.pin).filter(Boolean) };
     }
 
+    if (type === 'priority_matrix') {
+      // Pro Item: Verteilung über die 4 Quadranten zählen
+      const itemPlacements = {}; // itemId -> { qw: n, sb: n, ts: n, dr: n }
+      const itemMeta = {}; // itemId -> { text }
+      visible.forEach((r) => {
+        const m = r.response?.matrix || {};
+        const meta = r.response?.meta || {};
+        Object.entries(m).forEach(([itemId, q]) => {
+          if (!['qw', 'sb', 'ts', 'dr'].includes(q)) return;
+          if (!itemPlacements[itemId]) itemPlacements[itemId] = { qw: 0, sb: 0, ts: 0, dr: 0 };
+          itemPlacements[itemId][q]++;
+          if (meta[itemId] && !itemMeta[itemId]) itemMeta[itemId] = meta[itemId];
+        });
+      });
+      return { ...base, itemPlacements, itemMeta };
+    }
+
     return base;
   }
 
@@ -207,6 +224,55 @@
         const valueLabel = displayMode === 'count' ? String(Math.round(e.val)) : `${pct}%`;
         return `<div class="viz-bar-row"><span>${esc(e.label)}</span><div class="viz-bar-track" style="background:${trackBg}"><div class="viz-bar-fill" style="width:${barPct}%"></div></div><strong>${valueLabel}</strong></div>`;
       }).join('')}</div>`;
+    }
+
+    if (agg.type === 'priority_matrix') {
+      // Aggregierte Matrix: jedes Item landet im Quadranten mit den meisten Votes
+      const itemPlacements = agg.itemPlacements || {};
+      const itemMeta = agg.itemMeta || {};
+      const quadrants = slide.content.quadrants || {
+        qw: { label: 'Quick Win', icon: '🚀' },
+        sb: { label: 'Strategic Bet', icon: '⭐' },
+        ts: { label: 'Time Sink', icon: '🔧' },
+        dr: { label: 'Drop', icon: '❌' },
+      };
+      const byQuadrant = { qw: [], sb: [], ts: [], dr: [], _split: [] };
+      Object.entries(itemPlacements).forEach(([id, counts]) => {
+        const max = Math.max(counts.qw, counts.sb, counts.ts, counts.dr);
+        if (max === 0) return;
+        const winners = Object.entries(counts).filter(([_q, n]) => n === max).map(([q]) => q);
+        const text = itemMeta[id]?.text || id;
+        const total = counts.qw + counts.sb + counts.ts + counts.dr;
+        const placement = { id, text, max, total, counts };
+        if (winners.length === 1) byQuadrant[winners[0]].push(placement);
+        else byQuadrant._split.push({ ...placement, winners });
+      });
+      const renderItems = (q) => byQuadrant[q].length
+        ? byQuadrant[q].sort((a, b) => b.max - a.max).map((it) => {
+            const pct = Math.round((it.max / Math.max(1, it.total)) * 100);
+            return `<div class="lp-matrix-result-item" title="${esc(it.text)} – ${it.max}/${it.total} Stimmen">
+              <span class="lp-matrix-result-text">${esc(it.text)}</span>
+              <span class="lp-matrix-result-pct">${pct}%</span>
+            </div>`;
+          }).join('')
+        : '<div class="lp-matrix-result-empty">—</div>';
+      const splitHtml = byQuadrant._split.length
+        ? `<div class="lp-matrix-split"><div class="lp-matrix-split-head">Geteilte Meinung (gleiche Stimmen in mehreren Quadranten)</div>${byQuadrant._split.map((it) => `<div class="lp-matrix-result-item">${esc(it.text)} <span class="lp-matrix-result-pct">${it.winners.join('·')}</span></div>`).join('')}</div>`
+        : '';
+      return `<div class="lp-matrix-result">
+        <div class="lp-matrix-result-axes">
+          <div class="lp-matrix-result-y-label">${esc(slide.content.yAxisLabel || 'Impact')}</div>
+          <div class="lp-matrix-result-grid">
+            <div class="lp-matrix-result-cell lp-q-sb"><div class="lp-matrix-cell-title">${quadrants.sb.icon} ${esc(quadrants.sb.label)}</div><div class="lp-matrix-cell-items">${renderItems('sb')}</div></div>
+            <div class="lp-matrix-result-cell lp-q-qw"><div class="lp-matrix-cell-title">${quadrants.qw.icon} ${esc(quadrants.qw.label)}</div><div class="lp-matrix-cell-items">${renderItems('qw')}</div></div>
+            <div class="lp-matrix-result-cell lp-q-dr"><div class="lp-matrix-cell-title">${quadrants.dr.icon} ${esc(quadrants.dr.label)}</div><div class="lp-matrix-cell-items">${renderItems('dr')}</div></div>
+            <div class="lp-matrix-result-cell lp-q-ts"><div class="lp-matrix-cell-title">${quadrants.ts.icon} ${esc(quadrants.ts.label)}</div><div class="lp-matrix-cell-items">${renderItems('ts')}</div></div>
+          </div>
+          <div class="lp-matrix-result-x-label">${esc(slide.content.xAxisLabel || 'Aufwand')} (hoch ← → niedrig)</div>
+        </div>
+        ${splitHtml}
+        <div class="lp-matrix-result-total">${agg.total} Teilnehmer · ${Object.keys(itemPlacements).length} Use Cases priorisiert</div>
+      </div>`;
     }
 
     if (agg.type === 'pin_image' && slide.content.imageUrl) {
