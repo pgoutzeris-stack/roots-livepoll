@@ -3286,7 +3286,7 @@ function seedDebugSession() {
   State._debugSeeded = true;
   ensureDebugPanel();
   LP_DebugSim.start();
-
+}
 
 // Manual debug helpers exposed on window for console access
 window.LP_seedDebug = function () { State._debugSeeded = false; seedDebugSession(); };
