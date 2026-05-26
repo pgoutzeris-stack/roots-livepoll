@@ -1321,17 +1321,7 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
       <button type="button" class="sop-nav-phase-item ${stateClass}" data-slide-index="${phaseIntroIdx >= 0 ? phaseIntroIdx : phaseBrainstormIdx}" ${(phaseIntroIdx < 0 && phaseBrainstormIdx < 0) ? 'disabled' : ''}>
         <i class="fa-solid fa-bookmark"></i>
         <span>${esc(phase.name)}</span>
-        <span class="sop-nav-phase-meta">${(phase.cards || []).length} Schritt${(phase.cards || []).length === 1 ? '' : 'e'}</span>
       </button>`;
-    // Karten-Liste als kleine "Inhalt"-Hinweise unter der Phase
-    if (phase.cards && phase.cards.length) {
-      html += '<ul class="sop-nav-card-list">';
-      (phase.cards || []).forEach((card) => {
-        const cardActive = phaseActive; // Karten gehoeren zur aktiven Phase
-        html += `<li class="sop-nav-card-item ${cardActive ? 'is-current' : (phasePassed ? 'is-passed' : '')}" title="${esc(card.intro || '')}">${esc(card.name)}</li>`;
-      });
-      html += '</ul>';
-    }
     if (phaseBrainstormIdx >= 0) {
       html += `<button type="button" class="workshop-sop-step ${currentIndex === phaseBrainstormIdx ? 'active' : ''}" data-slide-index="${phaseBrainstormIdx}" title="Brainstorming">
         <i class="fa-solid fa-lightbulb"></i> Brainstorm
