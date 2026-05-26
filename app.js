@@ -2915,10 +2915,211 @@ async function loadSessionData() {
   State.slides = normalizeSlides(slides);
   State.responses = responses || [];
   State.participants = participants || [];
+  // ─── DEBUG-Modus: Wenn Präsentations-Titel mit [DEBUG] beginnt, injiziere
+  //     simulierte Teilnehmer + Antworten lokal (keine DB-Schreibvorgänge).
+  if (State.presentation?.title?.startsWith('[DEBUG]')) {
+    seedDebugSession();
+  }
 }
 
 function sessionChannelName(sessionId) {
   return `lp-session-${sessionId}`;
+}
+
+// ════════════════════════════════════════════════════════════════
+// DEBUG-MODE — Simulierte Teilnehmer und Antworten zum QA-Testen
+// Wird ausschließlich client-seitig in State injiziert, keine DB.
+// ════════════════════════════════════════════════════════════════
+function seedDebugSession() {
+  if (State._debugSeeded) return;
+  if (!State.session || !Array.isArray(State.slides)) return;
+  State._debugSeeded = true;
+
+  const PARTICIPANTS_DEF = window.LP_DEBUG_PARTICIPANTS || [];
+  const PHASE_USE_CASES = window.LP_DEBUG_PHASE_USE_CASES || {};
+  const sessionId = State.session.id;
+  const now = Date.now();
+
+  // 1) Fake-Teilnehmer
+  const fakeParticipants = PARTICIPANTS_DEF.map((p, i) => ({
+    id: `debug-p-${i}-${sessionId}`,
+    session_id: sessionId,
+    device_id: `debug-d-${i}`,
+    display_name: p.name,
+    avatar_emoji: p.emoji,
+    avatar_color: p.color,
+    joined_at: new Date(now - (PARTICIPANTS_DEF.length - i) * 30000).toISOString(),
+    last_active_at: new Date(now).toISOString(),
+  }));
+
+  // Avoid duplicate IDs across re-loads
+  const existingIds = new Set((State.participants || []).map((p) => p.id));
+  fakeParticipants.forEach((p) => {
+    if (!existingIds.has(p.id)) State.participants.push(p);
+  });
+
+  // 2) Erste Schleife: brainstorm-Antworten generieren → wir brauchen
+  //    die generierten Use-Cases später als Optionen für Voting + Matrix
+  const allCollectedUseCases = []; // [{ slideId, respId, text, phaseName, trackLabel }]
+
+  State.slides.forEach((slide) => {
+    if (slide.slide_type !== 'brainstorm') return;
+    const c = slide.content || {};
+    const phaseName = c.sopPhaseName || c.title || '';
+    const useCases = PHASE_USE_CASES[phaseName] || PHASE_USE_CASES[c.title] || [];
+    if (!useCases.length) return;
+    useCases.forEach((text, i) => {
+      const p = fakeParticipants[i % fakeParticipants.length];
+      const respId = `debug-r-${slide.id}-${i}`;
+      const ts = new Date(now - (useCases.length - i) * 8000).toISOString();
+      State.responses.push({
+        id: respId,
+        session_id: sessionId,
+        slide_id: slide.id,
+        participant_id: p.id,
+        response: { text },
+        is_hidden: false,
+        created_at: ts,
+        updated_at: ts,
+      });
+      allCollectedUseCases.push({
+        slideId: slide.id, respId, text,
+        phaseName, trackLabel: c.sopTrackLabel || '',
+      });
+    });
+  });
+
+  // Helper für gleichmäßige Pseudo-Random Verteilung
+  function pseudoRandom(seed) { let x = Math.sin(seed) * 10000; return x - Math.floor(x); }
+
+  // 3) Antworten für andere Slide-Typen generieren
+  State.slides.forEach((slide) => {
+    const type = slide.slide_type;
+    const c = slide.content || {};
+    const st = slide.settings || {};
+
+    // Skip non-interactive
+    if (!isInteractive(type)) return;
+    if (type === 'brainstorm') return; // bereits gemacht
+
+    fakeParticipants.forEach((p, idx) => {
+      const respId = `debug-r-${slide.id}-${p.id}`;
+      // Skip already-seeded items (idempotent)
+      if (State.responses.find((r) => r.id === respId)) return;
+      const ts = new Date(now - (fakeParticipants.length - idx) * 12000).toISOString();
+      let response = null;
+
+      if (type === 'mc_single' || type === 'yesno' || type === 'quiz') {
+        const opts = type === 'yesno'
+          ? [{ id: 'yes' }, { id: 'no' }]
+          : (c.options || []);
+        if (!opts.length) return;
+        const choice = opts[Math.floor(pseudoRandom(idx + slide.id.charCodeAt(0)) * opts.length)];
+        if (type === 'quiz') {
+          const correct = opts.find((o) => o.correct);
+          response = { value: choice.id, correct: correct && choice.id === correct.id };
+        } else {
+          response = { value: choice.id };
+        }
+      } else if (type === 'mc_multi') {
+        if (st.sopCardVote || st.sopTrackVote || st.brainstormVote || st.sopAllTracksVote) {
+          // Vote-Slides: ziehe aus allCollectedUseCases
+          const max = st.sopVoteMax || c.maxSelections || 2;
+          const pool = allCollectedUseCases.length ? [...allCollectedUseCases] : [];
+          const picked = pool.sort(() => pseudoRandom(idx + slide.id.length) - 0.5).slice(0, max);
+          if (picked.length) response = { values: picked.map((it) => `resp-${it.respId}`) };
+        } else {
+          const opts = c.options || [];
+          const max = c.maxSelections || 3;
+          const shuffled = [...opts].sort(() => pseudoRandom(idx) - 0.5).slice(0, Math.min(max, Math.max(1, opts.length)));
+          if (shuffled.length) response = { values: shuffled.map((o) => o.id) };
+        }
+      } else if (type === 'wordcloud') {
+        const words = ['effizienz','automation','geschwindigkeit','qualität','präzision','transparenz','skalierbar','innovation'];
+        response = { text: words[idx % words.length] };
+      } else if (type === 'open' || type === 'qa') {
+        const samples = [
+          'Großartig — direkt umsetzbar.',
+          'Bin gespannt auf die Pilot-Phase.',
+          'Sehr wertvoll für unsere Workflows.',
+          'Brauchen wir, um schneller zu werden.',
+          'Klare Action Items für die nächsten 14 Tage.',
+        ];
+        response = { text: samples[idx % samples.length] };
+      } else if (type === 'scale') {
+        const min = c.min ?? 0, max = c.max ?? 10;
+        const v = Math.round(min + pseudoRandom(idx + slide.id.length) * (max - min));
+        response = { value: v };
+      } else if (type === 'number_guess') {
+        response = { value: Math.round(100 + pseudoRandom(idx) * 500) };
+      } else if (type === 'reaction') {
+        const reactions = ['👍','❤️','🎉','😂','😮','👏'];
+        response = { emoji: reactions[idx % reactions.length] };
+      } else if (type === 'ranking') {
+        const opts = c.options || [];
+        if (opts.length) response = { order: [...opts].sort(() => pseudoRandom(idx) - 0.5).map((o) => o.id) };
+      } else if (type === 'percent_split') {
+        if (st.sopAllTracksVote || st.sopTrackVote) {
+          // 100 Punkte über 5 aus allen gesammelten Use Cases
+          const pool = allCollectedUseCases.length ? [...allCollectedUseCases].sort(() => pseudoRandom(idx) - 0.5).slice(0, 5) : [];
+          if (pool.length) {
+            const points = {};
+            let remaining = 100;
+            pool.forEach((it, i) => {
+              const pts = i === pool.length - 1 ? remaining : Math.max(5, Math.floor(remaining * (0.2 + pseudoRandom(idx + i) * 0.4)));
+              points[`resp-${it.respId}`] = Math.min(pts, remaining);
+              remaining -= points[`resp-${it.respId}`];
+            });
+            response = { points };
+          }
+        } else {
+          const opts = c.options || [];
+          if (opts.length) {
+            const points = {};
+            let remaining = 100;
+            opts.forEach((o, i) => {
+              const pts = i === opts.length - 1 ? remaining : Math.floor(remaining / (opts.length - i));
+              points[o.id] = pts; remaining -= pts;
+            });
+            response = { points };
+          }
+        }
+      } else if (type === 'priority_matrix') {
+        // Jeder Teilnehmer ordnet die Use Cases in zufällige Quadranten
+        const quadrants = ['qw', 'sb', 'ts', 'dr'];
+        const weights = [0.4, 0.3, 0.15, 0.15]; // Quick Win + Strategic Bet bevorzugt
+        const matrix = {}, meta = {};
+        allCollectedUseCases.forEach((it, i) => {
+          const r = pseudoRandom(idx * 31 + i);
+          let acc = 0, picked = 'qw';
+          for (let q = 0; q < quadrants.length; q++) {
+            acc += weights[q];
+            if (r <= acc) { picked = quadrants[q]; break; }
+          }
+          matrix[it.respId] = picked;
+          meta[it.respId] = { text: it.text, phase: it.phaseName, trackLabel: it.trackLabel };
+        });
+        response = { matrix, meta };
+      } else if (type === 'pin_image') {
+        response = { pin: { x: Math.round(pseudoRandom(idx) * 100), y: Math.round(pseudoRandom(idx + 1) * 100) } };
+      }
+
+      if (response) {
+        State.responses.push({
+          id: respId,
+          session_id: sessionId,
+          slide_id: slide.id,
+          participant_id: p.id,
+          response,
+          is_hidden: false,
+          created_at: ts,
+          updated_at: ts,
+        });
+      }
+    });
+  });
+
+  console.info(`[DEBUG-Seed] ${fakeParticipants.length} Teilnehmer, ${State.responses.filter((r) => r.id.startsWith('debug-r-')).length} simulierte Antworten injiziert.`);
 }
 
 function applySessionPatch(patch) {

@@ -441,6 +441,98 @@ window.LP_TEMPLATES = [
     tips: 'Pro Unterphase (z. B. ROOTS Vorstellung): sammeln → max. 2 Favoriten → Ergebnisfolie. Live-Ansicht zeigt Abstimmungsfortschritt.',
     slides: buildSopKiWorkshopSlides(),
   },
+  {
+    key: 'roots-sop-ki-workshop-debug',
+    category: 'ROOTS · SOP & KI · DEBUG',
+    name: '[DEBUG] SOP-Workshop · simulierte Antworten',
+    desc: 'QA-Test-Version: Sobald du sie startest, werden automatisch Fake-Teilnehmer und realistische Antworten für ALLE Folien injiziert. Damit kannst du jede Slide-Render-Variante inspizieren.',
+    duration: '— (Debug)',
+    group: '— (Debug)',
+    tips: 'Erscheint nur lokal — Antworten werden nicht in der DB persistiert. Nach dem Verlassen der Session sind sie weg.',
+    slides: buildSopKiWorkshopSlides(),
+  },
+];
+
+// ─── DEBUG MOCK DATA ─────────────────────────────────────────────
+window.LP_DEBUG_PHASE_USE_CASES = {
+  'Anbahnung': [
+    'Otter.ai für Discovery-Call-Transcripts',
+    'Perplexity für tiefe Wettbewerbs-Recherche',
+    'ChatGPT für Vorrecherche zum Kunden',
+    'Synthesia für personalisiertes Outreach-Video',
+    'Notion AI für strukturierte Vorbereitungs-Notes',
+  ],
+  'Exploration': [
+    'Auto-Transkript von Discovery-Calls + Themen-Cluster',
+    'Symptom-Ursache-Mapping mit GPT',
+    'Aufwand-Predictor basierend auf historischen Projekten',
+    'SEO-Auditor (Lighthouse + GPT-Erklärungen)',
+    'User-Story-Generator aus Briefing-Notes',
+    'Brand-Consistency-Checker für Website',
+  ],
+  'Pitch': [
+    'Proposal-Generator aus Brief + Templates',
+    'Pitch-Deck-AI für Slide-Optimierung',
+    'Pricing-Optimizer mit Marktvergleich',
+    'Auto-Risk-Flag für Verträge',
+    'Contract-Generator aus Scope-Doc',
+  ],
+  'Ramp-up': [
+    'Auto-Kanban-Board aus Scope-Doc',
+    'Rollen-Allokator basierend auf Skills',
+    'Timeline-Generator aus Briefing',
+    'Editorial-Calendar-AI',
+    'Theme-Suggestion-Bot für Content-Plan',
+  ],
+  'Analyse & Synthese': [
+    'Auto-Dashboards aus GA4/Meta',
+    'Anomalie-Detection in Conversion-Funnel',
+    'Sentiment-Analyse aus Reviews',
+    'Persona-Generator aus Survey-Daten',
+    'Social-Listening mit Cluster-AI',
+    'Auto-Synthese aus Discovery-Notes',
+  ],
+  'Delivery': [
+    'ChatGPT für Copy-Varianten',
+    'Midjourney/DALL-E für Visuals',
+    'ElevenLabs für Voiceover',
+    'Runway für Video-Generierung',
+    'Best-Time-To-Post-Predictor',
+    'Auto-Reply-Drafts für Community Management',
+  ],
+  'Implementierung': [
+    'Auto-Creative-Variants für Ads',
+    'Audience-Generator aus Lookalike-Daten',
+    'Bid-Optimizer für Kampagnen',
+    'Zapier + GPT für Custom-Workflows',
+    'n8n-Templates für Routine-Aufgaben',
+    'Make.com-Szenarien mit AI-Steps',
+  ],
+  'Closeout': [
+    'Auto-PDF-Report aus Analytics',
+    'Highlights-Reel-Generator',
+    'Stakeholder-Briefing-Bot',
+    'Retro-Facilitator-Bot',
+    'Auto-Learning-Database',
+    'NPS-Bot für Kundenfeedback',
+  ],
+  'Follow-Up': [
+    'Smart-CRM-Reminder',
+    'Personalisierte Check-in-Drafts',
+    'Customer-Health-Score',
+    'Buying-Signal-Detection',
+    'Upsell-Pitch-Generator',
+    'Case-Study-Draft aus Projektdaten',
+  ],
+};
+
+window.LP_DEBUG_PARTICIPANTS = [
+  { name: 'Anna Becker',  emoji: '🦊', color: '#206efb' },
+  { name: 'Max Hoffmann', emoji: '🐼', color: '#10b981' },
+  { name: 'Lena Schmidt', emoji: '🦁', color: '#f59e0b' },
+  { name: 'Tom Werner',   emoji: '🐸', color: '#a855f7' },
+  { name: 'Sara Klein',   emoji: '🦄', color: '#ec4899' },
+  { name: 'Felix Bauer',  emoji: '🐙', color: '#06b6d4' },
 ];
 
 window.LP_SLIDE_TYPES = [
