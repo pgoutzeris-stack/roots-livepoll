@@ -2929,223 +2929,376 @@ function sessionChannelName(sessionId) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// DEBUG-MODE — Simulierte Teilnehmer und Antworten zum QA-Testen
-// Wird ausschließlich client-seitig in State injiziert, keine DB.
+// DEBUG-MODE — Realtime-Simulator
+// Teilnehmer joinen zeitversetzt, Antworten kommen drip-by-drip wie in
+// einem echten Workshop. Alles ausschließlich client-seitig.
 // ════════════════════════════════════════════════════════════════
-function seedDebugSession() {
-  if (State._debugSeeded) {
-    console.info('[DEBUG-Seed] bereits geseedet — übersprungen. Reset mit LP_resetDebug().');
-    return;
-  }
-  if (!State.session) { console.warn('[DEBUG-Seed] keine Session'); return; }
-  if (!Array.isArray(State.slides) || !State.slides.length) {
-    console.warn('[DEBUG-Seed] keine Slides geladen');
-    return;
-  }
-  State._debugSeeded = true;
+const LP_DebugSim = {
+  active: false,
+  joinIdx: 0,
+  joinTimer: null,
+  responsesBySlide: new Map(), // slideId -> [{ response, delayMs }]
+  pendingTimers: [],            // alle setTimeout IDs zum Aufräumen
+  triggeredSlides: new Set(),   // slideIds wo Drip schon gestartet wurde
+  speed: 1,                     // 1 = normal, 2 = 2x schnell, 0.5 = halbe
 
-  const PARTICIPANTS_DEF = window.LP_DEBUG_PARTICIPANTS || [];
-  const PHASE_USE_CASES = window.LP_DEBUG_PHASE_USE_CASES || {};
-  const sessionId = State.session.id;
-  const now = Date.now();
+  start() {
+    this.stop();
+    this.active = true;
+    this.joinIdx = 0;
+    this.triggeredSlides = new Set();
+    this.responsesBySlide = new Map();
+    this.pendingTimers = [];
+    this.prepareResponses();
+    this.dripNextParticipant();
+    // Für aktuellen Slide schon vorbereiten
+    setTimeout(() => this.maybeDripCurrentSlide(), 1500 / this.speed);
+    try { toast(`🛠 DEBUG-Simulator gestartet — 6 Teilnehmer joinen jetzt zeitversetzt`, 'info'); } catch {}
+  },
 
-  // 1) Fake-Teilnehmer
-  const fakeParticipants = PARTICIPANTS_DEF.map((p, i) => ({
-    id: `debug-p-${i}-${sessionId}`,
-    session_id: sessionId,
-    device_id: `debug-d-${i}`,
-    display_name: p.name,
-    avatar_emoji: p.emoji,
-    avatar_color: p.color,
-    joined_at: new Date(now - (PARTICIPANTS_DEF.length - i) * 30000).toISOString(),
-    last_active_at: new Date(now).toISOString(),
-  }));
+  stop() {
+    this.active = false;
+    if (this.joinTimer) { clearTimeout(this.joinTimer); this.joinTimer = null; }
+    this.pendingTimers.forEach((t) => clearTimeout(t));
+    this.pendingTimers = [];
+  },
 
-  // Avoid duplicate IDs across re-loads
-  const existingIds = new Set((State.participants || []).map((p) => p.id));
-  fakeParticipants.forEach((p) => {
-    if (!existingIds.has(p.id)) State.participants.push(p);
-  });
+  schedule(fn, ms) {
+    const t = setTimeout(() => {
+      this.pendingTimers = this.pendingTimers.filter((x) => x !== t);
+      if (this.active) fn();
+    }, Math.max(0, ms / this.speed));
+    this.pendingTimers.push(t);
+    return t;
+  },
 
-  // 2) Erste Schleife: brainstorm-Antworten generieren → wir brauchen
-  //    die generierten Use-Cases später als Optionen für Voting + Matrix
-  const allCollectedUseCases = []; // [{ slideId, respId, text, phaseName, trackLabel }]
+  // ─── Teilnehmer drip-by-drip joinen lassen ──────────────────
+  dripNextParticipant() {
+    if (!this.active) return;
+    const defs = window.LP_DEBUG_PARTICIPANTS || [];
+    if (this.joinIdx >= defs.length) return;
+    const p = defs[this.joinIdx];
+    const sessionId = State.session?.id;
+    const fake = {
+      id: `debug-p-${this.joinIdx}-${sessionId}`,
+      session_id: sessionId,
+      device_id: `debug-d-${this.joinIdx}`,
+      display_name: p.name,
+      avatar_emoji: p.emoji,
+      avatar_color: p.color,
+      joined_at: new Date().toISOString(),
+      last_active_at: new Date().toISOString(),
+    };
+    if (!State.participants.find((x) => x.id === fake.id)) {
+      State.participants.push(fake);
+      try { pushPresentActivity(fake.id, 'ist beigetreten'); } catch {}
+    }
+    try { updatePresentStats(); } catch {}
+    try { renderPresentParticipants(); } catch {}
+    try { renderPresent(); } catch {}
+    this.joinIdx++;
+    if (this.joinIdx < defs.length) {
+      const next = 700 + Math.random() * 1300; // 0.7–2.0s
+      this.joinTimer = setTimeout(() => this.dripNextParticipant(), next / this.speed);
+    }
+  },
 
-  State.slides.forEach((slide) => {
-    if (slide.slide_type !== 'brainstorm') return;
-    const c = slide.content || {};
-    const phaseName = c.sopPhaseName || c.title || '';
-    const useCases = PHASE_USE_CASES[phaseName] || PHASE_USE_CASES[c.title] || [];
-    if (!useCases.length) return;
-    useCases.forEach((text, i) => {
-      const p = fakeParticipants[i % fakeParticipants.length];
-      const respId = `debug-r-${slide.id}-${i}`;
-      const ts = new Date(now - (useCases.length - i) * 8000).toISOString();
-      State.responses.push({
-        id: respId,
-        session_id: sessionId,
-        slide_id: slide.id,
-        participant_id: p.id,
-        response: { text },
-        is_hidden: false,
-        created_at: ts,
-        updated_at: ts,
-      });
-      allCollectedUseCases.push({
-        slideId: slide.id, respId, text,
-        phaseName, trackLabel: c.sopTrackLabel || '',
-      });
-    });
-  });
+  // ─── Antworten vorbereiten (alle Slides) ────────────────────
+  prepareResponses() {
+    if (!Array.isArray(State.slides) || !State.slides.length) return;
+    const PHASE_USE_CASES = window.LP_DEBUG_PHASE_USE_CASES || {};
+    const defs = window.LP_DEBUG_PARTICIPANTS || [];
+    const sessionId = State.session?.id;
+    const now = Date.now();
+    function pseudoRandom(seed) { let x = Math.sin(seed) * 10000; return x - Math.floor(x); }
 
-  // Helper für gleichmäßige Pseudo-Random Verteilung
-  function pseudoRandom(seed) { let x = Math.sin(seed) * 10000; return x - Math.floor(x); }
-
-  // 3) Antworten für andere Slide-Typen generieren
-  State.slides.forEach((slide) => {
-    const type = slide.slide_type;
-    const c = slide.content || {};
-    const st = slide.settings || {};
-
-    // Skip non-interactive
-    if (!isInteractive(type)) return;
-    if (type === 'brainstorm') return; // bereits gemacht
-
-    fakeParticipants.forEach((p, idx) => {
-      const respId = `debug-r-${slide.id}-${p.id}`;
-      // Skip already-seeded items (idempotent)
-      if (State.responses.find((r) => r.id === respId)) return;
-      const ts = new Date(now - (fakeParticipants.length - idx) * 12000).toISOString();
-      let response = null;
-
-      if (type === 'mc_single' || type === 'yesno' || type === 'quiz') {
-        const opts = type === 'yesno'
-          ? [{ id: 'yes' }, { id: 'no' }]
-          : (c.options || []);
-        if (!opts.length) return;
-        const choice = opts[Math.floor(pseudoRandom(idx + slide.id.charCodeAt(0)) * opts.length)];
-        if (type === 'quiz') {
-          const correct = opts.find((o) => o.correct);
-          response = { value: choice.id, correct: correct && choice.id === correct.id };
-        } else {
-          response = { value: choice.id };
-        }
-      } else if (type === 'mc_multi') {
-        if (st.sopCardVote || st.sopTrackVote || st.brainstormVote || st.sopAllTracksVote) {
-          // Vote-Slides: ziehe aus allCollectedUseCases
-          const max = st.sopVoteMax || c.maxSelections || 2;
-          const pool = allCollectedUseCases.length ? [...allCollectedUseCases] : [];
-          const picked = pool.sort(() => pseudoRandom(idx + slide.id.length) - 0.5).slice(0, max);
-          if (picked.length) response = { values: picked.map((it) => `resp-${it.respId}`) };
-        } else {
-          const opts = c.options || [];
-          const max = c.maxSelections || 3;
-          const shuffled = [...opts].sort(() => pseudoRandom(idx) - 0.5).slice(0, Math.min(max, Math.max(1, opts.length)));
-          if (shuffled.length) response = { values: shuffled.map((o) => o.id) };
-        }
-      } else if (type === 'wordcloud') {
-        const words = ['effizienz','automation','geschwindigkeit','qualität','präzision','transparenz','skalierbar','innovation'];
-        response = { text: words[idx % words.length] };
-      } else if (type === 'open' || type === 'qa') {
-        const samples = [
-          'Großartig — direkt umsetzbar.',
-          'Bin gespannt auf die Pilot-Phase.',
-          'Sehr wertvoll für unsere Workflows.',
-          'Brauchen wir, um schneller zu werden.',
-          'Klare Action Items für die nächsten 14 Tage.',
-        ];
-        response = { text: samples[idx % samples.length] };
-      } else if (type === 'scale') {
-        const min = c.min ?? 0, max = c.max ?? 10;
-        const v = Math.round(min + pseudoRandom(idx + slide.id.length) * (max - min));
-        response = { value: v };
-      } else if (type === 'number_guess') {
-        response = { value: Math.round(100 + pseudoRandom(idx) * 500) };
-      } else if (type === 'reaction') {
-        const reactions = ['👍','❤️','🎉','😂','😮','👏'];
-        response = { emoji: reactions[idx % reactions.length] };
-      } else if (type === 'ranking') {
-        const opts = c.options || [];
-        if (opts.length) response = { order: [...opts].sort(() => pseudoRandom(idx) - 0.5).map((o) => o.id) };
-      } else if (type === 'percent_split') {
-        if (st.sopAllTracksVote || st.sopTrackVote) {
-          // 100 Punkte über 5 aus allen gesammelten Use Cases
-          const pool = allCollectedUseCases.length ? [...allCollectedUseCases].sort(() => pseudoRandom(idx) - 0.5).slice(0, 5) : [];
-          if (pool.length) {
-            const points = {};
-            let remaining = 100;
-            pool.forEach((it, i) => {
-              const pts = i === pool.length - 1 ? remaining : Math.max(5, Math.floor(remaining * (0.2 + pseudoRandom(idx + i) * 0.4)));
-              points[`resp-${it.respId}`] = Math.min(pts, remaining);
-              remaining -= points[`resp-${it.respId}`];
-            });
-            response = { points };
-          }
-        } else {
-          const opts = c.options || [];
-          if (opts.length) {
-            const points = {};
-            let remaining = 100;
-            opts.forEach((o, i) => {
-              const pts = i === opts.length - 1 ? remaining : Math.floor(remaining / (opts.length - i));
-              points[o.id] = pts; remaining -= pts;
-            });
-            response = { points };
-          }
-        }
-      } else if (type === 'priority_matrix') {
-        // Jeder Teilnehmer ordnet die Use Cases in zufällige Quadranten
-        const quadrants = ['qw', 'sb', 'ts', 'dr'];
-        const weights = [0.4, 0.3, 0.15, 0.15]; // Quick Win + Strategic Bet bevorzugt
-        const matrix = {}, meta = {};
-        allCollectedUseCases.forEach((it, i) => {
-          const r = pseudoRandom(idx * 31 + i);
-          let acc = 0, picked = 'qw';
-          for (let q = 0; q < quadrants.length; q++) {
-            acc += weights[q];
-            if (r <= acc) { picked = quadrants[q]; break; }
-          }
-          matrix[it.respId] = picked;
-          meta[it.respId] = { text: it.text, phase: it.phaseName, trackLabel: it.trackLabel };
-        });
-        response = { matrix, meta };
-      } else if (type === 'pin_image') {
-        response = { pin: { x: Math.round(pseudoRandom(idx) * 100), y: Math.round(pseudoRandom(idx + 1) * 100) } };
-      }
-
-      if (response) {
-        State.responses.push({
+    // First pass: brainstorm slides
+    const allCollected = [];
+    State.slides.forEach((slide) => {
+      if (slide.slide_type !== 'brainstorm') return;
+      const c = slide.content || {};
+      const phaseName = c.sopPhaseName || c.title || '';
+      const useCases = PHASE_USE_CASES[phaseName] || PHASE_USE_CASES[c.title] || [];
+      if (!useCases.length) return;
+      const queue = [];
+      useCases.forEach((text, i) => {
+        const pIdx = i % defs.length;
+        const fakeP = `debug-p-${pIdx}-${sessionId}`;
+        const respId = `debug-r-${slide.id}-${i}`;
+        const response = {
           id: respId,
           session_id: sessionId,
           slide_id: slide.id,
-          participant_id: p.id,
-          response,
+          participant_id: fakeP,
+          response: { text },
           is_hidden: false,
-          created_at: ts,
-          updated_at: ts,
+          created_at: new Date(now + i * 100).toISOString(),
+          updated_at: new Date(now + i * 100).toISOString(),
+        };
+        // Drip-Delay: 600ms–2.4s zwischen Antworten
+        const delayMs = 800 + i * (1100 + Math.random() * 800);
+        queue.push({ response, delayMs });
+        allCollected.push({ slideId: slide.id, respId, text, phaseName, trackLabel: c.sopTrackLabel || '' });
+      });
+      this.responsesBySlide.set(slide.id, queue);
+    });
+
+    // Second pass: alle anderen Slide-Typen
+    State.slides.forEach((slide) => {
+      const type = slide.slide_type;
+      if (!isInteractive(type) || type === 'brainstorm') return;
+      const c = slide.content || {};
+      const st = slide.settings || {};
+      const queue = [];
+      defs.forEach((p, idx) => {
+        const fakeP = `debug-p-${idx}-${sessionId}`;
+        const respId = `debug-r-${slide.id}-${fakeP}`;
+        let response = null;
+
+        if (type === 'mc_single' || type === 'yesno' || type === 'quiz') {
+          const opts = type === 'yesno' ? [{ id: 'yes' }, { id: 'no' }] : (c.options || []);
+          if (!opts.length) return;
+          const choice = opts[Math.floor(pseudoRandom(idx + (slide.id.charCodeAt(0) || 0)) * opts.length)];
+          if (type === 'quiz') {
+            const correct = opts.find((o) => o.correct);
+            response = { value: choice.id, correct: correct && choice.id === correct.id };
+          } else {
+            response = { value: choice.id };
+          }
+        } else if (type === 'mc_multi') {
+          if (st.sopCardVote || st.sopTrackVote || st.brainstormVote || st.sopAllTracksVote) {
+            const max = st.sopVoteMax || c.maxSelections || 2;
+            if (allCollected.length) {
+              const picked = [...allCollected].sort(() => pseudoRandom(idx + slide.id.length) - 0.5).slice(0, max);
+              response = { values: picked.map((it) => `resp-${it.respId}`) };
+            }
+          } else {
+            const opts = c.options || [];
+            const max = c.maxSelections || 3;
+            const shuffled = [...opts].sort(() => pseudoRandom(idx) - 0.5).slice(0, Math.min(max, Math.max(1, opts.length)));
+            if (shuffled.length) response = { values: shuffled.map((o) => o.id) };
+          }
+        } else if (type === 'wordcloud') {
+          const words = ['effizienz', 'automation', 'geschwindigkeit', 'qualität', 'präzision', 'transparenz', 'skalierbar', 'innovation'];
+          response = { text: words[idx % words.length] };
+        } else if (type === 'open' || type === 'qa') {
+          const samples = ['Großartig — direkt umsetzbar.', 'Bin gespannt auf die Pilot-Phase.', 'Sehr wertvoll für unsere Workflows.', 'Brauchen wir, um schneller zu werden.', 'Klare Action Items für die nächsten 14 Tage.', 'Spannend! Wer übernimmt das?'];
+          response = { text: samples[idx % samples.length] };
+        } else if (type === 'scale') {
+          const min = c.min ?? 0, max = c.max ?? 10;
+          response = { value: Math.round(min + pseudoRandom(idx + slide.id.length) * (max - min)) };
+        } else if (type === 'number_guess') {
+          response = { value: Math.round(100 + pseudoRandom(idx) * 500) };
+        } else if (type === 'reaction') {
+          const reactions = ['👍', '❤️', '🎉', '😂', '😮', '👏'];
+          response = { emoji: reactions[idx % reactions.length] };
+        } else if (type === 'ranking') {
+          const opts = c.options || [];
+          if (opts.length) response = { order: [...opts].sort(() => pseudoRandom(idx) - 0.5).map((o) => o.id) };
+        } else if (type === 'percent_split') {
+          if (st.sopAllTracksVote || st.sopTrackVote) {
+            if (allCollected.length) {
+              const pool = [...allCollected].sort(() => pseudoRandom(idx) - 0.5).slice(0, 5);
+              const points = {}; let remaining = 100;
+              pool.forEach((it, i) => {
+                const pts = i === pool.length - 1 ? remaining : Math.max(5, Math.floor(remaining * (0.2 + pseudoRandom(idx + i) * 0.4)));
+                points[`resp-${it.respId}`] = Math.min(pts, remaining);
+                remaining -= points[`resp-${it.respId}`];
+              });
+              response = { points };
+            }
+          } else {
+            const opts = c.options || [];
+            if (opts.length) {
+              const points = {}; let remaining = 100;
+              opts.forEach((o, i) => {
+                const pts = i === opts.length - 1 ? remaining : Math.floor(remaining / (opts.length - i));
+                points[o.id] = pts; remaining -= pts;
+              });
+              response = { points };
+            }
+          }
+        } else if (type === 'priority_matrix') {
+          const quadrants = ['qw', 'sb', 'ts', 'dr'];
+          const weights = [0.4, 0.3, 0.15, 0.15];
+          const matrix = {}, meta = {};
+          allCollected.forEach((it, i) => {
+            const r = pseudoRandom(idx * 31 + i);
+            let acc = 0, picked = 'qw';
+            for (let q = 0; q < quadrants.length; q++) {
+              acc += weights[q];
+              if (r <= acc) { picked = quadrants[q]; break; }
+            }
+            matrix[it.respId] = picked;
+            meta[it.respId] = { text: it.text, phase: it.phaseName, trackLabel: it.trackLabel };
+          });
+          response = { matrix, meta };
+        } else if (type === 'pin_image') {
+          response = { pin: { x: Math.round(pseudoRandom(idx) * 100), y: Math.round(pseudoRandom(idx + 1) * 100) } };
+        }
+
+        if (response) {
+          const full = {
+            id: respId,
+            session_id: sessionId,
+            slide_id: slide.id,
+            participant_id: fakeP,
+            response,
+            is_hidden: false,
+            created_at: new Date(now + idx * 200).toISOString(),
+            updated_at: new Date(now + idx * 200).toISOString(),
+          };
+          // Drip-Delay: 1.2–3.5s zwischen Antworten (zufällig pro Teilnehmer)
+          const delayMs = 1000 + idx * (1400 + Math.random() * 1500);
+          queue.push({ response: full, delayMs });
+        }
+      });
+      if (queue.length) this.responsesBySlide.set(slide.id, queue);
+    });
+  },
+
+  // ─── Drip-Funktion: läuft, wenn Host zu einem Slide wechselt ──
+  maybeDripCurrentSlide() {
+    if (!this.active) return;
+    const idx = State.session?.current_slide_index || 0;
+    const slide = State.slides[idx];
+    if (!slide || this.triggeredSlides.has(slide.id)) return;
+    const queue = this.responsesBySlide.get(slide.id);
+    if (!queue || !queue.length) return;
+    this.triggeredSlides.add(slide.id);
+    queue.forEach((item) => {
+      this.schedule(() => {
+        // Skip wenn Teilnehmer noch nicht da → später nochmal versuchen
+        const haveP = State.participants.find((p) => p.id === item.response.participant_id);
+        if (!haveP) {
+          this.schedule(() => this.pushResponse(item.response), 1500);
+          return;
+        }
+        this.pushResponse(item.response);
+      }, item.delayMs);
+    });
+  },
+
+  pushResponse(response) {
+    // Dedupe
+    if (State.responses.find((r) => r.id === response.id)) return;
+    State.responses.push(response);
+    try { if (response.participant_id) pushPresentActivity(response.participant_id); } catch {}
+    try { updatePresentStats(); } catch {}
+    try { renderPresent(); } catch {}
+  },
+
+  setSpeed(s) {
+    this.speed = Math.max(0.25, Math.min(10, Number(s) || 1));
+    console.info(`[DebugSim] Speed = ${this.speed}x`);
+  },
+
+  // Sofort-Modus: alles auf einmal (für QA-Sprung)
+  flushAll() {
+    this.responsesBySlide.forEach((queue, slideId) => {
+      this.triggeredSlides.add(slideId);
+      queue.forEach((item) => {
+        if (!State.responses.find((r) => r.id === item.response.id)) {
+          State.responses.push(item.response);
+        }
+      });
+    });
+    const defs = window.LP_DEBUG_PARTICIPANTS || [];
+    const sessionId = State.session?.id;
+    defs.forEach((p, idx) => {
+      const id = `debug-p-${idx}-${sessionId}`;
+      if (!State.participants.find((x) => x.id === id)) {
+        State.participants.push({
+          id, session_id: sessionId, device_id: `debug-d-${idx}`,
+          display_name: p.name, avatar_emoji: p.emoji, avatar_color: p.color,
+          joined_at: new Date().toISOString(),
         });
       }
     });
-  });
+    this.joinIdx = defs.length;
+    if (this.joinTimer) { clearTimeout(this.joinTimer); this.joinTimer = null; }
+    try { renderPresentParticipants(); updatePresentStats(); renderPresent(); } catch {}
+    console.info('[DebugSim] flushAll: alle Antworten + Teilnehmer sofort injiziert');
+  },
+};
+window.LP_DebugSim = LP_DebugSim;
 
-  const totalSeeded = State.responses.filter((r) => String(r.id).startsWith('debug-r-')).length;
-  console.info(`[DEBUG-Seed] ${fakeParticipants.length} Teilnehmer, ${totalSeeded} simulierte Antworten injiziert.`);
-  try { toast(`🛠 DEBUG-Modus aktiv: ${fakeParticipants.length} Fake-Teilnehmer · ${totalSeeded} Antworten simuliert`, 'info'); } catch {}
-  // Re-render present screen so seeded data appears immediately
-  try { if (typeof renderPresent === 'function') renderPresent(); } catch {}
-  try { if (typeof renderPresentParticipants === 'function') renderPresentParticipants(); } catch {}
-  try { if (typeof updatePresentStats === 'function') updatePresentStats(); } catch {}
+// ─── DEBUG-Panel im Präsentations-Modus injizieren ───
+function ensureDebugPanel() {
+  if (document.getElementById('lp-debug-panel')) return;
+  const panel = document.createElement('div');
+  panel.id = 'lp-debug-panel';
+  panel.className = 'lp-debug-panel';
+  panel.innerHTML = `
+    <div class="lp-debug-panel-head"><i class="fa-solid fa-flask-vial"></i> DEBUG-Simulator</div>
+    <div class="lp-debug-row"><span>Status:</span><strong id="lp-dbg-status">aktiv</strong></div>
+    <div class="lp-debug-row"><span>Teilnehmer:</span><strong id="lp-dbg-participants">0</strong></div>
+    <div class="lp-debug-row"><span>Antworten:</span><strong id="lp-dbg-responses">0</strong></div>
+    <div class="lp-debug-row" style="gap:.4rem"><span>Speed:</span>
+      <div class="lp-debug-btn-grp">
+        <button class="lp-debug-btn" data-speed="0.5">0.5x</button>
+        <button class="lp-debug-btn active" data-speed="1">1x</button>
+        <button class="lp-debug-btn" data-speed="2">2x</button>
+        <button class="lp-debug-btn" data-speed="5">5x</button>
+      </div>
+    </div>
+    <div class="lp-debug-btn-grp">
+      <button class="lp-debug-btn warn" id="lp-dbg-flush">⚡ Alles sofort</button>
+      <button class="lp-debug-btn danger" id="lp-dbg-reset">Reset</button>
+    </div>
+    <div class="lp-debug-status" id="lp-dbg-current">Slide: 1</div>
+  `;
+  document.body.appendChild(panel);
+  panel.querySelectorAll('[data-speed]').forEach((b) => {
+    b.onclick = () => {
+      LP_DebugSim.setSpeed(parseFloat(b.dataset.speed));
+      panel.querySelectorAll('[data-speed]').forEach((x) => x.classList.toggle('active', x === b));
+    };
+  });
+  panel.querySelector('#lp-dbg-flush').onclick = () => LP_DebugSim.flushAll();
+  panel.querySelector('#lp-dbg-reset').onclick = () => window.LP_resetDebug?.();
+  setInterval(() => {
+    if (!document.getElementById('lp-debug-panel')) return;
+    const cnt = State.responses.filter((r) => String(r.id).startsWith('debug-r-')).length;
+    const pcnt = State.participants.filter((p) => String(p.id).startsWith('debug-p-')).length;
+    const idx = State.session?.current_slide_index || 0;
+    document.getElementById('lp-dbg-participants').textContent = pcnt;
+    document.getElementById('lp-dbg-responses').textContent = cnt;
+    document.getElementById('lp-dbg-current').textContent = `Slide: ${idx + 1} / ${State.slides?.length || 0}`;
+    document.getElementById('lp-dbg-status').textContent = LP_DebugSim.active ? `aktiv (${LP_DebugSim.speed}x)` : 'pausiert';
+  }, 800);
 }
+
+function removeDebugPanel() {
+  document.getElementById('lp-debug-panel')?.remove();
+}
+
+function seedDebugSession() {
+  if (State._debugSeeded) {
+    console.info('[DEBUG-Sim] bereits initialisiert — übersprungen. Reset mit LP_resetDebug().');
+    return;
+  }
+  if (!State.session) { console.warn('[DEBUG-Sim] keine Session'); return; }
+  if (!Array.isArray(State.slides) || !State.slides.length) {
+    console.warn('[DEBUG-Sim] keine Slides geladen');
+    return;
+  }
+  State._debugSeeded = true;
+  ensureDebugPanel();
+  LP_DebugSim.start();
+
 
 // Manual debug helpers exposed on window for console access
 window.LP_seedDebug = function () { State._debugSeeded = false; seedDebugSession(); };
 window.LP_resetDebug = function () {
+  LP_DebugSim.stop();
   State.responses = (State.responses || []).filter((r) => !String(r.id).startsWith('debug-r-'));
   State.participants = (State.participants || []).filter((p) => !String(p.id).startsWith('debug-p-'));
   State._debugSeeded = false;
+  removeDebugPanel();
   if (typeof renderPresent === 'function') renderPresent();
   if (typeof renderPresentParticipants === 'function') renderPresentParticipants();
-  console.info('[DEBUG-Seed] zurückgesetzt');
+  console.info('[DEBUG-Sim] zurückgesetzt');
 };
 
 function applySessionPatch(patch) {
@@ -3264,6 +3417,9 @@ function renderPresent() {
   const stage = $('#present-stage');
   if (!slide) { stage.innerHTML = '<h1>Keine Folien</h1>'; return; }
   const c = slide.content || {};
+  // DEBUG-Simulator: bei jedem Slide-Wechsel die Antworten für diesen Slide
+  // zeitversetzt drippen (nur einmal pro Slide via triggeredSlides-Set)
+  if (window.LP_DebugSim?.active) window.LP_DebugSim.maybeDripCurrentSlide();
   // #13 Track-Farb-Coding: propagiere SOP-Track-Class auf Stage-Wrapper,
   // damit CSS-Akzente (Header-Border, Badge-Farben) automatisch zur Geltung kommen.
   const trackClass = c.sopTrackClass || c.sopTrackKey || '';

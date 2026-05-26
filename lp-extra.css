@@ -349,6 +349,30 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .present-toolbar #present-focus-toggle{display:none}
 }
 
+/* ═══════ DEBUG-SIMULATOR FLOATING PANEL ═══════════════════ */
+.lp-debug-panel{
+  position:fixed;top:5.5rem;left:1rem;
+  background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;
+  border:1px solid rgba(255,255,255,.1);border-radius:14px;
+  padding:.75rem .85rem;display:flex;flex-direction:column;gap:.5rem;
+  z-index:300;box-shadow:0 12px 30px rgba(0,0,0,.4);min-width:200px;
+  font-size:.78rem;
+}
+.lp-debug-panel-head{display:flex;align-items:center;gap:.4rem;font-weight:700;font-size:.78rem;letter-spacing:.04em}
+.lp-debug-panel-head i{color:#fbbf24}
+.lp-debug-row{display:flex;align-items:center;gap:.35rem;font-size:.72rem;color:rgba(255,255,255,.85)}
+.lp-debug-row strong{color:#fff}
+.lp-debug-btn-grp{display:flex;gap:4px;flex-wrap:wrap}
+.lp-debug-btn{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:4px 10px;font-size:.7rem;cursor:pointer;font-weight:600;transition:all .15s;font-family:inherit}
+.lp-debug-btn:hover{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.3)}
+.lp-debug-btn.active{background:#206efb;border-color:#206efb}
+.lp-debug-btn.warn{background:rgba(245,158,11,.2);border-color:rgba(245,158,11,.4)}
+.lp-debug-btn.danger{background:rgba(220,38,38,.2);border-color:rgba(220,38,38,.4)}
+.lp-debug-status{font-size:.65rem;color:rgba(255,255,255,.55);font-family:'SF Mono',Menlo,monospace}
+@media (max-width:760px){
+  .lp-debug-panel{top:auto;bottom:5rem;left:.5rem;right:.5rem;min-width:0}
+}
+
 /* ═══════ DARK MODE ANPASSUNGEN für neue Komponenten ═══════ */
 @media (prefers-color-scheme:dark){
   .lp-mx-item{background:var(--surface,#1e293b);color:var(--ink)}
