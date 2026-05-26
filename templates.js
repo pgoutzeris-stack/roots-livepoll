@@ -14,84 +14,76 @@ const SOP_TOOL_TRACKS = [
   {
     title: 'Track 1: Pre-Engagement',
     class: 'track-pre',
-    intro: 'Vom Erstkontakt bis zum Vertragsabschluss. 3 Phasen.',
+    intro: 'Vom ersten Kontakt bis zum unterschriebenen Vertrag. 3 Phasen.',
     phases: [
       {
         name: 'Anbahnung',
-        intro: 'Erstkontakt mit dem Kunden — vorstellen, Ziele klären, Markt einschätzen.',
+        intro: 'Potenziellen Kunden erkennen, Bedarf erspüren, ROOTS vorstellen.',
         cards: [
           {
-            name: 'ROOTS Vorstellung',
-            intro: 'Erster Kontakt mit dem Kunden – ROOTS Positionierung, Team und Arbeitsweise vorstellen.',
-            prompt: 'Welche KI macht den Erstkontakt persönlicher und überzeugender?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: KI-personalisiertes Outreach, Auto-Recherche zum Kunden vorab, Pitch-Video-Generator.',
-            voteMax: 1,
-          },
-          {
-            name: 'Zielstellung klären',
-            intro: 'Gemeinsame Ziele, Erfolgskriterien und Erwartungen des Kunden definieren.',
-            prompt: 'Welche KI hilft, Ziele schneller und schärfer zu klären?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: SMART-Goal-Coach, KI-Moderator für Discovery-Calls, Auto-Transcript & Highlight-Extraktion.',
+            name: 'Bedarfserkennung / Problem Sensing',
+            intro: 'Signale für einen möglichen Beratungsbedarf frühzeitig erkennen und qualifizieren.',
+            prompt: 'Welche KI hilft beim Erkennen und Qualifizieren von Beratungsbedarf?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: LinkedIn-Signal-Monitoring, News-Tracker zu Zielkunden, Intent-Scoring-Bot.',
             voteMax: 2,
           },
           {
-            name: 'Initiale Analyse',
-            intro: 'Erste Einschätzung von Markt, Wettbewerb und Ist-Situation des Kunden.',
-            prompt: 'Welche KI beschleunigt Markt- und Wettbewerbs-Analysen?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Wettbewerbs-Scraper, Industry-Research-Bot, SWOT-Generator.',
+            name: 'Erstgespräch / ROOTS Vorstellung',
+            intro: 'ROOTS Positionierung, Arbeitsweise und Team im Erstkontakt überzeugend präsentieren.',
+            prompt: 'Welche KI macht den Erstkontakt persönlicher und schärfer?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: KI-personalisiertes Outreach, Auto-Recherche zum Kunden vorab, Pitch-Deck-Generator.',
             voteMax: 2,
           },
         ],
       },
       {
         name: 'Exploration',
-        intro: 'Tiefer eintauchen — Bedarf verstehen, Online-Auftritt prüfen, erste Specs erfassen.',
+        intro: 'Kernproblem durchdringen, Ziele schärfen, erste Hypothesen ableiten.',
         cards: [
           {
-            name: 'Bedarfsanalyse / Problem Framing',
-            intro: 'Kernprobleme und Herausforderungen des Kunden strukturiert erfassen.',
-            prompt: 'Welche KI macht Problem-Framing schärfer und schneller?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Transkript von Discovery-Calls + Themen-Cluster, "5-Why"-Bot, Symptom-Ursache-Mapping.',
-            voteMax: 2,
-            requiresIntro: true,
-          },
-          {
-            name: 'Onboarding-Skizze & Aufwand',
-            intro: 'Groben Projekt- und Onboarding-Rahmen mit Aufwandsindikation skizzieren.',
-            prompt: 'Welche KI hilft beim schnellen Aufwand-Scoping und Onboarding-Plan?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Templates aus Vergangenheits-Projekten, Aufwand-Predictor, Auto-Plan-Generator.',
+            name: 'Problem Verstehen',
+            intro: 'Kundenproblem tief durchdringen — Symptome von Ursachen trennen.',
+            prompt: 'Welche KI macht Problem-Framing schneller und präziser?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: "5-Why"-Bot, Symptom-Ursache-Mapping, Auto-Transkript von Discovery-Calls.',
             voteMax: 2,
           },
           {
-            name: 'Website & Online-Analyse',
-            intro: 'Digitale Touchpoints, Website und Online-Auftritt des Kunden bewerten.',
-            prompt: 'Welche KI liefert automatisierte Website- und Online-Audits?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: SEO-Auditor, UX-Analyse-AI, Heatmap-Predictor, Brand-Consistency-Checker.',
-            voteMax: 3,
+            name: 'Zielstellung klären',
+            intro: 'Gemeinsame Ziele, Erfolgskriterien und Erwartungen aller Stakeholder definieren.',
+            prompt: 'Welche KI hilft, Ziele schneller und klarer zu formulieren?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: SMART-Goal-Coach, KI-Moderator für Discovery-Calls, Highlight-Extraktion aus Transcripts.',
+            voteMax: 2,
           },
           {
-            name: 'Initiale Spezifikationen',
-            intro: 'Erste Anforderungen und Spezifikationen für das Projekt dokumentieren.',
-            prompt: 'Welche KI hilft beim sauberen Erfassen erster Specs?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: User-Story-Generator, Spec-Template-Filler, Akzeptanz-Kriterien-Bot.',
+            name: 'Initiale Analyse',
+            intro: 'Erste faktenbasierte Einschätzung von Markt, Wettbewerb und Ist-Situation.',
+            prompt: 'Welche KI beschleunigt Markt- und Wettbewerbs-Analysen?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Perplexity Deep Research, Industry-Research-Bot, SWOT-Generator.',
+            voteMax: 2,
+          },
+          {
+            name: 'Initiale Hypothese(n)',
+            intro: 'Erste fundierte Hypothesen zur Problemlösung entwickeln und dokumentieren.',
+            prompt: 'Welche KI hilft beim Entwickeln und Schärfen erster Hypothesen?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Hypothesen-Generierung aus Interviews, Issue-Tree-Bot, LLM als Sparring-Partner.',
             voteMax: 2,
           },
         ],
       },
       {
         name: 'Pitch',
-        intro: 'Angebot bauen, präsentieren, Vertrag schließen.',
+        intro: 'Angebot entwickeln, überzeugend pitchen, Vertrag abschließen.',
         cards: [
           {
-            name: 'Angebotsgestaltung & Präsentation',
-            intro: 'Angebot erstellen und überzeugend beim Kunden präsentieren.',
-            prompt: 'Welche KI macht Angebote schneller und schöner?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Proposal-Generator aus Brief, Pitch-Deck-AI, Pricing-Optimizer.',
+            name: 'Projektablauf skizzieren',
+            intro: 'Groben Projektplan, Vorgehensweise und Meilensteine für den Kunden skizzieren.',
+            prompt: 'Welche KI hilft beim schnellen Skizzieren eines überzeugenden Projektablaufs?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Workplan aus Scope-Doc, Timeline-Generator, Meilenstein-Template-AI.',
             voteMax: 2,
           },
           {
-            name: 'Pitch Benchmarking',
-            intro: 'Pitch gegen Wettbewerb und Best Practices spiegeln und schärfen.',
-            prompt: 'Welche KI hilft beim Benchmarken gegen Best-Practice-Pitches?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Competitive-Pitch-Library, AI-Pitch-Critique, A/B-Test-Generator.',
-            voteMax: 1,
-            requiresIntro: true,
+            name: 'KVA aufsetzen',
+            intro: 'Kostenschätzung, Vertragsbasis und kommerzielles Angebot strukturieren.',
+            prompt: 'Welche KI unterstützt beim sauberen Aufsetzen eines KVA?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Aufwand-Predictor aus Scope, Pricing-Optimizer, Contract-Template-Filler.',
+            voteMax: 2,
           },
           {
-            name: 'Onboarding Admin & Vertrag',
-            intro: 'Vertrag, Admin und organisatorisches Onboarding nach Pitch-Abschluss.',
-            prompt: 'Welche KI automatisiert Vertrag und administratives Onboarding?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Contract-Generator, Auto-Risk-Flag, Onboarding-Checkliste-AI.',
+            name: 'Kundenpitch oder E-Mail Kommunikation',
+            intro: 'Angebot persönlich pitchen oder überzeugend schriftlich kommunizieren.',
+            prompt: 'Welche KI macht Pitch und Kommunikation schärfer und persönlicher?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Pitch-Deck-Optimizer, Personalisierungs-AI für E-Mails, Rehearsal-Coach-Bot.',
             voteMax: 2,
           },
         ],
@@ -101,85 +93,185 @@ const SOP_TOOL_TRACKS = [
   {
     title: 'Track 2: Execution',
     class: 'track-ops',
-    intro: 'Projekt-Operations vom Start bis zur Live-Schaltung. 4 Phasen — größter SOP-Bereich.',
+    intro: 'Vom Projekt-Kickoff bis zur Auslieferung und Implementierung. 5 Phasen.',
     phases: [
       {
         name: 'Ramp-up',
-        intro: 'Projekt aufgleisen — Team, Struktur, Briefing, Content-Plan.',
+        intro: 'Projekt aufgleisen — Team, Struktur, Zugänge, Kickoff.',
         cards: [
           {
-            name: 'Projektstruktur aufbauen',
-            intro: 'Team, Rollen, Timelines und Projekt-Setup etablieren.',
-            prompt: 'Welche KI hilft beim sauberen Projekt-Setup?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Kanban-Board, Rollen-Allokator, Timeline-Generator aus Scope-Doc.',
+            name: 'Vertrag',
+            intro: 'Vertragsabschluss rechtssicher finalisieren und intern ablegen.',
+            prompt: 'Welche KI automatisiert oder beschleunigt den Vertragsabschluss?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Contract-Generator, Auto-Risk-Flag, E-Signature-Workflow.',
+            voteMax: 1,
+          },
+          {
+            name: 'Team-Staffing, Rollenverteilung',
+            intro: 'Passendes Team zusammenstellen und Rollen klar zuweisen.',
+            prompt: 'Welche KI hilft beim smarten Team-Staffing und Rollen-Matching?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Skill-Matching-Bot, Rollen-Allokator aus Scope, Kapazitätsplanung-AI.',
             voteMax: 2,
           },
           {
-            name: 'Briefing & Content-Plan',
-            intro: 'Briefings erstellen und Content-Planung für das Projekt festlegen.',
-            prompt: 'Welche KI hilft beim Briefing-Schreiben und Content-Planning?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Brief-Template-Filler, Editorial-Calendar-AI, Theme-Suggestion-Bot.',
+            name: 'Detaillierter Workplan & Projektplan',
+            intro: 'Detaillierten Arbeitsplan mit Tasks, Verantwortlichkeiten und Timeline erstellen.',
+            prompt: 'Welche KI generiert oder optimiert Workpläne und Projektpläne?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Kanban aus Scope, Timeline-Generator, Projektplan-AI.',
+            voteMax: 2,
+          },
+          {
+            name: 'Zugänge',
+            intro: 'Benötigte System-, Tool- und Datenzugänge beschaffen und verwalten.',
+            prompt: 'Welche KI unterstützt beim Managen von Zugängen und Berechtigungen?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Access-Request-Tracker, Onboarding-Checkliste-AI, Permissioning-Bot.',
+            voteMax: 1,
+          },
+          {
+            name: 'Daten',
+            intro: 'Relevante Datenquellen identifizieren, beschaffen und für Analysen vorbereiten.',
+            prompt: 'Welche KI hilft beim Identifizieren, Beschaffen und Aufbereiten von Daten?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Data-Catalog-AI, Auto-Data-Cleaning, Schema-Matching-Bot.',
+            voteMax: 2,
+          },
+          {
+            name: 'Kick-off / Client-Onboarding & Erwartungsmanagement',
+            intro: 'Projekt formal starten, Stakeholder ausrichten und Erwartungen managen.',
+            prompt: 'Welche KI macht Kickoff und Erwartungsmanagement effektiver?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Kickoff-Agenda-Generator, Stakeholder-Map-AI, Expectation-Tracker.',
             voteMax: 2,
           },
         ],
       },
       {
-        name: 'Analyse & Synthese',
-        intro: 'Daten verstehen, Muster erkennen, Strategie schärfen.',
+        name: 'Analyse',
+        intro: 'Daten erheben, IST-Situation analysieren, gegen Benchmarks messen.',
         cards: [
           {
-            name: 'Performance-Analyse',
-            intro: 'Kampagnen- und Marketing-Performance auswerten.',
-            prompt: 'Welche KI liefert schnellere oder tiefere Performance-Insights?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Dashboards aus GA4/Meta, Anomalie-Detection in Conversion-Funnel, Predictive-ROI-Modelle.',
+            name: 'Datenanforderung & -erhebung',
+            intro: 'Benötigte Daten beim Kunden anfragen und strukturiert erheben.',
+            prompt: 'Welche KI unterstützt bei Datenanforderung und -erhebung?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Data-Request-Template-AI, Survey-Generator, Auto-Follow-up für Datenlieferungen.',
             voteMax: 2,
           },
           {
-            name: 'Zielgruppen-Insights',
-            intro: 'Zielgruppenverhalten und Insights ableiten.',
-            prompt: 'Welche KI hilft uns, Zielgruppen schneller und präziser zu verstehen?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Sentiment-Analyse aus Reviews, Persona-Generator aus Survey-Daten, Social-Listening mit Cluster-AI.',
+            name: 'IST-Analyse',
+            intro: 'Aktuellen Zustand faktenbasiert analysieren, strukturieren und dokumentieren.',
+            prompt: 'Welche KI beschleunigt oder vertieft die IST-Analyse?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Dashboards aus Rohdaten, Process-Mining-AI, Anomalie-Detection.',
             voteMax: 2,
           },
           {
-            name: 'Erkenntnisse bündeln & Strategie-Update',
-            intro: 'Analyseergebnisse zusammenführen, Muster identifizieren und die Strategie auf Basis daraus anpassen.',
-            prompt: 'Welche KI hilft beim Verdichten von Insights und Schärfen der Strategie?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Synthese aus Discovery-Notes, Strategie-Canvas-Generator, Hypothesen-Tests mit LLMs.',
+            name: 'Benchmarking',
+            intro: 'Performance des Kunden gegen Markt, Wettbewerb und Best Practices messen.',
+            prompt: 'Welche KI liefert schnellere und tiefere Benchmark-Vergleiche?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Industry-Benchmark-Scraper, Competitive-Intelligence-AI, KPI-Vergleichs-Bot.',
             voteMax: 2,
-            requiresIntro: true,
+          },
+        ],
+      },
+      {
+        name: 'Synthese',
+        intro: 'Erkenntnisse verdichten, Storyline entwickeln, Empfehlungen schärfen.',
+        cards: [
+          {
+            name: '„So-What"-Extraktion aus Analysen',
+            intro: 'Aus Rohdaten und Analysen handlungsrelevante Erkenntnisse ableiten.',
+            prompt: 'Welche KI hilft beim schnellen Destillieren von So-Whats?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Insight-Extraktion aus Analysen, LLM-Sparring für So-What-Test, Pattern-Erkennung.',
+            voteMax: 3,
+          },
+          {
+            name: 'Storyline (Pyramid Principle)',
+            intro: 'Argumentation nach dem Pyramid Principle logisch und überzeugend strukturieren.',
+            prompt: 'Welche KI unterstützt beim Aufbau einer starken Storyline?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Storyline-Coach-AI, Pyramid-Principle-Checker, Auto-Narrative-Generator.',
+            voteMax: 2,
+          },
+          {
+            name: 'Priorisierung',
+            intro: 'Empfehlungen nach Impact, Aufwand und Realisierbarkeit priorisieren.',
+            prompt: 'Welche KI hilft bei der strukturierten Priorisierung von Handlungsoptionen?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Impact-Effort-Matrix-AI, Decision-Support-Bot, Multi-Criteria-Priorisierung.',
+            voteMax: 2,
+          },
+          {
+            name: 'Business-Case',
+            intro: 'Wirtschaftlichkeit der Empfehlung quantifizieren und plausibilisieren.',
+            prompt: 'Welche KI beschleunigt die Business-Case-Entwicklung?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Business-Case-Calculator, ROI-Modell-Generator, Sensitivitätsanalyse-AI.',
+            voteMax: 2,
+          },
+          {
+            name: 'Roadmap & Next Steps',
+            intro: 'Umsetzungs-Roadmap und konkrete nächste Schritte definieren.',
+            prompt: 'Welche KI hilft bei der Entwicklung einer belastbaren Roadmap?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Roadmap aus Empfehlungen, Dependency-Mapper, Quick-Win-Identifier.',
+            voteMax: 2,
+          },
+          {
+            name: 'Executive Summary',
+            intro: 'Kernbotschaft und wichtigste Erkenntnisse für Entscheider prägnant zusammenfassen.',
+            prompt: 'Welche KI schreibt oder schärft Executive Summaries?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Exec-Summary-Generator, Zusammenfassungs-AI, One-Pager-Bot.',
+            voteMax: 2,
           },
         ],
       },
       {
         name: 'Delivery',
-        intro: 'Content produzieren, ausspielen, Community pflegen.',
+        intro: 'Ergebnisse aufbereiten, präsentieren und formal übergeben.',
         cards: [
           {
-            name: 'Content-Produktion',
-            intro: 'Inhalte erstellen – Texte, Visuals, Formate gemäß Plan.',
-            prompt: 'Welche KI verzehnfacht unsere Content-Produktion?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: ChatGPT für Copy-Varianten, Midjourney/DALL-E für Visuals, ElevenLabs für Voiceover, Runway für Video.',
-            voteMax: 3,
+            name: 'Charting',
+            intro: 'Daten und Erkenntnisse in klare, überzeugende Charts und Visualisierungen übersetzen.',
+            prompt: 'Welche KI beschleunigt Charting und Datenvisualisierung?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Charting aus Excel, Chart-Empfehlungs-AI, Dataviz-Generator.',
+            voteMax: 2,
           },
           {
-            name: 'Ausspielung & Community Management',
-            intro: 'Content veröffentlichen und Community aktiv betreuen.',
-            prompt: 'Welche KI optimiert Posting und Community-Reaktion?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Best-Time-To-Post-Predictor, Auto-Reply-Drafts, Sentiment-Watchdog.',
+            name: '(Steering-Committee) Präsentation(en)',
+            intro: 'Ergebnisse vor Kunden, Management oder Steering Committee überzeugend präsentieren.',
+            prompt: 'Welche KI unterstützt bei der Präsentation vor Entscheidern?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Präsentations-Coach-AI, Slide-Optimizer, Rehearsal-Bot.',
             voteMax: 2,
+          },
+          {
+            name: 'ggf. Q&A im JFX',
+            intro: 'Fragen und kritische Einwände im JFX-Format souverän und präzise beantworten.',
+            prompt: 'Welche KI hilft, auf schwierige Fragen besser vorbereitet zu sein?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Fragen-Anticipation-Bot, Devil-Advocate-AI, Auto-FAQ aus Präsentationsinhalt.',
+            voteMax: 1,
+          },
+          {
+            name: 'Elevator Test für kommunikative Stärke der Empfehlung',
+            intro: 'Empfehlung in 30 Sekunden klar, prägnant und überzeugend vertreten können.',
+            prompt: 'Welche KI hilft beim Schärfen des Elevator Pitches einer Empfehlung?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Pitch-Feedback-AI, Klarheits-Check-Bot, Elevator-Test-Simulator.',
+            voteMax: 1,
+          },
+          {
+            name: 'Auslieferung / Sign-off',
+            intro: 'Finale Deliverables übergeben und formalen Abschluss mit dem Kunden sichern.',
+            prompt: 'Welche KI unterstützt bei der strukturierten Übergabe und dem Sign-off?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Deliverable-Checklist-AI, Sign-off-Workflow-Bot, Archive-Generator.',
+            voteMax: 1,
           },
         ],
       },
       {
         name: 'Implementierung',
-        intro: 'Kampagnen launchen, Tools integrieren, Workflows automatisieren.',
+        intro: 'Empfehlungen umsetzen — Fähigkeiten aufbauen, Change begleiten, Ergebnisse sichern.',
         cards: [
           {
-            name: 'Kampagnen-Setup',
-            intro: 'Kampagnen in Plattformen konfigurieren und launchen.',
-            prompt: 'Welche KI automatisiert Kampagnen-Setup in Ads-Plattformen?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Creative-Variants, Audience-Generator, Bid-Optimizer.',
+            name: 'Capability Building & Training',
+            intro: 'Kundenseitige Kompetenzen und Fähigkeiten für die Umsetzung systematisch aufbauen.',
+            prompt: 'Welche KI unterstützt Capability Building und Training?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Personalisierte Lernpfad-AI, Training-Content-Generator, Kompetenz-Gap-Analyse-Bot.',
             voteMax: 2,
           },
           {
-            name: 'Tool-Integration & Automatisierung',
-            intro: 'Tools verbinden, Workflows automatisieren und skalieren.',
-            prompt: 'Welche KI hilft bei Tool-Integration und Workflow-Automatisierung?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Zapier + GPT für Custom-Workflows, n8n-Templates, Make.com-Szenarien mit AI-Steps.',
-            voteMax: 4,
-            requiresIntro: true,
+            name: 'Change-Management',
+            intro: 'Veränderungsprozess strukturiert begleiten und Widerstände proaktiv managen.',
+            prompt: 'Welche KI macht Change-Management effektiver?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Stakeholder-Sentiment-Monitor, Change-Story-Generator, Widerstandsanalyse-AI.',
+            voteMax: 2,
+          },
+          {
+            name: 'Governance',
+            intro: 'Entscheidungsstrukturen und Steuerungsmechanismen für die Umsetzung etablieren.',
+            prompt: 'Welche KI hilft beim Aufsetzen effizienter Governance-Strukturen?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: RACI-Generator, Meeting-Cadence-Planer, Decision-Log-AI.',
+            voteMax: 1,
+          },
+          {
+            name: 'Pilot-Design & Durchführung',
+            intro: 'Pilotprojekt konzipieren, kontrolliert durchführen und Ergebnisse bewerten.',
+            prompt: 'Welche KI unterstützt beim Design und der Auswertung von Pilots?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: A/B-Test-Design-AI, Pilot-Tracking-Dashboard, Ergebnis-Auswertungs-Bot.',
+            voteMax: 2,
+          },
+          {
+            name: 'Monitoring',
+            intro: 'Fortschritt und Wirkung der Implementierung systematisch messen und steuern.',
+            prompt: 'Welche KI automatisiert das Implementierungs-Monitoring?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: KPI-Tracker-AI, Anomalie-Alert-Bot, Auto-Fortschrittsbericht.',
+            voteMax: 2,
           },
         ],
       },
@@ -188,52 +280,64 @@ const SOP_TOOL_TRACKS = [
   {
     title: 'Track 3: Post-Engagement',
     class: 'track-post',
-    intro: 'Projektabschluss und langfristige Kunden-Beziehung. 2 Phasen.',
+    intro: 'Sauberer Projektabschluss und nachhaltige Kundenbeziehung. 2 Phasen.',
     phases: [
       {
         name: 'Closeout',
-        intro: 'Sauberer Abschluss — Reporting, interne Retro, Kundenfeedback.',
+        intro: 'Projekt sauber abschließen — Übergabe, Abrechnung, Feedback, Learnings.',
         cards: [
           {
-            name: 'Finales Reporting & Übergabe',
-            intro: 'Ergebnisse dokumentieren und an den Kunden übergeben.',
-            prompt: 'Welche KI automatisiert Reporting und Übergabe?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-PDF-Report aus Analytics, Highlights-Reel-Generator, Stakeholder-Briefing-Bot.',
-            voteMax: 3,
-          },
-          {
-            name: 'Interne Retro & Learnings',
-            intro: 'Interne Retrospektive und Learnings festhalten.',
-            prompt: 'Welche KI verbessert unsere Retros und Learnings-Speicher?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Retro-Facilitator-Bot, Auto-Learning-Database, Pattern-Detection across Projects.',
+            name: 'Finale Übergabe',
+            intro: 'Alle Ergebnisse, Dokumente und Deliverables strukturiert an den Kunden übergeben.',
+            prompt: 'Welche KI automatisiert oder verbessert die finale Projektübergabe?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Abschlussbericht, Übergabe-Checkliste-AI, Dokumentations-Bot.',
             voteMax: 2,
           },
           {
-            name: 'Kundenfeedback einholen',
-            intro: 'Feedback vom Kunden strukturiert einholen und auswerten.',
-            prompt: 'Welche KI hilft beim sauberen Einholen + Auswerten von Feedback?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: NPS-Bot, Sentiment-aus-Email, Auto-Theme-Extraktion.',
+            name: 'Rechnung',
+            intro: 'Leistungsabrechnung korrekt erstellen und Zahlungseingang sicherstellen.',
+            prompt: 'Welche KI unterstützt beim effizienten Rechnungs- und Zahlungsmanagement?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Invoicing-AI, Auto-Mahnwesen, Zahlungseingangs-Tracker.',
+            voteMax: 1,
+          },
+          {
+            name: 'Team-Feedback & Evaluation (NPS)',
+            intro: 'Projekterfahrungen intern und mit dem Kunden strukturiert bewerten.',
+            prompt: 'Welche KI hilft beim effizienten Einholen und Auswerten von Feedback?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: NPS-Bot, Sentiment-aus-Email, Auto-Theme-Extraktion aus Feedbacks.',
+            voteMax: 2,
+          },
+          {
+            name: 'Internes Review & Learnings',
+            intro: 'Projektlernpunkte intern dokumentieren und für künftige Projekte nutzbar machen.',
+            prompt: 'Welche KI verbessert unsere Retros und den Learnings-Speicher?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Retro-Facilitator-Bot, Auto-Learning-Database, Pattern-Detection across Projects.',
+            voteMax: 2,
+          },
+          {
+            name: 'Interne Margin-Analyse',
+            intro: 'Wirtschaftlichkeit des Projekts analysieren und Erkenntnisse für künftige Kalkulation ableiten.',
+            prompt: 'Welche KI unterstützt die Margin-Analyse und Projektkalkulation?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Profitabilitäts-Report, Stunden-Auswertungs-AI, Budget-vs-Actual-Analyse.',
             voteMax: 2,
           },
         ],
       },
       {
-        name: 'Follow-Up',
-        intro: 'Beziehung pflegen, Upsell finden, Case Study produzieren.',
+        name: 'Follow-up',
+        intro: 'Beziehung nachhaltig pflegen, KPIs tracken, Folgeaufträge entwickeln.',
         cards: [
           {
-            name: 'Beziehungspflege & Check-ins',
-            intro: 'Regelmäßige Check-ins und Beziehungspflege mit dem Kunden.',
-            prompt: 'Welche KI hält die Kunden-Beziehung warm?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Smart-CRM-Reminder, Personalisierte Check-in-Drafts, Birthday-/Anniversary-Bot.',
+            name: 'KPI-Tracking',
+            intro: 'Wirkung und Ergebnisse der umgesetzten Empfehlungen anhand von KPIs messen.',
+            prompt: 'Welche KI automatisiert das KPI-Tracking nach Projektabschluss?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: KPI-Dashboard-AI, Auto-Impact-Report, Anomalie-Alerting für Ziel-KPIs.',
             voteMax: 2,
           },
           {
-            name: 'Upsell & Folgeauftrag',
-            intro: 'Folgeprojekte und Upsell-Potenziale identifizieren und ansprechen.',
-            prompt: 'Welche KI hilft beim Erkennen und Adressieren von Upsell-Signalen?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Customer-Health-Score, Buying-Signal-Detection, Upsell-Pitch-Generator.',
-            voteMax: 3,
+            name: 'Case-Study-Entwicklung',
+            intro: 'Projekterfolge als überzeugende Case Study aufbereiten und vermarkten.',
+            prompt: 'Welche KI beschleunigt die Case-Study-Entwicklung?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Case-Study-Draft-Generator, Quote-Extraktion aus Calls, Reference-Letter-AI.',
+            voteMax: 2,
           },
           {
-            name: 'Case Study & Referenz',
-            intro: 'Erfolgsgeschichte als Case Study und Referenz aufbereiten.',
-            prompt: 'Welche KI macht Case Studies und Referenzen schneller produzierbar?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Case-Study-Draft aus Projektdaten, Quote-Extraktion aus Calls, Reference-Letter-Generator.',
+            name: 'Nachfrage weiterer Beratungsbedarf',
+            intro: 'Folgeprojekte und neuen Beratungsbedarf beim Kunden proaktiv identifizieren.',
+            prompt: 'Welche KI hilft beim Erkennen und Adressieren von Folgebedarf?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Customer-Health-Score, Buying-Signal-Detection, Upsell-Pitch-Generator.',
             voteMax: 2,
           },
         ],
@@ -432,6 +536,39 @@ function buildSopKiWorkshopSlides() {
 
 window.SOP_TOOL_TRACKS = SOP_TOOL_TRACKS;
 
+// ─── LOCALSTORAGE: SOP-Struktur beim ersten Laden speichern ──────────────────
+// Damit kann die Struktur jederzeit in DevTools → Application → localStorage
+// eingesehen, exportiert oder für künftige Anpassungen genutzt werden.
+(function () {
+  const LS_KEY = 'lp_sop_tracks_v2';
+  try {
+    const existing = localStorage.getItem(LS_KEY);
+    if (!existing) {
+      localStorage.setItem(LS_KEY, JSON.stringify(SOP_TOOL_TRACKS, null, 2));
+      console.info(
+        '%c[LP] SOP-Struktur in localStorage gespeichert%c  Key: ' + LS_KEY,
+        'background:#206efb;color:#fff;padding:2px 6px;border-radius:4px;font-weight:700',
+        'color:#64748b'
+      );
+    }
+    // Expose helper: LP.exportSopTracks() → kopiert JSON in Clipboard
+    if (window.LP) {
+      window.LP.exportSopTracks = function () {
+        const json = localStorage.getItem(LS_KEY) || JSON.stringify(SOP_TOOL_TRACKS, null, 2);
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(json).then(() => {
+            if (window.toast) window.toast('SOP-Struktur in Zwischenablage kopiert ✓', 'success');
+          });
+        } else {
+          console.log(json);
+          if (window.toast) window.toast('SOP-Struktur → siehe Konsole', 'info');
+        }
+        return json;
+      };
+    }
+  } catch (_) { /* quota */ }
+})();
+
 window.LP_TEMPLATES = [
   {
     key: 'roots-sop-ki-workshop',
@@ -458,73 +595,79 @@ window.LP_TEMPLATES = [
 // ─── DEBUG MOCK DATA ─────────────────────────────────────────────
 window.LP_DEBUG_PHASE_USE_CASES = {
   'Anbahnung': [
+    'LinkedIn-Signal-Monitoring für Bedarfserkennung',
     'Otter.ai für Discovery-Call-Transcripts',
-    'Perplexity für tiefe Wettbewerbs-Recherche',
-    'ChatGPT für Vorrecherche zum Kunden',
-    'Synthesia für personalisiertes Outreach-Video',
-    'Notion AI für strukturierte Vorbereitungs-Notes',
+    'Perplexity Deep Research zum Zielkunden',
+    'ChatGPT für personalisiertes Outreach',
+    'Synthesia für Pitch-Video vorab',
   ],
   'Exploration': [
     'Auto-Transkript von Discovery-Calls + Themen-Cluster',
-    'Symptom-Ursache-Mapping mit GPT',
-    'Aufwand-Predictor basierend auf historischen Projekten',
-    'SEO-Auditor (Lighthouse + GPT-Erklärungen)',
-    'User-Story-Generator aus Briefing-Notes',
-    'Brand-Consistency-Checker für Website',
+    '5-Why-Bot für Symptom-Ursache-Mapping',
+    'Highlight-Extraktion aus Stakeholder-Interviews',
+    'SMART-Goal-Coach für Zieldefinition',
+    'Perplexity für initiale Markt- und Wettbewerbsanalyse',
+    'Issue-Tree-Generator für erste Hypothesen',
   ],
   'Pitch': [
     'Proposal-Generator aus Brief + Templates',
-    'Pitch-Deck-AI für Slide-Optimierung',
+    'Auto-Workplan aus Scope-Doc',
     'Pricing-Optimizer mit Marktvergleich',
-    'Auto-Risk-Flag für Verträge',
-    'Contract-Generator aus Scope-Doc',
+    'Contract-Template-Filler für KVA',
+    'Pitch-Deck-Optimizer mit AI-Feedback',
   ],
   'Ramp-up': [
     'Auto-Kanban-Board aus Scope-Doc',
-    'Rollen-Allokator basierend auf Skills',
+    'Skill-Matching-Bot für Team-Staffing',
     'Timeline-Generator aus Briefing',
-    'Editorial-Calendar-AI',
-    'Theme-Suggestion-Bot für Content-Plan',
+    'Data-Catalog-AI für Datenquellen',
+    'Kickoff-Agenda-Generator',
+    'Stakeholder-Map-AI für Erwartungsmanagement',
   ],
-  'Analyse & Synthese': [
-    'Auto-Dashboards aus GA4/Meta',
-    'Anomalie-Detection in Conversion-Funnel',
-    'Sentiment-Analyse aus Reviews',
-    'Persona-Generator aus Survey-Daten',
-    'Social-Listening mit Cluster-AI',
-    'Auto-Synthese aus Discovery-Notes',
+  'Analyse': [
+    'Survey-Generator für Datenanforderung',
+    'Auto-Dashboards aus Rohdaten',
+    'Process-Mining-AI für IST-Analyse',
+    'Industry-Benchmark-Scraper',
+    'Competitive-Intelligence-AI für Benchmarking',
+  ],
+  'Synthese': [
+    'LLM-Sparring für So-What-Test aus Analysen',
+    'Storyline-Coach-AI nach Pyramid Principle',
+    'Impact-Effort-Matrix-AI für Priorisierung',
+    'Business-Case-Calculator mit ROI-Modell',
+    'Auto-Roadmap aus Empfehlungen',
+    'Exec-Summary-Generator',
   ],
   'Delivery': [
-    'ChatGPT für Copy-Varianten',
-    'Midjourney/DALL-E für Visuals',
-    'ElevenLabs für Voiceover',
-    'Runway für Video-Generierung',
-    'Best-Time-To-Post-Predictor',
-    'Auto-Reply-Drafts für Community Management',
+    'Auto-Charting aus Excel',
+    'Slide-Optimizer für Steering-Committee',
+    'Fragen-Anticipation-Bot für Q&A',
+    'Elevator-Test-Simulator für Empfehlungen',
+    'Deliverable-Checklist-AI für Sign-off',
   ],
   'Implementierung': [
-    'Auto-Creative-Variants für Ads',
-    'Audience-Generator aus Lookalike-Daten',
-    'Bid-Optimizer für Kampagnen',
-    'Zapier + GPT für Custom-Workflows',
-    'n8n-Templates für Routine-Aufgaben',
-    'Make.com-Szenarien mit AI-Steps',
+    'Personalisierter Lernpfad für Capability Building',
+    'Change-Story-Generator',
+    'RACI-Generator für Governance',
+    'A/B-Test-Design-AI für Pilots',
+    'KPI-Tracker-AI für Monitoring',
+    'Anomalie-Alert-Bot bei Zielabweichung',
   ],
   'Closeout': [
-    'Auto-PDF-Report aus Analytics',
-    'Highlights-Reel-Generator',
-    'Stakeholder-Briefing-Bot',
+    'Auto-Abschlussbericht aus Projektdaten',
+    'Invoicing-AI für Rechnungsstellung',
+    'NPS-Bot für Team-Feedback',
     'Retro-Facilitator-Bot',
-    'Auto-Learning-Database',
-    'NPS-Bot für Kundenfeedback',
+    'Auto-Learning-Database für Learnings',
+    'Auto-Profitabilitäts-Report für Margin-Analyse',
   ],
-  'Follow-Up': [
-    'Smart-CRM-Reminder',
-    'Personalisierte Check-in-Drafts',
+  'Follow-up': [
+    'KPI-Dashboard-AI für Impact-Tracking',
+    'Case-Study-Draft-Generator',
     'Customer-Health-Score',
-    'Buying-Signal-Detection',
+    'Buying-Signal-Detection für Folgeprojekte',
     'Upsell-Pitch-Generator',
-    'Case-Study-Draft aus Projektdaten',
   ],
 };
 
