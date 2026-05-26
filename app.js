@@ -1140,7 +1140,7 @@ function renderTrackVotePresentHtml(slide, visible) {
     const newIds = markNewBubbleIds('all-tracks-vote', allItems);
     const bubbleHtml = window.LPViz.renderBrainstormBubbles(allItems, { mode: 'present', maxItems: 200, newIds });
     const hasVotes = visible.length > 0 || !State.session.question_open;
-    return `<div class="track-vote-present">
+    return `<div class="track-vote-present" data-uniform-bubbles="true">
       <div class="track-vote-present-head">
         <span class="track-vote-count">${allItems.length} Use Cases</span>
         <span class="track-vote-hint">Alle Tracks zusammen · ${State.session.question_open ? 'Teilnehmer priorisieren jetzt die Top-5' : 'Priorisierung abgeschlossen'}</span>
@@ -1273,50 +1273,76 @@ function bindSopWorkshopPanelClicks(container, onNavigate) {
 
 function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigate } = {}) {
   const tracks = window.SOP_TOOL_TRACKS || [];
-  const ctx = getSopSlideContext(State.slides[currentIndex]);
   const activeTrackKey = getActiveTrackKey(currentIndex);
   const activeTrack = tracks.find((t) => t.class === activeTrackKey);
   if (!activeTrack) return { html: '', bind() {} };
 
   const navClass = SOP_TRACK_NAV_CLASS[activeTrack.class] || '';
-  const trackIdx = findSlideIndexForSopStep(activeTrack.class, null, null, 'track-intro');
+  // Slide-Index Finder fuer Phase-basierte Struktur:
+  // - 'phase-intro': section-Slide mit sopKind='phase'
+  // - 'phase-brainstorm': brainstorm-Slide mit dem Phase-Namen
+  // - 'track-summary': content-Slide mit sopTrackResults
+  function findIdx(predicate) {
+    return State.slides.findIndex(predicate);
+  }
+  const trackIntroIdx = findIdx((s) => {
+    const c = s.content || {};
+    return s.slide_type === 'section' && c.sopKind === 'track' && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
+  });
+  const trackSummaryIdx = findIdx((s) => {
+    const c = s.content || {};
+    return s.slide_type === 'content' && c.sopTrackResults && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
+  });
   const trackIdxNum = tracks.findIndex((t) => t.class === activeTrack.class);
+
   let html = `<div class="workshop-sop-panel ${esc(activeTrack.class)} ${esc(navClass)}">
     <div class="workshop-sop-panel-head"><i class="fa-solid fa-map"></i> Workshop</div>`;
-  html += `<button type="button" class="workshop-sop-panel-track${ctx?.kind === 'track-intro' ? ' active' : ''}" data-slide-index="${trackIdx}" ${trackIdx < 0 ? 'disabled' : ''}>
+  html += `<button type="button" class="workshop-sop-panel-track${currentIndex === trackIntroIdx ? ' active' : ''}" data-slide-index="${trackIntroIdx}" ${trackIntroIdx < 0 ? 'disabled' : ''}>
     <span class="workshop-sop-panel-badge">Track ${trackIdxNum + 1}</span>
     <span class="workshop-sop-panel-title">${esc(activeTrack.title.replace(/^Track \d+: /, ''))}</span>
   </button>`;
 
-  (activeTrack.phases || []).forEach((phase) => {
-    html += `<div class="workshop-sop-phase"><div class="workshop-sop-phase-label">${esc(phase.name)}</div>`;
-    (phase.cards || []).forEach((card) => {
-      const brainstormIdx = findSlideIndexForSopStep(activeTrack.class, phase.name, card.name, 'card');
-      const voteIdx = findSlideIndexForSopStep(activeTrack.class, phase.name, card.name, 'card-vote');
-      const resultsIdx = findSlideIndexForSopStep(activeTrack.class, phase.name, card.name, 'card-results');
-      const status = getCardNavStatus(activeTrack.class, phase.name, card.name, currentIndex);
-      const cardActive = [brainstormIdx, voteIdx, resultsIdx].includes(currentIndex);
-      html += `<div class="workshop-sop-card-wrap${cardActive ? ' active' : ''}">`;
-      html += `<button type="button" class="workshop-sop-card status-${status}${brainstormIdx === currentIndex ? ' active' : ''}" data-slide-index="${brainstormIdx}" ${brainstormIdx < 0 ? 'disabled' : ''}>
-        ${cardNavStatusIcon(status)}<span>${esc(card.name)}</span>
-      </button>`;
-      if (voteIdx >= 0 || resultsIdx >= 0) {
-        html += `<div class="workshop-sop-card-steps">`;
-        if (brainstormIdx >= 0) html += `<button type="button" class="workshop-sop-step${brainstormIdx === currentIndex ? ' active' : ''}" data-slide-index="${brainstormIdx}" title="Brainstorming"><i class="fa-solid fa-lightbulb"></i></button>`;
-        if (voteIdx >= 0) html += `<button type="button" class="workshop-sop-step${voteIdx === currentIndex ? ' active' : ''}" data-slide-index="${voteIdx}" title="Priorisierung"><i class="fa-solid fa-heart"></i></button>`;
-        if (resultsIdx >= 0) html += `<button type="button" class="workshop-sop-step${resultsIdx === currentIndex ? ' active' : ''}" data-slide-index="${resultsIdx}" title="Ergebnis"><i class="fa-solid fa-trophy"></i></button>`;
-        html += '</div>';
-      }
-      html += '</div>';
+  (activeTrack.phases || []).forEach((phase, phaseIdx) => {
+    const phaseIntroIdx = findIdx((s) => {
+      const c = s.content || {};
+      return s.slide_type === 'section' && c.sopKind === 'phase' && c.sopPhaseName === phase.name && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
     });
+    const phaseBrainstormIdx = findIdx((s) => {
+      const c = s.content || {};
+      return s.slide_type === 'brainstorm' && c.sopPhaseName === phase.name && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
+    });
+    // Aktuelle Phase = wenn currentIndex auf Phase-Intro oder Phase-Brainstorm liegt
+    const phaseActive = (currentIndex === phaseIntroIdx) || (currentIndex === phaseBrainstormIdx);
+    // Passed: bereits abgehakt
+    const phasePassed = phaseBrainstormIdx >= 0 && currentIndex > phaseBrainstormIdx;
+    const stateClass = phaseActive ? 'is-current' : (phasePassed ? 'is-passed' : '');
+
+    html += `<div class="workshop-sop-phase">
+      <button type="button" class="sop-nav-phase-item ${stateClass}" data-slide-index="${phaseIntroIdx >= 0 ? phaseIntroIdx : phaseBrainstormIdx}" ${(phaseIntroIdx < 0 && phaseBrainstormIdx < 0) ? 'disabled' : ''}>
+        <i class="fa-solid fa-bookmark"></i>
+        <span>${esc(phase.name)}</span>
+        <span class="sop-nav-phase-meta">${(phase.cards || []).length} Schritt${(phase.cards || []).length === 1 ? '' : 'e'}</span>
+      </button>`;
+    // Karten-Liste als kleine "Inhalt"-Hinweise unter der Phase
+    if (phase.cards && phase.cards.length) {
+      html += '<ul class="sop-nav-card-list">';
+      (phase.cards || []).forEach((card) => {
+        const cardActive = phaseActive; // Karten gehoeren zur aktiven Phase
+        html += `<li class="sop-nav-card-item ${cardActive ? 'is-current' : (phasePassed ? 'is-passed' : '')}" title="${esc(card.intro || '')}">${esc(card.name)}</li>`;
+      });
+      html += '</ul>';
+    }
+    if (phaseBrainstormIdx >= 0) {
+      html += `<button type="button" class="workshop-sop-step ${currentIndex === phaseBrainstormIdx ? 'active' : ''}" data-slide-index="${phaseBrainstormIdx}" title="Brainstorming">
+        <i class="fa-solid fa-lightbulb"></i> Brainstorm
+      </button>`;
+    }
     html += '</div>';
   });
 
-  const voteIdx = findSlideIndexForSopStep(activeTrack.class, null, null, 'track-vote');
-  if (voteIdx >= 0) {
-    const voteActive = ctx?.kind === 'track-vote';
-    html += `<button type="button" class="workshop-sop-vote${voteActive ? ' active' : ''}" data-slide-index="${voteIdx}" ${voteIdx < 0 ? 'disabled' : ''}>
-      <i class="fa-solid fa-chart-pie"></i><span>Track-Priorisierung</span>
+  if (trackSummaryIdx >= 0) {
+    html += `<button type="button" class="workshop-sop-vote ${currentIndex === trackSummaryIdx ? 'active' : ''}" data-slide-index="${trackSummaryIdx}">
+      <i class="fa-solid fa-chart-pie"></i><span>Track-Übersicht</span>
     </button>`;
   }
 
@@ -1324,14 +1350,10 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
   if (laterTracks.length) {
     html += '<div class="workshop-sop-later">';
     laterTracks.forEach((track) => {
-      const tIdx = findSlideIndexForSopStep(track.class, null, null, 'track-intro');
-      const lastCard = track.phases?.flatMap((p) => p.cards)?.slice(-1)[0];
-      const lastPhase = track.phases?.find((p) => p.cards?.includes(lastCard));
-      const doneIdx = lastCard && lastPhase
-        ? findSlideIndexForSopStep(track.class, lastPhase.name, lastCard.name, 'card-results')
-        : -1;
-      const done = doneIdx >= 0 && currentIndex > doneIdx;
-      const label = done ? 'Abgeschlossen' : currentIndex >= tIdx && tIdx >= 0 ? 'Später' : 'Noch nicht gestartet';
+      const tIdx = findIdx((s) => s.content?.sopKind === 'track' && (s.content.sopTrackClass === track.class || s.content.sopTrackKey === track.class));
+      const tSummary = findIdx((s) => (s.content?.sopTrackResults) && (s.content.sopTrackClass === track.class || s.content.sopTrackKey === track.class));
+      const done = tSummary >= 0 && currentIndex > tSummary;
+      const label = done ? 'Abgeschlossen' : (currentIndex >= tIdx && tIdx >= 0 ? 'Später' : 'Noch nicht gestartet');
       html += `<div class="workshop-sop-later-item">${esc(track.title.replace(/^Track \d+: /, ''))} · ${label}</div>`;
     });
     html += '</div>';
@@ -3230,23 +3252,29 @@ function ensureDebugPanel() {
   panel.id = 'lp-debug-panel';
   panel.className = 'lp-debug-panel';
   panel.innerHTML = `
-    <div class="lp-debug-panel-head"><i class="fa-solid fa-flask-vial"></i> DEBUG-Simulator</div>
-    <div class="lp-debug-row"><span>Status:</span><strong id="lp-dbg-status">aktiv</strong></div>
-    <div class="lp-debug-row"><span>Teilnehmer:</span><strong id="lp-dbg-participants">0</strong></div>
-    <div class="lp-debug-row"><span>Antworten:</span><strong id="lp-dbg-responses">0</strong></div>
-    <div class="lp-debug-row" style="gap:.4rem"><span>Speed:</span>
-      <div class="lp-debug-btn-grp">
-        <button class="lp-debug-btn" data-speed="0.5">0.5x</button>
-        <button class="lp-debug-btn active" data-speed="1">1x</button>
-        <button class="lp-debug-btn" data-speed="2">2x</button>
-        <button class="lp-debug-btn" data-speed="5">5x</button>
+    <div class="lp-debug-panel-head">
+      <i class="fa-solid fa-flask-vial"></i>
+      <span class="lp-dbg-title">DEBUG-Simulator</span>
+      <button class="lp-debug-collapse" id="lp-dbg-collapse" title="Ein-/Ausblenden"><i class="fa-solid fa-chevron-up"></i></button>
+    </div>
+    <div class="lp-debug-body">
+      <div class="lp-debug-row"><span>Status:</span><strong id="lp-dbg-status">aktiv</strong></div>
+      <div class="lp-debug-row"><span>Teilnehmer:</span><strong id="lp-dbg-participants">0</strong></div>
+      <div class="lp-debug-row"><span>Antworten:</span><strong id="lp-dbg-responses">0</strong></div>
+      <div class="lp-debug-row" style="gap:.4rem"><span>Speed:</span>
+        <div class="lp-debug-btn-grp">
+          <button class="lp-debug-btn" data-speed="0.5">0.5x</button>
+          <button class="lp-debug-btn active" data-speed="1">1x</button>
+          <button class="lp-debug-btn" data-speed="2">2x</button>
+          <button class="lp-debug-btn" data-speed="5">5x</button>
+        </div>
       </div>
+      <div class="lp-debug-btn-grp">
+        <button class="lp-debug-btn warn" id="lp-dbg-flush">⚡ Alles sofort</button>
+        <button class="lp-debug-btn danger" id="lp-dbg-reset">Reset</button>
+      </div>
+      <div class="lp-debug-status" id="lp-dbg-current">Slide: 1</div>
     </div>
-    <div class="lp-debug-btn-grp">
-      <button class="lp-debug-btn warn" id="lp-dbg-flush">⚡ Alles sofort</button>
-      <button class="lp-debug-btn danger" id="lp-dbg-reset">Reset</button>
-    </div>
-    <div class="lp-debug-status" id="lp-dbg-current">Slide: 1</div>
   `;
   document.body.appendChild(panel);
   panel.querySelectorAll('[data-speed]').forEach((b) => {
@@ -3257,6 +3285,19 @@ function ensureDebugPanel() {
   });
   panel.querySelector('#lp-dbg-flush').onclick = () => LP_DebugSim.flushAll();
   panel.querySelector('#lp-dbg-reset').onclick = () => window.LP_resetDebug?.();
+  // Collapse-Toggle: speichert Status in localStorage
+  const applyCollapse = (collapsed) => {
+    panel.classList.toggle('collapsed', collapsed);
+    const icon = panel.querySelector('#lp-dbg-collapse i');
+    if (icon) icon.className = collapsed ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-up';
+    try { localStorage.setItem('lp_dbg_collapsed', collapsed ? '1' : '0'); } catch {}
+  };
+  applyCollapse(localStorage.getItem('lp_dbg_collapsed') === '1');
+  panel.querySelector('#lp-dbg-collapse').onclick = () => applyCollapse(!panel.classList.contains('collapsed'));
+  panel.querySelector('.lp-debug-panel-head').onclick = (e) => {
+    if (e.target.closest('#lp-dbg-collapse')) return; // schon vom Button erledigt
+    if (panel.classList.contains('collapsed')) applyCollapse(false);
+  };
   setInterval(() => {
     if (!document.getElementById('lp-debug-panel')) return;
     const cnt = State.responses.filter((r) => String(r.id).startsWith('debug-r-')).length;
@@ -4103,10 +4144,34 @@ function startQuestionTimer(sec) {
 }
 
 function getMatrixItems(slide) {
-  // Wenn sopAllTracksMatrix: ziehe aus allen Brainstorms aller Tracks (unique)
+  // Wenn sopAllTracksMatrix: nutze die Top-5 aus dem vorherigen sopAllTracksVote
   if (slide?.settings?.sopAllTracksMatrix) {
-    const { unique } = aggregateAllTracksUseCases();
-    return unique.map((u, i) => ({ id: u.id || `it-${i}`, text: u.text, phase: u.phase, trackLabel: u.trackLabel }));
+    // Suche den Vote-Slide
+    const voteSlide = (State.slides || []).find((s) => s.settings?.sopAllTracksVote);
+    const { allItems } = aggregateAllTracksUseCases();
+    const itemById = {};
+    allItems.forEach((it) => { itemById[`resp-${it.id}`] = it; });
+    if (voteSlide) {
+      // Aggregiere Punkte/Stimmen pro Option-ID
+      const visible = (State.responses || []).filter((r) => r.slide_id === voteSlide.id && !r.is_hidden);
+      const totals = {};
+      visible.forEach((r) => {
+        const points = r.response?.points || {};
+        Object.entries(points).forEach(([k, v]) => { totals[k] = (totals[k] || 0) + Number(v || 0); });
+        const values = r.response?.values || [];
+        values.forEach((v) => { totals[v] = (totals[v] || 0) + 1; });
+      });
+      const ranked = Object.entries(totals)
+        .map(([k, v]) => ({ key: k, score: v, item: itemById[k] }))
+        .filter((x) => x.item && x.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5);
+      if (ranked.length) {
+        return ranked.map((r) => ({ id: r.item.id, text: r.item.text, phase: r.item.phase, trackLabel: r.item.trackLabel, score: r.score }));
+      }
+    }
+    // Fallback: wenn noch keine Votes da sind, zeige alle (max 12) damit Slide nicht leer ist
+    return allItems.slice(0, 12).map((u, i) => ({ id: u.id || `it-${i}`, text: u.text, phase: u.phase, trackLabel: u.trackLabel }));
   }
   // Manuelle Items aus slide.content.manualItems
   return (slide?.content?.manualItems || []).map((t, i) => ({ id: `it-${i}`, text: typeof t === 'string' ? t : (t.text || ''), phase: '', trackLabel: '' }));

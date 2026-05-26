@@ -289,7 +289,9 @@ function sopPhaseIntro(track, phase, phaseIndex, totalPhases) {
 // Inspiration im Slide-Body. Use Cases werden Track-weit aggregiert.
 
 function sopPhaseBrainstorm(track, phase) {
-  const cardsHint = phase.cards.map((c) => c.name).join(' · ');
+  // Karten der Phase mit ihrer kurzen Beschreibung als Bullet-Liste —
+  // damit Teilnehmer wissen welche SOP-Schritte konkret abgedeckt sind.
+  const cardsHint = phase.cards.map((c) => `• ${c.name}${c.intro ? ' — ' + c.intro : ''}`).join('\n');
   return tplSlide('brainstorm', {
     title: `KI in ${phase.name}`,
     body: cardsHint,

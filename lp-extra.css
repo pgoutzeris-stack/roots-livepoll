@@ -369,8 +369,113 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-debug-btn.warn{background:rgba(245,158,11,.2);border-color:rgba(245,158,11,.4)}
 .lp-debug-btn.danger{background:rgba(220,38,38,.2);border-color:rgba(220,38,38,.4)}
 .lp-debug-status{font-size:.65rem;color:rgba(255,255,255,.55);font-family:'SF Mono',Menlo,monospace}
+.lp-debug-panel-head{cursor:pointer;justify-content:space-between}
+.lp-debug-collapse{background:rgba(255,255,255,.1);border:none;color:#fff;width:22px;height:22px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.65rem;padding:0;transition:background .15s}
+.lp-debug-collapse:hover{background:rgba(255,255,255,.25)}
+.lp-debug-body{display:flex;flex-direction:column;gap:.5rem;transition:max-height .25s ease,opacity .2s ease,margin .2s ease;max-height:500px;overflow:hidden}
+.lp-debug-panel.collapsed .lp-debug-body{max-height:0;opacity:0;margin-top:-0.5rem;pointer-events:none}
+.lp-debug-panel.collapsed{padding:.55rem .85rem}
+.lp-debug-panel.collapsed .lp-dbg-title::after{content:' (eingeklappt)';opacity:.5;font-weight:400}
 @media (max-width:760px){
   .lp-debug-panel{top:auto;bottom:5rem;left:.5rem;right:.5rem;min-width:0}
+}
+
+/* ═══════ FINAL-VOTE: Uniforme kompakte Bubbles ═══════════════ */
+/* Auf der Top-5-Vote-Slide sollen alle Use-Case-Bubbles gleich gross
+   und in einem ordentlichen Grid liegen — keine zufaelligen Groessen/Rotationen. */
+.track-vote-present[data-uniform-bubbles="true"] .viz-bubble-cloud{
+  display:grid !important;
+  grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));
+  gap:.5rem !important;
+  padding:.85rem !important;
+  min-height:auto !important;
+  max-height:none !important;
+  align-content:start;
+  justify-content:start;
+}
+.track-vote-present[data-uniform-bubbles="true"] .viz-bubble{
+  --bubble-scale:1 !important;
+  --bubble-rotate:0deg !important;
+  transform:none !important;
+  width:auto;
+  padding:.45rem .65rem !important;
+  border-radius:8px !important;
+  font-size:.78rem;
+  line-height:1.3;
+  min-height:auto;
+  display:flex !important;
+  align-items:center;
+  justify-content:flex-start;
+  text-align:left;
+  border:1px solid rgba(15,23,42,.08);
+  box-shadow:0 1px 2px rgba(15,23,42,.04);
+}
+.track-vote-present[data-uniform-bubbles="true"] .viz-bubble-text{
+  font-size:.78rem !important;
+  font-weight:500;
+  line-height:1.3;
+  white-space:normal;
+}
+@media (max-width:760px){
+  .track-vote-present[data-uniform-bubbles="true"] .viz-bubble-cloud{
+    grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));
+  }
+  .track-vote-present[data-uniform-bubbles="true"] .viz-bubble{font-size:.72rem}
+}
+
+/* ═══════ SIDEBAR: Phase + Card Highlight ═══════ */
+.sop-nav-phase-item{
+  width:100%;display:flex;align-items:center;gap:.45rem;
+  padding:.45rem .65rem;border:1.5px solid var(--line);
+  background:var(--bg);border-radius:8px;cursor:pointer;
+  font-size:.82rem;font-weight:600;color:var(--ink);text-align:left;
+  margin-bottom:.25rem;transition:all .15s;
+}
+.sop-nav-phase-item:hover{border-color:var(--brand);color:var(--brand)}
+.sop-nav-phase-item:disabled{opacity:.45;cursor:not-allowed}
+.sop-nav-phase-item i{font-size:.75rem;color:var(--muted);flex-shrink:0}
+.sop-nav-phase-meta{margin-left:auto;font-size:.65rem;color:var(--muted);font-weight:500;background:var(--surface);padding:2px 7px;border-radius:99px;flex-shrink:0}
+.sop-nav-phase-item.is-current{
+  background:var(--brand-light);border-color:var(--brand);color:var(--brand);
+  box-shadow:0 0 0 3px rgba(32,110,251,.15);
+}
+.sop-nav-phase-item.is-current i,
+.sop-nav-phase-item.is-current .sop-nav-phase-meta{color:var(--brand);background:rgba(255,255,255,.5)}
+.sop-nav-phase-item.is-passed{opacity:.55}
+.sop-nav-phase-item.is-passed::after{
+  content:'\f00c';font-family:'Font Awesome 6 Free';font-weight:900;
+  color:var(--success);margin-left:.35rem;font-size:.7em;
+}
+.sop-nav-card-list{
+  list-style:none;margin:.2rem 0 .6rem 1.6rem;padding:0;
+  border-left:2px solid var(--line);
+}
+.sop-nav-card-item{
+  padding:.25rem .55rem;font-size:.74rem;color:var(--muted);
+  line-height:1.3;position:relative;
+}
+.sop-nav-card-item::before{
+  content:'';position:absolute;left:-7px;top:50%;width:6px;height:6px;
+  border-radius:50%;background:var(--line);transform:translateY(-50%);
+}
+.sop-nav-card-item.is-current{
+  color:var(--brand);font-weight:600;
+}
+.sop-nav-card-item.is-current::before{background:var(--brand);box-shadow:0 0 0 3px rgba(32,110,251,.2)}
+.sop-nav-card-item.is-passed{opacity:.6}
+.sop-nav-card-item.is-passed::before{background:var(--success)}
+
+/* ═══════ PHASE-BRAINSTORM: Body als richtige Bullet-Liste ═══════ */
+/* Die Karten-Beschreibungen mit \n in body werden als Liste gerendert */
+.menti-question-block p[class*="sub"],
+.menti-q-sub{
+  white-space:pre-wrap;line-height:1.65;
+}
+.workshop-slide-body .menti-q-sub,
+.menti-question-block .menti-q-sub{
+  background:var(--surface,#f8fafc);border-left:3px solid var(--brand);
+  padding:.7rem .9rem;border-radius:0 8px 8px 0;
+  font-size:.88rem;color:var(--ink);max-width:780px;
 }
 
 /* ═══════ DARK MODE ANPASSUNGEN für neue Komponenten ═══════ */
