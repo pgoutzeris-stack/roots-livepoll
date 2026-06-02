@@ -352,6 +352,9 @@ function getVoteSlideScope(slide) {
   if (st.sopCardVote && key && c.sopCardName) {
     return { kind: 'card', key, phaseName: c.sopPhaseName, cardName: c.sopCardName, maxSelections: st.sopVoteMax || 2 };
   }
+  if (st.sopPhaseVote && key && c.sopPhaseName) {
+    return { kind: 'phase', key, phaseName: c.sopPhaseName, cardName: null, maxSelections: st.sopVoteMax || c.maxSelections || 3 };
+  }
   if (st.sopTrackVote && key) {
     return { kind: 'track', key, maxSelections: 3 };
   }
@@ -386,6 +389,23 @@ function aggregateBrainstormItems(sourceSlideId) {
     .filter((r) => r.slide_id === sourceSlideId && !r.is_hidden)
     .map((r) => ({ id: r.id, text: String(r.response?.text || '').trim() }))
     .filter((item) => item.text);
+  return { items };
+}
+
+function aggregatePhaseUseCases(trackKey, phaseName) {
+  const slides = (State.slides || []).filter((s) => {
+    const c = s.content || {};
+    const trackMatch = c.sopTrackKey === trackKey || c.sopTrackClass === trackKey;
+    return trackMatch && s.slide_type === 'brainstorm' && c.sopKind === 'phase-workshop' && c.sopPhaseName === phaseName;
+  });
+  const items = [];
+  slides.forEach((slide) => {
+    (State.responses || [])
+      .filter((r) => r.slide_id === slide.id && !r.is_hidden)
+      .map((r) => ({ id: r.id, text: String(r.response?.text || '').trim(), phase: phaseName }))
+      .filter((item) => item.text)
+      .forEach((item) => items.push(item));
+  });
   return { items };
 }
 
@@ -732,7 +752,7 @@ function isBrainstormCollectSlide(slide) {
 
 function shouldUseVoteWorkshopUi(slide) {
   if (!slide) return false;
-  if (isSopWorkshopPresentation() && (slide.settings?.sopCardVote || slide.settings?.sopTrackVote)) return true;
+  if (isSopWorkshopPresentation() && (slide.settings?.sopCardVote || slide.settings?.sopPhaseVote || slide.settings?.sopTrackVote)) return true;
   return isBrainstormVoteSlide(slide);
 }
 
@@ -756,6 +776,11 @@ function getVoteOptions(slide) {
   if (scope.kind === 'card') {
     const { items } = aggregateCardUseCases(scope.key, scope.phaseName, scope.cardName);
     if (!items.length) return [{ id: 'none', text: 'Noch keine Use Cases gesammelt' }];
+    return items.map((item) => ({ id: `resp-${item.id}`, text: item.text }));
+  }
+  if (scope.kind === 'phase') {
+    const { items } = aggregatePhaseUseCases(scope.key, scope.phaseName);
+    if (!items.length) return [{ id: 'none', text: 'Noch keine Use Cases in dieser Phase gesammelt' }];
     return items.map((item) => ({ id: `resp-${item.id}`, text: item.text }));
   }
   const { allItems } = aggregateTrackUseCases(scope.key);
@@ -806,6 +831,9 @@ function findSlideIndexForSopStep(trackKey, phaseName, cardName, step) {
     if (step === 'card-vote') {
       return st.sopCardVote && trackMatch && c.sopPhaseName === phaseName && c.sopCardName === cardName;
     }
+    if (step === 'phase-vote') {
+      return st.sopPhaseVote && trackMatch && c.sopPhaseName === phaseName;
+    }
     if (step === 'card-results') {
       return st.sopCardResults && trackMatch && c.sopPhaseName === phaseName && c.sopCardName === cardName;
     }
@@ -825,6 +853,9 @@ function getSopSlideContext(slide) {
   }
   if (st.sopCardVote) {
     return { trackKey: c.sopTrackKey || c.sopTrackClass, phaseName: c.sopPhaseName, cardName: c.sopCardName, kind: 'card-vote' };
+  }
+  if (st.sopPhaseVote) {
+    return { trackKey: c.sopTrackKey || c.sopTrackClass, phaseName: c.sopPhaseName, cardName: null, kind: 'phase-vote' };
   }
   if (st.sopTrackVote) {
     return { trackKey: c.sopTrackKey || c.sopTrackClass, phaseName: null, cardName: null, kind: 'track-vote' };
@@ -879,7 +910,7 @@ function getWorkshopMode(slide) {
   if (!ctx) return slide?.settings?.workshopMode || null;
   if (ctx.kind === 'track-intro') return 'orient';
   if (ctx.kind === 'card-brainstorm' || ctx.kind === 'phase-brainstorm') return 'collect';
-  if (ctx.kind === 'track-vote' || ctx.kind === 'card-vote' || ctx.kind === 'card-results') return 'decide';
+  if (ctx.kind === 'track-vote' || ctx.kind === 'phase-vote' || ctx.kind === 'card-vote' || ctx.kind === 'card-results') return 'decide';
   return slide?.settings?.workshopMode || null;
 }
 
@@ -911,6 +942,13 @@ function getWorkshopProgress(slideIndex) {
     const phaseNum = idx >= 0 ? idx + 1 : 0;
     const pct = phases.length ? Math.round((phaseNum / phases.length) * 100) : 0;
     return { trackKey, trackLabel, step: 'collect', stepLabel: 'Brainstorming', cardIndex: phaseNum, cardTotal: phases.length, pct, phaseName: ctx.phaseName, counter: `Phase ${phaseNum} / ${phases.length} · ${ctx.phaseName}` };
+  }
+  if (ctx.kind === 'phase-vote') {
+    const phases = getTrackPhaseSlideIndexes(trackKey);
+    const idx = phases.findIndex(({ s }) => s.content?.sopPhaseName === ctx.phaseName);
+    const phaseNum = idx >= 0 ? idx + 1 : 0;
+    const pct = phases.length ? Math.round((phaseNum / phases.length) * 100) : 0;
+    return { trackKey, trackLabel, step: 'decide', stepLabel: 'Priorisierung', cardIndex: phaseNum, cardTotal: phases.length, pct, phaseName: ctx.phaseName, counter: `Priorisierung ${phaseNum} / ${phases.length} · ${ctx.phaseName}` };
   }
   if (ctx.cardName) {
     const idx = cards.findIndex(({ s }) => s.content?.sopCardName === ctx.cardName);
@@ -994,6 +1032,15 @@ function getTrackVoteOptionsGrouped(slide) {
     return [{
       phase: scope.phaseName,
       card: scope.cardName,
+      options: opts,
+    }];
+  }
+  if (scope?.kind === 'phase') {
+    const opts = getVoteOptions(slide).filter((o) => o.id !== 'none');
+    if (!opts.length) return [];
+    return [{
+      phase: scope.phaseName,
+      card: 'KI Use Cases',
       options: opts,
     }];
   }
@@ -1136,6 +1183,7 @@ function renderCardVoteParticipationHtml(slide) {
 
 function renderCardVotePresentHtml(slide, visible) {
   const scope = getVoteSlideScope(slide);
+  if (scope?.kind === 'phase') return renderPhaseVotePresentHtml(slide, visible);
   if (!scope || (scope.kind !== 'card' && scope.kind !== 'brainstorm')) return renderTrackVotePresentHtml(slide, visible);
   let items = [];
   let label = scope.cardName || 'Karte';
@@ -1163,6 +1211,25 @@ function renderCardVotePresentHtml(slide, visible) {
     ${renderCardVoteParticipationHtml(slide)}
     ${bubbleHtml}
     ${hasVotes ? `<div class="track-vote-live-ranking"><div class="track-vote-live-label">Live-Ergebnis (Prozent)</div>${renderVoteResultsHtml(slide, visible)}</div>` : ''}
+  </div>`;
+}
+
+function renderPhaseVotePresentHtml(slide, visible) {
+  const scope = getVoteSlideScope(slide);
+  const { items } = aggregatePhaseUseCases(scope?.key, scope?.phaseName);
+  if (!items.length) {
+    return '<div class="present-wait-msg">Noch keine Use Cases in dieser Phase gesammelt. Bitte zuerst die Phase sammeln.</div>';
+  }
+  return `<div class="phase-vote-present">
+    <div class="track-vote-present-head">
+      <span class="track-vote-count">${items.length} Use Cases · ${esc(scope.phaseName || 'Phase')}</span>
+      <span class="track-vote-hint">${State.session.question_open ? 'Teilnehmer priorisieren jetzt die Top 3' : 'Priorisierung abgeschlossen'}</span>
+    </div>
+    ${renderCardVoteParticipationHtml(slide)}
+    <div class="phase-vote-leaderboard">
+      <div class="track-vote-live-label">Leaderboard der Phase</div>
+      ${renderVoteResultsHtml(slide, visible)}
+    </div>
   </div>`;
 }
 
@@ -1333,6 +1400,12 @@ function renderParticipantTrackVoteHtml(slide) {
       <button type="button" class="btn-ghost vote-mode-toggle" id="vote-mode-toggle">Expertenmodus: 100 Punkte</button>
       <button type="button" class="btn-primary participant-submit" id="submit-favorites">Top 3 senden</button>`;
   }
+  if (scope?.kind === 'phase') {
+    return `<p class="vote-mode-hint">Wähle deine <strong>Top ${max} KI Use Cases</strong> in dieser Phase.</p>
+      ${renderTrackVoteGroupedListHtml(slide, { selectable: true })}
+      <div id="fav-counter" class="top3-counter">0 / ${max} gewählt</div>
+      <button type="button" class="btn-primary participant-submit" id="submit-favorites">Priorisierung senden</button>`;
+  }
   return `<p class="vote-mode-hint">Wähle <strong>maximal ${max} Lieblings-Use-Cases</strong> aus dem Brainstorming.</p>
     ${renderTrackVoteGroupedListHtml(slide, { selectable: true })}
     <div id="fav-counter" class="top3-counter">0 / ${max} gewählt</div>
@@ -1393,10 +1466,14 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
       const c = s.content || {};
       return s.slide_type === 'brainstorm' && c.sopPhaseName === phase.name && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
     });
+    const phaseVoteIdx = findIdx((s) => {
+      const c = s.content || {};
+      return s.settings?.sopPhaseVote && c.sopPhaseName === phase.name && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
+    });
     // Aktuelle Phase = wenn currentIndex auf Phase-Intro oder Phase-Brainstorm liegt
-    const phaseActive = (currentIndex === phaseIntroIdx) || (currentIndex === phaseBrainstormIdx);
+    const phaseActive = (currentIndex === phaseIntroIdx) || (currentIndex === phaseBrainstormIdx) || (currentIndex === phaseVoteIdx);
     // Passed: bereits abgehakt
-    const phasePassed = phaseBrainstormIdx >= 0 && currentIndex > phaseBrainstormIdx;
+    const phasePassed = (phaseVoteIdx >= 0 ? phaseVoteIdx : phaseBrainstormIdx) >= 0 && currentIndex > (phaseVoteIdx >= 0 ? phaseVoteIdx : phaseBrainstormIdx);
     const stateClass = phaseActive ? 'is-current' : (phasePassed ? 'is-passed' : '');
 
     html += `<div class="workshop-sop-phase">
@@ -1407,6 +1484,11 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
     if (phaseBrainstormIdx >= 0) {
       html += `<button type="button" class="workshop-sop-step ${currentIndex === phaseBrainstormIdx ? 'active' : ''}" data-slide-index="${phaseBrainstormIdx}" title="Brainstorming">
         <i class="fa-solid fa-lightbulb"></i> Brainstorm
+      </button>`;
+    }
+    if (phaseVoteIdx >= 0) {
+      html += `<button type="button" class="workshop-sop-step ${currentIndex === phaseVoteIdx ? 'active' : ''}" data-slide-index="${phaseVoteIdx}" title="Priorisierung">
+        <i class="fa-solid fa-ranking-star"></i> Priorisierung
       </button>`;
     }
     html += '</div>';
@@ -3175,10 +3257,12 @@ const LP_DebugSim = {
             response = { value: choice.id };
           }
         } else if (type === 'mc_multi') {
-          if (st.sopCardVote || st.sopTrackVote || st.brainstormVote || st.sopAllTracksVote) {
+          if (st.sopCardVote || st.sopPhaseVote || st.sopTrackVote || st.brainstormVote || st.sopAllTracksVote) {
             const max = st.sopVoteMax || c.maxSelections || 2;
             const scopedCollected = st.sopTrackVote
               ? allCollected.filter((it) => it.trackKey === (c.sopTrackKey || c.sopTrackClass))
+              : st.sopPhaseVote
+                ? allCollected.filter((it) => it.trackKey === (c.sopTrackKey || c.sopTrackClass) && it.phaseName === c.sopPhaseName)
               : allCollected;
             if (scopedCollected.length) {
               const picked = [...scopedCollected].sort(() => pseudoRandom(idx + slide.id.length) - 0.5).slice(0, max);
@@ -3208,9 +3292,11 @@ const LP_DebugSim = {
           const opts = c.options || [];
           if (opts.length) response = { order: [...opts].sort(() => pseudoRandom(idx) - 0.5).map((o) => o.id) };
         } else if (type === 'percent_split') {
-          if (st.sopAllTracksVote || st.sopTrackVote) {
+          if (st.sopAllTracksVote || st.sopTrackVote || st.sopPhaseVote) {
             const scopedCollected = st.sopTrackVote
               ? allCollected.filter((it) => it.trackKey === (c.sopTrackKey || c.sopTrackClass))
+              : st.sopPhaseVote
+                ? allCollected.filter((it) => it.trackKey === (c.sopTrackKey || c.sopTrackClass) && it.phaseName === c.sopPhaseName)
               : allCollected;
             if (scopedCollected.length) {
               const pool = [...scopedCollected].sort(() => pseudoRandom(idx) - 0.5).slice(0, 5);
@@ -3587,7 +3673,7 @@ function renderPresent() {
     // immer rendern, auch wenn noch keine Antwort vorliegt. Die einzelnen
     // Renderer (viz.js) zeigen leere Zustände passend an (Skelett-Balken,
     // "Antworten werden gesammelt…" für Brainstorm/Open).
-    if (slide.settings?.sopCardVote || slide.settings?.brainstormVote) {
+    if (slide.settings?.sopCardVote || slide.settings?.sopPhaseVote || slide.settings?.brainstormVote) {
       viz = renderCardVotePresentHtml(displaySlide, visible);
     } else if (slide.settings?.sopTrackVote || slide.settings?.sopAllTracksVote) {
       viz = renderTrackVotePresentHtml(displaySlide, visible);
@@ -3910,7 +3996,7 @@ async function ensureParticipantResponses(force = false) {
   if (!State.session?.id || !State.participant) return;
   const slideIndex = State.session.current_slide_index || 0;
   const slide = State.slides[slideIndex];
-  const needsTrackData = Boolean(slide?.settings?.sopTrackVote || slide?.settings?.sopCardVote || slide?.settings?.brainstormVote);
+  const needsTrackData = Boolean(slide?.settings?.sopTrackVote || slide?.settings?.sopPhaseVote || slide?.settings?.sopCardVote || slide?.settings?.brainstormVote);
   if (!needsTrackData && !force) return;
   const cacheKey = `${State.session.id}:${slideIndex}`;
   const fresh = State.participantResponsesKey === cacheKey
@@ -4070,7 +4156,7 @@ function subscribeParticipantChannel() {
       void (async () => {
         await ensureParticipantResponses(true);
         const slide = State.slides[State.session.current_slide_index || 0];
-        if (slide?.settings?.sopTrackVote || slide?.settings?.sopCardVote || slide?.settings?.brainstormVote || slide?.slide_type === 'qa') await renderParticipantQuestion();
+        if (slide?.settings?.sopTrackVote || slide?.settings?.sopPhaseVote || slide?.settings?.sopCardVote || slide?.settings?.brainstormVote || slide?.slide_type === 'qa') await renderParticipantQuestion();
       })();
     })
     .subscribe();

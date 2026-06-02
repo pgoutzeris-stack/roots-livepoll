@@ -405,6 +405,19 @@ function sopPhaseBrainstorm(track, phase) {
   }, { showResultsLive: true, workshopMode: 'collect', profanityFilter: true });
 }
 
+function sopPhaseVote(track, phase) {
+  return tplSlide('mc_multi', {
+    title: `Priorisierung · ${phase.name}`,
+    subtitle: track.title.replace(/^Track \d+: /, ''),
+    prompt: 'Wählt die drei wichtigsten KI Use Cases dieser Phase. Welche Ideen sollten in dieser Phase zuerst weitergedacht oder pilotiert werden?',
+    mentiQuestion: true,
+    options: [],
+    maxSelections: 3,
+    sopKind: 'phase-vote',
+    ...sopMeta(track, phase),
+  }, { showResultsLive: true, sopPhaseVote: true, sopVoteMax: 3, workshopMode: 'decide', phaseVoteLeaderboardOnly: true });
+}
+
 // ─── SOP TRACK SUMMARY (zeigt alle Phase-Use-Cases) ──────
 
 function sopTrackSummary(track, trackIndex) {
@@ -524,6 +537,7 @@ function buildSopKiWorkshopSlides() {
     track.phases.forEach((phase, pi, allPhases) => {
       slides.push(sopPhaseIntro(track, phase, pi, allPhases.length));
       slides.push(sopPhaseBrainstorm(track, phase));
+      slides.push(sopPhaseVote(track, phase));
     });
     slides.push(sopTrackSummary(track, ti));
     slides.push(sopTrackVote(track, ti));

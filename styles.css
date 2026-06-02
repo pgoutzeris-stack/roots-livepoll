@@ -536,6 +536,10 @@ html.lp-join-route #screen-participant{display:flex!important}
 .sop-nav-status.done{color:var(--success)}
 .sop-nav-status.open{color:var(--muted)}
 .track-vote-grouped,.track-vote-results{text-align:left;width:100%;max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:.75rem}
+.phase-vote-present{width:100%;max-width:860px;margin:0 auto;text-align:left}
+.phase-vote-leaderboard{margin-top:1rem;padding:1rem;border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,#fff,#f8fafc);box-shadow:var(--shadow-dash)}
+.phase-vote-leaderboard .track-vote-results{max-width:none}
+.phase-vote-leaderboard .track-vote-group{box-shadow:none;background:transparent}
 .track-vote-group{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:.85rem 1rem}
 .track-vote-group-head{display:flex;flex-wrap:wrap;gap:.35rem .65rem;font-size:.75rem;color:var(--muted);margin-bottom:.5rem}
 .track-vote-group-head strong{color:var(--ink);font-size:.85rem}
