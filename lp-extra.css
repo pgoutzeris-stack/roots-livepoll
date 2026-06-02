@@ -229,6 +229,13 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-mx-pool-count{font-size:.72rem;color:var(--muted);background:var(--surface);padding:2px 8px;border-radius:99px;font-weight:600}
 .lp-mx-pool-items{display:flex;flex-wrap:wrap;gap:6px;min-height:50px;align-content:flex-start}
 .lp-mx-pool .lp-mx-item{flex:0 1 auto;max-width:100%}
+.lp-sop-workshop .lp-mx-cell{min-height:105px;padding:.45rem;border-width:1px}
+.lp-sop-workshop .lp-mx-cell-items{gap:4px}
+.lp-sop-workshop .lp-mx-pool{padding:.55rem .65rem;border-width:1px;border-style:solid}
+.lp-sop-workshop .lp-mx-pool-items{display:grid;grid-template-columns:1fr;gap:4px;min-height:40px}
+.lp-sop-workshop .lp-mx-item{border-radius:7px;padding:.32rem .45rem;font-size:.72rem;line-height:1.22;box-shadow:none;border-width:1px;gap:.3rem}
+.lp-sop-workshop .lp-mx-item::before{display:none}
+.lp-sop-workshop .lp-mx-item:hover{box-shadow:none;transform:none}
 .lp-mx-actions{display:flex;align-items:center;gap:.6rem;margin-top:.5rem;flex-wrap:wrap}
 .lp-mx-actions .btn-primary{flex:1;min-width:200px}
 .lp-mx-actions .btn-ghost{padding:.6rem 1rem;border:1.5px solid var(--line);border-radius:99px}

@@ -531,7 +531,7 @@ function buildSopKiWorkshopSlides() {
     mentiHero: true,
   }));
 
-  // 2. Per Track: Intro → Phasen (Intro + Brainstorm) → Track-Übersicht
+  // 2. Per Track: Intro → Phasen (Intro + Brainstorm + Priorisierung) → Track Top-3
   SOP_TOOL_TRACKS.forEach((track, ti) => {
     slides.push(sopTrackIntro(track, ti));
     track.phases.forEach((phase, pi, allPhases) => {
@@ -539,7 +539,6 @@ function buildSopKiWorkshopSlides() {
       slides.push(sopPhaseBrainstorm(track, phase));
       slides.push(sopPhaseVote(track, phase));
     });
-    slides.push(sopTrackSummary(track, ti));
     slides.push(sopTrackVote(track, ti));
   });
 

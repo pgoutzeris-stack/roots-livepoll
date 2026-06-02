@@ -1440,10 +1440,6 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
     const c = s.content || {};
     return s.slide_type === 'section' && c.sopKind === 'track' && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
   });
-  const trackSummaryIdx = findIdx((s) => {
-    const c = s.content || {};
-    return s.slide_type === 'content' && c.sopTrackResults && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
-  });
   const trackVoteIdx = findIdx((s) => {
     const c = s.content || {};
     return s.settings?.sopTrackVote && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
@@ -1494,11 +1490,6 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
     html += '</div>';
   });
 
-  if (trackSummaryIdx >= 0) {
-    html += `<button type="button" class="workshop-sop-vote ${currentIndex === trackSummaryIdx ? 'active' : ''}" data-slide-index="${trackSummaryIdx}">
-      <i class="fa-solid fa-chart-pie"></i><span>Track-Übersicht</span>
-    </button>`;
-  }
   if (trackVoteIdx >= 0) {
     html += `<button type="button" class="workshop-sop-vote ${currentIndex === trackVoteIdx ? 'active' : ''}" data-slide-index="${trackVoteIdx}">
       <i class="fa-solid fa-ranking-star"></i><span>Top 3 priorisieren</span>
@@ -1510,8 +1501,8 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
     html += '<div class="workshop-sop-later">';
     laterTracks.forEach((track) => {
       const tIdx = findIdx((s) => s.content?.sopKind === 'track' && (s.content.sopTrackClass === track.class || s.content.sopTrackKey === track.class));
-      const tSummary = findIdx((s) => (s.content?.sopTrackResults) && (s.content.sopTrackClass === track.class || s.content.sopTrackKey === track.class));
-      const done = tSummary >= 0 && currentIndex > tSummary;
+      const tVote = findIdx((s) => s.settings?.sopTrackVote && (s.content?.sopTrackClass === track.class || s.content?.sopTrackKey === track.class));
+      const done = tVote >= 0 && currentIndex > tVote;
       const label = done ? 'Abgeschlossen' : (currentIndex >= tIdx && tIdx >= 0 ? 'Später' : 'Noch nicht gestartet');
       html += `<div class="workshop-sop-later-item">${esc(track.title.replace(/^Track \d+: /, ''))} · ${label}</div>`;
     });
