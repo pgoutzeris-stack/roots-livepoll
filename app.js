@@ -1289,6 +1289,7 @@ function renderTrackVoteResultsHtml(slide, visible) {
 }
 
 function renderWorkshopCardCollectHtml(c, editable = false) {
+  const boardEl = renderSopBoardPreview(c, editable);
   const titleEl = editable
     ? `<div class="canvas-editable menti-q-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
     : `<h1 class="menti-q-title">${esc(c.title || c.sopCardName || '')}</h1>`;
@@ -1299,7 +1300,13 @@ function renderWorkshopCardCollectHtml(c, editable = false) {
   const promptEl = editable
     ? `<div class="canvas-editable menti-q-prompt workshop-collect-prompt" contenteditable="true" data-field="prompt">${esc(c.prompt || '')}</div>`
     : (c.prompt ? `<p class="menti-q-prompt">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : '');
-  return `<div class="menti-question-block">${subEl}${titleEl}${bodyEl}${promptEl || ''}</div>`;
+  return `<div class="menti-question-block workshop-collect-shell">
+    ${subEl}
+    ${titleEl}
+    ${boardEl ? `<div class="workshop-collect-sop-context">${boardEl}</div>` : bodyEl}
+    ${boardEl && bodyEl ? `<div class="workshop-collect-details">${bodyEl}</div>` : ''}
+    ${promptEl || ''}
+  </div>`;
 }
 
 function renderParticipantWorkshopHeader(slideIndex) {
@@ -1371,6 +1378,10 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
     const c = s.content || {};
     return s.slide_type === 'content' && c.sopTrackResults && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
   });
+  const trackVoteIdx = findIdx((s) => {
+    const c = s.content || {};
+    return s.settings?.sopTrackVote && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
+  });
   const trackIdxNum = tracks.findIndex((t) => t.class === activeTrack.class);
 
   let html = `<div class="workshop-sop-panel ${esc(activeTrack.class)} ${esc(navClass)}">
@@ -1411,6 +1422,11 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
   if (trackSummaryIdx >= 0) {
     html += `<button type="button" class="workshop-sop-vote ${currentIndex === trackSummaryIdx ? 'active' : ''}" data-slide-index="${trackSummaryIdx}">
       <i class="fa-solid fa-chart-pie"></i><span>Track-Übersicht</span>
+    </button>`;
+  }
+  if (trackVoteIdx >= 0) {
+    html += `<button type="button" class="workshop-sop-vote ${currentIndex === trackVoteIdx ? 'active' : ''}" data-slide-index="${trackVoteIdx}">
+      <i class="fa-solid fa-ranking-star"></i><span>Top 3 priorisieren</span>
     </button>`;
   }
 
@@ -1508,14 +1524,17 @@ function renderSopBoardPreview(c, editable = false) {
   if (!board.length) return '';
   const theme = sopTrackTheme(c.sopTrackClass);
   const trackIdx = c.sopTrackIndex || 1;
+  const boardTitle = board.length === 1 && c.sopPhaseName
+    ? c.sopPhaseName
+    : (c.sopTrackLabel || c.title || 'SOP');
   const ed = (field, val, cls) => editable
     ? `<span class="canvas-editable ${cls}" contenteditable="true" data-field="${field}">${esc(val)}</span>`
     : esc(val);
   const cols = board.map((phase) => `
-    <div class="sop-board-phase">
+    <div class="sop-board-phase ${phase.name === c.sopPhaseName || board.length === 1 ? 'active' : ''}">
       <div class="sop-board-phase-label">${ed('phase', phase.name, 'sop-board-phase-name')}</div>
       <div class="sop-board-cards">${(phase.cards || []).map((card) => `
-        <div class="sop-board-card ${c.sopKind === 'card' && card === c.title ? 'active' : ''}">
+        <div class="sop-board-card ${card === c.sopCardName || (c.sopKind === 'card' && card === c.title) ? 'active' : ''}">
           <i class="fa-solid fa-file-lines"></i><span>${esc(card)}</span>
         </div>`).join('')}</div>
     </div>`).join('');
@@ -1523,7 +1542,7 @@ function renderSopBoardPreview(c, editable = false) {
     <div class="sop-board-preview ${esc(c.sopTrackClass || '')} ${esc(c.sopKind || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
       <div class="sop-board-track-header">
         <span class="sop-board-track-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">Track ${trackIdx}</span>
-        <span class="sop-board-track-name">${ed('title', c.title, 'sop-board-track-title')}</span>
+        <span class="sop-board-track-name">${ed('title', boardTitle, 'sop-board-track-title')}</span>
       </div>
       <div class="sop-board-phases-row">${cols}</div>
     </div>`;
