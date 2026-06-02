@@ -418,21 +418,6 @@ function sopPhaseVote(track, phase) {
   }, { showResultsLive: true, sopPhaseVote: true, sopVoteMax: 3, workshopMode: 'decide', phaseVoteLeaderboardOnly: true });
 }
 
-// ─── SOP TRACK SUMMARY (zeigt alle Phase-Use-Cases) ──────
-
-function sopTrackSummary(track, trackIndex) {
-  const label = track.title.replace(/^Track \d+: /, '');
-  return tplSlide('content', {
-    title: `Übersicht · ${label}`,
-    subtitle: `Alle KI-Use-Cases aus Track ${trackIndex + 1}`,
-    body: 'Hier seht ihr alle Ideen aus diesem Track — strukturiert nach Phasen.\nIm nächsten Schritt wählt ihr die Top 3 Use Cases dieses Tracks.',
-    sopKind: 'track-summary',
-    sopTrackResults: true,
-    sopBoard: sopBoardData(track),
-    ...sopMeta(track),
-  }, { workshopMode: 'orient' });
-}
-
 function sopTrackVote(track, trackIndex) {
   const label = track.title.replace(/^Track \d+: /, '');
   return tplSlide('mc_multi', {
