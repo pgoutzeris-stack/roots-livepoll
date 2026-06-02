@@ -390,16 +390,13 @@ function sopPhaseIntro(track, phase, phaseIndex, totalPhases) {
 }
 
 // ─── SOP PHASE BRAINSTORM ─────────────────────────────
-// Statt pro Karte wird pro Phase gesammelt — die Karten dienen als
-// Inspiration im Slide-Body. Use Cases werden Track-weit aggregiert.
+// Statt pro Karte wird pro Phase gesammelt. Der SOP-Kontext wird direkt
+// auf der vorherigen Phasenfolie gezeigt.
 
 function sopPhaseBrainstorm(track, phase) {
-  // Karten der Phase mit ihrer kurzen Beschreibung als Bullet-Liste —
-  // damit Teilnehmer wissen welche SOP-Schritte konkret abgedeckt sind.
-  const cardsHint = phase.cards.map((c) => `• ${c.name}${c.intro ? ' — ' + c.intro : ''}`).join('\n');
   return tplSlide('brainstorm', {
-    title: `KI in ${phase.name}`,
-    body: cardsHint,
+    title: `KI Use Cases in ${phase.name}`,
+    body: '',
     subtitle: track.title.replace(/^Track \d+: /, ''),
     prompt: 'Wo seht ihr KI-Potenzial in dieser Phase? Sammelt eure Ideen — konkrete Tools, Workflows, Aufgaben die KI übernehmen könnte.',
     mentiQuestion: true,
