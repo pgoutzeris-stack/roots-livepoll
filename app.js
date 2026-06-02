@@ -1289,7 +1289,6 @@ function renderTrackVoteResultsHtml(slide, visible) {
 }
 
 function renderWorkshopCardCollectHtml(c, editable = false) {
-  const boardEl = renderSopBoardPreview(c, editable);
   const titleEl = editable
     ? `<div class="canvas-editable menti-q-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
     : `<h1 class="menti-q-title">${esc(c.title || c.sopCardName || '')}</h1>`;
@@ -1300,13 +1299,7 @@ function renderWorkshopCardCollectHtml(c, editable = false) {
   const promptEl = editable
     ? `<div class="canvas-editable menti-q-prompt workshop-collect-prompt" contenteditable="true" data-field="prompt">${esc(c.prompt || '')}</div>`
     : (c.prompt ? `<p class="menti-q-prompt">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : '');
-  return `<div class="menti-question-block workshop-collect-shell">
-    ${subEl}
-    ${titleEl}
-    ${boardEl ? `<div class="workshop-collect-sop-context">${boardEl}</div>` : bodyEl}
-    ${boardEl && bodyEl ? `<div class="workshop-collect-details">${bodyEl}</div>` : ''}
-    ${promptEl || ''}
-  </div>`;
+  return `<div class="menti-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${promptEl || ''}</div>`;
 }
 
 function renderParticipantWorkshopHeader(slideIndex) {
@@ -1519,7 +1512,7 @@ function syncSopWorkshopShell(mode, slideIndex) {
 }
 
 function renderSopBoardPreview(c, editable = false) {
-  if (c.sopKind === 'track' || c.sopKind === 'phase') return '';
+  if (c.sopKind === 'track') return '';
   const board = c.sopBoard || [];
   if (!board.length) return '';
   const theme = sopTrackTheme(c.sopTrackClass);

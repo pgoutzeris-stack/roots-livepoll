@@ -452,12 +452,6 @@ html.lp-join-route #screen-participant{display:flex!important}
 .participant-sop-section .sop-board-preview,.participant-sop-section .sop-board-phases-row{overflow-x:auto}
 .participant-sop-section .sop-menti-body,.participant-sop-section .sop-card-body{text-align:left}
 .workshop-collect-shell{max-width:min(860px,96vw)}
-.workshop-collect-sop-context{width:100%;margin:.75rem auto 1rem}
-.workshop-collect-sop-context .sop-board-preview{margin-top:0;box-shadow:0 16px 40px rgba(15,23,42,.08)}
-.workshop-collect-sop-context .sop-board-phases-row{padding:.85rem}
-.workshop-collect-sop-context .sop-board-phase{min-width:0}
-.workshop-collect-details{max-width:720px;margin:.6rem auto .9rem;padding:.75rem 1rem;border:1px dashed var(--line);border-radius:14px;background:var(--surface)}
-.workshop-collect-details .menti-q-sub{margin:0;font-size:.86rem;line-height:1.55;text-align:left}
 .track-vote-sop-context{width:100%;max-width:880px;margin:.35rem auto 1rem}
 .track-vote-sop-context .sop-board-preview{margin-top:0;box-shadow:none;border-radius:14px}
 .track-vote-sop-context .sop-board-phases-row{padding:.75rem;gap:.55rem}

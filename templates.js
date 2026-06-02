@@ -384,6 +384,7 @@ function sopPhaseIntro(track, phase, phaseIndex, totalPhases) {
     subtitle: `${track.title.replace(/^Track \d+: /, '')} · Phase ${phaseIndex + 1} von ${totalPhases}`,
     body: phase.intro,
     sopKind: 'phase',
+    sopBoard: [{ name: phase.name, cards: phase.cards.map((c) => c.name) }],
     ...sopMeta(track, phase),
   });
 }
