@@ -450,6 +450,14 @@ html.lp-join-route #screen-participant{display:flex!important}
 .sop-track-results-slide .sop-track-results-wrap{margin-top:1.25rem}
 .participant-sop-section .sop-board-preview,.participant-sop-section .sop-board-phases-row{overflow-x:auto}
 .participant-sop-section .sop-menti-body,.participant-sop-section .sop-card-body{text-align:left}
+.track-vote-sop-context{width:100%;max-width:880px;margin:.35rem auto 1rem}
+.track-vote-sop-context .sop-board-preview{margin-top:0;box-shadow:none;border-radius:14px}
+.track-vote-sop-context .sop-board-phases-row{padding:.75rem;gap:.55rem}
+.track-vote-sop-context .sop-board-phase{min-width:150px}
+.track-vote-sop-context .sop-board-card{font-size:.7rem;padding:.42rem .5rem}
+.sop-all-tracks-results--top3 .sop-all-track-item{display:flex;flex-direction:column;gap:.2rem}
+.sop-all-tracks-results--top3 .sop-all-track-item strong{color:var(--track-accent,var(--brand));font-size:.72rem;margin-right:.35rem}
+.sop-all-tracks-results--top3 .sop-all-track-item small{font-size:.7rem;color:var(--muted);line-height:1.35}
 /* SOP Workshop · panel on slide (mirrors nav structure) */
 .hidden{display:none!important}
 .present-stage-wrap,.editor-stage-wrap,.participant-main-wrap{display:flex;flex:1;min-height:0;overflow:hidden;align-items:stretch}

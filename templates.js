@@ -415,42 +415,47 @@ function sopTrackSummary(track, trackIndex) {
   return tplSlide('content', {
     title: `Übersicht · ${label}`,
     subtitle: `Alle KI-Use-Cases aus Track ${trackIndex + 1}`,
-    body: 'Hier seht ihr alle Ideen aus diesem Track — strukturiert nach Phasen.\nWeiter zum nächsten Track.',
+    body: 'Hier seht ihr alle Ideen aus diesem Track — strukturiert nach Phasen.\nIm nächsten Schritt wählt ihr die Top 3 Use Cases dieses Tracks.',
     sopKind: 'track-summary',
     sopTrackResults: true,
+    sopBoard: sopBoardData(track),
     ...sopMeta(track),
   }, { workshopMode: 'orient' });
+}
+
+function sopTrackVote(track, trackIndex) {
+  const label = track.title.replace(/^Track \d+: /, '');
+  return tplSlide('mc_multi', {
+    title: `Top 3 priorisieren · ${label}`,
+    subtitle: `Track ${trackIndex + 1} · alle gesammelten Use Cases`,
+    prompt: 'Wählt die drei KI Use Cases, die in diesem Track den größten Hebel für ROOTS haben. Nutzt die SOP-Übersicht als Kontext: In welchen Phasen zahlen die Ideen wirklich ein?',
+    mentiQuestion: true,
+    options: [],
+    maxSelections: 3,
+    sopKind: 'track-vote',
+    sopBoard: sopBoardData(track),
+    ...sopMeta(track),
+  }, { showResultsLive: true, sopTrackVote: true, sopVoteMax: 3, workshopMode: 'decide' });
 }
 
 // ─── WORKSHOP-LEVEL HELPERS (Cross-Track Summary + Final Vote + Closing) ───────
 
 function sopAllTracksSummary() {
   return tplSlide('content', {
-    title: 'Alle KI-Use-Cases',
-    subtitle: 'Über alle 3 Tracks zusammengefasst',
-    body: 'Hier seht ihr alle Use Cases aus dem gesamten Workshop — strukturiert nach Track und Phase.\nIm nächsten Schritt priorisiert ihr die Top-5 für die nächsten 90 Tage.',
+    title: 'Track-Top-3 im Überblick',
+    subtitle: 'Aus den priorisierten Use Cases aller Tracks',
+    body: 'Hier seht ihr die priorisierten Use Cases aus den Track-Abstimmungen. Diese Auswahl wandert im nächsten Schritt in die Impact/Effort-Matrix.',
     sopKind: 'all-tracks-summary',
     sopAllTracksResults: true,
     mentiHero: true,
   }, { workshopMode: 'orient' });
 }
 
-function sopFinalVote() {
-  return tplSlide('percent_split', {
-    title: 'Top-5 für die nächsten 90 Tage',
-    prompt: 'Verteile 100 Punkte. Welche 5 Use Cases pilotiert ROOTS zuerst — über alle Tracks hinweg?',
-    subtitle: 'Workshop-Finale · alle Tracks zusammen',
-    mentiQuestion: true,
-    options: [],
-    sopKind: 'final-vote',
-  }, { showResultsLive: true, sopAllTracksVote: true, workshopMode: 'decide' });
-}
-
 function sopPriorityMatrix() {
   return tplSlide('priority_matrix', {
     title: 'Priorisierungs-Matrix',
-    prompt: 'Ziehe jeden Use Case in den passenden Quadranten. Du kannst beliebig oft umsortieren.',
-    subtitle: 'Effort vs. Impact · alle Tracks',
+    prompt: 'Ziehe die je Track priorisierten KI Use Cases in den passenden Quadranten. Diskutiert kurz, ob Impact und Aufwand realistisch eingeschätzt sind.',
+    subtitle: 'Impact vs. Effort · Track-Top-3',
     xAxisLabel: 'Aufwand',
     xAxisLow: 'niedrig',
     xAxisHigh: 'hoch',
@@ -512,7 +517,7 @@ function buildSopKiWorkshopSlides() {
   // 1. Opener
   slides.push(tplSlide('content', {
     title: 'SOP · KI Use-Case Workshop',
-    body: 'Wir gehen die ROOTS-SOP Track für Track durch.\nPro Phase sammeln wir KI-Use-Cases.\nAm Track-Ende seht ihr alle Ideen strukturiert.\nAm Workshop-Ende priorisiert ihr die Top-5 für die nächsten 90 Tage.\n\nQR scannen · Name + Avatar wählen.',
+    body: 'Wir gehen die ROOTS-SOP Track für Track durch.\nPro Phase sammeln wir KI-Use-Cases.\nAm Track-Ende priorisiert ihr die Top 3 Use Cases.\nZum Abschluss ordnen wir die priorisierten Use Cases in eine Impact/Effort-Matrix ein.\n\nQR scannen · Name + Avatar wählen.',
     mentiHero: true,
   }));
 
@@ -524,11 +529,11 @@ function buildSopKiWorkshopSlides() {
       slides.push(sopPhaseBrainstorm(track, phase));
     });
     slides.push(sopTrackSummary(track, ti));
+    slides.push(sopTrackVote(track, ti));
   });
 
-  // 3. Workshop-Finale: Übersicht aller Use Cases, Top-5 Vote, Priorisierungs-Matrix
+  // 3. Workshop-Finale: Track-Top-3 Übersicht + Priorisierungs-Matrix
   slides.push(sopAllTracksSummary());
-  slides.push(sopFinalVote());
   slides.push(sopPriorityMatrix());
 
   return slides;
@@ -574,10 +579,10 @@ window.LP_TEMPLATES = [
     key: 'roots-sop-ki-workshop',
     category: 'ROOTS · SOP & KI',
     name: 'SOP-Brainstorming & KI Use Cases',
-    desc: 'Fokussierter SOP-Workshop: pro Karte Brainstorming, 2 Favoriten wählen, Ergebnis mit Prozenten und Gewinnern.',
+    desc: 'Fokussierter SOP-Workshop: pro Phase KI Use Cases sammeln, pro Track Top 3 priorisieren, finale Impact/Effort-Matrix.',
     duration: '90–150 Min.',
     group: '6–25',
-    tips: 'Pro Unterphase (z. B. ROOTS Vorstellung): sammeln → max. 2 Favoriten → Ergebnisfolie. Live-Ansicht zeigt Abstimmungsfortschritt.',
+    tips: 'Flow: Phase verstehen → KI Use Cases sammeln → Track-Top-3 wählen → Impact/Effort-Matrix befüllen.',
     slides: buildSopKiWorkshopSlides(),
   },
   {
