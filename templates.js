@@ -404,7 +404,6 @@ function sopPhaseBrainstorm(track, phase) {
     prompt: 'Wo seht ihr KI-Potenzial in dieser Phase? Sammelt eure Ideen — konkrete Tools, Workflows, Aufgaben die KI übernehmen könnte.',
     mentiQuestion: true,
     sopKind: 'phase-workshop',
-    sopBoard: [{ name: phase.name, cards: phase.cards.map((c) => c.name) }],
     ...sopMeta(track, phase),
   }, { showResultsLive: true, workshopMode: 'collect', profanityFilter: true });
 }
