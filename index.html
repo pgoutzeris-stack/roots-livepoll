@@ -102,10 +102,11 @@
     <button type="button" class="board-back" id="editor-back" title="Zurück"><i class="fa-solid fa-arrow-left"></i></button>
     <input id="editor-title" class="board-title-input" type="text" placeholder="Präsentationstitel" />
     <span class="autosave-pill is-active" id="editor-save-status"><span class="pill-dot"></span> Autosave aktiv</span>
+    <button type="button" class="sim-pill" id="editor-sim-toggle" title="Simulation: simulierte Teilnehmer & Antworten zum Testen" aria-pressed="false">
+      <i class="fa-solid fa-flask"></i> <span class="sim-pill-label">Simulation</span> <span class="sim-pill-state">aus</span>
+    </button>
     <div class="board-topbar-right">
       <button type="button" class="btn-ghost editor-mobile-props" id="btn-toggle-props" title="Eigenschaften"><i class="fa-solid fa-sliders"></i></button>
-      <button type="button" class="btn-secondary" id="btn-show-versions"><i class="fa-solid fa-clock-rotate-left"></i> Versionen</button>
-      <button type="button" class="btn-secondary" id="btn-save-version"><i class="fa-solid fa-bookmark"></i> Snapshot</button>
       <button type="button" class="btn-secondary" id="btn-export-pres"><i class="fa-solid fa-download"></i> Export</button>
       <button type="button" class="btn-primary" id="btn-start-present"><i class="fa-solid fa-play"></i> Präsentieren</button>
     </div>
@@ -210,40 +211,8 @@
   <div class="modal-card">
     <div class="modal-head"><h2>Folie hinzufügen</h2><button type="button" class="btn-ghost modal-close" data-close="modal-add-slide"><i class="fa-solid fa-xmark"></i></button></div>
     <div class="modal-body">
+      <p class="add-slide-intro"><i class="fa-solid fa-circle-info"></i> Folie auswählen — alle Einstellungen erscheinen danach in der rechten Seitenleiste.</p>
       <div id="slide-type-grid" class="slide-type-grid"></div>
-      <div id="add-slide-layout" class="add-slide-chain hidden">
-        <div class="add-slide-chain-title"><i class="fa-solid fa-align-center"></i> Layout</div>
-        <p class="add-slide-chain-hint">Titel- und Inhaltsfolien wirklich zentriert wie eine Einleitung oder ein Abschluss.</p>
-        <label class="props-check"><input type="checkbox" id="add-slide-center" checked> Zentriertes Layout</label>
-      </div>
-      <div id="brainstorm-add-chain" class="add-slide-chain hidden">
-        <div class="add-slide-chain-title"><i class="fa-solid fa-link"></i> Sammeln → Ranking → Ergebnis</div>
-        <p class="add-slide-chain-hint">Optional direkt Ranking- und Ergebnisfolien an Brainstorming, Offene Frage oder Word Cloud anbinden.</p>
-        <label class="props-check"><input type="checkbox" id="add-chain-rank" checked> Ranking-Folie (Favoriten wählen)</label>
-        <label class="props-check"><input type="checkbox" id="add-chain-results" checked> Ergebnis-Folie (Gewinner & Prozent)</label>
-        <label class="add-slide-chain-max">Max. Favoriten <input type="number" id="add-chain-max" min="1" max="10" value="2"></label>
-      </div>
-      <div id="add-closure-options" class="add-slide-chain hidden">
-        <div id="add-closure-results-panel" class="add-closure-panel hidden">
-          <div class="add-slide-chain-title"><i class="fa-solid fa-chart-column"></i> Session-Ergebnis</div>
-          <p class="add-slide-chain-hint" id="add-closure-results-hint"></p>
-          <div class="add-closure-seg" role="group" aria-label="Ergebnis-Anzeige">
-            <button type="button" class="add-closure-seg-btn active" data-results-mode="percent">Prozent</button>
-            <button type="button" class="add-closure-seg-btn" data-results-mode="count">Absolute Zahlen</button>
-          </div>
-          <label class="props-check"><input type="checkbox" id="add-results-confetti" checked> Konfetti für Platz 1</label>
-          <button type="button" class="btn-secondary btn-sm" id="btn-toggle-pres-results"><i class="fa-solid fa-plus"></i> Session-Ergebnis einblenden</button>
-        </div>
-        <div id="add-closure-closing-panel" class="add-closure-panel hidden">
-          <div class="add-slide-chain-title"><i class="fa-solid fa-heart"></i> Abschlussfolie</div>
-          <p class="add-slide-chain-hint">Zentrierte Danke-Folie am Ende der Präsentation.</p>
-          <div class="props-label" style="margin-left:0;margin-top:.5rem">Titel</div>
-          <input id="add-closing-title" value="Danke für eure Teilnahme!" />
-          <div class="props-label" style="margin-left:0">Untertitel</div>
-          <input id="add-closing-body" value="Fragen, Feedback oder Applaus willkommen." />
-          <button type="button" class="btn-secondary btn-sm" id="btn-toggle-pres-closing"><i class="fa-solid fa-plus"></i> Abschlussfolie einblenden</button>
-        </div>
-      </div>
     </div>
   </div>
 </div>

@@ -610,16 +610,6 @@ window.LP_TEMPLATES = [
     tips: 'Am schnellsten — eine Priorisierung am Ende.',
     slides: buildSopKiWorkshopSlides('end'),
   },
-  {
-    key: 'roots-sop-ki-workshop-debug',
-    category: 'ROOTS · SOP & KI · DEBUG',
-    name: '[DEBUG] SOP-Workshop',
-    desc: 'QA-Version mit simulierten Teilnehmern & Antworten für alle Folien.',
-    duration: '— (Debug)',
-    group: '— (Debug)',
-    tips: 'Nur lokal — nichts wird in der DB gespeichert.',
-    slides: buildSopKiWorkshopSlides('phase'),
-  },
 ];
 
 // ─── DEBUG MOCK DATA ─────────────────────────────────────────────

@@ -807,14 +807,43 @@ function setEditorSaveStatus(state) {
     return;
   }
   if (state === 'saved') {
-    el.classList.add('is-active');
-    el.innerHTML = '<span class="pill-dot"></span> Gespeichert';
+    el.classList.add('is-active', 'just-saved');
+    el.innerHTML = '<i class="fa-solid fa-check pill-check"></i> Gespeichert';
+    // Animation neu antriggern
+    void el.offsetWidth;
     clearTimeout(_autosaveTimer);
     _autosaveTimer = setTimeout(() => setEditorSaveStatus('idle'), 2400);
     return;
   }
   el.classList.add('is-active');
   el.innerHTML = '<span class="pill-dot"></span> Autosave aktiv';
+}
+
+// ─── Simulations-/Debug-Modus (Toggle-Pill im Editor-Header) ─────────────────
+function syncSimulationPill() {
+  const btn = $('#editor-sim-toggle');
+  if (!btn) return;
+  const on = !!State.presentation?.settings?.debug;
+  btn.classList.toggle('is-on', on);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  const st = btn.querySelector('.sim-pill-state');
+  if (st) st.textContent = on ? 'an' : 'aus';
+}
+
+async function toggleSimulationMode() {
+  if (!State.presentation) return;
+  const settings = { ...(State.presentation.settings || {}) };
+  settings.debug = !settings.debug;
+  State.presentation.settings = settings;
+  syncSimulationPill();
+  try {
+    await sb.from('lp_presentations').update({ settings }).eq('id', State.presentation.id);
+    toast(settings.debug
+      ? '🧪 Simulation an — beim Präsentieren joinen simulierte Teilnehmer & Antworten'
+      : 'Simulation aus', settings.debug ? 'info' : 'success');
+  } catch (e) {
+    toast(e?.message || 'Konnte Simulation nicht umschalten', 'error');
+  }
 }
 
 function isBrainstormCollectSlide(slide) {
@@ -1431,14 +1460,14 @@ function renderTrackVoteResultsHtml(slide, visible) {
 
 function renderWorkshopCardCollectHtml(c, editable = false) {
   const titleEl = editable
-    ? `<div class="canvas-editable menti-q-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+    ? `<div class="canvas-editable menti-q-title" contenteditable="true" data-field="title" data-placeholder="Titel der Folie…">${esc(c.title || '')}</div>`
     : `<h1 class="menti-q-title">${esc(c.title || c.sopCardName || '')}</h1>`;
   const subEl = c.subtitle ? `<p class="menti-crumb">${esc(c.subtitle)}</p>` : '';
   const bodyEl = editable
-    ? `<div class="canvas-editable menti-q-sub" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+    ? `<div class="canvas-editable canvas-editable--optional menti-q-sub" contenteditable="true" data-field="body" data-placeholder="Beschreibung (optional)…">${esc(c.body || '')}</div>`
     : (c.body ? `<p class="menti-q-sub">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
   const promptEl = editable
-    ? `<div class="canvas-editable menti-q-prompt workshop-collect-prompt" contenteditable="true" data-field="prompt">${esc(c.prompt || '')}</div>`
+    ? `<div class="canvas-editable menti-q-prompt workshop-collect-prompt" contenteditable="true" data-field="prompt" data-placeholder="Frage / Aufgabe für die Teilnehmer…">${esc(c.prompt || '')}</div>`
     : (c.prompt ? `<p class="menti-q-prompt">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : '');
   return `<div class="menti-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${promptEl || ''}</div>`;
 }
@@ -2043,6 +2072,7 @@ function renderEditor() {
   renderSlideList();
   renderEditorCanvas();
   renderEditorProps();
+  syncSimulationPill();
   const slideIdx = State.slides.findIndex((s) => s.id === State.selectedSlideId);
   syncSopWorkshopShell('editor', slideIdx >= 0 ? slideIdx : 0);
 }
@@ -2767,6 +2797,21 @@ function collectStyleFromPanel() {
 
 let panel = null;
 
+// Lesbarer Folientyp (Icon + Label) für Editor-Anzeige
+function editorSlideTypeMeta(slide) {
+  if (!slide) return { icon: 'fa-file', label: 'Folie' };
+  const t = slide.slide_type;
+  if (slide.settings?.presentationResults) return { icon: 'fa-chart-column', label: 'Session-Ergebnis' };
+  if (slide.settings?.presentationClosing) return { icon: 'fa-heart', label: 'Abschlussfolie' };
+  if (slide.settings?.sopAllTracksMatrix || t === 'priority_matrix') return { icon: 'fa-table-cells-large', label: 'Priorisierungs-Matrix' };
+  if (isBrainstormCollectSlide(slide)) return { icon: 'fa-lightbulb', label: 'Brainstorming · Sammeln' };
+  if (shouldUseVoteWorkshopUi(slide)) return { icon: 'fa-square-check', label: 'Priorisierung · Abstimmung' };
+  if (isCardResultsSlide?.(slide) || isSlideResultsLinkedSlide?.(slide)) return { icon: 'fa-trophy', label: 'Ergebnis-Folie' };
+  const meta = (window.LP_SLIDE_TYPES || []).find((x) => x.type === t);
+  if (meta) return { icon: meta.icon, label: meta.label };
+  return { icon: 'fa-file', label: t || 'Folie' };
+}
+
 // Optionen für die Matrix-Quellfolien-Auswahl (vorausgehende Sammel-Folien)
 function brainstormSourceOptionsHtml(matrixSlide, selectedId) {
   const idx = (State.slides || []).findIndex((s) => s.id === matrixSlide.id);
@@ -2875,9 +2920,10 @@ function renderEditorProps() {
     <p class="props-hint"><i class="fa-solid fa-circle-info"></i> 0 = keine Begrenzung.</p>`;
   }
 
+  const _typeMeta = editorSlideTypeMeta(slide);
   panel.innerHTML = `
     <div class="props-head">
-      <span>Design & Einstellungen</span>
+      <span class="props-head-type"><i class="fa-solid ${_typeMeta.icon}"></i> ${esc(_typeMeta.label)}</span>
       <button type="button" class="btn-ghost props-close-mobile" id="props-close-mobile"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="props-section">Design</div>
@@ -3086,29 +3132,22 @@ function renderAddSlideModal() {
     </button>`),
   ].join('');
   grid.innerHTML = typeCards;
-  refreshAddSlideClosureUi();
   grid.querySelectorAll('.type-card').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const type = btn.dataset.type;
+      // Spezialfolien (Session-Ergebnis / Abschluss) direkt ein-/ausschalten.
       if (type === 'presentation_results' || type === 'presentation_closing') {
-        showAddSlideOptions(type);
+        closeModal('modal-add-slide');
+        await togglePresentationClosureCard(type);
         return;
       }
+      // Reguläre Folie mit sinnvollen Defaults hinzufügen — alle weiteren
+      // Einstellungen macht der Nutzer danach in der rechten Seitenleiste.
       const base = JSON.parse(JSON.stringify(window.LP_DEFAULT_CONTENT[type] || { title: 'Neu' }));
       const settings = { ...window.LP_DEFAULT_SETTINGS };
       const content = { ...defaultStyle(), ...base };
-      if (type === 'section' || type === 'content') {
-        content.layout = $('#add-slide-center')?.checked ? 'center' : 'default';
-      }
-      if (type === 'brainstorm') {
-        settings.brainstormAttachRanking = !!$('#add-chain-rank')?.checked;
-        settings.brainstormAttachResults = !!$('#add-chain-results')?.checked;
-        settings.brainstormVoteMax = Number($('#add-chain-max')?.value || 2);
-      } else if (type === 'open' || type === 'wordcloud') {
-        settings.slideAttachRanking = !!$('#add-chain-rank')?.checked;
-        settings.slideAttachResults = !!$('#add-chain-results')?.checked;
-        settings.slideAttachVoteMax = Number($('#add-chain-max')?.value || 2);
-      }
+      if (type === 'section') content.layout = 'center';
+      else if (type === 'content') content.layout = 'default';
       const { data } = await sb.from('lp_slides').insert({
         presentation_id: State.presentation.id,
         sort_order: State.slides.length,
@@ -3117,16 +3156,11 @@ function renderAddSlideModal() {
         settings,
       }).select().single();
       State.slides.push(data);
-      if ((type === 'brainstorm' && settings.brainstormAttachRanking) || ((type === 'open' || type === 'wordcloud') && settings.slideAttachRanking)) {
-        await syncCollectChainSlides(data);
-      }
       State.selectedSlideId = data.id;
       closeModal('modal-add-slide');
       renderEditor();
     });
-    btn.addEventListener('mouseenter', () => showAddSlideOptions(btn.dataset.type));
   });
-  showAddSlideOptions(null);
 }
 
 function bindAddSlideModalControls() {
@@ -5099,6 +5133,7 @@ function bindUi() {
   bindAddSlideModalControls();
   $('#btn-save-version')?.addEventListener('click', saveVersionSnapshot);
   $('#btn-show-versions')?.addEventListener('click', openVersionsModal);
+  $('#editor-sim-toggle')?.addEventListener('click', toggleSimulationMode);
   $('#btn-export-pres')?.addEventListener('click', exportPresentationJson);
   $('#btn-toggle-props')?.addEventListener('click', () => $('#editor-props')?.classList.toggle('mobile-open'));
   $('#btn-start-present')?.addEventListener('click', startPresentation);
