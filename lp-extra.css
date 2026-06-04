@@ -506,3 +506,6 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .sop-all-track-item{background:rgba(255,255,255,.04)}
   .sop-all-track-total{background:rgba(255,255,255,.04)}
 }
+
+/* Zeichen-Counter bei Freitext-Eingaben */
+.p-char-counter{font-size:.72rem;color:var(--muted);text-align:right;margin:-.35rem 0 .5rem;font-weight:600}

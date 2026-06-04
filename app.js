@@ -2767,6 +2767,20 @@ function collectStyleFromPanel() {
 
 let panel = null;
 
+// Optionen für die Matrix-Quellfolien-Auswahl (vorausgehende Sammel-Folien)
+function brainstormSourceOptionsHtml(matrixSlide, selectedId) {
+  const idx = (State.slides || []).findIndex((s) => s.id === matrixSlide.id);
+  const opts = [];
+  (State.slides || []).forEach((s, i) => {
+    if (i >= idx) return;
+    if (!['brainstorm', 'open', 'wordcloud'].includes(s.slide_type)) return;
+    const label = (s.content?.title || s.slide_type) + ` (Folie ${i + 1})`;
+    opts.push(`<option value="${esc(s.id)}" ${s.id === selectedId ? 'selected' : ''}>${esc(label)}</option>`);
+  });
+  if (!opts.length) return '<option value="">— keine Brainstorm-Folie davor —</option>';
+  return '<option value="">— automatisch (nächste davor) —</option>' + opts.join('');
+}
+
 function renderEditorProps() {
   const slide = currentSlide();
   panel = $('#editor-props');
@@ -2815,6 +2829,52 @@ function renderEditorProps() {
     ${!chainCap.canRank && !chainCap.canResults && chainCap.reason ? `<p class="props-chain-reason">${esc(chainCap.reason)}</p>` : ''}`;
   }
 
+  // ─── Priorisierungs-Matrix-Konfiguration ───
+  let matrixPropsHtml = '';
+  if (slide.slide_type === 'priority_matrix') {
+    const isSopMatrix = !!s.sopAllTracksMatrix;
+    const src = c.matrixSource || 'auto';
+    const manualText = (c.manualItems || []).map((t) => (typeof t === 'string' ? t : (t.text || ''))).join('\n');
+    const q = (k, fb) => esc((c.quadrants && c.quadrants[k] && c.quadrants[k].label) || fb);
+    matrixPropsHtml = `
+    <div class="props-section">Priorisierungs-Matrix</div>
+    ${isSopMatrix ? `<p class="props-hint"><i class="fa-solid fa-link"></i> Diese Matrix nutzt automatisch die Track-Top-3 des SOP-Workshops.</p>` : `
+    <div class="props-label">Use Cases beziehen aus</div>
+    <select id="prop-mx-source">
+      <option value="auto" ${src === 'auto' ? 'selected' : ''}>Automatisch · vorherige Brainstorm-Folie</option>
+      <option value="brainstorm" ${src === 'brainstorm' ? 'selected' : ''}>Bestimmte Brainstorm-Folie</option>
+      <option value="manual" ${src === 'manual' ? 'selected' : ''}>Manuelle Liste</option>
+    </select>
+    <div id="prop-mx-srcid-wrap" style="${src === 'brainstorm' ? '' : 'display:none'}">
+      <div class="props-label">Quell-Folie</div>
+      <select id="prop-mx-srcid">${brainstormSourceOptionsHtml(slide, c.brainstormSourceId)}</select>
+    </div>
+    <div id="prop-mx-manual-wrap" style="${src === 'manual' ? '' : 'display:none'}">
+      <div class="props-label">Items · eine Zeile = ein Use Case</div>
+      <textarea id="prop-mx-items" rows="5" placeholder="Use Case A&#10;Use Case B&#10;Use Case C">${esc(manualText)}</textarea>
+    </div>
+    <p class="props-hint"><i class="fa-solid fa-circle-info"></i> Bei „Automatisch" muss <strong>vor</strong> dieser Folie eine Brainstorm- oder Offene-Frage-Folie liegen — deren Antworten werden zu Matrix-Items.</p>`}
+    <div class="props-label">Achsenbeschriftung</div>
+    <div class="props-row-2"><input id="prop-mx-yaxis" value="${esc(c.yAxisLabel || 'Impact')}" placeholder="Y-Achse (vertikal)" /><input id="prop-mx-xaxis" value="${esc(c.xAxisLabel || 'Aufwand')}" placeholder="X-Achse (horizontal)" /></div>
+    <div class="props-label">Quadranten (Namen)</div>
+    <input id="prop-mx-qw" value="${q('qw', 'Quick Win')}" placeholder="hoher Impact · niedriger Aufwand" style="margin-bottom:.4rem" />
+    <input id="prop-mx-sb" value="${q('sb', 'Strategic Bet')}" placeholder="hoher Impact · hoher Aufwand" style="margin-bottom:.4rem" />
+    <input id="prop-mx-ts" value="${q('ts', 'Time Sink')}" placeholder="niedriger Impact · hoher Aufwand" style="margin-bottom:.4rem" />
+    <input id="prop-mx-dr" value="${q('dr', 'Drop')}" placeholder="niedriger Impact · niedriger Aufwand" />`;
+  }
+
+  // ─── Sammel-Limits (Brainstorm / Offen / Wortwolke) ───
+  let collectLimitsHtml = '';
+  if (['brainstorm', 'open', 'wordcloud'].includes(slide.slide_type)) {
+    collectLimitsHtml = `
+    <div class="props-section">Eingabe-Limits</div>
+    <div class="props-row-2">
+      <div><div class="props-label">Max. Antworten / Person</div><input id="prop-max-responses" type="number" min="0" value="${Number(c.maxResponsesPerUser || 0)}" placeholder="0 = ∞" /></div>
+      <div><div class="props-label">Zeichenlimit</div><input id="prop-char-limit" type="number" min="0" value="${Number(c.charLimit || 0)}" placeholder="0 = aus" /></div>
+    </div>
+    <p class="props-hint"><i class="fa-solid fa-circle-info"></i> 0 = keine Begrenzung.</p>`;
+  }
+
   panel.innerHTML = `
     <div class="props-head">
       <span>Design & Einstellungen</span>
@@ -2837,6 +2897,8 @@ function renderEditorProps() {
       <input id="prop-min-label" value="${esc(c.minLabel || '')}" placeholder="Beschriftung links" />
       <input id="prop-max-label" value="${esc(c.maxLabel || '')}" placeholder="Beschriftung rechts" />` : ''}
     ${optionsHtml}
+    ${matrixPropsHtml}
+    ${collectLimitsHtml}
     ${slideChainHtml}
     <div class="props-section">Interaktion</div>
     <div class="props-toggle-grid">
@@ -2870,6 +2932,32 @@ function renderEditorProps() {
       maxLabel: $('#prop-max-label')?.value ?? slideObj.content.maxLabel,
       maxSelections: Number($('#prop-max-sel')?.value ?? slideObj.content.maxSelections ?? 3),
     };
+    // ── Priorisierungs-Matrix-Felder ──
+    if (slideObj.slide_type === 'priority_matrix') {
+      if ($('#prop-mx-source')) slideObj.content.matrixSource = $('#prop-mx-source').value;
+      if ($('#prop-mx-srcid')) slideObj.content.brainstormSourceId = $('#prop-mx-srcid').value || null;
+      if ($('#prop-mx-items')) {
+        slideObj.content.manualItems = $('#prop-mx-items').value.split('\n').map((l) => l.trim()).filter(Boolean);
+      }
+      if ($('#prop-mx-yaxis')) slideObj.content.yAxisLabel = $('#prop-mx-yaxis').value;
+      if ($('#prop-mx-xaxis')) slideObj.content.xAxisLabel = $('#prop-mx-xaxis').value;
+      const qd = slideObj.content.quadrants || {
+        qw: { label: 'Quick Win', icon: '🚀', desc: 'hoher Impact · niedriger Aufwand' },
+        sb: { label: 'Strategic Bet', icon: '⭐', desc: 'hoher Impact · hoher Aufwand' },
+        ts: { label: 'Time Sink', icon: '🔧', desc: 'niedriger Impact · hoher Aufwand' },
+        dr: { label: 'Drop', icon: '❌', desc: 'niedriger Impact · niedriger Aufwand' },
+      };
+      ['qw', 'sb', 'ts', 'dr'].forEach((k) => {
+        const el = $(`#prop-mx-${k}`);
+        if (el && qd[k]) qd[k] = { ...qd[k], label: el.value };
+      });
+      slideObj.content.quadrants = qd;
+    }
+    // ── Sammel-Limits (Brainstorm/Offen/Wortwolke) ──
+    if (['brainstorm', 'open', 'wordcloud'].includes(slideObj.slide_type)) {
+      if ($('#prop-max-responses')) slideObj.content.maxResponsesPerUser = Number($('#prop-max-responses').value || 0);
+      if ($('#prop-char-limit')) slideObj.content.charLimit = Number($('#prop-char-limit').value || 0);
+    }
     panel.querySelectorAll('[data-opt="color"]').forEach((inp) => {
       const idx = Number(inp.dataset.idx);
       if (slideObj.content.options?.[idx]) slideObj.content.options[idx].color = inp.value;
@@ -2921,9 +3009,19 @@ function renderEditorProps() {
     toast('Folien-Kette aktualisiert', 'success');
   };
 
-  panel.querySelectorAll('input,textarea').forEach((el) => {
+  panel.querySelectorAll('input,textarea,select').forEach((el) => {
     el.addEventListener('input', saveContent);
     el.addEventListener('change', saveContent);
+  });
+  // Matrix-Quelle: Sichtbarkeit der Unterfelder umschalten + Canvas aktualisieren
+  $('#prop-mx-source')?.addEventListener('change', () => {
+    const v = $('#prop-mx-source').value;
+    const srcWrap = $('#prop-mx-srcid-wrap');
+    const manWrap = $('#prop-mx-manual-wrap');
+    if (srcWrap) srcWrap.style.display = v === 'brainstorm' ? '' : 'none';
+    if (manWrap) manWrap.style.display = v === 'manual' ? '' : 'none';
+    saveContent();
+    setTimeout(renderEditorCanvas, 60);
   });
   $('#set-slide-rank')?.addEventListener('change', () => {
     const on = $('#set-slide-rank')?.checked;
@@ -4305,12 +4403,16 @@ async function renderParticipantQuestion() {
     }
   } else if (type === 'wordcloud' || type === 'open' || type === 'brainstorm') {
     const isCollect = isBrainstormCollectSlide(slide);
+    const lim = Number(c.charLimit || 0);
+    const maxAttr = lim > 0 ? ` maxlength="${lim}"` : '';
+    const counter = lim > 0 ? `<div class="p-char-counter"><span id="p-char-n">0</span>/${lim}</div>` : '';
     if (isCollect) {
       input = `<label class="join-label" for="p-text">Dein KI Use Case</label>
-        <textarea id="p-text" rows="4" class="participant-textarea participant-textarea-lg" placeholder="${esc((c.prompt || '').split('\n')[0] || 'Use Case beschreiben…')}"></textarea>
+        <textarea id="p-text" rows="4" class="participant-textarea participant-textarea-lg"${maxAttr} placeholder="${esc((c.prompt || '').split('\n')[0] || 'Use Case beschreiben…')}"></textarea>
+        ${counter}
         <button type="button" class="btn-primary participant-submit participant-submit-lg" id="submit-text">Use Case senden</button>`;
     } else {
-      input = `<textarea id="p-text" rows="3" class="participant-textarea" placeholder="${esc(c.prompt || 'Antwort')}"></textarea><button type="button" class="btn-primary participant-submit" id="submit-text">Senden</button>`;
+      input = `<textarea id="p-text" rows="3" class="participant-textarea"${maxAttr} placeholder="${esc(c.prompt || 'Antwort')}"></textarea>${counter}<button type="button" class="btn-primary participant-submit" id="submit-text">Senden</button>`;
     }
   } else if (type === 'qa') {
     input = `<textarea id="p-text" rows="2" class="participant-textarea" placeholder="Deine Frage…"></textarea><button type="button" class="btn-primary participant-submit" id="submit-text">Frage senden</button><div id="qa-list" class="qa-list"></div>`;
@@ -4388,8 +4490,20 @@ function startQuestionTimer(sec) {
   }, 1000);
 }
 
+// Finde die nächste vorausgehende Sammel-Folie (Brainstorm/Offen/Wortwolke)
+// vor der Matrix — für automatisches Item-Sourcing.
+function findPrecedingCollectSlide(matrixSlide) {
+  const idx = (State.slides || []).findIndex((s) => s.id === matrixSlide.id);
+  if (idx < 0) return null;
+  for (let i = idx - 1; i >= 0; i--) {
+    const s = State.slides[i];
+    if (s.slide_type === 'brainstorm' || s.slide_type === 'open' || s.slide_type === 'wordcloud') return s;
+  }
+  return null;
+}
+
 function getMatrixItems(slide) {
-  // Wenn sopAllTracksMatrix: nutze die Top-3 aus den jeweiligen Track-Votes.
+  // 1. SOP-Workshop-Matrix: Top-3 aus den Track-Votes (bzw. Fallback).
   if (slide?.settings?.sopAllTracksMatrix) {
     const trackTop = aggregateTopTrackVotedUseCases();
     const rankedTop = trackTop.flatMap((trk) => trk.items.map((item) => ({
@@ -4402,11 +4516,38 @@ function getMatrixItems(slide) {
     if (rankedTop.length) return rankedTop;
 
     const { allItems } = aggregateAllTracksUseCases();
-    // Fallback: wenn noch keine Track-Votes da sind, zeige alle (max 12) damit Slide nicht leer ist.
     return allItems.slice(0, 12).map((u, i) => ({ id: u.id || `it-${i}`, text: u.text, phase: u.phase, trackLabel: u.trackLabel }));
   }
-  // Manuelle Items aus slide.content.manualItems
-  return (slide?.content?.manualItems || []).map((t, i) => ({ id: `it-${i}`, text: typeof t === 'string' ? t : (t.text || ''), phase: '', trackLabel: '' }));
+
+  const c = slide?.content || {};
+  const source = c.matrixSource || 'auto'; // 'auto' | 'brainstorm' | 'manual'
+
+  // 2. Aus einem Brainstorm/Sammel-Slide (explizit verknüpft oder automatisch der Vorgänger).
+  if (source !== 'manual') {
+    let srcId = c.brainstormSourceId;
+    if (!srcId) {
+      const prev = findPrecedingCollectSlide(slide);
+      srcId = prev?.id || null;
+    }
+    if (srcId) {
+      const { items } = aggregateBrainstormItems(srcId);
+      // Dedupe nach Text, jüngste zuerst, sinnvoll begrenzen.
+      const seen = new Set();
+      const deduped = [];
+      for (let i = items.length - 1; i >= 0; i--) {
+        const key = items[i].text.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push({ id: items[i].id, text: items[i].text, phase: '', trackLabel: '' });
+      }
+      return deduped.slice(0, 24);
+    }
+    // 'auto' ohne Vorgänger → fällt auf manuelle Items zurück (s.u.)
+    if (source === 'brainstorm') return [];
+  }
+
+  // 3. Manuelle Items aus slide.content.manualItems.
+  return (c.manualItems || []).map((t, i) => ({ id: `it-${i}`, text: typeof t === 'string' ? t : (t.text || ''), phase: '', trackLabel: '' }));
 }
 
 function getMatrixLocalKey(slideId) {
@@ -4736,10 +4877,20 @@ function bindParticipantHandlers(slide) {
   $('#participant-root').querySelectorAll('.participant-option[data-emoji]').forEach((btn) => {
     btn.onclick = () => submitResponse({ emoji: btn.dataset.emoji });
   });
+  // Zeichen-Counter aktualisieren
+  const charN = $('#p-char-n');
+  if (charN) {
+    const ta = $('#p-text');
+    const upd = () => { charN.textContent = String((ta?.value || '').length); };
+    ta?.addEventListener('input', upd);
+    upd();
+  }
   $('#submit-text')?.addEventListener('click', () => {
     const text = filterProfanity($('#p-text').value.trim(), slide.settings?.profanityFilter !== false);
     const isCollect = isBrainstormCollectSlide(slide);
     if (!text && (slide.settings?.required || isCollect)) { toast(isCollect ? 'Bitte Idee eingeben' : 'Antwort erforderlich', 'warn'); return; }
+    const lim = Number(slide.content?.charLimit || 0);
+    if (lim > 0 && text.length > lim) { toast(`Maximal ${lim} Zeichen erlaubt`, 'warn'); return; }
     submitResponse({ text, upvotes: 0 });
   });
   $('#submit-num')?.addEventListener('click', () => {
