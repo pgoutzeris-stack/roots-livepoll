@@ -115,6 +115,18 @@ html.lp-join-route #screen-participant{display:flex!important}
 .sim-pill.is-on .sim-pill-state{background:#9333ea;color:#fff}
 .sim-pill.is-on i{color:#9333ea}
 .board-topbar-right{display:flex;align-items:center;gap:.5rem;margin-left:auto}
+/* Editor-Topbar: Autosave + Simulation sehen aus wie Export/Präsentieren,
+   alle einheitlich 34px hoch, insgesamt etwas kleiner. Status-Farben der
+   Pills (is-active/is-on) bleiben erhalten (nur Breite/Größe wird gesetzt). */
+.board-topbar-right .autosave-pill,
+.board-topbar-right .sim-pill,
+.board-topbar-right .btn-secondary,
+.board-topbar-right .btn-primary{height:34px;border-radius:var(--radius-pill);font-size:.82rem;font-weight:600;display:inline-flex;align-items:center;gap:.4rem;line-height:1}
+.board-topbar-right .btn-secondary,
+.board-topbar-right .btn-primary{padding:0 1rem}
+.board-topbar-right .autosave-pill,
+.board-topbar-right .sim-pill{padding:0 .9rem;border-width:1.5px}
+.board-topbar-right .btn-ghost{height:34px;width:34px;justify-content:center}
 .editor-layout{display:flex;flex:1;margin-top:56px;min-height:0;overflow:hidden}
 .editor-slides-panel{width:220px;background:var(--bg);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0}
 .editor-slides-head{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-bottom:1px solid var(--line);font-size:.85rem;font-weight:700;color:var(--muted)}
