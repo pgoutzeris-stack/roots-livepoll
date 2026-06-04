@@ -694,7 +694,7 @@ window.LP_DEBUG_PHASE_USE_CASES = {
 window.LP_DEBUG_PARTICIPANTS = [
   { name: 'Anna Becker',  emoji: '🦊', color: '#206efb' },
   { name: 'Max Hoffmann', emoji: '🐼', color: '#10b981' },
-  { name: 'Lena Schmidt', emoji: '🦁', color: '#f59e0b' },
+  { name: 'Lena Schmidt', emoji: '🦁', color: '#06b6d4' },
   { name: 'Tom Werner',   emoji: '🐸', color: '#a855f7' },
   { name: 'Sara Klein',   emoji: '🦄', color: '#ec4899' },
   { name: 'Felix Bauer',  emoji: '🐙', color: '#06b6d4' },
@@ -732,7 +732,7 @@ window.LP_INTERACTIVE_TYPES = new Set([
 ]);
 
 window.LP_AVATAR_EMOJIS = ['🦊', '🐼', '🦁', '🐸', '🦄', '🐙', '🦋', '🐳', '🌟', '🔥', '💎', '🎯', '🚀', '🌈', '🎨', '⚡'];
-window.LP_AVATAR_COLORS = ['#206efb', '#10b981', '#f59e0b', '#dc2626', '#a855f7', '#ec4899', '#06b6d4', '#84cc16', '#6366f1', '#14b8a6'];
+window.LP_AVATAR_COLORS = ['#206efb', '#10b981', '#06b6d4', '#dc2626', '#6366f1', '#0ea5e9', '#14b8a6', '#22d3ee', '#3b82f6', '#475569'];
 
 window.LP_DEFAULT_CONTENT = {
   content: { title: 'Neue Folie', body: '', imageUrl: '', ...window.LP_DEFAULT_STYLE },

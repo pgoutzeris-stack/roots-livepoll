@@ -12,7 +12,7 @@ window.__rootsSupabaseClient = sb;
 const PROFANITY = ['arsch', 'scheiße', 'scheisse', 'fuck', 'shit', 'damn', 'idiot', 'hurensohn'];
 const OPTION_TYPES = new Set(['mc_single', 'mc_multi', 'quiz', 'ranking', 'percent_split']);
 const LP_AVATAR_EMOJIS = () => window.LP_AVATAR_EMOJIS || ['🦊', '🐼', '🦁', '🦄', '🐸', '🐙', '🌟', '🔥'];
-const LP_AVATAR_COLORS = () => window.LP_AVATAR_COLORS || ['#206efb', '#10b981', '#f59e0b', '#dc2626', '#a855f7'];
+const LP_AVATAR_COLORS = () => window.LP_AVATAR_COLORS || ['#206efb', '#10b981', '#06b6d4', '#dc2626', '#6366f1'];
 
 try {
   if (window.self !== window.top) document.documentElement.classList.add('in-iframe');
@@ -572,7 +572,7 @@ function launchResultsConfetti(duration = 3200) {
     canvas.height = window.innerHeight;
   };
   resize();
-  const colors = ['#206efb', '#10b981', '#f59e0b', '#a855f7', '#ef4444', '#fbbf24', '#22d3ee'];
+  const colors = ['#206efb', '#10b981', '#06b6d4', '#6366f1', '#ef4444', '#14b8a6', '#22d3ee'];
   const particles = Array.from({ length: 140 }, () => ({
     x: canvas.width * (0.25 + Math.random() * 0.5),
     y: -10 - Math.random() * canvas.height * 0.2,
@@ -4675,7 +4675,8 @@ function renderParticipantMatrixHtml(slide) {
     ${origin ? `<span class="lp-mx-item-origin">${esc(origin)}</span>` : ''}
   </div>`;
   };
-  const cellHead = (q) => `<div class="lp-mx-cell-head"><span class="lp-mx-cell-icon">${quadrants[q].icon}</span><strong>${esc(quadrants[q].label)}</strong></div>${quadrants[q].desc ? `<div class="lp-mx-cell-desc">${esc(quadrants[q].desc)}</div>` : ''}`;
+  const QICON = { qw: 'fa-rocket', sb: 'fa-star', ts: 'fa-screwdriver-wrench', dr: 'fa-ban' };
+  const cellHead = (q) => `<div class="lp-mx-cell-head"><span class="lp-mx-cell-icon"><i class="fa-solid ${QICON[q] || 'fa-square'}"></i></span><strong>${esc(quadrants[q].label)}</strong></div>${quadrants[q].desc ? `<div class="lp-mx-cell-desc">${esc(quadrants[q].desc)}</div>` : ''}`;
   return `<div class="lp-mx-wrap" data-slide-id="${esc(slide.id)}">
     <div class="lp-mx-instructions">
       <i class="fa-solid fa-hand-pointer"></i>
