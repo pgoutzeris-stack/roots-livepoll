@@ -506,28 +506,38 @@ function sopWorkshopClose() {
 
 // ─── BUILD ───────
 
-function buildSopKiWorkshopSlides() {
+// mode:
+//  'phase' → pro Unterphase priorisieren (Phase-Vote) + Track-Vote + Matrix  (Standard)
+//  'track' → nur pro Track priorisieren (kein Phase-Vote) + Track-Vote + Matrix
+//  'end'   → keine Zwischen-Votes, Priorisierung nur ganz am Schluss in der Matrix
+function buildSopKiWorkshopSlides(mode = 'phase') {
   const slides = [];
+
+  const openerBody = {
+    phase: 'Wir gehen die ROOTS-SOP Track für Track durch.\nPro Phase sammelt ihr KI-Use-Cases und priorisiert direkt die wichtigsten.\nPro Track wählt ihr daraus die Top 3.\nZum Abschluss ordnen wir alles in eine Impact/Effort-Matrix.\n\nQR scannen · Name + Avatar wählen.',
+    track: 'Wir gehen die ROOTS-SOP Track für Track durch.\nPro Phase sammelt ihr KI-Use-Cases.\nAm Track-Ende priorisiert ihr die Top 3 je Track.\nZum Abschluss ordnen wir alles in eine Impact/Effort-Matrix.\n\nQR scannen · Name + Avatar wählen.',
+    end: 'Wir gehen die ROOTS-SOP Track für Track durch.\nPro Phase sammelt ihr nur KI-Use-Cases — ohne Zwischenabstimmung.\nDie Priorisierung passiert ganz am Schluss gemeinsam in der Impact/Effort-Matrix.\n\nQR scannen · Name + Avatar wählen.',
+  }[mode] || '';
 
   // 1. Opener
   slides.push(tplSlide('content', {
     title: 'SOP · KI Use-Case Workshop',
-    body: 'Wir gehen die ROOTS-SOP Track für Track durch.\nPro Phase sammeln wir KI-Use-Cases.\nAm Track-Ende priorisiert ihr die Top 3 Use Cases.\nZum Abschluss ordnen wir die priorisierten Use Cases in eine Impact/Effort-Matrix ein.\n\nQR scannen · Name + Avatar wählen.',
+    body: openerBody,
     mentiHero: true,
   }));
 
-  // 2. Per Track: Intro → Phasen (Intro + Brainstorm + Priorisierung) → Track Top-3
+  // 2. Per Track: Intro → Phasen (Intro + Brainstorm [+ Phase-Vote]) → [Track Top-3]
   SOP_TOOL_TRACKS.forEach((track, ti) => {
     slides.push(sopTrackIntro(track, ti));
     track.phases.forEach((phase, pi, allPhases) => {
       slides.push(sopPhaseIntro(track, phase, pi, allPhases.length));
       slides.push(sopPhaseBrainstorm(track, phase));
-      slides.push(sopPhaseVote(track, phase));
+      if (mode === 'phase') slides.push(sopPhaseVote(track, phase));
     });
-    slides.push(sopTrackVote(track, ti));
+    if (mode === 'phase' || mode === 'track') slides.push(sopTrackVote(track, ti));
   });
 
-  // 3. Workshop-Finale: Track-Top-3 Übersicht + Priorisierungs-Matrix
+  // 3. Workshop-Finale: Übersicht + Priorisierungs-Matrix
   slides.push(sopAllTracksSummary());
   slides.push(sopPriorityMatrix());
 
@@ -571,24 +581,44 @@ window.SOP_TOOL_TRACKS = SOP_TOOL_TRACKS;
 
 window.LP_TEMPLATES = [
   {
-    key: 'roots-sop-ki-workshop',
+    key: 'roots-sop-ki-workshop-phase',
     category: 'ROOTS · SOP & KI',
-    name: 'SOP-Brainstorming & KI Use Cases',
-    desc: 'Fokussierter SOP-Workshop: pro Phase KI Use Cases sammeln, pro Track Top 3 priorisieren, finale Impact/Effort-Matrix.',
+    name: 'SOP-Workshop · pro Phase',
+    desc: 'Pro Phase sammeln & direkt priorisieren, dann Track-Top-3, finale Matrix.',
     duration: '90–150 Min.',
     group: '6–25',
-    tips: 'Flow: Phase verstehen → KI Use Cases sammeln → Track-Top-3 wählen → Impact/Effort-Matrix befüllen.',
-    slides: buildSopKiWorkshopSlides(),
+    tips: 'Höchste Beteiligung — viele Abstimmungen.',
+    slides: buildSopKiWorkshopSlides('phase'),
+  },
+  {
+    key: 'roots-sop-ki-workshop-track',
+    category: 'ROOTS · SOP & KI',
+    name: 'SOP-Workshop · pro Track',
+    desc: 'Pro Phase nur sammeln, Priorisierung am Track-Ende, finale Matrix.',
+    duration: '75–120 Min.',
+    group: '6–25',
+    tips: 'Guter Mittelweg aus Tempo und Tiefe.',
+    slides: buildSopKiWorkshopSlides('track'),
+  },
+  {
+    key: 'roots-sop-ki-workshop-end',
+    category: 'ROOTS · SOP & KI',
+    name: 'SOP-Workshop · nur am Ende',
+    desc: 'Erst alles sammeln, Priorisierung nur am Schluss in der Matrix.',
+    duration: '60–90 Min.',
+    group: '6–25',
+    tips: 'Am schnellsten — eine Priorisierung am Ende.',
+    slides: buildSopKiWorkshopSlides('end'),
   },
   {
     key: 'roots-sop-ki-workshop-debug',
     category: 'ROOTS · SOP & KI · DEBUG',
-    name: '[DEBUG] SOP-Workshop · simulierte Antworten',
-    desc: 'QA-Test-Version: Sobald du sie startest, werden automatisch Fake-Teilnehmer und realistische Antworten für ALLE Folien injiziert. Damit kannst du jede Slide-Render-Variante inspizieren.',
+    name: '[DEBUG] SOP-Workshop',
+    desc: 'QA-Version mit simulierten Teilnehmern & Antworten für alle Folien.',
     duration: '— (Debug)',
     group: '— (Debug)',
-    tips: 'Erscheint nur lokal — Antworten werden nicht in der DB persistiert. Nach dem Verlassen der Session sind sie weg.',
-    slides: buildSopKiWorkshopSlides(),
+    tips: 'Nur lokal — nichts wird in der DB gespeichert.',
+    slides: buildSopKiWorkshopSlides('phase'),
   },
 ];
 

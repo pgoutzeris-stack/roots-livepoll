@@ -4438,13 +4438,18 @@ function renderParticipantMatrixHtml(slide) {
   const placements = loadMatrixLocal(slide.id);
   const inQuadrant = (q) => items.filter((it) => placements[it.id] === q);
   const inPool = items.filter((it) => !placements[it.id]);
-  const itemCard = (it) => `<div class="lp-mx-item" data-item-id="${esc(it.id)}" data-text="${esc(it.text)}">
+  const itemCard = (it) => {
+    const origin = [it.trackLabel, it.phase].filter(Boolean).join(' · ');
+    return `<div class="lp-mx-item" data-item-id="${esc(it.id)}" data-text="${esc(it.text)}" title="${esc(it.text)}${origin ? ' — ' + esc(origin) : ''}">
     <span class="lp-mx-item-text">${esc(it.text)}</span>
+    ${origin ? `<span class="lp-mx-item-origin">${esc(origin)}</span>` : ''}
   </div>`;
+  };
+  const cellHead = (q) => `<div class="lp-mx-cell-head"><span class="lp-mx-cell-icon">${quadrants[q].icon}</span><strong>${esc(quadrants[q].label)}</strong></div>${quadrants[q].desc ? `<div class="lp-mx-cell-desc">${esc(quadrants[q].desc)}</div>` : ''}`;
   return `<div class="lp-mx-wrap" data-slide-id="${esc(slide.id)}">
     <div class="lp-mx-instructions">
       <i class="fa-solid fa-hand-pointer"></i>
-      <span>Halten und ziehen, um Use Cases in Quadranten zu schieben. Tippen zum schnellen Setzen.</span>
+      <span>Ziehe jeden Use Case in den passenden Quadranten — oder tippe ihn an und wähle.</span>
     </div>
     <div class="lp-mx-grid-wrap">
       <div class="lp-mx-y-label">${esc(c.yAxisLabel || 'Impact')}</div>
@@ -4452,26 +4457,26 @@ function renderParticipantMatrixHtml(slide) {
       <div class="lp-mx-y-low">↓ niedrig</div>
       <div class="lp-mx-grid">
         <div class="lp-mx-cell lp-q-sb" data-drop="sb">
-          <div class="lp-mx-cell-head"><span class="lp-mx-cell-icon">${quadrants.sb.icon}</span><strong>${esc(quadrants.sb.label)}</strong></div>
+          ${cellHead('sb')}
           <div class="lp-mx-cell-items">${inQuadrant('sb').map(itemCard).join('')}</div>
         </div>
         <div class="lp-mx-cell lp-q-qw" data-drop="qw">
-          <div class="lp-mx-cell-head"><span class="lp-mx-cell-icon">${quadrants.qw.icon}</span><strong>${esc(quadrants.qw.label)}</strong></div>
+          ${cellHead('qw')}
           <div class="lp-mx-cell-items">${inQuadrant('qw').map(itemCard).join('')}</div>
         </div>
         <div class="lp-mx-cell lp-q-dr" data-drop="dr">
-          <div class="lp-mx-cell-head"><span class="lp-mx-cell-icon">${quadrants.dr.icon}</span><strong>${esc(quadrants.dr.label)}</strong></div>
+          ${cellHead('dr')}
           <div class="lp-mx-cell-items">${inQuadrant('dr').map(itemCard).join('')}</div>
         </div>
         <div class="lp-mx-cell lp-q-ts" data-drop="ts">
-          <div class="lp-mx-cell-head"><span class="lp-mx-cell-icon">${quadrants.ts.icon}</span><strong>${esc(quadrants.ts.label)}</strong></div>
+          ${cellHead('ts')}
           <div class="lp-mx-cell-items">${inQuadrant('ts').map(itemCard).join('')}</div>
         </div>
       </div>
       <div class="lp-mx-x-label">${esc(c.xAxisLabel || 'Aufwand')}: hoch ← → niedrig</div>
     </div>
     <div class="lp-mx-pool" data-drop="pool">
-      <div class="lp-mx-pool-head"><strong>Use Cases</strong> <span class="lp-mx-pool-count" id="lp-mx-pool-count">${inPool.length} / ${items.length}</span></div>
+      <div class="lp-mx-pool-head"><strong><i class="fa-solid fa-layer-group"></i> Use Cases</strong> <span class="lp-mx-pool-count" id="lp-mx-pool-count">${inPool.length} / ${items.length}</span></div>
       <div class="lp-mx-pool-items">${inPool.map(itemCard).join('')}</div>
     </div>
     <div class="lp-mx-actions">

@@ -338,7 +338,8 @@ html.lp-join-route #screen-participant{display:flex!important}
 .lp-confirm-ok:hover{opacity:.88}
 .lp-confirm-ok.warning{background:#d97706}
 .lp-confirm-ok.info{background:var(--brand)}
-.templates-grid,.slide-type-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem}
+.templates-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:1rem}
+.slide-type-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem}
 .add-slide-chain{margin-top:1rem;padding:1rem 1.1rem;border:1px dashed var(--line);border-radius:12px;background:var(--brand-light)}
 .add-slide-chain.hidden{display:none}
 .add-slide-chain-title{font-size:.82rem;font-weight:700;color:var(--brand-dark);margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}
@@ -346,15 +347,21 @@ html.lp-join-route #screen-participant{display:flex!important}
 .add-slide-chain .props-check{display:flex;align-items:center;gap:.45rem;font-size:.82rem;margin:.35rem 0}
 .add-slide-chain-max{display:flex;align-items:center;justify-content:space-between;gap:.75rem;font-size:.78rem;color:var(--muted);margin-top:.55rem}
 .add-slide-chain-max input{width:64px;height:34px;border:1px solid var(--line);border-radius:8px;padding:0 .5rem;font-family:inherit}
-.template-card,.type-card{border:1.5px solid var(--line);border-radius:12px;padding:1rem;cursor:pointer;background:var(--bg);transition:all .15s}
-.template-card:hover,.type-card:hover{border-color:var(--brand);background:var(--brand-light)}
-.template-card h3,.type-card h3{font-size:.92rem;margin-bottom:.35rem}
-.template-card p,.type-card p{font-size:.78rem;color:var(--muted);line-height:1.45}
-.template-cat{font-size:.72rem;color:var(--muted);margin-bottom:.35rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-.template-meta{display:flex;flex-wrap:wrap;gap:.5rem .75rem;margin-top:.5rem;font-size:.72rem;color:var(--brand);font-weight:600}
-.template-meta span{display:inline-flex;align-items:center;gap:.25rem}
-.template-tips{margin-top:.65rem;font-size:.72rem;color:var(--muted);line-height:1.4;display:flex;gap:.35rem;align-items:flex-start}
-.template-tips i{color:var(--warn);margin-top:.1rem}
+.type-card{border:1.5px solid var(--line);border-radius:12px;padding:1rem;cursor:pointer;background:var(--bg);transition:all .15s}
+.type-card:hover{border-color:var(--brand);background:var(--brand-light)}
+.type-card h3{font-size:.92rem;margin-bottom:.35rem}
+.type-card p{font-size:.78rem;color:var(--muted);line-height:1.45}
+/* Template-Karten: mehr Atemraum, kein Quetschen, gleichmäßige Höhe */
+.template-card{display:flex;flex-direction:column;text-align:left;border:1.5px solid var(--line);border-radius:14px;padding:1.15rem 1.25rem;cursor:pointer;background:var(--bg);transition:border-color .15s,background .15s,box-shadow .15s;height:100%}
+.template-card:hover{border-color:var(--brand);background:var(--brand-light);box-shadow:0 4px 16px rgba(32,110,251,.1)}
+.template-card h3{font-size:1rem;font-weight:700;line-height:1.3;margin-bottom:.45rem;color:var(--ink)}
+.template-card p{font-size:.82rem;color:var(--muted);line-height:1.5;margin:0}
+.template-cat{font-size:.68rem;color:var(--brand);margin-bottom:.5rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.template-meta{display:flex;flex-wrap:wrap;gap:.4rem .9rem;margin-top:.85rem;padding-top:.85rem;border-top:1px solid var(--line);font-size:.74rem;color:var(--muted);font-weight:600}
+.template-meta span{display:inline-flex;align-items:center;gap:.3rem}
+.template-meta i{color:var(--brand);opacity:.8}
+.template-tips{margin-top:.7rem;font-size:.74rem;color:var(--muted);line-height:1.45;display:flex;gap:.4rem;align-items:flex-start}
+.template-tips i{color:var(--warn);margin-top:.15rem;flex-shrink:0}
 .p-avatar{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:1.1rem;line-height:1;border:2px solid var(--bg);box-shadow:var(--shadow-dash);flex-shrink:0}
 .p-avatar-xs{width:24px;height:24px;font-size:.75rem}
 .p-avatar-sm{width:32px;height:32px;font-size:.95rem}
