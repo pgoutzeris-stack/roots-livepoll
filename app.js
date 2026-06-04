@@ -1312,8 +1312,7 @@ function renderCardVotePresentHtml(slide, visible) {
       <span class="track-vote-hint">${State.session.question_open ? `Max. ${maxHint} Favoriten pro Person` : 'Abstimmung abgeschlossen'}</span>
     </div>
     ${renderCardVoteParticipationHtml(slide)}
-    ${bubbleHtml}
-    ${hasVotes ? `<div class="track-vote-live-ranking"><div class="track-vote-live-label">Live-Ergebnis (Prozent)</div>${renderVoteResultsHtml(slide, visible)}</div>` : ''}
+    ${hasVotes ? `<div class="track-vote-live-ranking"><div class="track-vote-live-label">Live-Ergebnis (Prozent)</div>${renderVoteResultsHtml(slide, visible)}</div>` : '<div class="present-wait-msg">Warte auf die ersten Stimmen …</div>'}
   </div>`;
 }
 
@@ -1392,8 +1391,7 @@ function renderTrackVotePresentHtml(slide, visible) {
         <span class="track-vote-hint">Alle Tracks zusammen · ${State.session.question_open ? 'Teilnehmer priorisieren jetzt die Top-5' : 'Priorisierung abgeschlossen'}</span>
       </div>
       ${renderCardVoteParticipationHtml(slide)}
-      ${bubbleHtml}
-      ${hasVotes ? `<div class="track-vote-live-ranking"><div class="track-vote-live-label">Live-Ergebnis</div>${renderVoteResultsHtml(slide, visible)}</div>` : ''}
+      ${hasVotes ? `<div class="track-vote-live-ranking"><div class="track-vote-live-label">Live-Ergebnis</div>${renderVoteResultsHtml(slide, visible)}</div>` : '<div class="present-wait-msg">Warte auf die ersten Stimmen …</div>'}
     </div>`;
   }
   const key = slide.content?.sopTrackKey || slide.content?.sopTrackClass;
@@ -1404,16 +1402,13 @@ function renderTrackVotePresentHtml(slide, visible) {
   const newIds = markNewBubbleIds(`track-vote-${key}`, allItems);
   const bubbleHtml = window.LPViz.renderBrainstormBubbles(allItems, { mode: 'present', maxItems: 120, newIds });
   const hasVotes = visible.length > 0 || !State.session.question_open;
-  const boardHtml = renderSopBoardPreview(slide.content || {});
   return `<div class="track-vote-present">
     <div class="track-vote-present-head">
       <span class="track-vote-count">${allItems.length} Use Cases</span>
       <span class="track-vote-hint">Kontext aus allen SOP-Phasen · ${State.session.question_open ? 'Teilnehmer wählen jetzt Top 3' : 'Priorisierung abgeschlossen'}</span>
     </div>
-    ${boardHtml ? `<div class="track-vote-sop-context">${boardHtml}</div>` : ''}
     ${renderCardVoteParticipationHtml(slide)}
-    ${bubbleHtml}
-    ${hasVotes ? `<div class="track-vote-live-ranking"><div class="track-vote-live-label">Live-Ergebnis</div>${renderVoteResultsHtml(slide, visible)}</div>` : ''}
+    ${hasVotes ? `<div class="track-vote-live-ranking"><div class="track-vote-live-label">Live-Ergebnis</div>${renderVoteResultsHtml(slide, visible)}</div>` : '<div class="present-wait-msg">Warte auf die ersten Stimmen …</div>'}
   </div>`;
 }
 
@@ -1676,14 +1671,23 @@ function syncSopWorkshopShell(mode, slideIndex) {
     panel.bind(el);
   };
 
+  // Auf Priorisierungs-Folien (Votes + Matrix) die SOP-Übersicht ausblenden —
+  // dort soll nur Leaderboard + Teilnehmer-Panel zu sehen sein.
+  const curSlide = State.slides[idx];
+  const hidePanelForSlide = !!curSlide && (
+    curSlide.settings?.sopPhaseVote || curSlide.settings?.sopTrackVote ||
+    curSlide.settings?.sopAllTracksVote || curSlide.settings?.sopAllTracksMatrix ||
+    curSlide.slide_type === 'priority_matrix'
+  );
+
   editorNav?.classList.add('hidden');
   if (mode === 'editor') mountPanel(editorPanel);
   else editorPanel?.classList.add('hidden');
 
-  if (mode === 'present') mountPanel(presentPanel);
+  if (mode === 'present' && !hidePanelForSlide) mountPanel(presentPanel);
   else presentPanel?.classList.add('hidden');
 
-  if (mode === 'participant') mountPanel(participantPanel);
+  if (mode === 'participant' && !hidePanelForSlide) mountPanel(participantPanel);
   else participantPanel?.classList.add('hidden');
 }
 
