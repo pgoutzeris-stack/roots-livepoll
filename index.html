@@ -256,6 +256,33 @@
   </div>
 </div>
 
+<!-- ── ROOTS Confirm Modal ── -->
+<div id="lp-confirm-modal" class="modal lp-confirm">
+  <div class="modal-card lp-confirm-card">
+    <div class="lp-confirm-icon" id="lp-confirm-icon"><i class="fa-solid fa-trash"></i></div>
+    <h2 class="lp-confirm-title" id="lp-confirm-title">Wirklich löschen?</h2>
+    <p class="lp-confirm-desc" id="lp-confirm-desc">Diese Aktion kann nicht rückgängig gemacht werden.</p>
+    <div class="lp-confirm-actions">
+      <button type="button" class="lp-confirm-cancel" id="lp-confirm-cancel">Abbrechen</button>
+      <button type="button" class="lp-confirm-ok" id="lp-confirm-ok">Löschen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ROOTS Prompt Modal (Text-Eingabe) ── -->
+<div id="lp-prompt-modal" class="modal lp-confirm">
+  <div class="modal-card lp-confirm-card">
+    <div class="lp-confirm-icon info" id="lp-prompt-icon"><i class="fa-solid fa-pen"></i></div>
+    <h2 class="lp-confirm-title" id="lp-prompt-title">Umbenennen</h2>
+    <p class="lp-confirm-desc" id="lp-prompt-label">Neuer Titel</p>
+    <input type="text" id="lp-prompt-input" class="lp-prompt-input" />
+    <div class="lp-confirm-actions">
+      <button type="button" class="lp-confirm-cancel" id="lp-prompt-cancel">Abbrechen</button>
+      <button type="button" class="lp-confirm-ok info" id="lp-prompt-ok">Speichern</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://pgoutzeris-stack.github.io/ROOTS_Intranet/roots-user-bridge.js?v=__BUILD__"></script>
 <script src="templates.js?v=__BUILD__"></script>
 <script src="viz.js?v=__BUILD__"></script>

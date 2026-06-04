@@ -322,6 +322,22 @@ html.lp-join-route #screen-participant{display:flex!important}
 .modal-head{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--line)}
 .modal-head h2{font-size:1.05rem}
 .modal-body{padding:1rem 1.25rem 1.25rem;overflow-y:auto}
+/* ── ROOTS Confirm / Prompt Modal ── */
+.lp-confirm-card{max-width:380px;padding:1.75rem 1.5rem 1.5rem;text-align:center}
+.lp-confirm-icon{width:48px;height:48px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:1.15rem;margin:0 auto .85rem;background:#fef2f2;color:#dc2626}
+.lp-confirm-icon.warning{background:#fffbeb;color:#d97706}
+.lp-confirm-icon.info{background:var(--brand-light);color:var(--brand)}
+.lp-confirm-title{font-size:1.05rem;font-weight:700;color:var(--ink);margin:0 0 .4rem}
+.lp-confirm-desc{font-size:.875rem;color:var(--muted);line-height:1.5;margin:0 0 1.25rem}
+.lp-prompt-input{width:100%;height:44px;padding:0 .9rem;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:.95rem;color:var(--ink);background:var(--bg);outline:none;box-sizing:border-box;margin:0 0 1.25rem;transition:border-color .15s}
+.lp-prompt-input:focus{border-color:var(--brand)}
+.lp-confirm-actions{display:flex;gap:.6rem}
+.lp-confirm-cancel{flex:1;padding:.75rem 1rem;border:1px solid var(--line);border-radius:10px;background:transparent;font-family:inherit;font-weight:600;font-size:.875rem;color:var(--ink);cursor:pointer;transition:all .15s}
+.lp-confirm-cancel:hover{border-color:var(--brand);color:var(--brand)}
+.lp-confirm-ok{flex:1;padding:.75rem 1rem;border:none;border-radius:10px;font-family:inherit;font-weight:600;font-size:.875rem;color:#fff;background:#dc2626;cursor:pointer;transition:opacity .15s}
+.lp-confirm-ok:hover{opacity:.88}
+.lp-confirm-ok.warning{background:#d97706}
+.lp-confirm-ok.info{background:var(--brand)}
 .templates-grid,.slide-type-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem}
 .add-slide-chain{margin-top:1rem;padding:1rem 1.1rem;border:1px dashed var(--line);border-radius:12px;background:var(--brand-light)}
 .add-slide-chain.hidden{display:none}

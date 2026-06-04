@@ -81,6 +81,80 @@ function toast(msg, type = 'info') {
   setTimeout(() => el.remove(), 3200);
 }
 
+// ── ROOTS Confirm Modal (ersetzt window.confirm) ───────────────────────────
+function lpConfirm({ title = 'Wirklich fortfahren?', desc = '', okLabel = 'Bestätigen', variant = 'danger', icon = 'fa-trash' } = {}) {
+  return new Promise((resolve) => {
+    const modal  = $('#lp-confirm-modal');
+    if (!modal) { resolve(window.confirm(desc || title)); return; }
+    const iconEl = $('#lp-confirm-icon');
+    const okBtn  = $('#lp-confirm-ok');
+    const cancel = $('#lp-confirm-cancel');
+    $('#lp-confirm-title').textContent = title;
+    const descEl = $('#lp-confirm-desc');
+    descEl.textContent = desc;
+    descEl.style.display = desc ? '' : 'none';
+    iconEl.className = 'lp-confirm-icon' + (variant !== 'danger' ? ' ' + variant : '');
+    iconEl.innerHTML = `<i class="fa-solid ${icon}"></i>`;
+    okBtn.className = 'lp-confirm-ok' + (variant !== 'danger' ? ' ' + variant : '');
+    okBtn.textContent = okLabel;
+    modal.classList.add('visible');
+    const done = (val) => {
+      modal.classList.remove('visible');
+      okBtn.removeEventListener('click', onOk);
+      cancel.removeEventListener('click', onCancel);
+      modal.removeEventListener('click', onBg);
+      document.removeEventListener('keydown', onKey);
+      resolve(val);
+    };
+    const onOk = () => done(true);
+    const onCancel = () => done(false);
+    const onBg = (e) => { if (e.target === modal) done(false); };
+    const onKey = (e) => { if (e.key === 'Escape') done(false); };
+    okBtn.addEventListener('click', onOk);
+    cancel.addEventListener('click', onCancel);
+    modal.addEventListener('click', onBg);
+    document.addEventListener('keydown', onKey);
+  });
+}
+
+// ── ROOTS Prompt Modal (ersetzt window.prompt) ─────────────────────────────
+function lpPrompt({ title = 'Eingabe', label = '', value = '', okLabel = 'Speichern' } = {}) {
+  return new Promise((resolve) => {
+    const modal = $('#lp-prompt-modal');
+    if (!modal) { resolve(window.prompt(label || title, value)); return; }
+    const input = $('#lp-prompt-input');
+    const okBtn = $('#lp-prompt-ok');
+    const cancel = $('#lp-prompt-cancel');
+    $('#lp-prompt-title').textContent = title;
+    const labelEl = $('#lp-prompt-label');
+    labelEl.textContent = label;
+    labelEl.style.display = label ? '' : 'none';
+    okBtn.textContent = okLabel;
+    input.value = value || '';
+    modal.classList.add('visible');
+    setTimeout(() => { input.focus(); input.select(); }, 50);
+    const done = (val) => {
+      modal.classList.remove('visible');
+      okBtn.removeEventListener('click', onOk);
+      cancel.removeEventListener('click', onCancel);
+      modal.removeEventListener('click', onBg);
+      input.removeEventListener('keydown', onInputKey);
+      document.removeEventListener('keydown', onKey);
+      resolve(val);
+    };
+    const onOk = () => done(input.value);
+    const onCancel = () => done(null);
+    const onBg = (e) => { if (e.target === modal) done(null); };
+    const onKey = (e) => { if (e.key === 'Escape') done(null); };
+    const onInputKey = (e) => { if (e.key === 'Enter') { e.preventDefault(); done(input.value); } };
+    okBtn.addEventListener('click', onOk);
+    cancel.addEventListener('click', onCancel);
+    modal.addEventListener('click', onBg);
+    input.addEventListener('keydown', onInputKey);
+    document.addEventListener('keydown', onKey);
+  });
+}
+
 function showScreen(name) {
   $$('.screen').forEach((s) => s.classList.remove('active'));
   const el = $(`#screen-${name}`);
@@ -1868,7 +1942,7 @@ function renderDashboard() {
     card.querySelector('[data-act="rename"]')?.addEventListener('click', async (e) => {
       e.stopPropagation();
       const p = State.presentations.find((x) => x.id === card.dataset.id);
-      const title = prompt('Neuer Titel:', p.title);
+      const title = await lpPrompt({ title: 'Präsentation umbenennen', label: 'Neuer Titel', value: p.title, okLabel: 'Speichern' });
       if (!title?.trim()) return;
       await sb.from('lp_presentations').update({ title: title.trim() }).eq('id', p.id);
       await loadPresentations(); renderDashboard();
@@ -1879,7 +1953,7 @@ function renderDashboard() {
     });
     card.querySelector('[data-act="del"]')?.addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (!confirm('Präsentation löschen?')) return;
+      if (!await lpConfirm({ title: 'Präsentation löschen?', desc: 'Die Präsentation und alle Folien werden dauerhaft entfernt.', okLabel: 'Löschen', variant: 'danger', icon: 'fa-trash' })) return;
       await sb.from('lp_presentations').delete().eq('id', card.dataset.id);
       await loadPresentations(); renderDashboard();
     });
@@ -2027,7 +2101,7 @@ function renderSlideList() {
   list.querySelectorAll('[data-del]').forEach((btn) => btn.addEventListener('click', async (e) => {
     e.stopPropagation();
     if (State.slides.length <= 1) { toast('Mindestens eine Folie behalten', 'warn'); return; }
-    if (!confirm('Folie löschen?')) return;
+    if (!await lpConfirm({ title: 'Folie löschen?', desc: 'Diese Folie wird dauerhaft entfernt.', okLabel: 'Löschen', variant: 'danger', icon: 'fa-trash' })) return;
     await deleteSlide(btn.dataset.del);
   }));
 }
@@ -3021,7 +3095,8 @@ async function openVersionsModal() {
 
 async function restoreVersion(versionId, versions) {
   const ver = versions.find((v) => v.id === versionId);
-  if (!ver || !confirm('Aktuelle Folien durch diese Version ersetzen?')) return;
+  if (!ver) return;
+  if (!await lpConfirm({ title: 'Version wiederherstellen?', desc: 'Die aktuellen Folien werden durch diese Version ersetzt.', okLabel: 'Ersetzen', variant: 'warning', icon: 'fa-clock-rotate-left' })) return;
   const snap = ver.snapshot;
   await sb.from('lp_slides').delete().eq('presentation_id', State.presentation.id);
   const rows = (snap.slides || []).map((s, i) => ({
@@ -3950,14 +4025,14 @@ function bindPresentToolbar() {
     toast(State.showPresentPanels ? 'Teilnehmer-Leiste eingeblendet' : 'Teilnehmer-Leiste ausgeblendet', 'success');
   });
   $('#present-reset').onclick = async () => {
-    if (!confirm('Antworten dieser Folie zurücksetzen?')) return;
+    if (!await lpConfirm({ title: 'Antworten zurücksetzen?', desc: 'Alle Antworten dieser Folie werden gelöscht.', okLabel: 'Zurücksetzen', variant: 'warning', icon: 'fa-arrow-rotate-left' })) return;
     const slide = currentSessionSlide();
     await sb.from('lp_responses').delete().eq('session_id', State.session.id).eq('slide_id', slide.id);
     State.responses = State.responses.filter((r) => r.slide_id !== slide.id);
     renderPresent();
   };
   $('#present-end').onclick = async () => {
-    if (!confirm('Session beenden?')) return;
+    if (!await lpConfirm({ title: 'Session beenden?', desc: 'Die Live-Session wird beendet und die Ergebnisse angezeigt.', okLabel: 'Beenden', variant: 'danger', icon: 'fa-stop' })) return;
     await sb.from('lp_sessions').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', State.session.id);
     location.hash = `#results/${State.session.id}`;
     await openResults(State.session.id);
