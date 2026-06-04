@@ -363,32 +363,39 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 
 /* ═══════ DEBUG-SIMULATOR FLOATING PANEL ═══════════════════ */
+/* ── Simulations-Widget · ROOTS-Design (hell, verschiebbar) ── */
 .lp-debug-panel{
   position:fixed;top:5.5rem;left:1rem;
-  background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;
-  border:1px solid rgba(255,255,255,.1);border-radius:14px;
-  padding:.75rem .85rem;display:flex;flex-direction:column;gap:.5rem;
-  z-index:300;box-shadow:0 12px 30px rgba(0,0,0,.4);min-width:200px;
-  font-size:.78rem;
+  background:var(--bg,#fff);color:var(--ink,#0f172a);
+  border:1px solid var(--line,#e2e8f0);border-radius:16px;
+  padding:0;display:flex;flex-direction:column;
+  z-index:300;box-shadow:0 16px 40px rgba(15,23,42,.18);min-width:230px;
+  font-size:.78rem;overflow:hidden;user-select:none;
+  animation:lp-slide-in .25s ease;
 }
-.lp-debug-panel-head{display:flex;align-items:center;gap:.4rem;font-weight:700;font-size:.78rem;letter-spacing:.04em}
-.lp-debug-panel-head i{color:#fbbf24}
-.lp-debug-row{display:flex;align-items:center;gap:.35rem;font-size:.72rem;color:rgba(255,255,255,.85)}
-.lp-debug-row strong{color:#fff}
-.lp-debug-btn-grp{display:flex;gap:4px;flex-wrap:wrap}
-.lp-debug-btn{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:4px 10px;font-size:.7rem;cursor:pointer;font-weight:600;transition:all .15s;font-family:inherit}
-.lp-debug-btn:hover{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.3)}
-.lp-debug-btn.active{background:#206efb;border-color:#206efb}
-.lp-debug-btn.warn{background:rgba(245,158,11,.2);border-color:rgba(245,158,11,.4)}
-.lp-debug-btn.danger{background:rgba(220,38,38,.2);border-color:rgba(220,38,38,.4)}
-.lp-debug-status{font-size:.65rem;color:rgba(255,255,255,.55);font-family:'SF Mono',Menlo,monospace}
-.lp-debug-panel-head{cursor:pointer;justify-content:space-between}
-.lp-debug-collapse{background:rgba(255,255,255,.1);border:none;color:#fff;width:22px;height:22px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.65rem;padding:0;transition:background .15s}
-.lp-debug-collapse:hover{background:rgba(255,255,255,.25)}
-.lp-debug-body{display:flex;flex-direction:column;gap:.5rem;transition:max-height .25s ease,opacity .2s ease,margin .2s ease;max-height:500px;overflow:hidden}
-.lp-debug-panel.collapsed .lp-debug-body{max-height:0;opacity:0;margin-top:-0.5rem;pointer-events:none}
-.lp-debug-panel.collapsed{padding:.55rem .85rem}
-.lp-debug-panel.collapsed .lp-dbg-title::after{content:' (eingeklappt)';opacity:.5;font-weight:400}
+.lp-debug-panel.lp-dbg-dragging{box-shadow:0 22px 55px rgba(15,23,42,.28);cursor:grabbing}
+.lp-debug-panel-head{display:flex;align-items:center;gap:.5rem;font-weight:700;font-size:.85rem;
+  padding:.6rem .75rem;background:linear-gradient(135deg,#9333ea,#a855f7);color:#fff;cursor:grab}
+.lp-debug-panel.lp-dbg-dragging .lp-debug-panel-head{cursor:grabbing}
+.lp-dbg-grip{opacity:.7;font-size:.7rem;cursor:grab}
+.lp-dbg-badge{width:22px;height:22px;border-radius:7px;background:rgba(255,255,255,.22);display:inline-flex;align-items:center;justify-content:center;font-size:.7rem}
+.lp-dbg-title{flex:1}
+.lp-debug-body{display:flex;flex-direction:column;gap:.55rem;padding:.75rem .8rem;transition:max-height .25s ease,opacity .2s ease,padding .2s ease;max-height:500px;overflow:hidden}
+.lp-debug-row{display:flex;align-items:center;gap:.4rem;font-size:.74rem;color:var(--muted,#64748b)}
+.lp-debug-row strong{color:var(--ink,#0f172a);font-weight:700}
+.lp-debug-btn-grp{display:flex;gap:5px;flex-wrap:wrap}
+.lp-debug-btn{background:var(--surface,#f8fafc);color:var(--ink,#0f172a);border:1px solid var(--line,#e2e8f0);border-radius:8px;padding:5px 11px;font-size:.72rem;cursor:pointer;font-weight:600;transition:all .15s;font-family:inherit}
+.lp-debug-btn:hover{border-color:#a855f7;color:#9333ea;background:#faf5ff}
+.lp-debug-btn.active{background:#9333ea;border-color:#9333ea;color:#fff}
+.lp-debug-btn.warn{background:#fffbeb;border-color:#fcd34d;color:#b45309}
+.lp-debug-btn.warn:hover{background:#fef3c7}
+.lp-debug-btn.danger{background:#fef2f2;border-color:#fca5a5;color:#dc2626}
+.lp-debug-btn.danger:hover{background:#fee2e2}
+.lp-debug-status{font-size:.66rem;color:var(--muted,#94a3b8);font-family:'SF Mono',Menlo,monospace}
+.lp-debug-collapse{background:rgba(255,255,255,.22);border:none;color:#fff;width:24px;height:24px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.65rem;padding:0;transition:background .15s;flex-shrink:0}
+.lp-debug-collapse:hover{background:rgba(255,255,255,.4)}
+.lp-debug-panel.collapsed .lp-debug-body{max-height:0;opacity:0;padding-top:0;padding-bottom:0;pointer-events:none}
+.lp-debug-panel.collapsed .lp-dbg-title::after{content:' · eingeklappt';opacity:.7;font-weight:400;font-size:.72rem}
 @media (max-width:760px){
   .lp-debug-panel{top:auto;bottom:5rem;left:.5rem;right:.5rem;min-width:0}
 }

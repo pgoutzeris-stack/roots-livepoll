@@ -3335,7 +3335,7 @@ const LP_DebugSim = {
     this.dripNextParticipant();
     // Für aktuellen Slide schon vorbereiten
     setTimeout(() => this.maybeDripCurrentSlide(), 1500 / this.speed);
-    try { toast(`🛠 DEBUG-Simulator gestartet — 6 Teilnehmer joinen jetzt zeitversetzt`, 'info'); } catch {}
+    try { toast(`🧪 Simulation gestartet — simulierte Teilnehmer joinen zeitversetzt`, 'info'); } catch {}
   },
 
   stop() {
@@ -3396,12 +3396,24 @@ const LP_DebugSim = {
 
     // First pass: brainstorm slides
     const allCollected = [];
+    const GENERIC_USE_CASES = [
+      'KI-gestützte Recherche', 'Automatische Protokolle', 'Chatbot für häufige Fragen',
+      'Datenanalyse-Assistent', 'Vorlagen-Generator', 'E-Mail-Entwürfe automatisieren',
+      'Übersetzungen on demand', 'Meeting-Zusammenfassungen', 'Wettbewerbs-Monitoring',
+      'Reporting automatisieren', 'Wissensdatenbank-Suche', 'Onboarding-Assistent',
+    ];
     State.slides.forEach((slide) => {
       if (slide.slide_type !== 'brainstorm') return;
       const c = slide.content || {};
       const phaseName = c.sopPhaseName || c.title || '';
-      const useCases = PHASE_USE_CASES[phaseName] || PHASE_USE_CASES[c.title] || [];
-      if (!useCases.length) return;
+      let useCases = PHASE_USE_CASES[phaseName] || PHASE_USE_CASES[c.title] || [];
+      // Fallback: generische Use Cases, damit JEDE Brainstorm-Folie (auch eigene)
+      // in der Simulation Antworten erhält und nachgelagerte Matrizen befüllt werden.
+      if (!useCases.length) {
+        const seed = String(slide.id).split('').reduce((a, ch) => a + ch.charCodeAt(0), 0);
+        const offset = seed % GENERIC_USE_CASES.length;
+        useCases = GENERIC_USE_CASES.slice(offset).concat(GENERIC_USE_CASES.slice(0, offset)).slice(0, 6);
+      }
       const queue = [];
       useCases.forEach((text, i) => {
         const pIdx = i % defs.length;
@@ -3630,8 +3642,9 @@ function ensureDebugPanel() {
   panel.className = 'lp-debug-panel';
   panel.innerHTML = `
     <div class="lp-debug-panel-head">
-      <i class="fa-solid fa-flask-vial"></i>
-      <span class="lp-dbg-title">DEBUG-Simulator</span>
+      <i class="fa-solid fa-grip-vertical lp-dbg-grip" title="Verschieben"></i>
+      <span class="lp-dbg-badge"><i class="fa-solid fa-flask"></i></span>
+      <span class="lp-dbg-title">Simulation</span>
       <button class="lp-debug-collapse" id="lp-dbg-collapse" title="Ein-/Ausblenden"><i class="fa-solid fa-chevron-up"></i></button>
     </div>
     <div class="lp-debug-body">
@@ -3671,10 +3684,52 @@ function ensureDebugPanel() {
   };
   applyCollapse(localStorage.getItem('lp_dbg_collapsed') === '1');
   panel.querySelector('#lp-dbg-collapse').onclick = () => applyCollapse(!panel.classList.contains('collapsed'));
-  panel.querySelector('.lp-debug-panel-head').onclick = (e) => {
-    if (e.target.closest('#lp-dbg-collapse')) return; // schon vom Button erledigt
-    if (panel.classList.contains('collapsed')) applyCollapse(false);
+
+  // ─── Gespeicherte Position wiederherstellen ───
+  try {
+    const pos = JSON.parse(localStorage.getItem('lp_dbg_pos') || 'null');
+    if (pos && Number.isFinite(pos.left) && Number.isFinite(pos.top)) {
+      panel.style.left = Math.max(0, Math.min(pos.left, window.innerWidth - 80)) + 'px';
+      panel.style.top = Math.max(0, Math.min(pos.top, window.innerHeight - 60)) + 'px';
+      panel.style.right = 'auto';
+      panel.style.bottom = 'auto';
+    }
+  } catch {}
+
+  // ─── Drag & Drop über den Kopf ───
+  const head = panel.querySelector('.lp-debug-panel-head');
+  let drag = null;
+  head.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('#lp-dbg-collapse')) return;
+    const rect = panel.getBoundingClientRect();
+    drag = { offX: e.clientX - rect.left, offY: e.clientY - rect.top, moved: false, sx: e.clientX, sy: e.clientY };
+    head.setPointerCapture(e.pointerId);
+    panel.classList.add('lp-dbg-dragging');
+  });
+  head.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 4) drag.moved = true;
+    const left = Math.max(0, Math.min(e.clientX - drag.offX, window.innerWidth - panel.offsetWidth));
+    const top = Math.max(0, Math.min(e.clientY - drag.offY, window.innerHeight - 40));
+    panel.style.left = left + 'px';
+    panel.style.top = top + 'px';
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  });
+  const endDrag = (e) => {
+    if (!drag) return;
+    panel.classList.remove('lp-dbg-dragging');
+    try { head.releasePointerCapture(e.pointerId); } catch {}
+    if (drag.moved) {
+      const rect = panel.getBoundingClientRect();
+      try { localStorage.setItem('lp_dbg_pos', JSON.stringify({ left: rect.left, top: rect.top })); } catch {}
+    } else if (panel.classList.contains('collapsed')) {
+      applyCollapse(false); // Klick (ohne Bewegung) im collapsed-Zustand → ausklappen
+    }
+    drag = null;
   };
+  head.addEventListener('pointerup', endDrag);
+  head.addEventListener('pointercancel', endDrag);
   setInterval(() => {
     if (!document.getElementById('lp-debug-panel')) return;
     const cnt = State.responses.filter((r) => String(r.id).startsWith('debug-r-')).length;
