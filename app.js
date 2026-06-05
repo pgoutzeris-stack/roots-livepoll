@@ -1461,7 +1461,11 @@ function renderWorkshopCardCollectHtml(c, editable = false) {
   const subEl = c.subtitle ? `<p class="menti-crumb">${esc(c.subtitle)}</p>` : '';
   // Beschreibung nur zeigen, wenn vorhanden — kein leeres Zweitfeld, das wie eine
   // doppelte Frage aussieht. (Bearbeitbar bleibt sie, sobald Text vorhanden ist.)
-  const hasBody = !!(c.body && String(c.body).trim());
+  // Body nur zeigen, wenn vorhanden UND nicht identisch zur Frage (verhindert
+  // doppelten Fragetext bei evtl. bereits gespiegelten Altdaten).
+  const bodyTxt = (c.body && String(c.body).trim()) || '';
+  const promptTxt = (c.prompt && String(c.prompt).trim()) || '';
+  const hasBody = !!bodyTxt && bodyTxt !== promptTxt;
   const bodyEl = editable
     ? (hasBody ? `<div class="canvas-editable menti-q-sub" contenteditable="true" data-field="body">${esc(c.body)}</div>` : '')
     : (hasBody ? `<p class="menti-q-sub">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
@@ -3003,7 +3007,11 @@ function renderEditorProps() {
       title: $('#prop-title')?.value || '',
       subtitle: $('#prop-subtitle')?.value ?? slideObj.content.subtitle,
       prompt: $('#prop-prompt')?.value || '',
-      body: ['content', 'section'].includes(slideObj.slide_type) || slideObj.content.sopKind
+      // Body nur bei nicht-interaktiven Inhalts-/SOP-Folien aus dem Prompt-Feld
+      // spiegeln. Bei interaktiven Folien (Brainstorm, Offen, MC …) ist das
+      // Prompt-Feld die Frage — sonst landet die Frage doppelt in body+prompt.
+      body: (['content', 'section'].includes(slideObj.slide_type)
+        || (slideObj.content.sopKind && !(window.LP_INTERACTIVE_TYPES || new Set()).has(slideObj.slide_type)))
         ? ($('#prop-prompt')?.value || slideObj.content.body)
         : slideObj.content.body,
       imageUrl: $('#prop-image')?.value ?? slideObj.content.imageUrl,
