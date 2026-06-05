@@ -549,3 +549,9 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 
 /* Zeichen-Counter bei Freitext-Eingaben */
 .p-char-counter{font-size:.72rem;color:var(--muted);text-align:right;margin:-.35rem 0 .5rem;font-weight:600}
+
+/* ── „Ergebnisse aufdecken"-Gate (resultsReveal: manual) ── */
+.present-reveal-gate{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.1rem;padding:3rem 1rem;text-align:center;animation:lp-slide-in .3s ease}
+.present-reveal-icon{width:74px;height:74px;border-radius:20px;background:var(--brand-light);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:1.9rem}
+.present-reveal-count{font-size:1.05rem;font-weight:700;color:var(--ink)}
+.present-reveal-gate .btn-primary{font-size:1rem;padding:.8rem 1.5rem}

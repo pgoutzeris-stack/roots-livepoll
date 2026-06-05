@@ -621,3 +621,4 @@ html.lp-join-route #screen-participant{display:flex!important}
 .toast.success{border-left-color:var(--success)}
 .toast.warn{border-left-color:var(--warn)}
 @keyframes toastIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
+.editor-slides-head-actions{display:flex;align-items:center;gap:.15rem}

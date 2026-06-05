@@ -2593,6 +2593,15 @@ function finalizePresentUi(slide) {
   updatePresentToolbarUi(slide);
   bindResultsDisplayToggle($('#present-stage'));
   maybeLaunchResultsConfetti(slide);
+  // „Ergebnisse aufdecken"-Button (resultsReveal: 'manual')
+  const revealBtn = document.getElementById('present-reveal-btn');
+  if (revealBtn && slide) {
+    revealBtn.addEventListener('click', () => {
+      if (!State.revealedSlides) State.revealedSlides = new Set();
+      State.revealedSlides.add(slide.id);
+      renderPresent();
+    });
+  }
 }
 
 async function deleteSlide(id) {
@@ -2925,6 +2934,20 @@ function renderEditorProps() {
     <p class="props-hint"><i class="fa-solid fa-circle-info"></i> 0 = keine Begrenzung.</p>`;
   }
 
+  // Ergebnis-Anzeige (live vs. auf Klick aufdecken) — generisch für alle interaktiven Folien
+  const _isInteractiveType = (window.LP_INTERACTIVE_TYPES || new Set()).has(slide.slide_type);
+  let resultRevealHtml = '';
+  if (_isInteractiveType) {
+    const rv = s.resultsReveal || 'live';
+    resultRevealHtml = `
+    <div class="props-label">Ergebnis-Anzeige</div>
+    <select id="prop-results-reveal">
+      <option value="live" ${rv === 'live' ? 'selected' : ''}>Sofort live anzeigen</option>
+      <option value="manual" ${rv === 'manual' ? 'selected' : ''}>Erst auf Klick aufdecken</option>
+    </select>
+    <p class="props-hint"><i class="fa-solid fa-eye"></i> „Aufdecken" zeigt im Präsentationsmodus zuerst nur die Antwortzahl + einen Button — gut für Spannung & Quiz.</p>`;
+  }
+
   const _typeMeta = editorSlideTypeMeta(slide);
   panel.innerHTML = `
     <div class="props-head">
@@ -2960,6 +2983,7 @@ function renderEditorProps() {
       <label class="props-toggle"><input type="checkbox" id="set-profanity" ${s.profanityFilter !== false ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-filter"></i></span><span class="props-toggle-text">Profanity-Filter</span></label>
     </div>
     <p class="props-hint"><i class="fa-solid fa-circle-info"></i> Name & Avatar werden bei Teilnahme immer abgefragt.</p>
+    ${resultRevealHtml}
     <div class="props-label">Zeitlimit (Sek., 0 = aus)</div><input id="set-time" type="number" min="0" value="${s.timeLimitSec || 0}" />`;
 
   const saveContent = debounce(async () => {
@@ -3022,6 +3046,7 @@ function renderEditorProps() {
       profanityFilter: $('#set-profanity')?.checked,
       askName: true,
       timeLimitSec: Number($('#set-time')?.value || 0),
+      resultsReveal: $('#prop-results-reveal')?.value || slideObj.settings?.resultsReveal || 'live',
     };
     if (COLLECT_CHAIN_TYPES.has(slideObj.slide_type) && !slideObj.content?.sopTrackKey && !slideObj.content?.sopTrackClass) {
       setCollectChainSettings(slideObj, {
@@ -3281,6 +3306,7 @@ async function startPresentation() {
   State.responses = [];
   State.participants = [];
   State._debugSeeded = false; // ← Re-Seed erlauben bei jeder neuen Session
+  State.revealedSlides = new Set(); // Reveal-Status pro Session zurücksetzen
   location.hash = `#present/${session.id}`;
   showScreen('present');
   await loadSessionData();
@@ -3947,6 +3973,13 @@ function renderPresent() {
     } else if (c.imageUrl) {
       viz = `<img src="${esc(c.imageUrl)}" alt="" style="max-width:min(720px,90vw);border-radius:16px;margin-top:1rem">`;
     }
+  } else if (slide.settings?.resultsReveal === 'manual' && !(State.revealedSlides && State.revealedSlides.has(slide.id))) {
+    // „Erst auf Klick aufdecken": Ergebnis verbergen bis der Presenter aufdeckt.
+    viz = `<div class="present-reveal-gate">
+      <div class="present-reveal-icon"><i class="fa-solid fa-eye-slash"></i></div>
+      <div class="present-reveal-count">${visible.length} Antwort${visible.length === 1 ? '' : 'en'} gesammelt</div>
+      <button type="button" class="btn-primary" id="present-reveal-btn"><i class="fa-solid fa-eye"></i> Ergebnisse aufdecken</button>
+    </div>`;
   } else if (slide.settings?.showResultsLive !== false) {
     // Live-Ergebnisse für ALLE Slide-Typen (einheitlich wie SOP): Visualisierung
     // immer rendern, auch wenn noch keine Antwort vorliegt. Die einzelnen
@@ -5251,6 +5284,10 @@ function bindUi() {
   $('#btn-join-as-participant')?.addEventListener('click', () => { location.hash = '#join'; enterParticipantJoin(); });
   $('#editor-back')?.addEventListener('click', goDashboard);
   $('#btn-add-slide')?.addEventListener('click', () => { renderAddSlideModal(); openModal('modal-add-slide'); });
+  $('#btn-add-session-result')?.addEventListener('click', async () => {
+    await togglePresentationClosureCard('presentation_results');
+    renderEditor();
+  });
   bindAddSlideModalControls();
   $('#btn-save-version')?.addEventListener('click', saveVersionSnapshot);
   $('#btn-show-versions')?.addEventListener('click', openVersionsModal);
