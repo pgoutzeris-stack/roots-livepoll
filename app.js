@@ -1459,9 +1459,12 @@ function renderWorkshopCardCollectHtml(c, editable = false) {
     ? `<div class="canvas-editable menti-q-title" contenteditable="true" data-field="title" data-placeholder="Titel der Folie…">${esc(c.title || '')}</div>`
     : `<h1 class="menti-q-title">${esc(c.title || c.sopCardName || '')}</h1>`;
   const subEl = c.subtitle ? `<p class="menti-crumb">${esc(c.subtitle)}</p>` : '';
+  // Beschreibung nur zeigen, wenn vorhanden — kein leeres Zweitfeld, das wie eine
+  // doppelte Frage aussieht. (Bearbeitbar bleibt sie, sobald Text vorhanden ist.)
+  const hasBody = !!(c.body && String(c.body).trim());
   const bodyEl = editable
-    ? `<div class="canvas-editable canvas-editable--optional menti-q-sub" contenteditable="true" data-field="body" data-placeholder="Beschreibung (optional)…">${esc(c.body || '')}</div>`
-    : (c.body ? `<p class="menti-q-sub">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+    ? (hasBody ? `<div class="canvas-editable menti-q-sub" contenteditable="true" data-field="body">${esc(c.body)}</div>` : '')
+    : (hasBody ? `<p class="menti-q-sub">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
   const promptEl = editable
     ? `<div class="canvas-editable menti-q-prompt workshop-collect-prompt" contenteditable="true" data-field="prompt" data-placeholder="Frage / Aufgabe für die Teilnehmer…">${esc(c.prompt || '')}</div>`
     : (c.prompt ? `<p class="menti-q-prompt">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : '');
