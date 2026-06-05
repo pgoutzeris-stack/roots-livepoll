@@ -65,6 +65,7 @@ localStorage.setItem('lp_device_id', State.deviceId);
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
+const cssEscapeLP = (s) => { try { return (window.CSS && CSS.escape) ? CSS.escape(String(s)) : String(s).replace(/["\\\]]/g, '\\$&'); } catch { return String(s); } };
 const uid = () => crypto.randomUUID();
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -221,8 +222,8 @@ function participantChipHtml(p) {
 function sopTrackTheme(trackClass) {
   const themes = {
     'track-pre': { accent: '#206efb', badgeBg: '#dbe7ff', badgeColor: '#165fd9', soft: '#eff6ff' },
-    'track-ops': { accent: '#0f6b57', badgeBg: '#d0f4ee', badgeColor: '#0f6b57', soft: '#ecfdf5' },
-    'track-post': { accent: '#5b21b6', badgeBg: '#ede9fe', badgeColor: '#5b21b6', soft: '#f5f3ff' },
+    'track-ops': { accent: '#206efb', badgeBg: '#dbe7ff', badgeColor: '#165fd9', soft: '#eff6ff' },
+    'track-post': { accent: '#206efb', badgeBg: '#dbe7ff', badgeColor: '#165fd9', soft: '#eff6ff' },
   };
   return themes[trackClass] || themes['track-pre'];
 }
@@ -3780,7 +3781,26 @@ window.LP_resetDebug = function () {
 
 function applySessionPatch(patch) {
   if (!State.session) return;
-  State.session = { ...State.session, ...patch };
+  // Presenter→Teilnehmer: aufgelöste Matrix-Items übernehmen
+  if (patch && patch.matrixItems && typeof patch.matrixItems === 'object') {
+    State.matrixItemsBySlide = { ...(State.matrixItemsBySlide || {}), ...patch.matrixItems };
+  }
+  const { matrixItems, ...rest } = patch || {};
+  State.session = { ...State.session, ...rest };
+}
+
+// Presenter: aufgelöste Matrix-Items an Teilnehmer broadcasten (nur bei Änderung)
+function broadcastMatrixItems(slide) {
+  if (!slide) return;
+  const isMatrix = slide.slide_type === 'priority_matrix' || slide.settings?.sopAllTracksMatrix;
+  if (!isMatrix) return;
+  const items = getMatrixItems(slide);
+  if (!items.length) return;
+  const sig = slide.id + ':' + items.map((i) => i.id).join(',');
+  if (State._lastMatrixSig === sig) return;
+  State._lastMatrixSig = sig;
+  State.matrixItemsBySlide = { ...(State.matrixItemsBySlide || {}), [slide.id]: items };
+  try { State.sessionChannel?.send({ type: 'broadcast', event: 'session_sync', payload: { matrixItems: { [slide.id]: items } } }); } catch {}
 }
 
 function broadcastSessionPatch(patch) {
@@ -3897,6 +3917,8 @@ function renderPresent() {
   // DEBUG-Simulator: bei jedem Slide-Wechsel die Antworten für diesen Slide
   // zeitversetzt drippen (nur einmal pro Slide via triggeredSlides-Set)
   if (window.LP_DebugSim?.active) window.LP_DebugSim.maybeDripCurrentSlide();
+  // Matrix-Items an Teilnehmer broadcasten, damit sie dieselben Items ziehen können
+  broadcastMatrixItems(slide);
   // #13 Track-Farb-Coding: propagiere SOP-Track-Class auf Stage-Wrapper,
   // damit CSS-Akzente (Header-Border, Badge-Farben) automatisch zur Geltung kommen.
   const trackClass = c.sopTrackClass || c.sopTrackKey || '';
@@ -4253,7 +4275,7 @@ async function ensureParticipantResponses(force = false) {
   if (!State.session?.id || !State.participant) return;
   const slideIndex = State.session.current_slide_index || 0;
   const slide = State.slides[slideIndex];
-  const needsTrackData = Boolean(slide?.settings?.sopTrackVote || slide?.settings?.sopPhaseVote || slide?.settings?.sopCardVote || slide?.settings?.brainstormVote);
+  const needsTrackData = Boolean(slide?.settings?.sopTrackVote || slide?.settings?.sopPhaseVote || slide?.settings?.sopCardVote || slide?.settings?.brainstormVote || slide?.settings?.sopAllTracksMatrix || slide?.slide_type === 'priority_matrix');
   if (!needsTrackData && !force) return;
   const cacheKey = `${State.session.id}:${slideIndex}`;
   const fresh = State.participantResponsesKey === cacheKey
@@ -4433,7 +4455,8 @@ function hasAnsweredSlide(slide) {
 async function renderParticipantQuestion() {
   const slideIndex = State.session.current_slide_index || 0;
   const slide = State.slides[slideIndex];
-  if (isSopVoteSlide(slide)) await ensureParticipantResponses(true);
+  const isMatrixSlide = slide?.slide_type === 'priority_matrix' || slide?.settings?.sopAllTracksMatrix;
+  if (isSopVoteSlide(slide) || isMatrixSlide) await ensureParticipantResponses(true);
   const root = $('#participant-root');
   const finishParticipant = () => syncSopWorkshopShell('participant', slideIndex);
   if (!slide?.settings?.sopTrackVote) State.participantVoteExpert = false;
@@ -4596,6 +4619,12 @@ function findPrecedingCollectSlide(matrixSlide) {
 }
 
 function getMatrixItems(slide) {
+  // 0. Vom Presenter gebroadcastete Items (Teilnehmer sehen exakt dieselben
+  //    Items wie der Presenter — funktioniert auch im Simulationsmodus, wo die
+  //    zugrundeliegenden Antworten nur lokal beim Presenter liegen).
+  const pushed = State.matrixItemsBySlide && State.matrixItemsBySlide[slide?.id];
+  if (Array.isArray(pushed) && pushed.length) return pushed;
+
   // 1. SOP-Workshop-Matrix: Top-3 aus den Track-Votes (bzw. Fallback).
   if (slide?.settings?.sopAllTracksMatrix) {
     const trackTop = aggregateTopTrackVotedUseCases();
@@ -4714,9 +4743,19 @@ function renderParticipantMatrixHtml(slide) {
       <div class="lp-mx-pool-head"><strong><i class="fa-solid fa-layer-group"></i> Use Cases</strong> <span class="lp-mx-pool-count" id="lp-mx-pool-count">${inPool.length} / ${items.length}</span></div>
       <div class="lp-mx-pool-items">${inPool.map(itemCard).join('')}</div>
     </div>
+    <div class="lp-mx-mobile">
+      <div class="lp-mx-mobile-hint"><i class="fa-solid fa-circle-info"></i> Wähle pro Use Case den passenden Quadranten.</div>
+      ${items.map((it) => {
+        const origin = [it.trackLabel, it.phase].filter(Boolean).join(' · ');
+        return `<div class="lp-mxm-item" data-item-id="${esc(it.id)}">
+          <div class="lp-mxm-text">${esc(it.text)}${origin ? `<span class="lp-mxm-origin">${esc(origin)}</span>` : ''}</div>
+          <div class="lp-mxm-choices">${['qw', 'sb', 'ts', 'dr'].map((q) => `<button type="button" class="lp-mxm-btn lp-q-${q}${placements[it.id] === q ? ' is-active' : ''}" data-item="${esc(it.id)}" data-q="${q}" aria-label="${esc(quadrants[q].label)}" title="${esc(quadrants[q].label)}"><i class="fa-solid ${QICON[q] || 'fa-square'}"></i></button>`).join('')}</div>
+        </div>`;
+      }).join('')}
+    </div>
     <div class="lp-mx-actions">
       <button type="button" class="btn-ghost" id="lp-mx-reset"><i class="fa-solid fa-rotate-left"></i> Zurücksetzen</button>
-      <button type="button" class="btn-primary participant-submit" id="lp-mx-submit"><i class="fa-solid fa-paper-plane"></i> Auswahl absenden <span class="lp-mx-progress">(<span id="lp-mx-progress-n">${items.length - inPool.length}</span>/${items.length})</span></button>
+      <button type="button" class="btn-primary participant-submit" id="lp-mx-submit"><i class="fa-solid fa-paper-plane"></i> Absenden <span class="lp-mx-progress">(<span id="lp-mx-progress-n">${items.length - inPool.length}</span>/${items.length})</span></button>
     </div>
   </div>`;
 }
@@ -4867,13 +4906,35 @@ function setupMatrixDragDrop(slide) {
     });
   });
 
+  // ── Mobile: direkte Quadranten-Buttons pro Item (1 Tap statt Cyclen) ──
+  function syncMobileItem(itemId) {
+    wrap.querySelectorAll(`.lp-mxm-btn[data-item="${cssEscapeLP(itemId)}"]`).forEach((b) => {
+      b.classList.toggle('is-active', placements[itemId] === b.dataset.q);
+    });
+  }
+  wrap.querySelectorAll('.lp-mxm-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const itemId = btn.dataset.item;
+      const q = btn.dataset.q;
+      const next = placements[itemId] === q ? 'pool' : q; // erneuter Tap = abwählen
+      setPlacement(itemId, next);
+      syncMobileItem(itemId);
+      // Grid-DOM ebenfalls aktualisieren, falls sichtbar
+      const gridItem = wrap.querySelector(`.lp-mx-grid .lp-mx-item[data-item-id="${cssEscapeLP(itemId)}"]`)
+        || wrap.querySelector(`.lp-mx-pool .lp-mx-item[data-item-id="${cssEscapeLP(itemId)}"]`);
+      if (gridItem) moveItemToDom(gridItem, next);
+    });
+  });
+
   // Reset
   document.getElementById('lp-mx-reset')?.addEventListener('click', () => {
     placements = {};
     saveMatrixLocal(slide.id, placements);
-    // Move all items back to pool
+    // Move all items back to pool (Grid)
     const pool = wrap.querySelector('.lp-mx-pool-items');
-    wrap.querySelectorAll('.lp-mx-item').forEach((it) => pool.appendChild(it));
+    if (pool) wrap.querySelectorAll('.lp-mx-grid .lp-mx-item').forEach((it) => pool.appendChild(it));
+    // Mobile-Buttons zurücksetzen
+    wrap.querySelectorAll('.lp-mxm-btn.is-active').forEach((b) => b.classList.remove('is-active'));
     updateProgress();
   });
 
