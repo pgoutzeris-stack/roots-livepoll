@@ -622,3 +622,7 @@ html.lp-join-route #screen-participant{display:flex!important}
 .toast.warn{border-left-color:var(--warn)}
 @keyframes toastIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
 .editor-slides-head-actions{display:flex;align-items:center;gap:.15rem}
+.props-toggle-row{display:flex;align-items:center;gap:.5rem;margin:.5rem 1rem .25rem;font-size:.85rem;font-weight:600;color:var(--ink);cursor:pointer}
+.props-toggle-row input{width:16px;height:16px;accent-color:var(--brand);flex-shrink:0}
+.props-toggle-row span{display:inline-flex;align-items:center;gap:.4rem}
+.props-toggle-row i{color:var(--brand)}

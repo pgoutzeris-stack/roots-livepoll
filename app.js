@@ -2596,15 +2596,6 @@ function finalizePresentUi(slide) {
   updatePresentToolbarUi(slide);
   bindResultsDisplayToggle($('#present-stage'));
   maybeLaunchResultsConfetti(slide);
-  // „Ergebnisse aufdecken"-Button (resultsReveal: 'manual')
-  const revealBtn = document.getElementById('present-reveal-btn');
-  if (revealBtn && slide) {
-    revealBtn.addEventListener('click', () => {
-      if (!State.revealedSlides) State.revealedSlides = new Set();
-      State.revealedSlides.add(slide.id);
-      renderPresent();
-    });
-  }
 }
 
 async function deleteSlide(id) {
@@ -2852,8 +2843,32 @@ function renderEditorProps() {
 
   let optionsHtml = '';
   if (OPTION_TYPES.has(slide.slide_type)) {
-    optionsHtml = `
-      <div class="props-section">Antwortoptionen</div>
+    const sopScope = getVoteSlideScope(slide);
+    const isSopScoped = !!sopScope && sopScope.kind !== 'brainstorm';
+    const importOn = isBrainstormVoteSlide(slide);
+    const canImport = slide.slide_type === 'mc_multi' || slide.slide_type === 'mc_single';
+
+    if (isSopScoped) {
+      // SOP-Vorlage: Optionen automatisch aus den Brainstorming-Folien der
+      // Phase/des Tracks — Logik im Editor sichtbar (read-only).
+      const scopeLabel = sopScope.kind === 'phase' ? `der Phase „${esc(sopScope.phaseName || '')}"`
+        : sopScope.kind === 'track' ? 'dieses Tracks'
+          : sopScope.kind === 'card' ? `der Karte „${esc(sopScope.cardName || '')}"`
+            : 'aller Tracks';
+      optionsHtml = `
+      <div class="props-section">Antwortoptionen · importiert</div>
+      <p class="props-hint"><i class="fa-solid fa-link"></i> Auswahloptionen werden automatisch aus den Brainstorming-Folien ${scopeLabel} übernommen. Mit <strong>„Live-Ergebnisse"</strong> erscheint nach dem Ausfüllen das Leaderboard.</p>
+      <div class="props-label">Max. Auswahl pro Person</div><input id="prop-sop-vote-max" type="number" min="1" max="10" value="${sopScope.maxSelections || 3}" />`;
+    } else {
+      const importCtrl = canImport ? `
+      <label class="props-toggle-row"><input type="checkbox" id="prop-import-brainstorm" ${importOn ? 'checked' : ''}><span><i class="fa-solid fa-link"></i> Optionen aus Brainstorming-Folie importieren</span></label>
+      <div id="prop-import-src-wrap" style="${importOn ? '' : 'display:none'}">
+        <div class="props-label">Quell-Brainstorming</div>
+        <select id="prop-import-src">${brainstormSourceOptionsHtml(slide, c.brainstormSourceId)}</select>
+        <div class="props-label">Max. Auswahl pro Person</div><input id="prop-import-max" type="number" min="1" max="10" value="${s.brainstormVoteMax || c.maxSelections || 3}" />
+        <p class="props-hint"><i class="fa-solid fa-trophy"></i> Optionen = gesammelte Ideen der Quell-Folie. „Live-Ergebnisse" zeigt nach dem Ausfüllen das Leaderboard.</p>
+      </div>` : '';
+      const manualHtml = importOn ? '' : `
       ${(c.options || []).map((o, i) => `
         <div class="option-row">
           <input type="color" class="opt-color" data-opt="color" data-idx="${i}" value="${esc(o.color || c.accentColor || '#206efb')}" title="Farbe" />
@@ -2862,8 +2877,11 @@ function renderEditorProps() {
           <button type="button" class="opt-rm" data-rm-opt="${i}"><i class="fa-solid fa-xmark"></i></button>
         </div>`).join('')}
       <button type="button" class="btn-secondary btn-sm" id="btn-add-option"><i class="fa-solid fa-plus"></i> Option</button>
-      ${slide.slide_type === 'mc_multi' && !isBrainstormVoteSlide(slide) ? `<div class="props-label">Max. Auswahl</div><input id="prop-max-sel" type="number" min="1" value="${c.maxSelections || 3}" />` : ''}
-      ${isBrainstormVoteSlide(slide) ? `<p class="props-hint"><i class="fa-solid fa-link"></i> Optionen kommen automatisch aus dem Brainstorming der vorherigen Folie.</p>` : ''}`;
+      ${slide.slide_type === 'mc_multi' ? `<div class="props-label">Max. Auswahl</div><input id="prop-max-sel" type="number" min="1" value="${c.maxSelections || 3}" />` : ''}`;
+      optionsHtml = `
+      <div class="props-section">Antwortoptionen</div>
+      ${importCtrl}${manualHtml}`;
+    }
   }
 
   let slideChainHtml = '';
@@ -2937,20 +2955,6 @@ function renderEditorProps() {
     <p class="props-hint"><i class="fa-solid fa-circle-info"></i> 0 = keine Begrenzung.</p>`;
   }
 
-  // Ergebnis-Anzeige (live vs. auf Klick aufdecken) — generisch für alle interaktiven Folien
-  const _isInteractiveType = (window.LP_INTERACTIVE_TYPES || new Set()).has(slide.slide_type);
-  let resultRevealHtml = '';
-  if (_isInteractiveType) {
-    const rv = s.resultsReveal || 'live';
-    resultRevealHtml = `
-    <div class="props-label">Ergebnis-Anzeige</div>
-    <select id="prop-results-reveal">
-      <option value="live" ${rv === 'live' ? 'selected' : ''}>Sofort live anzeigen</option>
-      <option value="manual" ${rv === 'manual' ? 'selected' : ''}>Erst auf Klick aufdecken</option>
-    </select>
-    <p class="props-hint"><i class="fa-solid fa-eye"></i> „Aufdecken" zeigt im Präsentationsmodus zuerst nur die Antwortzahl + einen Button — gut für Spannung & Quiz.</p>`;
-  }
-
   const _typeMeta = editorSlideTypeMeta(slide);
   panel.innerHTML = `
     <div class="props-head">
@@ -2986,7 +2990,6 @@ function renderEditorProps() {
       <label class="props-toggle"><input type="checkbox" id="set-profanity" ${s.profanityFilter !== false ? 'checked' : ''}><span class="props-toggle-box"><i class="fa-solid fa-filter"></i></span><span class="props-toggle-text">Profanity-Filter</span></label>
     </div>
     <p class="props-hint"><i class="fa-solid fa-circle-info"></i> Name & Avatar werden bei Teilnahme immer abgefragt.</p>
-    ${resultRevealHtml}
     <div class="props-label">Zeitlimit (Sek., 0 = aus)</div><input id="set-time" type="number" min="0" value="${s.timeLimitSec || 0}" />`;
 
   const saveContent = debounce(async () => {
@@ -3036,6 +3039,21 @@ function renderEditorProps() {
       if ($('#prop-max-responses')) slideObj.content.maxResponsesPerUser = Number($('#prop-max-responses').value || 0);
       if ($('#prop-char-limit')) slideObj.content.charLimit = Number($('#prop-char-limit').value || 0);
     }
+    // ── mc_multi/mc_single: Optionen aus Brainstorming importieren ──
+    if ($('#prop-import-brainstorm')) {
+      const on = $('#prop-import-brainstorm').checked;
+      slideObj.settings.brainstormVote = on;
+      if (on) {
+        let src = $('#prop-import-src')?.value || '';
+        if (!src) { const prev = findPrecedingCollectSlide(slideObj); src = prev?.id || ''; }
+        slideObj.content.brainstormSourceId = src || null;
+        slideObj.settings.brainstormVoteMax = Number($('#prop-import-max')?.value || 3);
+      } else {
+        slideObj.content.brainstormSourceId = null;
+      }
+    }
+    // ── SOP-Vote: Max. Auswahl pro Person ──
+    if ($('#prop-sop-vote-max')) slideObj.settings.sopVoteMax = Number($('#prop-sop-vote-max').value || 3);
     panel.querySelectorAll('[data-opt="color"]').forEach((inp) => {
       const idx = Number(inp.dataset.idx);
       if (slideObj.content.options?.[idx]) slideObj.content.options[idx].color = inp.value;
@@ -3049,7 +3067,6 @@ function renderEditorProps() {
       profanityFilter: $('#set-profanity')?.checked,
       askName: true,
       timeLimitSec: Number($('#set-time')?.value || 0),
-      resultsReveal: $('#prop-results-reveal')?.value || slideObj.settings?.resultsReveal || 'live',
     };
     if (COLLECT_CHAIN_TYPES.has(slideObj.slide_type) && !slideObj.content?.sopTrackKey && !slideObj.content?.sopTrackClass) {
       setCollectChainSettings(slideObj, {
@@ -3101,6 +3118,25 @@ function renderEditorProps() {
     if (manWrap) manWrap.style.display = v === 'manual' ? '' : 'none';
     saveContent();
     setTimeout(renderEditorCanvas, 60);
+  });
+  // Optionen aus Brainstorming importieren: Toggle → speichern + Panel neu aufbauen
+  // (blendet manuelle Optionen aus/ein) + Canvas-Vorschau aktualisieren
+  $('#prop-import-brainstorm')?.addEventListener('change', async () => {
+    const on = $('#prop-import-brainstorm').checked;
+    const slideObj = currentSlide();
+    if (!slideObj) return;
+    slideObj.settings.brainstormVote = on;
+    if (on) {
+      let src = $('#prop-import-src')?.value || '';
+      if (!src) { const prev = findPrecedingCollectSlide(slideObj); src = prev?.id || ''; }
+      slideObj.content.brainstormSourceId = src || null;
+      slideObj.settings.brainstormVoteMax = Number($('#prop-import-max')?.value || slideObj.content.maxSelections || 3);
+    } else {
+      slideObj.content.brainstormSourceId = null;
+    }
+    await persistSlide(slideObj);
+    renderEditorProps();
+    renderEditorCanvas();
   });
   $('#set-slide-rank')?.addEventListener('change', () => {
     const on = $('#set-slide-rank')?.checked;
@@ -3309,7 +3345,6 @@ async function startPresentation() {
   State.responses = [];
   State.participants = [];
   State._debugSeeded = false; // ← Re-Seed erlauben bei jeder neuen Session
-  State.revealedSlides = new Set(); // Reveal-Status pro Session zurücksetzen
   location.hash = `#present/${session.id}`;
   showScreen('present');
   await loadSessionData();
@@ -3976,13 +4011,6 @@ function renderPresent() {
     } else if (c.imageUrl) {
       viz = `<img src="${esc(c.imageUrl)}" alt="" style="max-width:min(720px,90vw);border-radius:16px;margin-top:1rem">`;
     }
-  } else if (slide.settings?.resultsReveal === 'manual' && !(State.revealedSlides && State.revealedSlides.has(slide.id))) {
-    // „Erst auf Klick aufdecken": Ergebnis verbergen bis der Presenter aufdeckt.
-    viz = `<div class="present-reveal-gate">
-      <div class="present-reveal-icon"><i class="fa-solid fa-eye-slash"></i></div>
-      <div class="present-reveal-count">${visible.length} Antwort${visible.length === 1 ? '' : 'en'} gesammelt</div>
-      <button type="button" class="btn-primary" id="present-reveal-btn"><i class="fa-solid fa-eye"></i> Ergebnisse aufdecken</button>
-    </div>`;
   } else if (slide.settings?.showResultsLive !== false) {
     // Live-Ergebnisse für ALLE Slide-Typen (einheitlich wie SOP): Visualisierung
     // immer rendern, auch wenn noch keine Antwort vorliegt. Die einzelnen
