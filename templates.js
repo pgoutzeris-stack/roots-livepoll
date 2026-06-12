@@ -390,13 +390,12 @@ function sopPhaseIntro(track, phase, phaseIndex, totalPhases) {
 }
 
 // ─── SOP PHASE BRAINSTORM ─────────────────────────────
-// Pro Phase wird gesammelt. Phase-Intro entfällt — sopBoard + phase.intro
-// sind direkt in der Brainstorm-Folie enthalten.
+// Pro Phase wird gesammelt. Phase-Intro entfällt — Kontext via sopBoard.
 
 function sopPhaseBrainstorm(track, phase) {
   return tplSlide('brainstorm', {
     title: `KI Use Cases in ${phase.name}`,
-    body: phase.intro || '',
+    body: '',
     subtitle: track.title.replace(/^Track \d+: /, ''),
     prompt: 'Wo seht ihr KI-Potenzial in dieser Phase? Sammelt eure Ideen — konkrete Tools, Workflows, Aufgaben die KI übernehmen könnte.',
     mentiQuestion: true,
@@ -528,7 +527,7 @@ function buildSopKiWorkshopSlides(mode = 'phase') {
   }));
 
   // 2. Per Track: Intro → Phasen (Brainstorm [+ Phase-Vote]) → [Track Top-3]
-  // Phase-Intro entfällt — Phase-Kontext ist in der Brainstorm-Folie enthalten.
+  // Phase-Intro entfällt — Phase-Kontext ist über sopBoard in der Brainstorm-Folie.
   SOP_TOOL_TRACKS.forEach((track, ti) => {
     slides.push(sopTrackIntro(track, ti));
     track.phases.forEach((phase) => {
@@ -681,20 +680,15 @@ function sopCardBrainstorm(track, phase, card) {
 }
 
 // ─── DEBUG · MARKETING SOP KI WORKSHOP ──────────────────────────
-// Kein Phase-Intro · Pro Karte eine eigene Brainstorm-Folie
-// → Teilnehmer tippen Use Cases je Teilbereich in der App ein
-// → Auswertung zeigt Aufschlüsselung nach Karte (sopCardName)
 function buildDebugSopWorkshopSlides() {
   const slides = [];
 
-  // 1. Opener
   slides.push(tplSlide('content', {
     title: 'Marketing SOP · KI Use-Case Workshop',
     body: 'Wir gehen unsere Marketing-SOP Teilbereich für Teilbereich durch.\nFür jeden Bereich sammelt ihr gezielt KI-Use-Cases — konkrete Tools, Workflows, Aufgaben.\nZum Abschluss priorisieren wir gemeinsam in der Impact/Effort-Matrix.\n\nQR scannen · Name + Avatar wählen.',
     mentiHero: true,
   }));
 
-  // 2. Track → Pro Karte eine Brainstorm-Folie (kein Phase-Intro)
   MARKETING_SOP_TRACKS.forEach((track, ti) => {
     slides.push(sopTrackIntro(track, ti));
     track.phases.forEach((phase) => {
@@ -705,7 +699,6 @@ function buildDebugSopWorkshopSlides() {
     slides.push(sopTrackVote(track, ti));
   });
 
-  // 3. Finale
   slides.push(sopAllTracksSummary());
   slides.push(sopPriorityMatrix());
   slides.push(...sopWorkshopClose());
