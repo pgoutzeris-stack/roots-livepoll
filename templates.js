@@ -414,6 +414,24 @@ function sopPhaseOverview(track, phase) {
   }, { workshopMode: 'orient' });
 }
 
+// SOP-Gesamtübersicht für einen Track — erscheint vor dem Track-Brainstorm.
+// Zeigt: alle Phasen mit ihren Karten als strukturierte Liste.
+function sopTrackOverview(track) {
+  const body = track.phases.map((p) => {
+    const cards = p.cards.map((c) => `  → ${c.name}`).join('\n');
+    return `${p.name}\n${cards}`;
+  }).join('\n\n');
+  const totalCards = track.phases.reduce((sum, p) => sum + p.cards.length, 0);
+  return tplSlide('content', {
+    title: `SOP · ${track.title.replace(/^Track \d+: /, '')}`,
+    subtitle: `${track.phases.length} Phasen · ${totalCards} Aktivitäten`,
+    body,
+    sopKind: 'track-overview',
+    sopBoard: sopBoardData(track),
+    ...sopMeta(track),
+  }, { workshopMode: 'orient' });
+}
+
 // ─── INSTRUKTIONS-FOLIE ────────────────────────────────────────────────────────
 // Erscheint einmal nach dem Opener — erklärt Format, Timing und Limit.
 
@@ -628,7 +646,8 @@ function buildSopKiWorkshopSlides(mode = 'pro-phase') {
 
     } else if (mode === 'pro-track' || mode === 'track') {
       // Pro Track: EIN Brainstorm (alle Phasen sichtbar) → Track-Vote → Presentation
-      slides.push(sopTrackBrainstorm(track));
+      slides.push(sopTrackOverview(track));     // SOP aller Phasen + Karten zeigen
+      slides.push(sopTrackBrainstorm(track));   // Brainstorm mit sopBoard
       slides.push(sopTrackVote(track, ti));
       slides.push(sopTrackPresentationSession(track));
     }
