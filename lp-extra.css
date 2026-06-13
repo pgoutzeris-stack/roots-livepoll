@@ -558,9 +558,12 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .editor-canvas .menti-crumb{text-align:left;margin:0 0 .35rem}
 
 /* ─── Workshop Collect: Frage-Icon + SOP-Board ───────────────── */
-.workshop-q-icon{color:var(--brand);margin-right:.35rem;font-size:.88em;vertical-align:middle;flex-shrink:0}
-.menti-q-prompt{display:flex;align-items:flex-start;gap:0}
-.menti-q-prompt .workshop-q-icon{margin-top:.18em}
+/* Icon: gleiche Größe wie Text, mehr Abstand, kein vertical-align (kein Effekt in flex) */
+.workshop-q-icon{color:var(--brand);margin-right:.5rem;font-size:1em;flex-shrink:0}
+/* Prompt: flex für saubere Icon+Text-Zeile, bessere line-height für mehrzeiligen Text */
+.menti-q-prompt{display:flex;align-items:flex-start;gap:0;line-height:1.65;margin-top:.75rem}
+/* Icon leicht nach unten — zentriert sich mit der x-Höhe der ersten Textzeile */
+.menti-q-prompt .workshop-q-icon{margin-top:.25em}
 
 /* Kompaktes sopBoard innerhalb Brainstorm-Collect-Slides */
 .workshop-collect-board{margin:.65rem 0 .55rem;opacity:.9}
