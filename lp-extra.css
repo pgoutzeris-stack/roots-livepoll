@@ -730,3 +730,46 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   opacity:.8;
   margin-top:.2rem;
 }
+
+/* ═══════ ROOTS Brand Design — Section Slides ═══════════════════ */
+/* Blaue Trennlinie + Pill-Badges für Track/Phase-Identifier */
+.sop-menti-section{border-top:4px solid var(--brand)}
+.sop-menti-section .sop-track-badge,
+.sop-menti-section .sop-phase-badge{
+  background:var(--brand);color:#fff;font-size:.72rem;font-weight:700;
+  padding:.3rem .75rem;border-radius:6px;letter-spacing:.04em;
+  text-transform:uppercase;display:inline-flex;align-items:center;gap:.4rem;
+}
+.sop-menti-section .menti-subtitle,
+.sop-menti-section .section-subtitle{
+  font-size:1rem;color:var(--brand);font-weight:600;letter-spacing:.01em;
+}
+
+/* ═══════ ROOTS Brand Design — Brainstorm Breadcrumb ══════════ */
+.menti-question-block .menti-crumb,
+.menti-question-block .menti-subtitle{
+  color:var(--brand);font-weight:600;font-size:.85rem;
+  letter-spacing:.02em;text-transform:uppercase;margin-bottom:.75rem;
+}
+
+/* ═══════ ROOTS Brand Design — Track Vote Result Rows ═════════ */
+.track-vote-result-row,
+.card-vote-result-row{
+  border-radius:10px;border:1px solid var(--line);
+  padding:.65rem 1rem;margin-bottom:.5rem;
+  background:var(--surface,#f8fafc);
+}
+
+/* ═══════ ROOTS Brand — Content SOP Board (Phase/Track Overview) ═ */
+/* Für content-type Slides (Phase Overview, Track Overview) */
+.content-sop-board{margin:1.25rem 0 .75rem}
+.content-sop-board .sop-board-preview{
+  border:1px solid var(--line);border-radius:12px;overflow:hidden;
+}
+.content-sop-board .sop-board-track-header{display:none}
+
+/* ═══════ menti-content-body: pre-line Textwiedergabe ════════════ */
+/* Für mehrzeilige body-Texte in content-type Slides */
+.menti-content-body{
+  white-space:pre-line;font-size:.97rem;line-height:1.7;color:var(--ink);
+}
