@@ -665,11 +665,11 @@ const MARKETING_SOP_TRACKS = [
   },
 ];
 
-// ─── SOP CARD BRAINSTORM (eine Folie pro Karte, mit Phase-Board) ─
+// ─── SOP CARD BRAINSTORM (eine Folie pro Karte, kein Body-Text — Kontext via sopBoard) ─
 function sopCardBrainstorm(track, phase, card) {
   return tplSlide('brainstorm', {
     title: card.name,
-    body: card.intro,
+    body: '',
     subtitle: phase.name,
     prompt: card.prompt || 'Welche KI Use Cases seht ihr hier? Konkrete Tools, Workflows, Aufgaben.',
     mentiQuestion: true,
