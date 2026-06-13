@@ -187,7 +187,7 @@ const SOP_TOOL_TRACKS = [
         intro: 'Erkenntnisse verdichten, Storyline entwickeln, Empfehlungen schärfen.',
         cards: [
           {
-            name: '„So-What\"-Extraktion aus Analysen',
+            name: '„So-What"-Extraktion aus Analysen',
             intro: 'Aus Rohdaten und Analysen handlungsrelevante Erkenntnisse ableiten.',
             prompt: 'Welche KI hilft beim schnellen Destillieren von So-Whats?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Insight-Extraktion aus Analysen, LLM-Sparring für So-What-Test, Pattern-Erkennung.',
             voteMax: 3,
@@ -432,7 +432,7 @@ function sopWorkshopInstructions() {
 }
 
 // ─── SOP PHASE BRAINSTORM ─────────────────────────────────────────────────────
-// Pro Phase wird gesammelt (modus 'phase' und 'end').
+// Pro Phase wird gesammelt.
 
 function sopPhaseBrainstorm(track, phase) {
   const ws = window.LP_WORKSHOP_SETTINGS;
@@ -450,7 +450,6 @@ function sopPhaseBrainstorm(track, phase) {
 
 // ─── SOP TRACK BRAINSTORM ─────────────────────────────────────────────────────
 // Pro Track: EINE Sammelfolie — alle Phasen + Karten im sopBoard sichtbar.
-// Gleicher visueller Look wie die Phasen-Brainstorm-Folie.
 
 function sopTrackBrainstorm(track) {
   const ws = window.LP_WORKSHOP_SETTINGS;
@@ -584,18 +583,10 @@ function sopWorkshopClose() {
 
 // ─── BUILD ───────────────────────────────────────────────────────────────────
 //
-// Folienstruktur aller Vorlagen:
-//   Opener → Instruktionen → [Tracks mit Brainstorm + Vote] → Übersicht → ICE-Matrix
-//
 // mode:
 //  'pro-phase' → SOP-Übersicht je Phase → Brainstorm → Track-Vote → Presentation Session → ICE-Matrix
-//  'pro-track' → pro Track EIN Brainstorm (alle Phasen sichtbar) → Track-Vote → Presentation Session → ICE-Matrix
-//  'lean'      → alle Phasen sammeln ohne Zwischen-Votes → ICE-Matrix am Ende
-//  'phase'     → (legacy) wie pro-phase
-//  'track'     → (legacy) wie pro-track
-//  'end'       → (legacy) wie lean
-//
-// Alle Brainstorm-Slides: Zeitlimit + max. Responses via LP_WORKSHOP_SETTINGS
+//  'pro-track' → pro Track EIN Brainstorm (alle Phasen sichtbar) → Track-Vote → Presentation → ICE-Matrix
+//  'phase'/'track' → legacy aliases
 
 function buildSopKiWorkshopSlides(mode = 'pro-phase') {
   const slides = [];
@@ -607,10 +598,8 @@ function buildSopKiWorkshopSlides(mode = 'pro-phase') {
   const modeLabel = {
     'pro-phase': `Pro Phase ${timeMin ? '· ' + timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases · SOP-Kontext vor jeder Phase`,
     'pro-track': `Pro Track ${timeMin ? '· ' + timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases · alle Phasen auf einen Blick`,
-    'lean':      `Lean-Format ${timeMin ? '· ' + timeMin + ' · ' : ''}alle Tracks sammeln · ICE Matrix am Ende`,
     phase:  `Pro Phase ${timeMin ? '· ' + timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases`,
     track:  `Pro Track ${timeMin ? '· ' + timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases`,
-    end:    'Sammeln ohne Zwischen-Votes · ICE Matrix am Ende',
   }[mode] || '';
 
   // 1. Opener
@@ -642,12 +631,6 @@ function buildSopKiWorkshopSlides(mode = 'pro-phase') {
       slides.push(sopTrackBrainstorm(track));
       slides.push(sopTrackVote(track, ti));
       slides.push(sopTrackPresentationSession(track));
-
-    } else if (mode === 'lean' || mode === 'end') {
-      // Lean: Alle Phasen Brainstormen ohne Zwischen-Votes
-      track.phases.forEach((phase) => {
-        slides.push(sopPhaseBrainstorm(track, phase));
-      });
     }
   });
 
@@ -810,7 +793,7 @@ function buildDebugSopWorkshopSlides() {
     mentiHero: true,
   }));
 
-  // Instruktions-Folie (gleiche wie SOP-Vorlagen)
+  // Instruktions-Folie
   slides.push(sopWorkshopInstructions());
 
   MARKETING_SOP_TRACKS.forEach((track, ti) => {
@@ -852,16 +835,6 @@ window.LP_TEMPLATES = [
     group: '6–25',
     tips: 'Tempo-Format. Vollständige SOP-Übersicht als Kontext. 5 Min. / max. 2 Use Cases pro Track.',
     slides: buildSopKiWorkshopSlides('pro-track'),
-  },
-  {
-    key: 'roots-sop-ki-workshop-lean',
-    category: 'ROOTS · SOP & KI',
-    name: 'SOP-Workshop · Lean',
-    desc: 'Alle Phasen sammeln ohne Zwischen-Votes — eine große ICE Matrix am Ende.',
-    duration: '60–90 Min.',
-    group: '6–25',
-    tips: 'Kompaktestes Format. Priorisierung direkt mit ICE Matrix.',
-    slides: buildSopKiWorkshopSlides('lean'),
   },
   {
     key: 'debug-marketing-sop-workshop',
