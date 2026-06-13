@@ -399,16 +399,33 @@ function sopTrackIntro(track, trackIndex) {
   }, { workshopMode: 'orient' });
 }
 
-// ─── SOP PHASE BRAINSTORM ─────────────────────────────
+// ─── INSTRUKTIONS-FOLIE ────────────────────────────────────────────────────────
+// Erscheint einmal nach dem Opener — erklärt Format, Timing und Limit.
+
+function sopWorkshopInstructions() {
+  const ws = window.LP_WORKSHOP_SETTINGS;
+  const timeMin = ws.brainstormTimeLimitSec > 0
+    ? `${Math.round(ws.brainstormTimeLimitSec / 60)} Minuten`
+    : 'offene Zeit';
+  return tplSlide('content', {
+    title: 'So formuliert ihr Use Cases',
+    subtitle: `⏱ ${timeMin} pro Runde · max. ${ws.brainstormMaxResponses} Use Cases pro Person`,
+    body: `Format: Was macht die KI · Wer nutzt sie · Welches Tool\n\n✅ Starke Use Cases:\n• „Discovery-Call automatisch transkribieren + Highlights markieren" → PL → Otter.ai\n• „Wettbewerbs-Recherche zu Zielkunden vor dem Erstgespräch" → BD → Perplexity\n• „Proposal-Draft aus Briefing in 5 Min. generieren" → Senior → ChatGPT\n• „KPI-Dashboard automatisch aus Rohdaten erstellen" → Analyst → Julius.ai\n\n❌ Zu vage (bitte vermeiden):\n„KI für E-Mails" · „AI einsetzen" · „ChatGPT nutzen"\n\nJe konkreter, desto wertvoller für die Auswertung.`,
+    mentiHero: false,
+    sopKind: 'instructions',
+  }, { workshopMode: 'orient' });
+}
+
+// ─── SOP PHASE BRAINSTORM ─────────────────────────────────────────────────────
 // Pro Phase wird gesammelt (modus 'phase' und 'end').
-// Kein Body-Text — Kontext kommt via sopBoard-Grid.
 
 function sopPhaseBrainstorm(track, phase) {
+  const ws = window.LP_WORKSHOP_SETTINGS;
   return tplSlide('brainstorm', {
-    title: `KI Use Cases in ${phase.name}`,
+    title: `KI Use Cases · ${phase.name}`,
     body: '',
     subtitle: track.title.replace(/^Track \d+: /, ''),
-    prompt: 'Wo seht ihr KI-Potenzial in dieser Phase? Max. 2 Use Cases pro Person — konkrete Tools, Workflows oder Aufgaben.',
+    prompt: `Welche KI seht ihr in dieser Phase? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\nFormat: Was · Wer · Tool — z. B. „Proposal-Draft aus Briefing → Senior → ChatGPT"`,
     mentiQuestion: true,
     sopKind: 'phase-workshop',
     sopBoard: [{ name: phase.name, cards: phase.cards.map((c) => c.name) }],
@@ -416,15 +433,17 @@ function sopPhaseBrainstorm(track, phase) {
   }, brainstormSettings());
 }
 
-// ─── SOP TRACK BRAINSTORM ─────────────────────────────
-// Eine Folie pro Track (modus 'track'): alle Phasen + Karten sichtbar via sopBoard.
+// ─── SOP TRACK BRAINSTORM ─────────────────────────────────────────────────────
+// Pro Track: EINE Sammelfolie — alle Phasen + Karten im sopBoard sichtbar.
+// Gleicher visueller Look wie die Phasen-Brainstorm-Folie.
 
 function sopTrackBrainstorm(track) {
+  const ws = window.LP_WORKSHOP_SETTINGS;
   return tplSlide('brainstorm', {
     title: `KI Use Cases · ${track.title.replace(/^Track \d+: /, '')}`,
     body: '',
     subtitle: track.title,
-    prompt: 'Wo seht ihr KI-Potenzial in diesem Track? Max. 2 Use Cases pro Person.\n\nNutzt die SOP-Übersicht als Orientierung — jede Phase und Karte ist ein möglicher Ansatzpunkt.',
+    prompt: `Welche KI seht ihr in diesem Track? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\nFormat: Was · Wer · Tool — z. B. „Proposal-Draft aus Briefing → Senior → ChatGPT"\n\nNutzt die SOP-Übersicht als Orientierung — alle Phasen und Karten sind mögliche Ansatzpunkte.`,
     mentiQuestion: true,
     sopKind: 'track-collect',
     sopBoard: sopBoardData(track),
@@ -436,7 +455,7 @@ function sopPhaseVote(track, phase) {
   return tplSlide('mc_multi', {
     title: `Priorisierung · ${phase.name}`,
     subtitle: track.title.replace(/^Track \d+: /, ''),
-    prompt: 'Wählt die drei wichtigsten KI Use Cases dieser Phase. Welche Ideen sollten in dieser Phase zuerst weitergedacht oder pilotiert werden?',
+    prompt: 'Wählt die drei wichtigsten KI Use Cases dieser Phase. Welche Ideen sollten zuerst weitergedacht oder pilotiert werden?',
     mentiQuestion: true,
     options: [],
     maxSelections: 3,
@@ -460,7 +479,7 @@ function sopTrackVote(track, trackIndex) {
   }, { showResultsLive: true, sopTrackVote: true, sopVoteMax: 3, workshopMode: 'decide' });
 }
 
-// ─── WORKSHOP-LEVEL HELPERS ─────────────────────────────────────
+// ─── CROSS-TRACK SUMMARY ───────────────────────────────────────────────────────
 
 function sopAllTracksSummary() {
   return tplSlide('content', {
@@ -473,11 +492,13 @@ function sopAllTracksSummary() {
   }, { workshopMode: 'orient' });
 }
 
-// ICE-Matrix = Impact vs. Effort — finale Priorisierung aller Use Cases
+// ─── ICE-MATRIX (Impact/Effort) — finale Priorisierung ────────────────────────
+// Erscheint am Ende ALLER Vorlagen. Enthält vollständige Priorisierungs-Anleitung.
+
 function sopIceMatrix() {
   return tplSlide('priority_matrix', {
     title: 'Impact/Effort-Matrix',
-    prompt: 'Ordnet die priorisierten KI Use Cases in die Matrix ein.\n\nFragt euch: Wie hoch ist der Impact? Wie hoch der Aufwand?\nQuick Wins zuerst angehen — Strategic Bets langfristig planen.',
+    prompt: 'Ordnet die priorisierten KI Use Cases gemeinsam in die Matrix ein.\n\n→ Impact: Wie stark verbessert dieser Use Case unsere Arbeit / unsere Qualität?\n→ Effort: Wie hoch ist der Aufwand für Einführung, Lernkurve und laufende Nutzung?\n\nQuick Wins sofort angehen · Strategic Bets langfristig einplanen\nTime Sinks kritisch hinterfragen · Drop weglassen',
     subtitle: 'Impact vs. Effort · finale Priorisierung',
     xAxisLabel: 'Aufwand (Effort)',
     xAxisLow: 'niedrig',
@@ -488,12 +509,14 @@ function sopIceMatrix() {
     quadrants: {
       qw: { label: 'Quick Win', icon: '🚀', desc: 'hoher Impact · niedriger Aufwand → sofort angehen' },
       sb: { label: 'Strategic Bet', icon: '⭐', desc: 'hoher Impact · hoher Aufwand → langfristig planen' },
-      ts: { label: 'Time Sink', icon: '🔧', desc: 'niedriger Impact · hoher Aufwand → hinterfragen' },
+      ts: { label: 'Time Sink', icon: '🔧', desc: 'niedriger Impact · hoher Aufwand → kritisch hinterfragen' },
       dr: { label: 'Drop', icon: '❌', desc: 'niedriger Impact · niedriger Aufwand → weglassen' },
     },
     sopKind: 'final-matrix',
   }, { showResultsLive: true, sopAllTracksMatrix: true, workshopMode: 'decide' });
 }
+
+// ─── ABSCHLUSS-FOLIEN ──────────────────────────────────────────────────────────
 
 function sopWorkshopClose() {
   return [
@@ -532,47 +555,52 @@ function sopWorkshopClose() {
   ];
 }
 
-// ─── BUILD ───────────────────────────────────────────────────────
+// ─── BUILD ───────────────────────────────────────────────────────────────────
+//
+// Foliensruktur aller Vorlagen:
+//   Opener → Instruktionen → [Tracks mit Brainstorm + Vote] → Übersicht → ICE-Matrix
 //
 // mode:
-//  'phase' → pro Unterphase sammeln + priorisieren, dann Track-Vote, ICE-Matrix
+//  'phase' → pro Unterphase sammeln + Phase-Vote, dann Track-Vote, ICE-Matrix
 //  'track' → pro Track EINE Sammelfolie (alle Phasen sichtbar) + Track-Vote, ICE-Matrix
 //  'end'   → alle Phasen sammeln (keine Zwischen-Votes), nur ICE-Matrix am Ende
 //
-// Alle Brainstorm-Slides: 5 Min Zeitlimit, max. 2 Use Cases pro Teilnehmer
-// (via LP_WORKSHOP_SETTINGS konfigurierbar)
+// Alle Brainstorm-Slides: Zeitlimit + max. Responses via LP_WORKSHOP_SETTINGS
 
 function buildSopKiWorkshopSlides(mode = 'phase') {
   const slides = [];
   const ws = window.LP_WORKSHOP_SETTINGS;
-  const timeInfo = ws.brainstormTimeLimitSec > 0
+  const timeMin = ws.brainstormTimeLimitSec > 0
     ? `${Math.round(ws.brainstormTimeLimitSec / 60)} Min.`
     : '';
-  const limitInfo = `max. ${ws.brainstormMaxResponses} Use Cases pro Person`;
 
-  const openerBody = {
-    phase: `Wir gehen die ROOTS-SOP Track für Track durch.\nPro Phase sammelt ihr KI-Use-Cases (${timeInfo ? timeInfo + ' · ' : ''}${limitInfo}).\nDanach priorisiert ihr direkt die wichtigsten — pro Phase und pro Track.\nZum Abschluss: gemeinsame Impact/Effort-Matrix.\n\nQR scannen · Name + Avatar wählen.`,
-    track: `Wir gehen die ROOTS-SOP Track für Track durch.\nPro Track habt ihr ${timeInfo || 'Zeit'} — sammelt eure KI-Use-Cases (${limitInfo}).\nDanach wählt ihr die Top 3 je Track.\nZum Abschluss: gemeinsame Impact/Effort-Matrix.\n\nQR scannen · Name + Avatar wählen.`,
-    end: `Wir gehen die ROOTS-SOP Track für Track durch.\nPro Phase sammelt ihr KI-Use-Cases (${timeInfo ? timeInfo + ' · ' : ''}${limitInfo}) — ohne Zwischenabstimmung.\nDie Priorisierung passiert ganz am Schluss in der Impact/Effort-Matrix.\n\nQR scannen · Name + Avatar wählen.`,
+  const modeLabel = {
+    phase: `Pro Phase ${timeMin ? timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases sammeln + direkt priorisieren`,
+    track: `Pro Track ${timeMin ? timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases sammeln, dann Top-3 wählen`,
+    end: `Erst alle Phasen sammeln (${timeMin ? timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases), dann ICE-Matrix`,
   }[mode] || '';
 
   // 1. Opener
   slides.push(tplSlide('content', {
     title: 'SOP · KI Use-Case Workshop',
-    body: openerBody,
+    subtitle: modeLabel,
+    body: 'QR scannen · Name + Avatar wählen · los geht\'s!',
     mentiHero: true,
   }));
 
-  // 2. Per Track
+  // 2. Instruktions-Folie (Format, Timing, Limit) — erscheint einmal vor den Tracks
+  slides.push(sopWorkshopInstructions());
+
+  // 3. Per Track
   SOP_TOOL_TRACKS.forEach((track, ti) => {
     slides.push(sopTrackIntro(track, ti));
 
     if (mode === 'track') {
-      // Pro Track: EIN Brainstorm für alle Phasen des Tracks → direkt Track-Top-3-Vote
+      // Pro Track: EIN Brainstorm (alle Phasen + Karten im sopBoard) → Track-Top-3
       slides.push(sopTrackBrainstorm(track));
       slides.push(sopTrackVote(track, ti));
     } else {
-      // Pro Phase: Brainstorm je Phase (+ ggf. Phase-Vote)
+      // Pro Phase oder End: Brainstorm je Phase
       track.phases.forEach((phase) => {
         slides.push(sopPhaseBrainstorm(track, phase));
         if (mode === 'phase') slides.push(sopPhaseVote(track, phase));
@@ -581,7 +609,7 @@ function buildSopKiWorkshopSlides(mode = 'phase') {
     }
   });
 
-  // 3. Finale: Übersicht + Impact/Effort-Matrix (ICE)
+  // 4. Finale: Übersicht + ICE-Matrix (Impact/Effort)
   slides.push(sopAllTracksSummary());
   slides.push(sopIceMatrix());
 
@@ -709,13 +737,14 @@ const MARKETING_SOP_TRACKS = [
   },
 ];
 
-// ─── SOP CARD BRAINSTORM (eine Folie pro Karte, kein Body-Text — Kontext via sopBoard) ─
+// ─── SOP CARD BRAINSTORM (eine Folie pro Karte, kein Body — Kontext via sopBoard) ─
 function sopCardBrainstorm(track, phase, card) {
+  const ws = window.LP_WORKSHOP_SETTINGS;
   return tplSlide('brainstorm', {
     title: card.name,
     body: '',
     subtitle: phase.name,
-    prompt: card.prompt || 'Welche KI Use Cases seht ihr hier? Max. 2 Use Cases — konkrete Tools, Workflows, Aufgaben.',
+    prompt: card.prompt || `Welche KI Use Cases seht ihr hier? Max. ${ws.brainstormMaxResponses} pro Person.\nFormat: Was · Wer · Tool`,
     mentiQuestion: true,
     sopKind: 'card-workshop',
     sopBoard: [{ name: phase.name, cards: phase.cards.map((c) => c.name) }],
@@ -723,19 +752,24 @@ function sopCardBrainstorm(track, phase, card) {
   }, brainstormSettings());
 }
 
-// ─── DEBUG · MARKETING SOP KI WORKSHOP ──────────────────────────
+// ─── DEBUG · MARKETING SOP KI WORKSHOP ──────────────────────────────────────
 function buildDebugSopWorkshopSlides() {
   const slides = [];
   const ws = window.LP_WORKSHOP_SETTINGS;
-  const timeInfo = ws.brainstormTimeLimitSec > 0
-    ? `${Math.round(ws.brainstormTimeLimitSec / 60)} Min. pro Karte`
+  const timeMin = ws.brainstormTimeLimitSec > 0
+    ? `${Math.round(ws.brainstormTimeLimitSec / 60)} Min.`
     : '';
 
+  // Opener
   slides.push(tplSlide('content', {
     title: 'Marketing SOP · KI Use-Case Workshop',
-    body: `Wir gehen unsere Marketing-SOP Teilbereich für Teilbereich durch.\nFür jede Karte sammelt ihr gezielt KI-Use-Cases (${timeInfo ? timeInfo + ' · ' : ''}max. ${ws.brainstormMaxResponses} pro Person).\nZum Abschluss priorisieren wir gemeinsam in der Impact/Effort-Matrix.\n\nQR scannen · Name + Avatar wählen.`,
+    subtitle: `Pro Karte ${timeMin ? timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases pro Person`,
+    body: 'QR scannen · Name + Avatar wählen · los geht\'s!',
     mentiHero: true,
   }));
+
+  // Instruktions-Folie (gleiche wie SOP-Vorlagen)
+  slides.push(sopWorkshopInstructions());
 
   MARKETING_SOP_TRACKS.forEach((track, ti) => {
     slides.push(sopTrackIntro(track, ti));
@@ -747,6 +781,7 @@ function buildDebugSopWorkshopSlides() {
     slides.push(sopTrackVote(track, ti));
   });
 
+  // Finale: Übersicht + ICE-Matrix + Abschluss
   slides.push(sopAllTracksSummary());
   slides.push(sopIceMatrix());
   slides.push(...sopWorkshopClose());
@@ -759,30 +794,30 @@ window.LP_TEMPLATES = [
     key: 'roots-sop-ki-workshop-phase',
     category: 'ROOTS · SOP & KI',
     name: 'SOP-Workshop · pro Phase',
-    desc: 'Pro Phase sammeln & priorisieren, Track-Top-3, Impact/Effort-Matrix am Ende.',
+    desc: 'Pro Phase sammeln & priorisieren, Track-Top-3, Impact/Effort-Matrix.',
     duration: '90–150 Min.',
     group: '6–25',
-    tips: `Höchste Beteiligung — ${Math.round((window.LP_WORKSHOP_SETTINGS?.brainstormTimeLimitSec || 300) / 60)} Min. / max. ${window.LP_WORKSHOP_SETTINGS?.brainstormMaxResponses || 2} Use Cases pro Phase.`,
+    tips: 'Höchste Beteiligung. Instruktions-Folie + 5 Min. / max. 2 Use Cases pro Phase.',
     slides: buildSopKiWorkshopSlides('phase'),
   },
   {
     key: 'roots-sop-ki-workshop-track',
     category: 'ROOTS · SOP & KI',
     name: 'SOP-Workshop · pro Track',
-    desc: 'Pro Track EIN Brainstorm (alle Phasen sichtbar), Track-Top-3, Impact/Effort-Matrix.',
+    desc: 'Pro Track EIN Brainstorm (alle Phasen sichtbar), Top-3, Impact/Effort-Matrix.',
     duration: '60–90 Min.',
     group: '6–25',
-    tips: `Tempo-Format — ${Math.round((window.LP_WORKSHOP_SETTINGS?.brainstormTimeLimitSec || 300) / 60)} Min. / max. ${window.LP_WORKSHOP_SETTINGS?.brainstormMaxResponses || 2} Use Cases pro Track.`,
+    tips: 'Tempo-Format. Instruktions-Folie + 5 Min. / max. 2 Use Cases pro Track.',
     slides: buildSopKiWorkshopSlides('track'),
   },
   {
     key: 'roots-sop-ki-workshop-end',
     category: 'ROOTS · SOP & KI',
     name: 'SOP-Workshop · nur am Ende',
-    desc: 'Erst alles sammeln (alle Phasen), Priorisierung nur am Schluss in der Impact/Effort-Matrix.',
+    desc: 'Erst alle Phasen sammeln (keine Zwischen-Votes), dann Impact/Effort-Matrix.',
     duration: '60–90 Min.',
     group: '6–25',
-    tips: `Schnellstes Format — eine Priorisierung am Ende. ${Math.round((window.LP_WORKSHOP_SETTINGS?.brainstormTimeLimitSec || 300) / 60)} Min. pro Phase.`,
+    tips: 'Schnellstes Format. Eine Priorisierung ganz am Ende.',
     slides: buildSopKiWorkshopSlides('end'),
   },
   {
@@ -792,12 +827,12 @@ window.LP_TEMPLATES = [
     desc: 'Marketing-SOP: je Karte KI Use Cases sammeln · Track-Top-3 · Impact/Effort-Matrix.',
     duration: '60–90 Min.',
     group: '6–20',
-    tips: 'Pro Karte 5 Min. · max. 2 Use Cases · Auswertung mit Aufschlüsselung nach Teilbereich.',
+    tips: 'Pro Karte 5 Min. · max. 2 Use Cases · Auswertung nach Teilbereich.',
     slides: buildDebugSopWorkshopSlides(),
   },
 ];
 
-// ─── DEBUG MOCK DATA ─────────────────────────────────────────────
+// ─── DEBUG MOCK DATA ─────────────────────────────────────────────────────────
 window.LP_DEBUG_PHASE_USE_CASES = {
   'Anbahnung': [
     'LinkedIn-Signal-Monitoring für Bedarfserkennung',
