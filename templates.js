@@ -596,8 +596,35 @@ function sopWorkshopClose() {
 // ─── BUILD ───────────────────────────────────────────────────────────────────
 //
 // mode:
-//  'pro-phase' → SOP-Übersicht je Phase → Brainstorm → Track-Vote → Presentation Session → ICE-Matrix
-//  'pro-track' → pro Track EIN Brainstorm (alle Phasen sichtbar) → Track-Vote → Presentation → ICE-Matrix
+// ─── PITCH SESSION + FINALE ABSTIMMUNG ─────────────────────────────────────────
+
+function sopPitchSession() {
+  return tplSlide('content', {
+    title: 'Pitch Session',
+    subtitle: 'Jede Person stellt ihren Use Case kurz vor · 2 Minuten pro Person',
+    body: '',
+    sopKind: 'pitch-session',
+    pitchTimerSec: 120,
+  }, { workshopMode: 'present', sopPitchSession: true });
+}
+
+function sopFinalAllTracksVote() {
+  const ws = window.LP_WORKSHOP_SETTINGS;
+  const max = ws?.brainstormMaxResponses || 3;
+  return tplSlide('mc_multi', {
+    title: 'Finale Priorisierung',
+    subtitle: 'Alle Use Cases · wähle deine Favoriten (keine eigenen)',
+    prompt: `Welche ${max} Use Cases haben den größten Impact für euer Team?\n→ Eigene Beiträge können nicht gewählt werden.`,
+    mentiQuestion: true,
+    options: [],
+    maxSelections: max,
+    sopKind: 'final-vote',
+    sopFairVote: true,
+  }, { showResultsLive: true, sopAllTracksVote: true, sopFairVote: true, sopVoteMax: max, workshopMode: 'decide' });
+}
+
+//  'pro-phase' → Brainstorm je Phase (SOP-Board on Slide) → Track-Vote → Presentation Session → Pitch → ICE-Matrix
+//  'pro-track' → EIN Brainstorm (SOP-Board on Slide) → Pitch-Session → Faire Abstimmung → ICE-Matrix
 //  'phase'/'track' → legacy aliases
 
 function buildSopKiWorkshopSlides(mode = 'pro-phase') {
@@ -630,25 +657,27 @@ function buildSopKiWorkshopSlides(mode = 'pro-phase') {
     slides.push(sopTrackIntro(track, ti));
 
     if (mode === 'pro-phase' || mode === 'phase') {
-      // Pro Phase: SOP-Übersicht → Brainstorm je Phase → Track-Vote → Presentation
+      // Pro Phase: Brainstorm je Phase (SOP-Board sichtbar) → Track-Vote → Presentation Session
       track.phases.forEach((phase) => {
-        slides.push(sopPhaseOverview(track, phase));    // SOP-Design für diese Phase
-        slides.push(sopPhaseBrainstorm(track, phase));  // Brainstorm 5 Min.
+        slides.push(sopPhaseBrainstorm(track, phase));  // SOP-Board direkt auf Brainstorm-Slide
       });
       slides.push(sopTrackVote(track, ti));
       slides.push(sopTrackPresentationSession(track));
 
     } else if (mode === 'pro-track' || mode === 'track') {
-      // Pro Track: EIN Brainstorm (alle Phasen sichtbar) → Track-Vote → Presentation
-      slides.push(sopTrackOverview(track));     // SOP aller Phasen + Karten zeigen
-      slides.push(sopTrackBrainstorm(track));   // Brainstorm mit sopBoard
-      slides.push(sopTrackVote(track, ti));
-      slides.push(sopTrackPresentationSession(track));
+      // Pro Track: EIN Brainstorm (SOP-Board sichtbar) → kein Track-Vote → konsolidiert am Ende
+      slides.push(sopTrackBrainstorm(track));   // SOP-Board direkt auf Brainstorm-Slide
     }
   });
 
-  // 4. Finale: Übersicht + ICE-Matrix
-  slides.push(sopAllTracksSummary());
+  // 4. Finale: Pitch-Session + Abstimmung + ICE-Matrix
+  if (mode === 'pro-track' || mode === 'track') {
+    slides.push(sopPitchSession());
+    slides.push(sopFinalAllTracksVote());
+  } else {
+    slides.push(sopAllTracksSummary());
+    slides.push(sopPitchSession());
+  }
   slides.push(sopIceMatrix());
 
   return slides;

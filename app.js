@@ -257,7 +257,7 @@ function aggregateTrackUseCases(trackKey) {
   slides.forEach((slide) => {
     const items = (State.responses || [])
       .filter((r) => r.slide_id === slide.id && !r.is_hidden)
-      .map((r) => ({ id: r.id, text: String(r.response?.text || '').trim() }))
+      .map((r) => ({ id: r.id, text: String(r.response?.text || '').trim(), participant_id: r.participant_id }))
       .filter((item) => item.text);
     byCard.push({
       phase: slide.content?.sopPhaseName || '',
@@ -300,7 +300,7 @@ function aggregateAllTracksUseCases() {
     }
     const items = (State.responses || [])
       .filter((r) => r.slide_id === slide.id && !r.is_hidden)
-      .map((r) => ({ id: r.id, text: String(r.response?.text || '').trim() }))
+      .map((r) => ({ id: r.id, text: String(r.response?.text || '').trim(), participant_id: r.participant_id }))
       .filter((item) => item.text);
     byTrackKey.get(trackKey).phases.push({ phase: phaseName, items, slideId: slide.id });
     items.forEach((item) => allItems.push({
@@ -856,7 +856,7 @@ function isBrainstormCollectSlide(slide) {
 
 function shouldUseVoteWorkshopUi(slide) {
   if (!slide) return false;
-  if (isSopWorkshopPresentation() && (slide.settings?.sopCardVote || slide.settings?.sopPhaseVote || slide.settings?.sopTrackVote)) return true;
+  if (isSopWorkshopPresentation() && (slide.settings?.sopCardVote || slide.settings?.sopPhaseVote || slide.settings?.sopTrackVote || slide.settings?.sopAllTracksVote)) return true;
   return isBrainstormVoteSlide(slide);
 }
 
@@ -1064,21 +1064,7 @@ function getWorkshopProgress(slideIndex) {
 }
 
 function renderWorkshopProgressHtml(slideIndex) {
-  if (!isSopWorkshopPresentation()) {
-    return `<div class="menti-slide-counter">Folie ${slideIndex + 1} / ${State.slides.length}</div>`;
-  }
-  const p = getWorkshopProgress(slideIndex);
-  if (!p) return `<div class="menti-slide-counter">Folie ${slideIndex + 1} / ${State.slides.length}</div>`;
-  const counter = p.counter || (p.step === 'decide' ? 'Priorisierung' : p.step === 'orient' ? 'Track-Start' : `Karte ${p.cardIndex} / ${p.cardTotal}`);
-  const mode = p.step === 'orient' ? 'orient' : p.step === 'collect' ? 'collect' : 'decide';
-  return `<div class="menti-slide-progress">
-    <div class="menti-slide-progress-top">
-      <span class="menti-slide-track">${esc(p.trackLabel)}</span>
-      <span class="menti-slide-step">${esc(counter)}</span>
-      ${renderWorkshopModeBadge(mode)}
-    </div>
-    <div class="workshop-progress-bar"><div class="workshop-progress-fill" style="width:${p.pct}%"></div></div>
-  </div>`;
+  return `<div class="menti-slide-counter">Folie ${slideIndex + 1} / ${State.slides.length}</div>`;
 }
 
 function wrapMentiSlide(bodyHtml, slideIndex) {
@@ -1157,7 +1143,7 @@ function getTrackVoteOptionsGrouped(slide) {
           groups.push({
             phase: `${trk.trackLabel} · ${p.phase}`,
             card: '',
-            options: p.items.map((item) => ({ id: `resp-${item.id}`, text: item.text })),
+            options: p.items.map((item) => ({ id: `resp-${item.id}`, text: item.text, participant_id: item.participant_id })),
           });
         }
       });
@@ -1172,7 +1158,7 @@ function getTrackVoteOptionsGrouped(slide) {
     .map((g) => ({
       phase: g.phase,
       card: g.card,
-      options: g.items.map((item) => ({ id: `resp-${item.id}`, text: item.text })),
+      options: g.items.map((item) => ({ id: `resp-${item.id}`, text: item.text, participant_id: item.participant_id })),
     }));
 }
 
@@ -1413,16 +1399,21 @@ function renderTrackVotePresentHtml(slide, visible) {
   </div>`;
 }
 
-function renderTrackVoteGroupedListHtml(slide, { selectable = false, selectedIds = [] } = {}) {
+function renderTrackVoteGroupedListHtml(slide, { selectable = false, selectedIds = [], fairVote = false } = {}) {
   const groups = getTrackVoteOptionsGrouped(slide);
   if (!groups.length) return '<div class="present-wait-msg">Noch keine Use Cases gesammelt.</div>';
+  const myId = fairVote ? (State.participant?.id) : null;
   return `<div class="track-vote-grouped">${groups.map((g) => `
     <div class="track-vote-group">
       <div class="track-vote-group-head"><span>${esc(g.phase)}</span><strong>${esc(g.card)}</strong></div>
       <div class="track-vote-group-items">${g.options.map((o) => {
-        if (selectable) {
+        const isOwn = myId && o.participant_id === myId;
+        if (selectable && !isOwn) {
           const checked = selectedIds.includes(o.id) ? ' checked' : '';
           return `<label class="track-vote-option"><input type="checkbox" value="${esc(o.id)}"${checked} /><span>${esc(o.text)}</span></label>`;
+        }
+        if (selectable && isOwn) {
+          return `<div class="track-vote-option track-vote-option--own"><span>${esc(o.text)}</span><span class="vote-own-badge">Mein Beitrag</span></div>`;
         }
         return `<div class="track-vote-option-read">${esc(o.text)}</div>`;
       }).join('')}</div>
@@ -1513,6 +1504,16 @@ function renderParticipantTrackVoteHtml(slide) {
       <div id="fav-counter" class="top3-counter">0 / ${max} gewählt</div>
       <button type="button" class="btn-primary participant-submit" id="submit-favorites">Priorisierung senden</button>`;
   }
+  if (scope?.kind === 'all-tracks') {
+    const fairVote = !!slide.settings?.sopFairVote;
+    const hint = fairVote
+      ? `Wähle deine <strong>Top ${max} Use Cases</strong> aus allen Tracks · eigene Beiträge sind ausgeschlossen.`
+      : `Wähle <strong>Top ${max} Use Cases</strong> aus allen Tracks.`;
+    return `<p class="vote-mode-hint">${hint}</p>
+      ${renderTrackVoteGroupedListHtml(slide, { selectable: true, fairVote })}
+      <div id="fav-counter" class="top3-counter">0 / ${max} gewählt</div>
+      <button type="button" class="btn-primary participant-submit" id="submit-favorites">Priorisierung senden</button>`;
+  }
   return `<p class="vote-mode-hint">Wähle <strong>maximal ${max} Lieblings-Use-Cases</strong> aus dem Brainstorming.</p>
     ${renderTrackVoteGroupedListHtml(slide, { selectable: true })}
     <div id="fav-counter" class="top3-counter">0 / ${max} gewählt</div>
@@ -1550,6 +1551,10 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
   const trackVoteIdx = findIdx((s) => {
     const c = s.content || {};
     return s.settings?.sopTrackVote && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
+  });
+  const trackPresentationIdx = findIdx((s) => {
+    const c = s.content || {};
+    return c.sopKind === 'track-presentation' && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
   });
   const trackIdxNum = tracks.findIndex((t) => t.class === activeTrack.class);
 
@@ -1600,6 +1605,11 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
   if (trackVoteIdx >= 0) {
     html += `<button type="button" class="workshop-sop-vote ${currentIndex === trackVoteIdx ? 'active' : ''}" data-slide-index="${trackVoteIdx}">
       <i class="fa-solid fa-ranking-star"></i><span>Top 3 priorisieren</span>
+    </button>`;
+  }
+  if (trackPresentationIdx >= 0) {
+    html += `<button type="button" class="workshop-sop-vote ${currentIndex === trackPresentationIdx ? 'active' : ''}" data-slide-index="${trackPresentationIdx}">
+      <i class="fa-solid fa-person-chalkboard"></i><span>Pitch Session</span>
     </button>`;
   }
 
@@ -1685,6 +1695,7 @@ function syncSopWorkshopShell(mode, slideIndex) {
   const curSlide = State.slides[idx];
   const hidePanelForSlide = !!curSlide && (
     curSlide.settings?.sopAllTracksVote || curSlide.settings?.sopAllTracksMatrix ||
+    curSlide.settings?.sopPitchSession ||
     curSlide.slide_type === 'priority_matrix'
   );
 
@@ -1855,6 +1866,36 @@ function renderSopContentHtml(c, editable = false) {
         ${titleEl}
         ${subEl}
         <div class="workshop-instructions-card">${instrHtml}</div>
+      </div>`;
+  }
+  // Pitch Session — alle Use Cases mit Autornamen + Timer
+  if (c.sopKind === 'pitch-session') {
+    const timerSec = Number(c.pitchTimerSec || 120);
+    const mm = String(Math.floor(timerSec / 60)).padStart(2, '0');
+    const ss = String(timerSec % 60).padStart(2, '0');
+    const titleEl = editable
+      ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+      : `<h1 class="sop-menti-title">${esc(c.title || '')}</h1>`;
+    const subEl = c.subtitle ? `<p class="sop-menti-sub">${esc(c.subtitle)}</p>` : '';
+    const timerEl = editable
+      ? `<div class="pitch-timer-edit"><i class="fa-solid fa-stopwatch"></i> Timer: <span contenteditable="true" class="canvas-editable pitch-timer-sec" data-field="pitchTimerSec">${timerSec}</span> Sekunden pro Person</div>`
+      : `<div class="pitch-timer-host" id="pitch-timer-host">
+          <div class="pitch-timer-display" id="pitch-timer-display">${mm}:${ss}</div>
+          <div class="pitch-timer-controls">
+            <button class="btn-ghost pitch-timer-btn" id="pitch-timer-start" data-sec="${timerSec}"><i class="fa-solid fa-play"></i> Start</button>
+            <button class="btn-ghost pitch-timer-btn" id="pitch-timer-reset"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+          </div>
+        </div>`;
+    const useCasesHtml = State.session
+      ? renderAllTracksUseCasesWithAuthors()
+      : '<div class="present-wait-msg">Use Cases mit Autornamen erscheinen in der Live-Session.</div>';
+    return `
+      <div class="sop-menti-section sop-pitch-session">
+        <div class="sop-menti-badge" style="background:#0f172a;color:#fff">Pitch Session</div>
+        ${titleEl}
+        ${subEl}
+        ${timerEl}
+        <div class="pitch-use-cases">${useCasesHtml}</div>
       </div>`;
   }
   // Phase Overview, Track Overview, Presentation Session
@@ -2658,10 +2699,76 @@ function showAddSlideOptions(type) {
   if (isClosure) refreshAddSlideClosureUi();
 }
 
+function renderAllTracksUseCasesWithAuthors() {
+  const { byTrack } = aggregateAllTracksUseCases();
+  if (!byTrack.length) return '<div class="present-wait-msg">Noch keine Use Cases gesammelt.</div>';
+  let html = '<div class="pitch-use-case-list">';
+  let n = 0;
+  byTrack.forEach((trk) => {
+    trk.phases.forEach((p) => {
+      p.items.forEach((item) => {
+        n += 1;
+        const author = (State.participants || []).find((x) => x.id === item.participant_id);
+        const authorName = author?.display_name || '–';
+        html += `<div class="pitch-use-case-item">
+          <span class="pitch-uc-num">${n}</span>
+          <div class="pitch-uc-content">
+            <div class="pitch-uc-text">${esc(item.text)}</div>
+            <div class="pitch-uc-meta">
+              <span class="pitch-uc-track">${esc(trk.trackLabel)}</span>
+              ${p.phase ? `<span class="pitch-uc-phase">${esc(p.phase)}</span>` : ''}
+              <span class="pitch-uc-author"><i class="fa-solid fa-user"></i> ${esc(authorName)}</span>
+            </div>
+          </div>
+        </div>`;
+      });
+    });
+  });
+  html += '</div>';
+  return html;
+}
+
+function bindPitchTimerIfPresent(stage) {
+  const startBtn = stage?.querySelector('#pitch-timer-start');
+  if (!startBtn) return;
+  const display = stage.querySelector('#pitch-timer-display');
+  const resetBtn = stage.querySelector('#pitch-timer-reset');
+  const totalSec = parseInt(startBtn.dataset.sec, 10) || 120;
+  let remaining = totalSec;
+  let interval = null;
+  function fmt(s) { return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; }
+  function stop() {
+    clearInterval(interval); interval = null;
+    if (startBtn) startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Weiter';
+    if (stage) stage.querySelector('#pitch-timer-host')?.classList.remove('is-running');
+  }
+  startBtn.addEventListener('click', () => {
+    if (interval) { stop(); return; }
+    if (remaining <= 0) remaining = totalSec;
+    startBtn.innerHTML = '<i class="fa-solid fa-pause"></i> Pause';
+    stage.querySelector('#pitch-timer-host')?.classList.add('is-running');
+    interval = setInterval(() => {
+      remaining -= 1;
+      if (display) display.textContent = fmt(remaining);
+      if (remaining <= 0) { stop(); }
+    }, 1000);
+  });
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      clearInterval(interval); interval = null;
+      remaining = totalSec;
+      if (display) display.textContent = fmt(remaining);
+      if (startBtn) startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start';
+      stage?.querySelector('#pitch-timer-host')?.classList.remove('is-running');
+    });
+  }
+}
+
 function finalizePresentUi(slide) {
   updatePresentToolbarUi(slide);
   bindResultsDisplayToggle($('#present-stage'));
   maybeLaunchResultsConfetti(slide);
+  bindPitchTimerIfPresent($('#present-stage'));
 }
 
 async function deleteSlide(id) {
