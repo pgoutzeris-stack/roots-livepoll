@@ -850,7 +850,7 @@ async function toggleSimulationMode() {
 function isBrainstormCollectSlide(slide) {
   if (!slide || !COLLECT_CHAIN_TYPES.has(slide.slide_type)) return false;
   const c = slide.content || {};
-  if (isSopWorkshopPresentation() && (c.sopKind === 'phase-workshop' || c.sopKind === 'card-workshop' || c.sopCardName)) return true;
+  if (isSopWorkshopPresentation() && (c.sopKind === 'phase-workshop' || c.sopKind === 'card-workshop' || c.sopKind === 'track-collect' || c.sopCardName)) return true;
   return hasCollectChain(slide);
 }
 
