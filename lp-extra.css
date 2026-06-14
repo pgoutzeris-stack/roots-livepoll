@@ -840,3 +840,50 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .workshop-instructions-card .wi-note{
   font-size:.82rem;color:var(--muted);margin:.5rem 0;line-height:1.5;
 }
+
+/* ═══ FINALE: nav panel + vote/matrix polish ═══ */
+
+/* — Finale-Navigationspanel (Pitch / Abstimmung / Impact-Effort) — */
+/* Erbt Basis-Styling von .workshop-sop-panel; der --finale Modifier gibt den
+   drei Finale-Schritten etwas mehr Luft und macht die "abgeschlossen"-Liste
+   als eigenen Block oberhalb erkennbar. */
+.workshop-sop-panel--finale .workshop-sop-panel-head i{color:var(--brand)}
+.workshop-sop-panel--finale .workshop-sop-later-item{
+  display:flex;align-items:center;gap:.4rem;
+  padding:.3rem .5rem;border-radius:8px;
+}
+.workshop-sop-panel--finale .workshop-sop-later-item::before{
+  content:"";flex-shrink:0;width:6px;height:6px;border-radius:50%;
+  background:var(--success,#10b981);
+}
+/* Trennlinie zwischen abgeschlossenen Tracks und den Finale-Schritten */
+.workshop-sop-panel--finale .workshop-sop-vote:first-of-type{
+  margin-top:.6rem;padding-top:.7rem;border-top:1px solid var(--line);
+  border-radius:0 0 12px 12px;
+}
+.workshop-sop-panel--finale .workshop-sop-vote i{
+  color:var(--brand);width:1rem;text-align:center;flex-shrink:0;
+}
+.workshop-sop-panel--finale .workshop-sop-vote.active i{color:var(--brand)}
+
+/* — Pitch Session Badge: Icon-Abstand (Badge nutzt inline-flex) — */
+.sop-pitch-session .sop-menti-badge{gap:.4rem}
+
+/* — Pitch Session Timer-Buttons: ROOTS-Pill — */
+.sop-pitch-session .pitch-timer-btn{
+  border:1.5px solid var(--line);border-radius:99px;
+  background:var(--bg);color:var(--ink);font-weight:700;
+}
+.sop-pitch-session .pitch-timer-btn:hover{
+  border-color:var(--brand);background:var(--brand-light);color:var(--brand);
+}
+.sop-pitch-session .pitch-timer-btn i{color:var(--brand)}
+
+/* — Finale-Vote (present): Live-Ergebnis-Label — */
+.track-vote-live-label{
+  font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--muted);margin-bottom:.6rem;display:flex;align-items:center;gap:.4rem;
+}
+.track-vote-live-label::before{
+  content:"";width:7px;height:7px;border-radius:50%;background:var(--brand);
+}

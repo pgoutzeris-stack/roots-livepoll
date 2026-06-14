@@ -1530,7 +1530,52 @@ function bindSopWorkshopPanelClicks(container, onNavigate) {
   });
 }
 
+function isFinaleSlide(s) {
+  if (!s) return false;
+  const st = s.settings || {};
+  const k = s.content?.sopKind;
+  return !!(st.sopPitchSession || st.sopAllTracksVote || st.sopAllTracksMatrix
+    || k === 'pitch-session' || k === 'final-vote' || k === 'final-matrix');
+}
+
+function renderSopFinalePanelHtml(currentIndex, { clickable = false, onNavigate } = {}) {
+  const findIdx = (predicate) => State.slides.findIndex(predicate);
+  const pitchIdx = findIdx((s) => s.settings?.sopPitchSession || s.content?.sopKind === 'pitch-session');
+  const voteIdx = findIdx((s) => s.settings?.sopAllTracksVote || s.content?.sopKind === 'final-vote');
+  const matrixIdx = findIdx((s) => s.settings?.sopAllTracksMatrix || s.content?.sopKind === 'final-matrix');
+
+  let html = `<div class="workshop-sop-panel workshop-sop-panel--finale">
+    <div class="workshop-sop-panel-head"><i class="fa-solid fa-flag-checkered"></i> Finale</div>`;
+  (window.SOP_TOOL_TRACKS || []).forEach((t) => {
+    html += `<div class="workshop-sop-later-item">${esc(t.title.replace(/^Track \d+: /, ''))} · Abgeschlossen</div>`;
+  });
+  const step = (idx, icon, label) => {
+    if (idx < 0) return '';
+    return `<button type="button" class="workshop-sop-vote${currentIndex === idx ? ' active' : ''}" data-slide-index="${idx}">
+      <i class="fa-solid ${icon}"></i><span>${esc(label)}</span>
+    </button>`;
+  };
+  html += step(pitchIdx, 'fa-person-chalkboard', 'Pitch Session');
+  html += step(voteIdx, 'fa-ranking-star', 'Abstimmung');
+  html += step(matrixIdx, 'fa-table-cells-large', 'Impact/Effort');
+  html += '</div>';
+  return {
+    html,
+    bind(container) {
+      if (clickable && onNavigate) bindSopWorkshopPanelClicks(container, onNavigate);
+    },
+  };
+}
+
 function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigate } = {}) {
+  // Finale-Folien (Pitch Session, Finale-Priorisierung, Impact/Effort-Matrix) haben
+  // keinen aktiven Track — sie bekommen ein eigenes Finale-Panel mit den drei
+  // Finale-Schritten + Liste der abgeschlossenen Tracks. Frühzeitig zurückkehren,
+  // damit die track-basierte Logik (getActiveTrackKey läuft sonst rückwärts zum
+  // LETZTEN Track) für die Finale-Folien NICHT greift.
+  if (isFinaleSlide(State.slides[currentIndex])) {
+    return renderSopFinalePanelHtml(currentIndex, { clickable, onNavigate });
+  }
   const tracks = window.SOP_TOOL_TRACKS || [];
   const activeTrackKey = getActiveTrackKey(currentIndex);
   const activeTrack = tracks.find((t) => t.class === activeTrackKey);
@@ -1690,14 +1735,10 @@ function syncSopWorkshopShell(mode, slideIndex) {
     panel.bind(el);
   };
 
-  // Auf Priorisierungs-Folien (Votes + Matrix) die SOP-Übersicht ausblenden —
-  // dort soll nur Leaderboard + Teilnehmer-Panel zu sehen sein.
-  const curSlide = State.slides[idx];
-  const hidePanelForSlide = !!curSlide && (
-    curSlide.settings?.sopAllTracksVote || curSlide.settings?.sopAllTracksMatrix ||
-    curSlide.settings?.sopPitchSession ||
-    curSlide.slide_type === 'priority_matrix'
-  );
+  // Die SOP-Übersicht soll auf ALLEN SOP-Folien sichtbar sein — inklusive der
+  // drei Finale-Folien (Pitch Session, Finale-Priorisierung, Impact/Effort-Matrix).
+  // renderSopWorkshopPanelHtml rendert für diese Folien automatisch das Finale-Panel.
+  const hidePanelForSlide = false;
 
   editorNav?.classList.add('hidden');
   if (mode === 'editor') mountPanel(editorPanel);
@@ -1891,7 +1932,7 @@ function renderSopContentHtml(c, editable = false) {
       : '<div class="present-wait-msg">Use Cases mit Autornamen erscheinen in der Live-Session.</div>';
     return `
       <div class="sop-menti-section sop-pitch-session">
-        <div class="sop-menti-badge" style="background:#0f172a;color:#fff">Pitch Session</div>
+        <div class="sop-menti-badge" style="background:var(--brand);color:#fff"><i class="fa-solid fa-person-chalkboard"></i> Pitch Session</div>
         ${titleEl}
         ${subEl}
         ${timerEl}
