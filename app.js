@@ -1820,6 +1820,34 @@ function renderSopContentHtml(c, editable = false) {
         <div class="sop-track-results-wrap">${results}</div>
       </div>`;
   }
+  // Phase Overview, Track Overview, Presentation Session, Instructions
+  // → alle rendern als sop-menti-section mit Track-Farbe und Board-Vorschau
+  if (c.sopKind === 'phase-overview' || c.sopKind === 'track-overview' ||
+      c.sopKind === 'track-presentation' || c.sopKind === 'instructions') {
+    const theme = c.sopTrackClass
+      ? sopTrackTheme(c.sopTrackClass)
+      : { accent: '#206efb', soft: 'rgba(32,110,251,.08)', badgeBg: '#206efb', badgeColor: '#fff' };
+    const badgeLabel = c.sopKind === 'instructions'
+      ? 'Workshop · So geht\'s'
+      : (c.sopTrackLabel || 'SOP');
+    const titleEl = editable
+      ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+      : `<h1 class="sop-menti-title">${esc(c.title || '')}</h1>`;
+    const subEl = editable
+      ? `<div class="canvas-editable sop-menti-sub" contenteditable="true" data-field="subtitle">${esc(c.subtitle || '')}</div>`
+      : (c.subtitle ? `<p class="sop-menti-sub">${esc(c.subtitle)}</p>` : '');
+    const bodyEl = editable
+      ? `<div class="canvas-editable sop-menti-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+      : (c.body ? `<p class="sop-menti-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+    return `
+      <div class="sop-menti-section sop-menti-${c.sopKind} ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+        <div class="sop-menti-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(badgeLabel)}</div>
+        ${titleEl}
+        ${subEl}
+        ${bodyEl}
+        ${c.sopKind !== 'instructions' ? renderSopBoardPreview(c, editable) : ''}
+      </div>`;
+  }
   return '';
 }
 
