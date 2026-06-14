@@ -1032,3 +1032,51 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .track-vote-live-label::before{
   content:"";width:7px;height:7px;border-radius:50%;background:var(--brand);
 }
+
+/* ═══ Workshop-Ziel: Impact/Effort-Vorschau (Quick Win = Ziel) ═══ */
+.sop-menti-goal{max-width:1000px}
+.goal-matrix{
+  display:grid;grid-template-columns:1.4rem 1fr;grid-template-rows:1fr 1.4rem;
+  gap:.5rem;max-width:660px;margin:1.4rem 0 .25rem;
+}
+.goal-matrix-yaxis{
+  grid-column:1;grid-row:1;writing-mode:vertical-rl;transform:rotate(180deg);
+  display:flex;align-items:center;justify-content:center;gap:.4rem;
+  font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+}
+.goal-matrix-grid{
+  grid-column:2;grid-row:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:.6rem;
+}
+.goal-matrix-xaxis{
+  grid-column:2;grid-row:2;display:flex;align-items:center;justify-content:center;gap:.4rem;
+  font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+}
+.goal-q{
+  border:1.5px solid var(--line);border-radius:12px;padding:.7rem .8rem;
+  display:flex;flex-direction:column;gap:.15rem;background:var(--surface);min-height:90px;
+}
+.goal-q i{font-size:1rem}
+.goal-q strong{font-size:.9rem;color:var(--ink);font-weight:700}
+.goal-q span{font-size:.72rem;color:var(--muted);line-height:1.35}
+.goal-q em{display:none}
+.goal-q--qw{
+  border-color:rgba(16,185,129,.55);
+  background:linear-gradient(160deg,rgba(16,185,129,.1),transparent 70%);
+  box-shadow:0 0 0 3px rgba(16,185,129,.12);
+}
+.goal-q--qw i{color:#10b981}
+.goal-q--qw em{
+  display:inline-flex;align-items:center;gap:.3rem;margin-top:.3rem;
+  font-style:normal;font-size:.64rem;font-weight:800;text-transform:uppercase;
+  letter-spacing:.04em;color:#10b981;
+}
+.goal-q--qw em::before{content:"\f00c";font-family:"Font Awesome 6 Free";font-weight:900}
+.goal-q--sb i{color:var(--brand)}
+.goal-q--ts i{color:#64748b}
+.goal-q--dr i{color:#dc2626}
+@media (max-width:760px){
+  .goal-matrix{max-width:none}
+  .goal-matrix-grid{gap:.4rem}
+  .goal-q{min-height:0;padding:.55rem .6rem}
+  .goal-q span{font-size:.68rem}
+}

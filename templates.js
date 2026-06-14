@@ -432,6 +432,17 @@ function sopTrackOverview(track) {
 // ─── INSTRUKTIONS-FOLIE ────────────────────────────────────────────────────────
 // Erscheint einmal nach dem Opener — erklärt Format, Timing und Limit.
 
+// Zielbild-Folie: erklärt vorweg, worauf der Workshop hinausläuft (Impact/Effort).
+function sopWorkshopGoal() {
+  return tplSlide('content', {
+    title: 'Worum es heute geht',
+    subtitle: 'Das Ziel des Workshops',
+    body: 'Wir sammeln konkrete KI Use Cases aus eurem Arbeitsalltag, priorisieren sie gemeinsam und ordnen sie am Ende nach Impact und Aufwand ein.\n\nGesucht sind vor allem Quick Wins: viel Wirkung bei wenig Aufwand — die setzen wir zuerst um.',
+    sopKind: 'workshop-goal',
+    mentiHero: false,
+  }, { workshopMode: 'orient' });
+}
+
 function sopWorkshopInstructions() {
   const ws = window.LP_WORKSHOP_SETTINGS;
   const timeMin = ws.brainstormTimeLimitSec > 0
@@ -652,7 +663,10 @@ function buildSopKiWorkshopSlides(mode = 'pro-phase') {
     mentiHero: true,
   }));
 
-  // 2. Instruktions-Folie (Format, Timing, Limit)
+  // 2. Zielbild (worauf der Workshop hinausläuft)
+  slides.push(sopWorkshopGoal());
+
+  // 3. Instruktions-Folie (Format, Timing, Limit)
   slides.push(sopWorkshopInstructions());
 
   // 3. Per Track
@@ -837,6 +851,9 @@ function buildDebugSopWorkshopSlides() {
     body: 'QR scannen · Name + Avatar wählen · los geht\'s!',
     mentiHero: true,
   }));
+
+  // Zielbild (worauf der Workshop hinausläuft)
+  slides.push(sopWorkshopGoal());
 
   // Instruktions-Folie
   slides.push(sopWorkshopInstructions());

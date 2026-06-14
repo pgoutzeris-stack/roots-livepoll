@@ -2006,6 +2006,37 @@ function renderSopContentHtml(c, editable = false) {
         <div class="sop-track-results-wrap">${results}</div>
       </div>`;
   }
+  // Zielbild-Folie — Workshop-Ziel mit Impact/Effort-Vorschau (Quick Wins als Ziel)
+  if (c.sopKind === 'workshop-goal') {
+    const titleEl = editable
+      ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+      : `<h1 class="sop-menti-title">${esc(c.title || '')}</h1>`;
+    const subEl = editable
+      ? `<div class="canvas-editable sop-menti-sub" contenteditable="true" data-field="subtitle">${esc(c.subtitle || '')}</div>`
+      : (c.subtitle ? `<p class="sop-menti-sub">${esc(c.subtitle)}</p>` : '');
+    const bodyEl = editable
+      ? `<div class="canvas-editable sop-menti-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+      : (c.body ? `<p class="sop-menti-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+    const goalMatrix = `
+      <div class="goal-matrix">
+        <div class="goal-matrix-yaxis"><i class="fa-solid fa-arrow-up"></i> Impact</div>
+        <div class="goal-matrix-grid">
+          <div class="goal-q goal-q--qw"><i class="fa-solid fa-rocket"></i><strong>Quick Win</strong><span>viel Wirkung · wenig Aufwand</span><em>Hier wollen wir hin</em></div>
+          <div class="goal-q goal-q--sb"><i class="fa-solid fa-star"></i><strong>Strategic Bet</strong><span>viel Wirkung · viel Aufwand</span></div>
+          <div class="goal-q goal-q--dr"><i class="fa-solid fa-ban"></i><strong>Drop</strong><span>wenig Wirkung · wenig Aufwand</span></div>
+          <div class="goal-q goal-q--ts"><i class="fa-solid fa-screwdriver-wrench"></i><strong>Time Sink</strong><span>wenig Wirkung · viel Aufwand</span></div>
+        </div>
+        <div class="goal-matrix-xaxis">Aufwand <i class="fa-solid fa-arrow-right"></i></div>
+      </div>`;
+    return `
+      <div class="sop-menti-section sop-menti-goal">
+        <div class="sop-menti-badge" style="background:var(--brand);color:#fff"><i class="fa-solid fa-bullseye"></i> Ziel</div>
+        ${titleEl}
+        ${subEl}
+        ${bodyEl}
+        ${goalMatrix}
+      </div>`;
+  }
   // Instructions slide — structured ROOTS-Design layout
   if (c.sopKind === 'instructions') {
     const theme = { accent: '#206efb', soft: 'rgba(32,110,251,.08)', badgeBg: '#206efb', badgeColor: '#fff' };
