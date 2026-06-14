@@ -7,6 +7,7 @@ window.LP_TEMPLATE_SETTINGS = { anonymous: false, askName: true, showResultsLive
 window.LP_WORKSHOP_SETTINGS = {
   brainstormTimeLimitSec: 300,   // Sammelzeit pro Folie in Sekunden (0 = kein Limit)
   brainstormMaxResponses: 2,     // Maximale Use Cases pro Teilnehmer pro Folie
+  finalPriorityCount: 5,         // Anzahl final priorisierter Use Cases → wandern in die Matrix
 };
 
 function tplSlide(type, content, settings = {}) {
@@ -553,7 +554,7 @@ function sopIceMatrix() {
       dr: { label: 'Drop', icon: '❌', desc: 'niedriger Impact · niedriger Aufwand → weglassen' },
     },
     sopKind: 'final-matrix',
-  }, { showResultsLive: true, sopAllTracksMatrix: true, workshopMode: 'decide' });
+  }, { showResultsLive: true, sopAllTracksMatrix: true, sopMatrixCount: (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5), workshopMode: 'decide' });
 }
 
 // ─── ABSCHLUSS-FOLIEN ──────────────────────────────────────────────────────────
@@ -612,17 +613,17 @@ function sopPitchSession() {
 
 function sopFinalAllTracksVote() {
   const ws = window.LP_WORKSHOP_SETTINGS;
-  const max = ws?.brainstormMaxResponses || 3;
+  const count = ws?.finalPriorityCount || 5;
   return tplSlide('mc_multi', {
     title: 'Finale Priorisierung',
-    subtitle: 'Alle Use Cases · wähle deine Favoriten (keine eigenen)',
-    prompt: `Welche ${max} Use Cases haben den größten Impact für euer Team?\nHinweis: Eigene Beiträge können nicht gewählt werden.`,
+    subtitle: `Alle Use Cases · wähle deine Top ${count} (keine eigenen)`,
+    prompt: `Welche ${count} Use Cases haben den größten Impact für euer Team?\nHinweis: Eigene Beiträge können nicht gewählt werden.`,
     mentiQuestion: true,
     options: [],
-    maxSelections: max,
+    maxSelections: count,
     sopKind: 'final-vote',
     sopFairVote: true,
-  }, { showResultsLive: true, sopAllTracksVote: true, sopFairVote: true, sopVoteMax: max, workshopMode: 'decide' });
+  }, { showResultsLive: true, sopAllTracksVote: true, sopFairVote: true, sopVoteMax: count, workshopMode: 'decide' });
 }
 
 //  'pro-phase' → Brainstorm je Phase (SOP-Board on Slide) → Track-Vote → Presentation Session → Pitch → ICE-Matrix

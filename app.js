@@ -465,9 +465,16 @@ function getVoteSlideScope(slide) {
     return { kind: 'track', key, maxSelections: 3 };
   }
   if (st.sopAllTracksVote) {
-    return { kind: 'all-tracks', key: null, maxSelections: 5 };
+    return { kind: 'all-tracks', key: null, maxSelections: finalPriorityCount(slide) };
   }
   return null;
+}
+
+// Zentrale Anzahl der final priorisierten Use Cases (→ wandern in die Matrix).
+// Reihenfolge: Slide-Einstellung → Workshop-/Vorlagen-Default → 5.
+function finalPriorityCount(slide) {
+  const st = slide?.settings || {};
+  return Number(st.sopVoteMax || st.sopFinalCount || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
 }
 
 function isSopVoteSlide(slide) {
@@ -3229,10 +3236,15 @@ function renderEditorProps() {
         : sopScope.kind === 'track' ? 'dieses Tracks'
           : sopScope.kind === 'card' ? `der Karte „${esc(sopScope.cardName || '')}"`
             : 'aller Tracks';
+      const isAllTracks = sopScope.kind === 'all-tracks';
+      const voteMaxLabel = isAllTracks
+        ? 'Anzahl Top Use Cases (→ Matrix)'
+        : 'Max. Auswahl pro Person';
       optionsHtml = `
       <div class="props-section">Antwortoptionen · importiert</div>
       <p class="props-hint"><i class="fa-solid fa-link"></i> Auswahloptionen werden automatisch aus den Brainstorming-Folien ${scopeLabel} übernommen. Mit <strong>„Live-Ergebnisse"</strong> erscheint nach dem Ausfüllen das Leaderboard.</p>
-      <div class="props-label">Max. Auswahl pro Person</div><input id="prop-sop-vote-max" type="number" min="1" max="10" value="${sopScope.maxSelections || 3}" />`;
+      <div class="props-label">${voteMaxLabel}</div><input id="prop-sop-vote-max" type="number" min="1" max="20" value="${sopScope.maxSelections || 3}" />
+      ${isAllTracks ? '<p class="props-hint"><i class="fa-solid fa-circle-info"></i> Jede Person wählt so viele Favoriten; die meistgewählten Use Cases dieser Anzahl wandern in die Impact/Effort-Matrix.</p>' : ''}`;
     } else {
       const importCtrl = canImport ? `
       <label class="props-toggle-row"><input type="checkbox" id="prop-import-brainstorm" ${importOn ? 'checked' : ''}><span><i class="fa-solid fa-link"></i> Optionen aus Brainstorming-Folie importieren</span></label>
@@ -3290,9 +3302,16 @@ function renderEditorProps() {
     const src = c.matrixSource || 'auto';
     const manualText = (c.manualItems || []).map((t) => (typeof t === 'string' ? t : (t.text || ''))).join('\n');
     const q = (k, fb) => esc((c.quadrants && c.quadrants[k] && c.quadrants[k].label) || fb);
+    const hasFinalVote = (State.slides || []).some((sl) => sl.settings?.sopAllTracksVote);
+    const mxCount = s.sopMatrixCount || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5;
     matrixPropsHtml = `
     <div class="props-section">Priorisierungs-Matrix</div>
-    ${isSopMatrix ? `<p class="props-hint"><i class="fa-solid fa-link"></i> Diese Matrix nutzt automatisch die Track-Top-3 des SOP-Workshops.</p>` : `
+    ${isSopMatrix ? `
+    <p class="props-hint"><i class="fa-solid fa-link"></i> Diese Matrix übernimmt automatisch die <strong>final priorisierten Top Use Cases</strong> des SOP-Workshops.</p>
+    ${hasFinalVote
+      ? '<p class="props-hint"><i class="fa-solid fa-circle-info"></i> Die Anzahl folgt der Folie „Finale Priorisierung" — dort „Anzahl Top Use Cases" einstellen.</p>'
+      : `<div class="props-label">Anzahl Use Cases in der Matrix</div><input id="prop-mx-count" type="number" min="1" max="20" value="${mxCount}" />`}
+    ` : `
     <div class="props-label">Use Cases beziehen aus</div>
     <select id="prop-mx-source">
       <option value="auto" ${src === 'auto' ? 'selected' : ''}>Automatisch · vorherige Brainstorm-Folie</option>
@@ -3393,6 +3412,7 @@ function renderEditorProps() {
     };
     // ── Priorisierungs-Matrix-Felder ──
     if (slideObj.slide_type === 'priority_matrix') {
+      if ($('#prop-mx-count')) slideObj.settings.sopMatrixCount = Number($('#prop-mx-count').value || 5);
       if ($('#prop-mx-source')) slideObj.content.matrixSource = $('#prop-mx-source').value;
       if ($('#prop-mx-srcid')) slideObj.content.brainstormSourceId = $('#prop-mx-srcid').value || null;
       if ($('#prop-mx-items')) {
@@ -5095,13 +5115,24 @@ function getMatrixItems(slide) {
   const pushed = State.matrixItemsBySlide && State.matrixItemsBySlide[slide?.id];
   if (Array.isArray(pushed) && pushed.length) return pushed;
 
-  // 1. SOP-Workshop-Matrix: prioritisierte Use Cases automatisch übernehmen.
+  // 1. SOP-Workshop-Matrix: NUR die final priorisierten Use Cases (Top-N) übernehmen.
+  //    Anzahl N: folgt der finalen Abstimmung (sopVoteMax), sonst der Matrix-eigenen
+  //    Einstellung (sopMatrixCount), sonst Vorlagen-Default — einstellbar pro Slide/Vorlage.
   if (slide?.settings?.sopAllTracksMatrix) {
+    const voteSlide = (State.slides || []).find((s) => s.settings?.sopAllTracksVote);
+    const count = Number(
+      voteSlide?.settings?.sopVoteMax
+      || slide.settings?.sopMatrixCount
+      || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount
+      || 5
+    );
+
     // 1a. Bevorzugt: Gewinner der FINALEN Cross-Track-Abstimmung (Pro-Track-Flow).
-    const finalTop = aggregateTopFinalVotedUseCases(12);
+    const finalTop = aggregateTopFinalVotedUseCases(count);
     if (finalTop.length) return finalTop;
 
-    // 1b. Fallback: Top-3 je Track-Vote (Pro-Phase-Flow mit per-Track-Votes).
+    // 1b. Fallback: Top-Use-Cases aus den per-Track-Votes (Pro-Phase-Flow), nach
+    //     Score sortiert auf N begrenzt.
     const trackTop = aggregateTopTrackVotedUseCases();
     const rankedTop = trackTop.flatMap((trk) => trk.items.map((item) => ({
       id: item.id,
@@ -5109,12 +5140,12 @@ function getMatrixItems(slide) {
       phase: item.phase,
       trackLabel: trk.trackLabel,
       score: item.score,
-    })));
+    }))).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, count);
     if (rankedTop.length) return rankedTop;
 
-    // 1c. Letzter Fallback: alle Use Cases (z. B. wenn noch nicht abgestimmt wurde).
+    // 1c. Letzter Fallback: erste N Use Cases (z. B. wenn noch nicht abgestimmt wurde).
     const { allItems } = aggregateAllTracksUseCases();
-    return allItems.slice(0, 12).map((u, i) => ({ id: u.id || `it-${i}`, text: u.text, phase: u.phase, trackLabel: u.trackLabel }));
+    return allItems.slice(0, count).map((u, i) => ({ id: u.id || `it-${i}`, text: u.text, phase: u.phase, trackLabel: u.trackLabel }));
   }
 
   const c = slide?.content || {};
