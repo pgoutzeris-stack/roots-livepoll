@@ -1434,7 +1434,7 @@ function renderFinalVotePresentHtml(slide, visible) {
     const barPct = Math.round((r.votes / maxVotes) * 100);
     const topClass = ranked && i < 3 ? ` ws-row--top ws-row--top${i + 1}` : '';
     html += `<div class="ws-row${topClass}">
-      <span class="ws-c-rank">${ranked ? i + 1 : '·'}</span>
+      <span class="ws-c-rank">${i + 1}</span>
       <span class="ws-c-uc">
         <span class="ws-uc-text">${esc(r.text)}</span>
         <span class="ws-uc-meta"><span class="ws-uc-track">${esc(r.trackLabel)}</span>${r.phase && r.phase !== r.trackLabel ? `<span class="ws-uc-phase">${esc(r.phase)}</span>` : ''}</span>
@@ -4010,7 +4010,26 @@ const LP_DebugSim = {
           const quadrants = ['qw', 'sb', 'ts', 'dr'];
           const weights = [0.4, 0.3, 0.15, 0.15];
           const matrix = {}, meta = {};
-          allCollected.forEach((it, i) => {
+          // SOP-Matrix: NUR die priorisierten Top-N Use Cases (gleiche, die getMatrixItems
+          // anzeigt) — ermittelt aus den bereits erzeugten Abstimmungs-Antworten.
+          let mxPool = allCollected;
+          if (st.sopAllTracksMatrix) {
+            const voteSlide = State.slides.find((sl) => sl.settings?.sopAllTracksVote);
+            const mxCount = Number(voteSlide?.settings?.sopVoteMax || st.sopMatrixCount || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
+            const tally = {};
+            this.responsesBySlide.forEach((q, sid) => {
+              const sl = State.slides.find((x) => x.id === sid);
+              if (!sl || !(sl.settings?.sopAllTracksVote || sl.settings?.sopTrackVote || sl.settings?.sopPhaseVote)) return;
+              q.forEach((entry) => {
+                (entry.response?.response?.values || []).forEach((vid) => { tally[vid] = (tally[vid] || 0) + 1; });
+                Object.entries(entry.response?.response?.points || {}).forEach(([vid, val]) => { tally[vid] = (tally[vid] || 0) + Number(val || 0); });
+              });
+            });
+            const topIds = Object.entries(tally).sort((a, b) => b[1] - a[1]).slice(0, mxCount).map(([vid]) => vid.replace(/^resp-/, ''));
+            mxPool = topIds.map((rid) => allCollected.find((it) => it.respId === rid)).filter(Boolean);
+            if (!mxPool.length) mxPool = allCollected.slice(0, mxCount);
+          }
+          mxPool.forEach((it, i) => {
             const r = pseudoRandom(idx * 31 + i);
             let acc = 0, picked = 'qw';
             for (let q = 0; q < quadrants.length; q++) {
@@ -4020,7 +4039,7 @@ const LP_DebugSim = {
             matrix[it.respId] = picked;
             meta[it.respId] = { text: it.text, phase: it.phaseName, trackLabel: it.trackLabel };
           });
-          response = { matrix, meta };
+          if (Object.keys(matrix).length) response = { matrix, meta };
         } else if (type === 'pin_image') {
           response = { pin: { x: Math.round(pseudoRandom(idx) * 100), y: Math.round(pseudoRandom(idx + 1) * 100) } };
         }
