@@ -3914,6 +3914,7 @@ const LP_DebugSim = {
           respId,
           text,
           phaseName,
+          participantId: fakeP,
           trackLabel: c.sopTrackLabel || '',
           trackKey: c.sopTrackKey || c.sopTrackClass || '',
         });
@@ -3946,11 +3947,13 @@ const LP_DebugSim = {
         } else if (type === 'mc_multi') {
           if (st.sopCardVote || st.sopPhaseVote || st.sopTrackVote || st.brainstormVote || st.sopAllTracksVote) {
             const max = st.sopVoteMax || c.maxSelections || 2;
-            const scopedCollected = st.sopTrackVote
+            let scopedCollected = st.sopTrackVote
               ? allCollected.filter((it) => it.trackKey === (c.sopTrackKey || c.sopTrackClass))
               : st.sopPhaseVote
                 ? allCollected.filter((it) => it.trackKey === (c.sopTrackKey || c.sopTrackClass) && it.phaseName === c.sopPhaseName)
               : allCollected;
+            // Fair Vote (wie echte Teilnehmer): nicht für eigene Use Cases stimmen.
+            if (st.sopFairVote) scopedCollected = scopedCollected.filter((it) => it.participantId !== fakeP);
             if (scopedCollected.length) {
               const picked = [...scopedCollected].sort(() => pseudoRandom(idx + slide.id.length) - 0.5).slice(0, max);
               response = { values: picked.map((it) => `resp-${it.respId}`) };
@@ -4285,7 +4288,9 @@ function broadcastMatrixItems(slide) {
   if (!slide) return;
   const isMatrix = slide.slide_type === 'priority_matrix' || slide.settings?.sopAllTracksMatrix;
   if (!isMatrix) return;
-  const items = getMatrixItems(slide);
+  // Presenter berechnet die Top-N immer frisch (Cache-Bypass), damit die an die
+  // Teilnehmer gesendeten Use Cases den aktuellen Abstimmungsstand widerspiegeln.
+  const items = getMatrixItems(slide, { fresh: true });
   if (!items.length) return;
   const sig = slide.id + ':' + items.map((i) => i.id).join(',');
   if (State._lastMatrixSig === sig) return;
@@ -5127,12 +5132,16 @@ function findPrecedingCollectSlide(matrixSlide) {
   return null;
 }
 
-function getMatrixItems(slide) {
+function getMatrixItems(slide, { fresh = false } = {}) {
   // 0. Vom Presenter gebroadcastete Items (Teilnehmer sehen exakt dieselben
   //    Items wie der Presenter — funktioniert auch im Simulationsmodus, wo die
   //    zugrundeliegenden Antworten nur lokal beim Presenter liegen).
-  const pushed = State.matrixItemsBySlide && State.matrixItemsBySlide[slide?.id];
-  if (Array.isArray(pushed) && pushed.length) return pushed;
+  //    fresh=true erzwingt eine Neuberechnung (Presenter beim Broadcast), damit
+  //    spät eingehende Stimmen die Top-N noch aktualisieren.
+  if (!fresh) {
+    const pushed = State.matrixItemsBySlide && State.matrixItemsBySlide[slide?.id];
+    if (Array.isArray(pushed) && pushed.length) return pushed;
+  }
 
   // 1. SOP-Workshop-Matrix: NUR die final priorisierten Use Cases (Top-N) übernehmen.
   //    Anzahl N: folgt der finalen Abstimmung (sopVoteMax), sonst der Matrix-eigenen
