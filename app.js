@@ -2056,31 +2056,34 @@ function renderSopContentHtml(c, editable = false) {
           avoidBuf = [];
         }
       };
+      // Formel: feste Komponenten-Labels (Use Case · Feature · Abhängigkeiten)
+      const partLabels = ['Use Case', 'Feature', 'Abhängigkeiten'];
+      const partIcons = ['fa-lightbulb', 'fa-gear', 'fa-link'];
       for (const line of c.body.split('\n')) {
         const t = line.trim();
         if (!t) { flushAvoid(); mode = ''; continue; }
         if (t.startsWith('Format:')) {
           flushAvoid();
           mode = '';
-          const txt = t.replace(/^Format:\s*/, '');
-          instrHtml += `<div class="wi-format"><i class="fa-solid fa-pen-ruler"></i> <span>${esc(txt)}</span></div>`;
+          const formula = t.replace(/^Format:\s*/, '').split('|').map((p) => p.trim()).filter(Boolean);
+          instrHtml += `<div class="wi-formula">${formula.map((p, i) =>
+            `${i > 0 ? '<span class="wi-formula-plus">+</span>' : ''}<span class="wi-formula-part"><i class="fa-solid ${partIcons[i] || 'fa-circle'}"></i> ${esc(p)}</span>`
+          ).join('')}</div>`;
         } else if (t === 'Gute Use Cases:') {
           flushAvoid();
           mode = 'good';
-          instrHtml += `<div class="wi-section-head wi-section-good"><i class="fa-solid fa-circle-check"></i> <span>Gute Use Cases</span></div>`;
+          instrHtml += `<div class="wi-section-head wi-section-good"><i class="fa-solid fa-circle-check"></i> <span>So sieht ein guter Use Case aus</span></div>`;
         } else if (t === 'Bitte vermeiden:') {
           flushAvoid();
           mode = 'avoid';
           instrHtml += `<div class="wi-section-head wi-section-avoid"><i class="fa-solid fa-circle-minus"></i> <span>Bitte vermeiden</span></div>`;
-        } else if (mode === 'good' && t.includes(' | ')) {
+        } else if (mode === 'good' && t.includes('|')) {
           const parts = t.split('|').map((p) => p.trim());
-          const what = parts[0] || '';
-          const who = parts[1] || '';
-          const tool = parts[2] || '';
-          const meta = (who || tool)
-            ? `<span class="wi-ex-meta">${who ? `<span class="wi-ex-who">${esc(who)}</span>` : ''}${tool ? `<span class="wi-ex-tool">${esc(tool)}</span>` : ''}</span>`
-            : '';
-          instrHtml += `<div class="wi-example"><span class="wi-ex-what">${esc(what)}</span>${meta}</div>`;
+          const uc = parts[0] || '';
+          const rest = parts.slice(1).map((val, i) => val
+            ? `<div class="wi-ex-part"><span class="wi-ex-label">${esc(partLabels[i + 1] || '')}</span><span class="wi-ex-val">${esc(val)}</span></div>`
+            : '').join('');
+          instrHtml += `<div class="wi-example"><div class="wi-ex-uc"><i class="fa-solid fa-lightbulb"></i> ${esc(uc)}</div>${rest}</div>`;
         } else if (mode === 'avoid') {
           avoidBuf.push(t);
         } else {
