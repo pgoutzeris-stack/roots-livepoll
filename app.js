@@ -1684,7 +1684,6 @@ function syncSopWorkshopShell(mode, slideIndex) {
   // dort soll nur Leaderboard + Teilnehmer-Panel zu sehen sein.
   const curSlide = State.slides[idx];
   const hidePanelForSlide = !!curSlide && (
-    curSlide.settings?.sopPhaseVote || curSlide.settings?.sopTrackVote ||
     curSlide.settings?.sopAllTracksVote || curSlide.settings?.sopAllTracksMatrix ||
     curSlide.slide_type === 'priority_matrix'
   );
@@ -1820,16 +1819,50 @@ function renderSopContentHtml(c, editable = false) {
         <div class="sop-track-results-wrap">${results}</div>
       </div>`;
   }
-  // Phase Overview, Track Overview, Presentation Session, Instructions
-  // → alle rendern als sop-menti-section mit Track-Farbe und Board-Vorschau
-  if (c.sopKind === 'phase-overview' || c.sopKind === 'track-overview' ||
-      c.sopKind === 'track-presentation' || c.sopKind === 'instructions') {
+  // Instructions slide — structured ROOTS-Design layout
+  if (c.sopKind === 'instructions') {
+    const theme = { accent: '#206efb', soft: 'rgba(32,110,251,.08)', badgeBg: '#206efb', badgeColor: '#fff' };
+    const titleEl = editable
+      ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+      : `<h1 class="sop-menti-title">${esc(c.title || '')}</h1>`;
+    const subEl = c.subtitle ? `<p class="sop-menti-sub">${esc(c.subtitle)}</p>` : '';
+    let instrHtml = '';
+    if (c.body) {
+      let inBadSection = false;
+      for (const line of c.body.split('\n')) {
+        const t = line.trim();
+        if (!t) continue;
+        if (t.startsWith('Format:')) {
+          instrHtml += `<div class="wi-format"><i class="fa-solid fa-pen"></i> <span>${esc(t)}</span></div>`;
+        } else if (t.startsWith('\u2705')) {
+          inBadSection = false;
+          instrHtml += `<div class="wi-section-head">${esc(t)}</div>`;
+        } else if (t.startsWith('\u274c')) {
+          inBadSection = true;
+          instrHtml += `<div class="wi-section-head" style="color:#dc2626">${esc(t)}</div>`;
+        } else if (t.startsWith('\u2022')) {
+          instrHtml += `<div class="wi-example">${esc(t.slice(1).trim())}</div>`;
+        } else if (inBadSection) {
+          instrHtml += `<div class="wi-example wi-bad">${esc(t)}</div>`;
+        } else {
+          instrHtml += `<p class="wi-note">${esc(t)}</p>`;
+        }
+      }
+    }
+    return `
+      <div class="sop-menti-section sop-menti-instructions" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+        <div class="sop-menti-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">Workshop · So geht\'s</div>
+        ${titleEl}
+        ${subEl}
+        <div class="workshop-instructions-card">${instrHtml}</div>
+      </div>`;
+  }
+  // Phase Overview, Track Overview, Presentation Session
+  // → rendern als sop-menti-section mit Track-Farbe und Board-Vorschau
+  if (c.sopKind === 'phase-overview' || c.sopKind === 'track-overview' || c.sopKind === 'track-presentation') {
     const theme = c.sopTrackClass
       ? sopTrackTheme(c.sopTrackClass)
       : { accent: '#206efb', soft: 'rgba(32,110,251,.08)', badgeBg: '#206efb', badgeColor: '#fff' };
-    const badgeLabel = c.sopKind === 'instructions'
-      ? 'Workshop · So geht\'s'
-      : (c.sopTrackLabel || 'SOP');
     const titleEl = editable
       ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
       : `<h1 class="sop-menti-title">${esc(c.title || '')}</h1>`;
@@ -1841,11 +1874,11 @@ function renderSopContentHtml(c, editable = false) {
       : (c.body ? `<p class="sop-menti-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
     return `
       <div class="sop-menti-section sop-menti-${c.sopKind} ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
-        <div class="sop-menti-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(badgeLabel)}</div>
+        <div class="sop-menti-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel || 'SOP')}</div>
         ${titleEl}
         ${subEl}
         ${bodyEl}
-        ${c.sopKind !== 'instructions' ? renderSopBoardPreview(c, editable) : ''}
+        ${renderSopBoardPreview(c, editable)}
       </div>`;
   }
   return '';

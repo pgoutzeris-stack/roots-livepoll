@@ -403,11 +403,10 @@ function sopTrackIntro(track, trackIndex) {
 // Zeigt: Phasenname + Intro + alle Karten als strukturierte Liste.
 // sopBoard ist enthalten für spätere Erweiterung in app.js.
 function sopPhaseOverview(track, phase) {
-  const cardList = phase.cards.map((c) => `→ ${c.name}`).join('\n');
   return tplSlide('content', {
     title: phase.name,
-    subtitle: `${track.title.replace(/^Track \d+: /, '')} · ${phase.cards.length} ${phase.cards.length === 1 ? 'Aktivität' : 'Aktivitäten'}`,
-    body: `${phase.intro}\n\n${cardList}`,
+    subtitle: track.title.replace(/^Track \d+: /, ''),
+    body: '',
     sopKind: 'phase-overview',
     sopBoard: [{ name: phase.name, cards: phase.cards.map((c) => c.name) }],
     ...sopMeta(track, phase),
@@ -417,15 +416,10 @@ function sopPhaseOverview(track, phase) {
 // SOP-Gesamtübersicht für einen Track — erscheint vor dem Track-Brainstorm.
 // Zeigt: alle Phasen mit ihren Karten als strukturierte Liste.
 function sopTrackOverview(track) {
-  const body = track.phases.map((p) => {
-    const cards = p.cards.map((c) => `  → ${c.name}`).join('\n');
-    return `${p.name}\n${cards}`;
-  }).join('\n\n');
-  const totalCards = track.phases.reduce((sum, p) => sum + p.cards.length, 0);
   return tplSlide('content', {
     title: `SOP · ${track.title.replace(/^Track \d+: /, '')}`,
-    subtitle: `${track.phases.length} Phasen · ${totalCards} Aktivitäten`,
-    body,
+    subtitle: '',
+    body: '',
     sopKind: 'track-overview',
     sopBoard: sopBoardData(track),
     ...sopMeta(track),

@@ -733,7 +733,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 
 /* ═══════ ROOTS Brand Design — Section Slides ═══════════════════ */
 /* Blaue Trennlinie + Pill-Badges für Track/Phase-Identifier */
-.sop-menti-section{border-top:4px solid var(--brand)}
+/* sop-menti-section: no top border — track context via badge only */
 .sop-menti-section .sop-track-badge,
 .sop-menti-section .sop-phase-badge{
   background:var(--brand);color:#fff;font-size:.72rem;font-weight:700;
@@ -772,4 +772,18 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 /* Für mehrzeilige body-Texte in content-type Slides */
 .menti-content-body{
   white-space:pre-line;font-size:.97rem;line-height:1.7;color:var(--ink);
+}
+
+/* ═══════ Workshop Progress Bar: ausblenden ════════════════════ */
+/* Der Top-Fortschrittsbalken (Track-Name + Karte X/Y) wird durch
+   den SOP-Panel rechts ersetzt — hier nur noch stiller Counter. */
+.lp-sop-workshop .menti-slide-progress { display: none; }
+
+/* ─── Instructions: wi-section-head + wi-note ───────────────── */
+.workshop-instructions-card .wi-section-head{
+  font-size:.88rem;font-weight:700;color:var(--ink);
+  margin:1rem 0 .4rem;
+}
+.workshop-instructions-card .wi-note{
+  font-size:.82rem;color:var(--muted);margin:.5rem 0;line-height:1.5;
 }
