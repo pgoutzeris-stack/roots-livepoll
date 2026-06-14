@@ -1445,6 +1445,21 @@ function renderTrackVoteResultsHtml(slide, visible) {
   return html;
 }
 
+// Zerlegt den Brainstorm-Prompt in Hauptfrage, Format-Hinweis und Orientierungs-Notiz.
+// Konvention der Vorlagen: Zeile 1 = Frage · Zeile „Format: …" = Hinweis · Rest = Notiz.
+function parseCollectPrompt(promptText) {
+  const lines = String(promptText || '').split('\n').map((l) => l.trim()).filter(Boolean);
+  let question = '';
+  let formatHint = '';
+  const noteLines = [];
+  for (const l of lines) {
+    if (/^Format:/i.test(l)) { formatHint = l.replace(/^Format:\s*/i, ''); continue; }
+    if (!question) { question = l; continue; }
+    noteLines.push(l);
+  }
+  return { question, formatHint, note: noteLines.join(' ') };
+}
+
 function renderWorkshopCardCollectHtml(c, editable = false) {
   const titleEl = editable
     ? `<div class="canvas-editable menti-q-title" contenteditable="true" data-field="title" data-placeholder="Titel der Folie…">${esc(c.title || '')}</div>`
@@ -1452,8 +1467,6 @@ function renderWorkshopCardCollectHtml(c, editable = false) {
   const subEl = c.subtitle ? `<p class="menti-crumb">${esc(c.subtitle)}</p>` : '';
   // Beschreibung nur zeigen, wenn vorhanden — kein leeres Zweitfeld, das wie eine
   // doppelte Frage aussieht. (Bearbeitbar bleibt sie, sobald Text vorhanden ist.)
-  // Body nur zeigen, wenn vorhanden UND nicht identisch zur Frage (verhindert
-  // doppelten Fragetext bei evtl. bereits gespiegelten Altdaten).
   const bodyTxt = (c.body && String(c.body).trim()) || '';
   const promptTxt = (c.prompt && String(c.prompt).trim()) || '';
   const hasBody = !!bodyTxt && bodyTxt !== promptTxt;
@@ -1461,10 +1474,33 @@ function renderWorkshopCardCollectHtml(c, editable = false) {
     ? (hasBody ? `<div class="canvas-editable menti-q-sub" contenteditable="true" data-field="body">${esc(c.body)}</div>` : '')
     : (hasBody ? `<p class="menti-q-sub">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
   const boardEl = !editable && c.sopBoard?.length ? `<div class="workshop-collect-board">${renderSopBoardPreview(c)}</div>` : '';
-  const promptEl = editable
-    ? `<div class="canvas-editable menti-q-prompt workshop-collect-prompt" contenteditable="true" data-field="prompt" data-placeholder="Frage / Aufgabe für die Teilnehmer…">${esc(c.prompt || '')}</div>`
-    : (c.prompt ? `<p class="menti-q-prompt"><i class="fa-solid fa-circle-question workshop-q-icon"></i> ${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : '');
-  return `<div class="menti-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${boardEl}${promptEl || ''}</div>`;
+  // Editor: Rohtext der Frage direkt bearbeitbar lassen (keine Strukturierung).
+  if (editable) {
+    const promptEl = `<div class="canvas-editable menti-q-prompt workshop-collect-prompt" contenteditable="true" data-field="prompt" data-placeholder="Frage / Aufgabe für die Teilnehmer…">${esc(c.prompt || '')}</div>`;
+    return `<div class="menti-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${boardEl}${promptEl}</div>`;
+  }
+  // Generische Brainstorm-Folien (ohne SOP-Kontext) behalten die einfache
+  // Prompt-Darstellung — nur SOP-Workshop-Folien werden strukturiert.
+  const isSopCollect = !!(c.sopKind || c.sopBoard?.length);
+  if (!isSopCollect) {
+    const promptEl = c.prompt
+      ? `<p class="menti-q-prompt"><i class="fa-solid fa-circle-question workshop-q-icon"></i> ${esc(c.prompt).replace(/\n/g, '<br>')}</p>`
+      : '';
+    return `<div class="menti-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${boardEl}${promptEl}</div>`;
+  }
+  // SOP-Workshop: Frage strukturieren — Hauptfrage prominent, Format als
+  // Hinweis-Chip, Orientierungs-Notiz unter dem SOP-Board (referenziert es).
+  const { question, formatHint, note } = parseCollectPrompt(c.prompt);
+  const questionEl = question
+    ? `<p class="menti-q-prompt workshop-collect-question"><i class="fa-solid fa-circle-question workshop-q-icon"></i><span>${esc(question)}</span></p>`
+    : '';
+  const formatEl = formatHint
+    ? `<div class="workshop-format-hint"><i class="fa-solid fa-pen-ruler"></i><span><strong>Format:</strong> ${esc(formatHint)}</span></div>`
+    : '';
+  const noteEl = note
+    ? `<p class="workshop-collect-note"><i class="fa-solid fa-lightbulb"></i><span>${esc(note)}</span></p>`
+    : '';
+  return `<div class="menti-question-block workshop-collect-shell">${subEl}${titleEl}${questionEl}${formatEl}${bodyEl}${boardEl}${noteEl}</div>`;
 }
 
 function renderParticipantWorkshopHeader(slideIndex) {
@@ -1604,6 +1640,11 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
     const c = s.content || {};
     return c.sopKind === 'track-presentation' && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
   });
+  // Pro-Track: EIN track-collect-Brainstorm pro Track (keine Phasen-Unterschritte).
+  const trackBrainstormIdx = findIdx((s) => {
+    const c = s.content || {};
+    return s.slide_type === 'brainstorm' && c.sopKind === 'track-collect' && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
+  });
   const trackIdxNum = tracks.findIndex((t) => t.class === activeTrack.class);
 
   let html = `<div class="workshop-sop-panel ${esc(activeTrack.class)} ${esc(navClass)}">
@@ -1612,6 +1653,14 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
     <span class="workshop-sop-panel-badge">Track ${trackIdxNum + 1}</span>
     <span class="workshop-sop-panel-title">${esc(activeTrack.title.replace(/^Track \d+: /, ''))}</span>
   </button>`;
+
+  // Pro-Track-Struktur: nur ein Brainstorm-Schritt, KEINE Phasen-Liste (die Phasen
+  // sind als Orientierung im SOP-Board auf der Folie sichtbar, nicht in der Nav).
+  if (trackBrainstormIdx >= 0) {
+    html += `<button type="button" class="workshop-sop-step ${currentIndex === trackBrainstormIdx ? 'active' : ''}" data-slide-index="${trackBrainstormIdx}" title="Brainstorming">
+      <i class="fa-solid fa-lightbulb"></i> Brainstorm
+    </button>`;
+  }
 
   (activeTrack.phases || []).forEach((phase, phaseIdx) => {
     const phaseIntroIdx = findIdx((s) => {
@@ -1622,6 +1671,8 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
       const c = s.content || {};
       return s.slide_type === 'brainstorm' && c.sopPhaseName === phase.name && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
     });
+    // Phasen ohne eigene Folien (Pro-Track-Modus) NICHT als (tote) Nav-Einträge zeigen.
+    if (phaseIntroIdx < 0 && phaseBrainstormIdx < 0) return;
     const phaseVoteIdx = findIdx((s) => {
       const c = s.content || {};
       return s.settings?.sopPhaseVote && c.sopPhaseName === phase.name && (c.sopTrackClass === activeTrack.class || c.sopTrackKey === activeTrack.class);
@@ -1938,30 +1989,27 @@ function renderSopContentHtml(c, editable = false) {
   // Pitch Session — alle Use Cases mit Autornamen + Timer
   if (c.sopKind === 'pitch-session') {
     const timerSec = Number(c.pitchTimerSec || 120);
-    const mm = String(Math.floor(timerSec / 60)).padStart(2, '0');
-    const ss = String(timerSec % 60).padStart(2, '0');
+    const tMin = Math.floor(timerSec / 60);
+    const tSec = timerSec % 60;
+    const tLabel = tMin > 0 ? `${tMin}:${String(tSec).padStart(2, '0')} Min` : `${tSec} Sek`;
     const titleEl = editable
       ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
       : `<h1 class="sop-menti-title">${esc(c.title || '')}</h1>`;
     const subEl = c.subtitle ? `<p class="sop-menti-sub">${esc(c.subtitle)}</p>` : '';
-    const timerEl = editable
-      ? `<div class="pitch-timer-edit"><i class="fa-solid fa-stopwatch"></i> Timer: <span contenteditable="true" class="canvas-editable pitch-timer-sec" data-field="pitchTimerSec">${timerSec}</span> Sekunden pro Person</div>`
-      : `<div class="pitch-timer-host" id="pitch-timer-host">
-          <div class="pitch-timer-display" id="pitch-timer-display">${mm}:${ss}</div>
-          <div class="pitch-timer-controls">
-            <button class="btn-ghost pitch-timer-btn" id="pitch-timer-start" data-sec="${timerSec}"><i class="fa-solid fa-play"></i> Start</button>
-            <button class="btn-ghost pitch-timer-btn" id="pitch-timer-reset"><i class="fa-solid fa-rotate-left"></i> Reset</button>
-          </div>
-        </div>`;
+    // Kein globaler Timer mehr — jeder Use Case bekommt einen eigenen Timer (s.u.).
+    // Im Editor nur die Dauer pro Pitch konfigurierbar.
+    const configEl = editable
+      ? `<div class="pitch-timer-edit"><i class="fa-solid fa-stopwatch"></i> Timer pro Pitch: <span contenteditable="true" class="canvas-editable pitch-timer-sec" data-field="pitchTimerSec">${timerSec}</span> Sekunden</div>`
+      : `<p class="pitch-hint"><i class="fa-solid fa-circle-info"></i> <span>Jede Person pitcht ihren Use Case · ${esc(tLabel)} pro Pitch — Timer je Use Case über den Button starten und stoppen.</span></p>`;
     const useCasesHtml = State.session
-      ? renderAllTracksUseCasesWithAuthors()
+      ? renderAllTracksUseCasesWithAuthors(timerSec)
       : '<div class="present-wait-msg">Use Cases mit Autornamen erscheinen in der Live-Session.</div>';
     return `
       <div class="sop-menti-section sop-pitch-session">
         <div class="sop-menti-badge" style="background:var(--brand);color:#fff"><i class="fa-solid fa-person-chalkboard"></i> Pitch Session</div>
         ${titleEl}
         ${subEl}
-        ${timerEl}
+        ${configEl}
         <div class="pitch-use-cases">${useCasesHtml}</div>
       </div>`;
   }
@@ -2766,7 +2814,12 @@ function showAddSlideOptions(type) {
   if (isClosure) refreshAddSlideClosureUi();
 }
 
-function renderAllTracksUseCasesWithAuthors() {
+function pitchFmt(s) {
+  const v = Math.max(0, s);
+  return `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
+}
+
+function renderAllTracksUseCasesWithAuthors(timerSec = 120) {
   const { byTrack } = aggregateAllTracksUseCases();
   if (!byTrack.length) return '<div class="present-wait-msg">Noch keine Use Cases gesammelt.</div>';
   let html = '<div class="pitch-use-case-list">';
@@ -2787,6 +2840,10 @@ function renderAllTracksUseCasesWithAuthors() {
               <span class="pitch-uc-author"><i class="fa-solid fa-user"></i> ${esc(authorName)}</span>
             </div>
           </div>
+          <div class="pitch-uc-timer" data-total="${timerSec}">
+            <span class="pitch-uc-time">${pitchFmt(timerSec)}</span>
+            <button type="button" class="pitch-uc-btn" data-pitch-toggle aria-label="Pitch-Timer starten / stoppen"><i class="fa-solid fa-play"></i></button>
+          </div>
         </div>`;
       });
     });
@@ -2795,47 +2852,47 @@ function renderAllTracksUseCasesWithAuthors() {
   return html;
 }
 
-function bindPitchTimerIfPresent(stage) {
-  const startBtn = stage?.querySelector('#pitch-timer-start');
-  if (!startBtn) return;
-  const display = stage.querySelector('#pitch-timer-display');
-  const resetBtn = stage.querySelector('#pitch-timer-reset');
-  const totalSec = parseInt(startBtn.dataset.sec, 10) || 120;
-  let remaining = totalSec;
-  let interval = null;
-  function fmt(s) { return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; }
-  function stop() {
-    clearInterval(interval); interval = null;
-    if (startBtn) startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Weiter';
-    if (stage) stage.querySelector('#pitch-timer-host')?.classList.remove('is-running');
-  }
-  startBtn.addEventListener('click', () => {
-    if (interval) { stop(); return; }
-    if (remaining <= 0) remaining = totalSec;
-    startBtn.innerHTML = '<i class="fa-solid fa-pause"></i> Pause';
-    stage.querySelector('#pitch-timer-host')?.classList.add('is-running');
-    interval = setInterval(() => {
-      remaining -= 1;
-      if (display) display.textContent = fmt(remaining);
-      if (remaining <= 0) { stop(); }
-    }, 1000);
-  });
-  if (resetBtn) {
-    resetBtn.addEventListener('click', () => {
+// Bindet pro Use Case einen eigenen Start/Stop-Countdown (kein globaler Timer).
+function bindPitchTimers(stage) {
+  const timers = stage?.querySelectorAll('.pitch-uc-timer[data-total]');
+  if (!timers || !timers.length) return;
+  timers.forEach((timerEl) => {
+    const total = parseInt(timerEl.dataset.total, 10) || 120;
+    const timeEl = timerEl.querySelector('.pitch-uc-time');
+    const btn = timerEl.querySelector('[data-pitch-toggle]');
+    if (!btn || !timeEl) return;
+    let remaining = total;
+    let interval = null;
+    const setIcon = (name) => { btn.innerHTML = `<i class="fa-solid ${name}"></i>`; };
+    const halt = () => {
       clearInterval(interval); interval = null;
-      remaining = totalSec;
-      if (display) display.textContent = fmt(remaining);
-      if (startBtn) startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start';
-      stage?.querySelector('#pitch-timer-host')?.classList.remove('is-running');
+      timerEl.classList.remove('is-running');
+      setIcon(remaining <= 0 ? 'fa-rotate-left' : 'fa-play');
+    };
+    btn.addEventListener('click', () => {
+      if (interval) { halt(); return; }            // läuft → stoppen
+      if (remaining <= 0) { remaining = total; timerEl.classList.remove('is-done'); } // abgelaufen → reset & neu
+      timerEl.classList.add('is-running');
+      setIcon('fa-stop');
+      interval = setInterval(() => {
+        remaining -= 1;
+        timeEl.textContent = pitchFmt(remaining);
+        if (remaining <= 0) {
+          clearInterval(interval); interval = null;
+          timerEl.classList.remove('is-running');
+          timerEl.classList.add('is-done');
+          setIcon('fa-rotate-left');
+        }
+      }, 1000);
     });
-  }
+  });
 }
 
 function finalizePresentUi(slide) {
   updatePresentToolbarUi(slide);
   bindResultsDisplayToggle($('#present-stage'));
   maybeLaunchResultsConfetti(slide);
-  bindPitchTimerIfPresent($('#present-stage'));
+  bindPitchTimers($('#present-stage'));
 }
 
 async function deleteSlide(id) {

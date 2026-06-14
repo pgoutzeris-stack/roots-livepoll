@@ -452,7 +452,7 @@ function sopPhaseBrainstorm(track, phase) {
     title: `KI Use Cases · ${phase.name}`,
     body: '',
     subtitle: track.title.replace(/^Track \d+: /, ''),
-    prompt: `Welche KI seht ihr in dieser Phase? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\nFormat: Was · Wer · Tool — z. B. „Proposal-Draft aus Briefing → Senior → ChatGPT"`,
+    prompt: `Welche KI seht ihr in dieser Phase? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\nFormat: Was · Wer · Tool — z. B. „Proposal-Draft aus Briefing · Senior · ChatGPT"`,
     mentiQuestion: true,
     sopKind: 'phase-workshop',
     sopBoard: [{ name: phase.name, cards: phase.cards.map((c) => c.name) }],
@@ -469,7 +469,7 @@ function sopTrackBrainstorm(track) {
     title: `KI Use Cases · ${track.title.replace(/^Track \d+: /, '')}`,
     body: '',
     subtitle: track.title,
-    prompt: `Welche KI seht ihr in diesem Track? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\nFormat: Was · Wer · Tool — z. B. „Proposal-Draft aus Briefing → Senior → ChatGPT"\n\nNutzt die SOP-Übersicht als Orientierung — alle Phasen und Karten sind mögliche Ansatzpunkte.`,
+    prompt: `Welche KI seht ihr in diesem Track? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\nFormat: Was · Wer · Tool — z. B. „Proposal-Draft aus Briefing · Senior · ChatGPT"\n\nNutzt die SOP-Übersicht als Orientierung — alle Phasen und Karten sind mögliche Ansatzpunkte.`,
     mentiQuestion: true,
     sopKind: 'track-collect',
     sopBoard: sopBoardData(track),
@@ -510,7 +510,7 @@ function sopTrackPresentationSession(track) {
   return tplSlide('content', {
     title: `Presentation Session · ${track.title.replace(/^Track \d+: /, '')}`,
     subtitle: 'Top-gewählte Use Cases · jetzt kurz vorstellen',
-    body: `Die Abstimmung ist abgeschlossen — die meistgewählten Use Cases sind sichtbar.\n\nJede Person hat 1–2 Minuten:\n→ Was ist die KI-Idee?\n→ Wer im Team profitiert?\n→ Welches Tool kommt zum Einsatz?\n\nDanach: Top-Ideen gemeinsam in die ICE Matrix eintragen.`,
+    body: `Die Abstimmung ist abgeschlossen — die meistgewählten Use Cases sind sichtbar.\n\nJede Person hat 1–2 Minuten: Was ist die KI-Idee? · Wer im Team profitiert? · Welches Tool kommt zum Einsatz?\n\nDanach: Top-Ideen gemeinsam in die ICE Matrix eintragen.`,
     mentiHero: false,
     sopKind: 'track-presentation',
     ...sopMeta(track),
@@ -536,7 +536,7 @@ function sopAllTracksSummary() {
 function sopIceMatrix() {
   return tplSlide('priority_matrix', {
     title: 'Impact/Effort-Matrix',
-    prompt: 'Ordnet die priorisierten KI Use Cases gemeinsam in die Matrix ein.\n\n→ Impact: Wie stark verbessert dieser Use Case unsere Arbeit / unsere Qualität?\n→ Effort: Wie hoch ist der Aufwand für Einführung, Lernkurve und laufende Nutzung?\n\nQuick Wins sofort angehen · Strategic Bets langfristig einplanen\nTime Sinks kritisch hinterfragen · Drop weglassen',
+    prompt: 'Ordnet die priorisierten KI Use Cases gemeinsam in die Matrix ein.\n\nImpact: Wie stark verbessert dieser Use Case unsere Arbeit / unsere Qualität?\nEffort: Wie hoch ist der Aufwand für Einführung, Lernkurve und laufende Nutzung?\n\nQuick Wins sofort angehen · Strategic Bets langfristig einplanen\nTime Sinks kritisch hinterfragen · Drop weglassen',
     subtitle: 'Impact vs. Effort · finale Priorisierung',
     xAxisLabel: 'Aufwand (Effort)',
     xAxisLow: 'niedrig',
@@ -614,7 +614,7 @@ function sopFinalAllTracksVote() {
   return tplSlide('mc_multi', {
     title: 'Finale Priorisierung',
     subtitle: 'Alle Use Cases · wähle deine Favoriten (keine eigenen)',
-    prompt: `Welche ${max} Use Cases haben den größten Impact für euer Team?\n→ Eigene Beiträge können nicht gewählt werden.`,
+    prompt: `Welche ${max} Use Cases haben den größten Impact für euer Team?\nHinweis: Eigene Beiträge können nicht gewählt werden.`,
     mentiQuestion: true,
     options: [],
     maxSelections: max,
