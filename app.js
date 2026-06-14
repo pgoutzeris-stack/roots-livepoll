@@ -1533,13 +1533,15 @@ function bindSopWorkshopPanelClicks(container, onNavigate) {
 function isFinaleSlide(s) {
   if (!s) return false;
   const st = s.settings || {};
-  const k = s.content?.sopKind;
-  return !!(st.sopPitchSession || st.sopAllTracksVote || st.sopAllTracksMatrix
-    || k === 'pitch-session' || k === 'final-vote' || k === 'final-matrix');
+  const c = s.content || {};
+  const k = c.sopKind;
+  return !!(st.sopPitchSession || st.sopAllTracksVote || st.sopAllTracksMatrix || c.sopAllTracksResults
+    || k === 'pitch-session' || k === 'final-vote' || k === 'final-matrix' || k === 'all-tracks-summary');
 }
 
 function renderSopFinalePanelHtml(currentIndex, { clickable = false, onNavigate } = {}) {
   const findIdx = (predicate) => State.slides.findIndex(predicate);
+  const summaryIdx = findIdx((s) => s.content?.sopAllTracksResults || s.content?.sopKind === 'all-tracks-summary');
   const pitchIdx = findIdx((s) => s.settings?.sopPitchSession || s.content?.sopKind === 'pitch-session');
   const voteIdx = findIdx((s) => s.settings?.sopAllTracksVote || s.content?.sopKind === 'final-vote');
   const matrixIdx = findIdx((s) => s.settings?.sopAllTracksMatrix || s.content?.sopKind === 'final-matrix');
@@ -1555,6 +1557,7 @@ function renderSopFinalePanelHtml(currentIndex, { clickable = false, onNavigate 
       <i class="fa-solid ${icon}"></i><span>${esc(label)}</span>
     </button>`;
   };
+  html += step(summaryIdx, 'fa-layer-group', 'Übersicht');
   html += step(pitchIdx, 'fa-person-chalkboard', 'Pitch Session');
   html += step(voteIdx, 'fa-ranking-star', 'Abstimmung');
   html += step(matrixIdx, 'fa-table-cells-large', 'Impact/Effort');
@@ -1892,7 +1895,7 @@ function renderSopContentHtml(c, editable = false) {
       };
       for (const line of c.body.split('\n')) {
         const t = line.trim();
-        if (!t) continue;
+        if (!t) { flushAvoid(); mode = ''; continue; }
         if (t.startsWith('Format:')) {
           flushAvoid();
           mode = '';
