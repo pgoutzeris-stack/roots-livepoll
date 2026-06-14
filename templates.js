@@ -568,6 +568,17 @@ function sopIceMatrix() {
   }, { showResultsLive: true, sopAllTracksMatrix: true, sopMatrixCount: (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5), workshopMode: 'decide' });
 }
 
+// Next Steps: aus den priorisierten Use Cases konkrete Actions ableiten.
+function sopWorkshopNextSteps() {
+  return tplSlide('content', {
+    title: 'Next Steps · konkrete Actions',
+    subtitle: 'Aus der Priorisierung wird Umsetzung',
+    body: 'Für die priorisierten Use Cases legen wir jetzt konkrete nächste Schritte fest — pro Use Case: Wer übernimmt? Was ist der erste Schritt? Bis wann?',
+    sopKind: 'next-steps',
+    mentiHero: false,
+  }, { workshopMode: 'decide', sopNextSteps: true });
+}
+
 // ─── ABSCHLUSS-FOLIEN ──────────────────────────────────────────────────────────
 
 function sopWorkshopClose() {
@@ -696,6 +707,7 @@ function buildSopKiWorkshopSlides(mode = 'pro-phase') {
     slides.push(sopPitchSession());
   }
   slides.push(sopIceMatrix());
+  slides.push(sopWorkshopNextSteps());
 
   return slides;
 }
@@ -869,9 +881,10 @@ function buildDebugSopWorkshopSlides() {
     slides.push(sopTrackPresentationSession(track));
   });
 
-  // Finale: Übersicht + ICE-Matrix + Abschluss
+  // Finale: Übersicht + ICE-Matrix + Next Steps + Abschluss
   slides.push(sopAllTracksSummary());
   slides.push(sopIceMatrix());
+  slides.push(sopWorkshopNextSteps());
   slides.push(...sopWorkshopClose());
 
   return slides;

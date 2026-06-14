@@ -429,6 +429,19 @@ function aggregateTopFinalVotedUseCases(limit = 12) {
     .map((item) => ({ id: item.id, text: item.text, phase: item.phase, trackLabel: item.trackLabel, score: item.score, votes: item.votes }));
 }
 
+// Die final priorisierten Use Cases (genau die, die in der Matrix gelandet sind) —
+// für die Next-Steps-Folie.
+function getFinalPrioritizedUseCases() {
+  const matrixSlide = (State.slides || []).find((s) => s.settings?.sopAllTracksMatrix);
+  if (matrixSlide) {
+    const items = getMatrixItems(matrixSlide);
+    if (items && items.length) return items;
+  }
+  const voteSlide = (State.slides || []).find((s) => s.settings?.sopAllTracksVote);
+  const count = Number(voteSlide?.settings?.sopVoteMax || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
+  return aggregateTopFinalVotedUseCases(count);
+}
+
 function aggregateCardUseCases(trackKey, phaseName, cardName) {
   const slide = State.slides.find((s) => {
     const c = s.content || {};
@@ -1646,8 +1659,8 @@ function isFinaleSlide(s) {
   const st = s.settings || {};
   const c = s.content || {};
   const k = c.sopKind;
-  return !!(st.sopPitchSession || st.sopAllTracksVote || st.sopAllTracksMatrix || c.sopAllTracksResults
-    || k === 'pitch-session' || k === 'final-vote' || k === 'final-matrix' || k === 'all-tracks-summary');
+  return !!(st.sopPitchSession || st.sopAllTracksVote || st.sopAllTracksMatrix || st.sopNextSteps || c.sopAllTracksResults
+    || k === 'pitch-session' || k === 'final-vote' || k === 'final-matrix' || k === 'next-steps' || k === 'all-tracks-summary');
 }
 
 // Konsistente Finale-Pill (Badge) für Pitch Session, Finale Priorisierung und Matrix.
@@ -1662,6 +1675,7 @@ function renderSopFinalePanelHtml(currentIndex, { clickable = false, onNavigate 
   const pitchIdx = findIdx((s) => s.settings?.sopPitchSession || s.content?.sopKind === 'pitch-session');
   const voteIdx = findIdx((s) => s.settings?.sopAllTracksVote || s.content?.sopKind === 'final-vote');
   const matrixIdx = findIdx((s) => s.settings?.sopAllTracksMatrix || s.content?.sopKind === 'final-matrix');
+  const nextStepsIdx = findIdx((s) => s.settings?.sopNextSteps || s.content?.sopKind === 'next-steps');
 
   let html = `<div class="workshop-sop-panel workshop-sop-panel--finale">
     <div class="workshop-sop-panel-head"><i class="fa-solid fa-flag-checkered"></i> Finale</div>`;
@@ -1678,6 +1692,7 @@ function renderSopFinalePanelHtml(currentIndex, { clickable = false, onNavigate 
   html += step(pitchIdx, 'fa-person-chalkboard', 'Pitch Session');
   html += step(voteIdx, 'fa-ranking-star', 'Abstimmung');
   html += step(matrixIdx, 'fa-table-cells-large', 'Impact/Effort');
+  html += step(nextStepsIdx, 'fa-list-check', 'Next Steps');
   html += '</div>';
   return {
     html,
@@ -2099,6 +2114,38 @@ function renderSopContentHtml(c, editable = false) {
         ${titleEl}
         ${subEl}
         <div class="workshop-instructions-card">${instrHtml}</div>
+      </div>`;
+  }
+  // Next Steps — priorisierte Use Cases als Action-Planungskarten
+  if (c.sopKind === 'next-steps') {
+    const titleEl = editable
+      ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+      : `<h1 class="sop-menti-title">${esc(c.title || '')}</h1>`;
+    const subEl = editable
+      ? `<div class="canvas-editable sop-menti-sub" contenteditable="true" data-field="subtitle">${esc(c.subtitle || '')}</div>`
+      : (c.subtitle ? `<p class="sop-menti-sub">${esc(c.subtitle)}</p>` : '');
+    const bodyEl = editable
+      ? `<div class="canvas-editable sop-menti-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+      : (c.body ? `<p class="sop-menti-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+    const items = State.session ? getFinalPrioritizedUseCases() : [];
+    const cards = items.length
+      ? `<div class="next-steps-list">${items.map((it, i) => `
+          <div class="next-step-card">
+            <div class="ns-uc"><span class="ns-num">${i + 1}</span><span class="ns-uc-text">${esc(it.text)}</span></div>
+            <div class="ns-fields">
+              <div class="ns-field"><span class="ns-label"><i class="fa-solid fa-user"></i> Verantwortlich</span><span class="ns-slot"></span></div>
+              <div class="ns-field"><span class="ns-label"><i class="fa-solid fa-flag-checkered"></i> Erster Schritt</span><span class="ns-slot"></span></div>
+              <div class="ns-field"><span class="ns-label"><i class="fa-solid fa-calendar-day"></i> Bis wann</span><span class="ns-slot"></span></div>
+            </div>
+          </div>`).join('')}</div>`
+      : '<div class="present-wait-msg">Die priorisierten Use Cases erscheinen hier, sobald die Impact/Effort-Matrix gefüllt ist.</div>';
+    return `
+      <div class="sop-menti-section sop-menti-nextsteps">
+        ${renderFinalePillHtml()}
+        ${titleEl}
+        ${subEl}
+        ${bodyEl}
+        ${cards}
       </div>`;
   }
   // Pitch Session — alle Use Cases mit Autornamen + Timer
@@ -4128,6 +4175,10 @@ const LP_DebugSim = {
     if (State.responses.find((r) => r.id === response.id)) return;
     State.responses.push(response);
     try { if (response.participant_id) pushPresentActivity(response.participant_id); } catch {}
+    try {
+      const p = State.participants.find((x) => x.id === response.participant_id);
+      liveDebugLog('info', `[SIM] ${p?.display_name || 'Bot'} → ${responseSummary(response)} (lokal, kein DB-Write)`);
+    } catch {}
     try { updatePresentStats(); } catch {}
     try { renderPresent(); } catch {}
   },
@@ -4378,9 +4429,65 @@ function startParticipantSync() {
   }, 2500);
 }
 
+// ─── LIVE-DEBUG-TERMINAL (Hover über „Live"-Badge im Präsentations-Header) ───
+// Zeigt in Echtzeit, ob Teilnehmer-Antworten in Supabase ankommen (= gespeichert)
+// und meldet Verbindungs-/Realtime-Fehler.
+function liveDebugLog(kind, msg) {
+  if (!State.liveDebugLog) State.liveDebugLog = [];
+  State.liveDebugLog.push({ t: Date.now(), kind, msg });
+  if (State.liveDebugLog.length > 120) State.liveDebugLog = State.liveDebugLog.slice(-120);
+  renderLiveTerminal();
+}
+
+function setLiveConn(state, note) {
+  State.liveConn = state; // 'live' | 'warn' | 'err'
+  if (note) liveDebugLog(state === 'err' ? 'err' : 'info', note);
+  else renderLiveTerminal();
+}
+
+function responseSummary(r) {
+  const resp = r?.response || {};
+  if (resp.text) return `„${String(resp.text).slice(0, 44)}${String(resp.text).length > 44 ? '…' : ''}"`;
+  if (Array.isArray(resp.values)) return `${resp.values.length} Stimme(n)`;
+  if (resp.matrix) return `${Object.keys(resp.matrix).length} Einordnung(en)`;
+  if (resp.points) return 'Punkte verteilt';
+  if (resp.order) return 'Ranking';
+  if (resp.pin) return 'Pin gesetzt';
+  if (resp.emoji) return resp.emoji;
+  if (resp.value !== undefined && resp.value !== null) return `Wert ${esc(String(resp.value))}`;
+  return 'Antwort';
+}
+
+function renderLiveTerminal() {
+  const el = document.getElementById('present-live-terminal');
+  if (!el) return;
+  const log = State.liveDebugLog || [];
+  const okCount = log.filter((l) => l.kind === 'ok').length;
+  const errCount = log.filter((l) => l.kind === 'err').length;
+  const conn = State.liveConn || 'live';
+  const connLabel = conn === 'live' ? 'Realtime verbunden' : conn === 'warn' ? 'Verbindung instabil' : 'Realtime getrennt';
+  const pad = (n) => String(n).padStart(2, '0');
+  const fmt = (t) => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+  const ico = { ok: '✓', join: '+', info: '·', err: '✗' };
+  const lines = log.slice(-80).reverse().map((l) =>
+    `<div class="plt-line plt-${esc(l.kind)}"><span class="plt-time">${fmt(l.t)}</span><span class="plt-ico">${ico[l.kind] || '·'}</span><span class="plt-msg">${esc(l.msg)}</span></div>`
+  ).join('');
+  el.innerHTML = `
+    <div class="present-live-term-head">
+      <span class="present-live-term-title"><i class="fa-solid fa-terminal"></i> Supabase Live</span>
+      <span class="plt-stat"><strong>${okCount}</strong> gespeichert</span>
+      <span class="plt-stat"><strong>${errCount}</strong> Fehler</span>
+      <span class="plt-conn is-${conn}">${esc(connLabel)}</span>
+    </div>
+    <div class="present-live-term-body">${lines || '<div class="plt-empty">Warte auf Live-Antworten …</div>'}</div>`;
+}
+
 function subscribeSessionChannel() {
   if (State.sessionChannel) sb.removeChannel(State.sessionChannel);
   const chName = sessionChannelName(State.session.id);
+  State.liveDebugLog = [];
+  State.liveConn = 'warn';
+  liveDebugLog('info', `Verbinde mit Session ${State.session.code || ''} …`);
   State.sessionChannel = sb.channel(chName)
     .on('broadcast', { event: 'session_sync' }, ({ payload }) => {
       window.LP?.channelHeartbeat(chName);
@@ -4396,6 +4503,8 @@ function subscribeSessionChannel() {
       window.LP?.channelHeartbeat(chName);
       State.responses.push(payload.new);
       if (payload.new.participant_id) pushPresentActivity(payload.new.participant_id);
+      const p = State.participants.find((x) => x.id === payload.new.participant_id);
+      liveDebugLog('ok', `${esc(p?.display_name || 'Teilnehmer')} → ${responseSummary(payload.new)} gespeichert`);
       renderPresent();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lp_responses', filter: `session_id=eq.${State.session.id}` }, (payload) => {
@@ -4403,6 +4512,7 @@ function subscribeSessionChannel() {
       const idx = State.responses.findIndex((r) => r.id === payload.new.id);
       if (idx >= 0) State.responses[idx] = payload.new;
       else State.responses.push(payload.new);
+      liveDebugLog('info', `Antwort aktualisiert (${payload.new.is_hidden ? 'verborgen' : 'freigegeben'})`);
       renderPresent();
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lp_participants', filter: `session_id=eq.${State.session.id}` }, (payload) => {
@@ -4410,6 +4520,7 @@ function subscribeSessionChannel() {
       if (!State.participants.find((p) => p.id === payload.new.id)) {
         State.participants.push(payload.new);
         pushPresentActivity(payload.new.id, 'ist beigetreten');
+        liveDebugLog('join', `${esc(payload.new.display_name || 'Teilnehmer')} beigetreten`);
       }
       updatePresentStats();
       renderPresentParticipants();
@@ -4417,7 +4528,9 @@ function subscribeSessionChannel() {
     })
     .on('system', {}, () => window.LP?.channelHeartbeat(chName))
     .subscribe((status) => {
-      if (status === 'SUBSCRIBED') window.LP?.channelHeartbeat(chName);
+      if (status === 'SUBSCRIBED') { window.LP?.channelHeartbeat(chName); setLiveConn('live', 'Realtime verbunden — Antworten werden live gespeichert'); }
+      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setLiveConn('err', `Realtime-Fehler: ${status}`);
+      else if (status === 'CLOSED') setLiveConn('warn', 'Realtime-Kanal geschlossen');
     });
   window.LP?.registerChannel(chName, () => subscribeSessionChannel());
 }
