@@ -398,6 +398,35 @@ function aggregateTopTrackVotedUseCases() {
   return byTrack;
 }
 
+// Top Use Cases aus der FINALEN Cross-Track-Abstimmung (sopAllTracksVote).
+// Diese wandern automatisch in die Impact/Effort-Matrix.
+function aggregateTopFinalVotedUseCases(limit = 12) {
+  const voteSlide = (State.slides || []).find((s) => s.settings?.sopAllTracksVote);
+  if (!voteSlide) return [];
+  const { allItems } = aggregateAllTracksUseCases();
+  const itemByVoteId = {};
+  allItems.forEach((item) => { itemByVoteId[`resp-${item.id}`] = item; });
+  const totals = {};
+  const votes = {};
+  (State.responses || [])
+    .filter((r) => r.slide_id === voteSlide.id && !r.is_hidden)
+    .forEach((r) => {
+      (r.response?.values || []).forEach((id) => {
+        votes[id] = (votes[id] || 0) + 1;
+        totals[id] = (totals[id] || 0) + 10;
+      });
+      Object.entries(r.response?.points || {}).forEach(([id, val]) => {
+        totals[id] = (totals[id] || 0) + Number(val || 0);
+      });
+    });
+  return Object.entries(totals)
+    .map(([id, score]) => ({ ...itemByVoteId[id], voteId: id, score, votes: votes[id] || 0 }))
+    .filter((item) => item?.text && item.score > 0)
+    .sort((a, b) => b.score - a.score || b.votes - a.votes)
+    .slice(0, limit)
+    .map((item) => ({ id: item.id, text: item.text, phase: item.phase, trackLabel: item.trackLabel, score: item.score, votes: item.votes }));
+}
+
 function aggregateCardUseCases(trackKey, phaseName, cardName) {
   const slide = State.slides.find((s) => {
     const c = s.content || {};
@@ -1361,25 +1390,62 @@ function renderBrainstormPresentViz(slide, visible) {
   return window.LPViz.renderBrainstormBubbles(items, { mode: 'present', maxItems: 100, newIds });
 }
 
+// Finale Priorisierung (Moderator/Beamer): moderne Tabelle — alle Use Cases mit
+// Autor + Live-Stimmen, immer sichtbar (auch vor der ersten Stimme).
+function renderFinalVotePresentHtml(slide, visible) {
+  const { allItems } = aggregateAllTracksUseCases();
+  if (!allItems.length) {
+    return '<div class="present-wait-msg">Noch keine Use Cases gesammelt. Bitte zuerst die Brainstormings durchführen.</div>';
+  }
+  const { voteCounts, totalVotes } = aggregateVoteResponses(slide, visible);
+  const { votedCount, totalCount } = getCardVoteParticipation(slide);
+  const partPct = totalCount ? Math.round((votedCount / totalCount) * 100) : 0;
+  const rows = allItems
+    .map((item) => ({ ...item, votes: voteCounts[`resp-${item.id}`] || 0 }))
+    .sort((a, b) => b.votes - a.votes);
+  const maxVotes = Math.max(1, ...rows.map((r) => r.votes));
+  let html = `<div class="ws-board finale-vote">
+    <div class="ws-board-head">
+      <span class="ws-board-stat"><i class="fa-solid fa-list-check"></i> ${allItems.length} Use Cases</span>
+      <span class="ws-board-stat"><i class="fa-solid fa-users"></i> ${votedCount} / ${totalCount} abgestimmt</span>
+      <span class="ws-board-stat ws-board-stat--accent"><i class="fa-solid fa-check-to-slot"></i> ${totalVotes} Stimmen</span>
+      <span class="ws-board-progress"><span class="ws-board-progress-fill" style="width:${partPct}%"></span></span>
+    </div>
+    <div class="ws-table">
+      <div class="ws-row ws-row--head">
+        <span class="ws-c-rank">#</span>
+        <span class="ws-c-uc">Use Case</span>
+        <span class="ws-c-author">Eingebracht von</span>
+        <span class="ws-c-action">Stimmen</span>
+      </div>`;
+  rows.forEach((r, i) => {
+    const author = (State.participants || []).find((x) => x.id === r.participant_id);
+    const authorName = author?.display_name || '–';
+    const ranked = r.votes > 0;
+    const barPct = Math.round((r.votes / maxVotes) * 100);
+    const topClass = ranked && i < 3 ? ` ws-row--top ws-row--top${i + 1}` : '';
+    html += `<div class="ws-row${topClass}">
+      <span class="ws-c-rank">${ranked ? i + 1 : '·'}</span>
+      <span class="ws-c-uc">
+        <span class="ws-uc-text">${esc(r.text)}</span>
+        <span class="ws-uc-meta"><span class="ws-uc-track">${esc(r.trackLabel)}</span>${r.phase ? `<span class="ws-uc-phase">${esc(r.phase)}</span>` : ''}</span>
+      </span>
+      <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
+      <span class="ws-c-action ws-votes">
+        <span class="ws-votebar"><span class="ws-votebar-fill" style="width:${barPct}%"></span></span>
+        <strong class="ws-votenum">${r.votes}</strong>
+      </span>
+    </div>`;
+  });
+  html += `</div></div>`;
+  return html;
+}
+
 function renderTrackVotePresentHtml(slide, visible) {
-  // Cross-Track-Voting (Workshop-Finale): aggregiert aus allen Tracks.
+  // Cross-Track-Voting (Workshop-Finale): moderne Tabelle aus allen Tracks.
   const scope = getVoteSlideScope(slide);
   if (scope?.kind === 'all-tracks') {
-    const { allItems } = aggregateAllTracksUseCases();
-    if (!allItems.length) {
-      return '<div class="present-wait-msg">Noch keine Use Cases gesammelt. Bitte zuerst die Phase-Brainstormings durchführen.</div>';
-    }
-    const newIds = markNewBubbleIds('all-tracks-vote', allItems);
-    const bubbleHtml = window.LPViz.renderBrainstormBubbles(allItems, { mode: 'present', maxItems: 200, newIds });
-    const hasVotes = visible.length > 0 || !State.session.question_open;
-    return `<div class="track-vote-present" data-uniform-bubbles="true">
-      <div class="track-vote-present-head">
-        <span class="track-vote-count">${allItems.length} Use Cases</span>
-        <span class="track-vote-hint">Alle Tracks zusammen · ${State.session.question_open ? 'Teilnehmer priorisieren jetzt die Top-5' : 'Priorisierung abgeschlossen'}</span>
-      </div>
-      ${renderCardVoteParticipationHtml(slide)}
-      ${hasVotes ? `<div class="track-vote-live-ranking"><div class="track-vote-live-label">Live-Ergebnis</div>${renderVoteResultsHtml(slide, visible)}</div>` : '<div class="present-wait-msg">Warte auf die ersten Stimmen …</div>'}
-    </div>`;
+    return renderFinalVotePresentHtml(slide, visible);
   }
   const key = slide.content?.sopTrackKey || slide.content?.sopTrackClass;
   const { allItems } = aggregateTrackUseCases(key);
@@ -2822,7 +2888,13 @@ function pitchFmt(s) {
 function renderAllTracksUseCasesWithAuthors(timerSec = 120) {
   const { byTrack } = aggregateAllTracksUseCases();
   if (!byTrack.length) return '<div class="present-wait-msg">Noch keine Use Cases gesammelt.</div>';
-  let html = '<div class="pitch-use-case-list">';
+  let html = `<div class="ws-table ws-table--pitch">
+    <div class="ws-row ws-row--head">
+      <span class="ws-c-rank">#</span>
+      <span class="ws-c-uc">Use Case</span>
+      <span class="ws-c-author">Eingebracht von</span>
+      <span class="ws-c-action">Pitch-Timer</span>
+    </div>`;
   let n = 0;
   byTrack.forEach((trk) => {
     trk.phases.forEach((p) => {
@@ -2830,20 +2902,17 @@ function renderAllTracksUseCasesWithAuthors(timerSec = 120) {
         n += 1;
         const author = (State.participants || []).find((x) => x.id === item.participant_id);
         const authorName = author?.display_name || '–';
-        html += `<div class="pitch-use-case-item">
-          <span class="pitch-uc-num">${n}</span>
-          <div class="pitch-uc-content">
-            <div class="pitch-uc-text">${esc(item.text)}</div>
-            <div class="pitch-uc-meta">
-              <span class="pitch-uc-track">${esc(trk.trackLabel)}</span>
-              ${p.phase ? `<span class="pitch-uc-phase">${esc(p.phase)}</span>` : ''}
-              <span class="pitch-uc-author"><i class="fa-solid fa-user"></i> ${esc(authorName)}</span>
-            </div>
-          </div>
-          <div class="pitch-uc-timer" data-total="${timerSec}">
-            <span class="pitch-uc-time">${pitchFmt(timerSec)}</span>
-            <button type="button" class="pitch-uc-btn" data-pitch-toggle aria-label="Pitch-Timer starten / stoppen"><i class="fa-solid fa-play"></i></button>
-          </div>
+        html += `<div class="ws-row">
+          <span class="ws-c-rank">${n}</span>
+          <span class="ws-c-uc">
+            <span class="ws-uc-text">${esc(item.text)}</span>
+            <span class="ws-uc-meta"><span class="ws-uc-track">${esc(trk.trackLabel)}</span>${p.phase ? `<span class="ws-uc-phase">${esc(p.phase)}</span>` : ''}</span>
+          </span>
+          <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
+          <span class="ws-c-action ws-timer" data-total="${timerSec}">
+            <span class="ws-time">${pitchFmt(timerSec)}</span>
+            <button type="button" class="ws-timer-btn" data-pitch-toggle aria-label="Pitch-Timer starten / stoppen"><i class="fa-solid fa-play"></i></button>
+          </span>
         </div>`;
       });
     });
@@ -2854,11 +2923,11 @@ function renderAllTracksUseCasesWithAuthors(timerSec = 120) {
 
 // Bindet pro Use Case einen eigenen Start/Stop-Countdown (kein globaler Timer).
 function bindPitchTimers(stage) {
-  const timers = stage?.querySelectorAll('.pitch-uc-timer[data-total]');
+  const timers = stage?.querySelectorAll('.ws-timer[data-total]');
   if (!timers || !timers.length) return;
   timers.forEach((timerEl) => {
     const total = parseInt(timerEl.dataset.total, 10) || 120;
-    const timeEl = timerEl.querySelector('.pitch-uc-time');
+    const timeEl = timerEl.querySelector('.ws-time');
     const btn = timerEl.querySelector('[data-pitch-toggle]');
     if (!btn || !timeEl) return;
     let remaining = total;
@@ -4640,7 +4709,7 @@ async function ensureParticipantResponses(force = false) {
   if (!State.session?.id || !State.participant) return;
   const slideIndex = State.session.current_slide_index || 0;
   const slide = State.slides[slideIndex];
-  const needsTrackData = Boolean(slide?.settings?.sopTrackVote || slide?.settings?.sopPhaseVote || slide?.settings?.sopCardVote || slide?.settings?.brainstormVote || slide?.settings?.sopAllTracksMatrix || slide?.slide_type === 'priority_matrix');
+  const needsTrackData = Boolean(slide?.settings?.sopTrackVote || slide?.settings?.sopPhaseVote || slide?.settings?.sopCardVote || slide?.settings?.brainstormVote || slide?.settings?.sopAllTracksVote || slide?.settings?.sopAllTracksMatrix || slide?.slide_type === 'priority_matrix');
   if (!needsTrackData && !force) return;
   const cacheKey = `${State.session.id}:${slideIndex}`;
   const fresh = State.participantResponsesKey === cacheKey
@@ -4990,8 +5059,13 @@ function getMatrixItems(slide) {
   const pushed = State.matrixItemsBySlide && State.matrixItemsBySlide[slide?.id];
   if (Array.isArray(pushed) && pushed.length) return pushed;
 
-  // 1. SOP-Workshop-Matrix: Top-3 aus den Track-Votes (bzw. Fallback).
+  // 1. SOP-Workshop-Matrix: prioritisierte Use Cases automatisch übernehmen.
   if (slide?.settings?.sopAllTracksMatrix) {
+    // 1a. Bevorzugt: Gewinner der FINALEN Cross-Track-Abstimmung (Pro-Track-Flow).
+    const finalTop = aggregateTopFinalVotedUseCases(12);
+    if (finalTop.length) return finalTop;
+
+    // 1b. Fallback: Top-3 je Track-Vote (Pro-Phase-Flow mit per-Track-Votes).
     const trackTop = aggregateTopTrackVotedUseCases();
     const rankedTop = trackTop.flatMap((trk) => trk.items.map((item) => ({
       id: item.id,
@@ -5002,6 +5076,7 @@ function getMatrixItems(slide) {
     })));
     if (rankedTop.length) return rankedTop;
 
+    // 1c. Letzter Fallback: alle Use Cases (z. B. wenn noch nicht abgestimmt wurde).
     const { allItems } = aggregateAllTracksUseCases();
     return allItems.slice(0, 12).map((u, i) => ({ id: u.id || `it-${i}`, text: u.text, phase: u.phase, trackLabel: u.trackLabel }));
   }
