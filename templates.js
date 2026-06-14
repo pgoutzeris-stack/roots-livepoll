@@ -24,6 +24,8 @@ function brainstormSettings(extra = {}) {
     showResultsLive: true,
     workshopMode: 'collect',
     profanityFilter: true,
+    askName: true, // Use Cases müssen einem benannten Teilnehmer zugeordnet sein
+    anonymous: false,
     timeLimitSec: ws.brainstormTimeLimitSec,
     responseLimit: ws.brainstormMaxResponses,
     multipleResponses: ws.brainstormMaxResponses > 1,

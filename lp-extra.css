@@ -1020,6 +1020,9 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 /* — Konsistente Finale-Pill (Pitch · Finale Priorisierung · Matrix) — */
 .sop-finale-badge{display:inline-flex;align-items:center;gap:.4rem}
 .sop-pitch-session .sop-menti-badge{gap:.4rem}
+/* Einheitlicher Finale-Folien-Rahmen (Vote + Matrix wie Pitch Session) */
+.sop-finale-section .sop-menti-sub{max-width:880px;margin-bottom:.6rem}
+.sop-finale-section .viz-wrap-present{margin-top:1.1rem}
 
 /* — Finale-Vote (present): Live-Ergebnis-Label — */
 .track-vote-live-label{

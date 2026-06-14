@@ -302,7 +302,7 @@ function aggregateAllTracksUseCases() {
     }
     const items = (State.responses || [])
       .filter((r) => r.slide_id === slide.id && !r.is_hidden)
-      .map((r) => ({ id: r.id, text: String(r.response?.text || '').trim(), participant_id: r.participant_id }))
+      .map((r) => ({ id: r.id, text: String(r.response?.text || '').trim(), participant_id: r.participant_id, authorName: r.response?._author || '' }))
       .filter((item) => item.text);
     byTrackKey.get(trackKey).phases.push({ phase: phaseName, items, slideId: slide.id });
     items.forEach((item) => allItems.push({
@@ -1422,7 +1422,7 @@ function renderFinalVotePresentHtml(slide, visible) {
       </div>`;
   rows.forEach((r, i) => {
     const author = (State.participants || []).find((x) => x.id === r.participant_id);
-    const authorName = author?.display_name || '–';
+    const authorName = author?.display_name || r.authorName || '–';
     const ranked = r.votes > 0;
     const barPct = Math.round((r.votes / maxVotes) * 100);
     const topClass = ranked && i < 3 ? ` ws-row--top ws-row--top${i + 1}` : '';
@@ -2909,7 +2909,7 @@ function renderAllTracksUseCasesWithAuthors(timerSec = 120) {
       p.items.forEach((item) => {
         n += 1;
         const author = (State.participants || []).find((x) => x.id === item.participant_id);
-        const authorName = author?.display_name || '–';
+        const authorName = author?.display_name || item.authorName || '–';
         html += `<div class="ws-row">
           <span class="ws-c-rank">${n}</span>
           <span class="ws-c-uc">
@@ -3865,13 +3865,23 @@ const LP_DebugSim = {
       useCases.forEach((text, i) => {
         const pIdx = i % defs.length;
         const fakeP = `debug-p-${pIdx}-${sessionId}`;
+        const pDef = defs[pIdx] || {};
+        // Sicherstellen, dass der (simulierte) Autor in State.participants existiert —
+        // sonst hätten Use Cases von noch nicht "beigetretenen" Teilnehmern keinen Autor.
+        if (!State.participants.find((x) => x.id === fakeP)) {
+          State.participants.push({
+            id: fakeP, session_id: sessionId, device_id: `debug-d-${pIdx}`,
+            display_name: pDef.name, avatar_emoji: pDef.emoji, avatar_color: pDef.color,
+            joined_at: new Date().toISOString(),
+          });
+        }
         const respId = `debug-r-${slide.id}-${i}`;
         const response = {
           id: respId,
           session_id: sessionId,
           slide_id: slide.id,
           participant_id: fakeP,
-          response: { text },
+          response: { text, _author: pDef.name },
           is_hidden: false,
           created_at: new Date(now + i * 100).toISOString(),
           updated_at: new Date(now + i * 100).toISOString(),
@@ -4527,11 +4537,17 @@ function renderPresent() {
   }
 
   if (shouldUseVoteWorkshopUi(slide)) {
-    stage.innerHTML = wrapMentiSlide(`
-      ${isFinaleSlide(slide) ? renderFinalePillHtml() : ''}
-      <h1 class="menti-q-title">${esc(c.title || 'Priorisierung')}</h1>
-      <p class="menti-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>
-      <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`, slideIdx);
+    const voteInner = isFinaleSlide(slide)
+      ? `<div class="sop-menti-section sop-finale-section">
+          ${renderFinalePillHtml()}
+          <h1 class="sop-menti-title">${esc(c.title || 'Priorisierung')}</h1>
+          ${c.prompt ? `<p class="sop-menti-sub">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : ''}
+          <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}
+        </div>`
+      : `<h1 class="menti-q-title">${esc(c.title || 'Priorisierung')}</h1>
+        <p class="menti-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>
+        <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`;
+    stage.innerHTML = wrapMentiSlide(voteInner, slideIdx);
     stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
     stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
     updatePresentHeader();
@@ -4543,13 +4559,23 @@ function renderPresent() {
     return;
   }
 
-  stage.innerHTML = wrapMentiSlide(`
-    ${isFinaleSlide(slide) ? renderFinalePillHtml() : ''}
-    ${!isSopWorkshopPresentation() && workshopMode ? renderWorkshopModeBadge(workshopMode) : ''}
-    ${!isSopWorkshopPresentation() ? sopBadge : ''}
-    <h1 class="menti-q-title ${c.mentiQuestion ? '' : 'present-slide-title'}" style="color:${esc(slideInk)}">${esc(c.title || c.prompt || 'Folie')}</h1>
-    <p class="menti-q-prompt ${c.mentiQuestion ? '' : 'present-slide-body'}" style="color:${esc(slideMuted)}">${esc(c.prompt || c.body || '').replace(/\n/g, '<br>')}</p>
-    <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`, slideIdx);
+  if (isFinaleSlide(slide)) {
+    // Finale-Folien (z. B. Impact/Effort-Matrix) im selben Stil wie Pitch Session +
+    // Finale Priorisierung: sop-menti-section + Pill + sop-menti-title.
+    stage.innerHTML = wrapMentiSlide(`<div class="sop-menti-section sop-finale-section">
+      ${renderFinalePillHtml()}
+      <h1 class="sop-menti-title">${esc(c.title || 'Folie')}</h1>
+      ${c.prompt ? `<p class="sop-menti-sub">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : ''}
+      <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}
+    </div>`, slideIdx);
+  } else {
+    stage.innerHTML = wrapMentiSlide(`
+      ${!isSopWorkshopPresentation() && workshopMode ? renderWorkshopModeBadge(workshopMode) : ''}
+      ${!isSopWorkshopPresentation() ? sopBadge : ''}
+      <h1 class="menti-q-title ${c.mentiQuestion ? '' : 'present-slide-title'}" style="color:${esc(slideInk)}">${esc(c.title || c.prompt || 'Folie')}</h1>
+      <p class="menti-q-prompt ${c.mentiQuestion ? '' : 'present-slide-body'}" style="color:${esc(slideMuted)}">${esc(c.prompt || c.body || '').replace(/\n/g, '<br>')}</p>
+      <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`, slideIdx);
+  }
 
   stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
   stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
@@ -5549,11 +5575,18 @@ async function submitResponse(response) {
   }
   if (response.text) response.text = filterProfanity(response.text, slide.settings?.profanityFilter !== false);
 
+  // Autor-Name direkt in der Antwort speichern (Snapshot), damit "Eingebracht von"
+  // robust ist — unabhängig davon, ob der Teilnehmer beim Host gerade in
+  // State.participants vorliegt (Realtime-Lücken o. Ä.).
+  const responsePayload = (response && typeof response === 'object' && !Array.isArray(response) && State.participant?.display_name)
+    ? { ...response, _author: State.participant.display_name }
+    : response;
+
   const row = {
     session_id: State.session.id,
     slide_id: slide.id,
     participant_id: State.participant?.id || null,
-    response,
+    response: responsePayload,
     is_hidden: !!slide.settings?.moderation,
   };
 
