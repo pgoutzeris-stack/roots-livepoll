@@ -436,8 +436,8 @@ function sopWorkshopInstructions() {
     : 'offene Zeit';
   return tplSlide('content', {
     title: 'So formuliert ihr Use Cases',
-    subtitle: `⏱ ${timeMin} pro Runde · max. ${ws.brainstormMaxResponses} Use Cases pro Person`,
-    body: `Format: Was macht die KI · Wer nutzt sie · Welches Tool\n\n✅ Starke Use Cases:\n• „Discovery-Call automatisch transkribieren + Highlights markieren" → PL → Otter.ai\n• „Wettbewerbs-Recherche zu Zielkunden vor dem Erstgespräch" → BD → Perplexity\n• „Proposal-Draft aus Briefing in 5 Min. generieren" → Senior → ChatGPT\n• „KPI-Dashboard automatisch aus Rohdaten erstellen" → Analyst → Julius.ai\n\n❌ Zu vage (bitte vermeiden):\n„KI für E-Mails" · „AI einsetzen" · „ChatGPT nutzen"\n\nJe konkreter, desto wertvoller für die Auswertung.`,
+    subtitle: `${timeMin} pro Runde · max. ${ws.brainstormMaxResponses} Use Cases pro Person`,
+    body: `Format: Was die KI macht | Wer nutzt sie | Welches Tool\n\nGute Use Cases:\nDiscovery-Call transkribieren + Highlights markieren | PL | Otter.ai\nWettbewerbs-Recherche zu Zielkunden vor dem Erstgespräch | BD | Perplexity\nProposal-Draft aus Briefing in 5 Min. generieren | Senior | ChatGPT\nKPI-Dashboard automatisch aus Rohdaten erstellen | Analyst | Julius.ai\n\nBitte vermeiden:\nKI für E-Mails\nAI einsetzen\nChatGPT nutzen\n\nJe konkreter, desto wertvoller für die Auswertung.`,
     mentiHero: false,
     sopKind: 'instructions',
   }, { workshopMode: 'orient' });

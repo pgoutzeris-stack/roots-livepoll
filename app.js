@@ -1839,26 +1839,49 @@ function renderSopContentHtml(c, editable = false) {
     const subEl = c.subtitle ? `<p class="sop-menti-sub">${esc(c.subtitle)}</p>` : '';
     let instrHtml = '';
     if (c.body) {
-      let inBadSection = false;
+      let mode = '';
+      let avoidBuf = [];
+      const flushAvoid = () => {
+        if (avoidBuf.length) {
+          instrHtml += `<div class="wi-avoid-tags">${avoidBuf
+            .map((a) => `<span class="wi-avoid-tag">${esc(a)}</span>`)
+            .join('')}</div>`;
+          avoidBuf = [];
+        }
+      };
       for (const line of c.body.split('\n')) {
         const t = line.trim();
         if (!t) continue;
         if (t.startsWith('Format:')) {
-          instrHtml += `<div class="wi-format"><i class="fa-solid fa-pen"></i> <span>${esc(t)}</span></div>`;
-        } else if (t.startsWith('\u2705')) {
-          inBadSection = false;
-          instrHtml += `<div class="wi-section-head">${esc(t)}</div>`;
-        } else if (t.startsWith('\u274c')) {
-          inBadSection = true;
-          instrHtml += `<div class="wi-section-head" style="color:#dc2626">${esc(t)}</div>`;
-        } else if (t.startsWith('\u2022')) {
-          instrHtml += `<div class="wi-example">${esc(t.slice(1).trim())}</div>`;
-        } else if (inBadSection) {
-          instrHtml += `<div class="wi-example wi-bad">${esc(t)}</div>`;
+          flushAvoid();
+          mode = '';
+          const txt = t.replace(/^Format:\s*/, '');
+          instrHtml += `<div class="wi-format"><i class="fa-solid fa-pen-ruler"></i> <span>${esc(txt)}</span></div>`;
+        } else if (t === 'Gute Use Cases:') {
+          flushAvoid();
+          mode = 'good';
+          instrHtml += `<div class="wi-section-head wi-section-good"><i class="fa-solid fa-circle-check"></i> <span>Gute Use Cases</span></div>`;
+        } else if (t === 'Bitte vermeiden:') {
+          flushAvoid();
+          mode = 'avoid';
+          instrHtml += `<div class="wi-section-head wi-section-avoid"><i class="fa-solid fa-circle-minus"></i> <span>Bitte vermeiden</span></div>`;
+        } else if (mode === 'good' && t.includes(' | ')) {
+          const parts = t.split('|').map((p) => p.trim());
+          const what = parts[0] || '';
+          const who = parts[1] || '';
+          const tool = parts[2] || '';
+          const meta = (who || tool)
+            ? `<span class="wi-ex-meta">${who ? `<span class="wi-ex-who">${esc(who)}</span>` : ''}${tool ? `<span class="wi-ex-tool">${esc(tool)}</span>` : ''}</span>`
+            : '';
+          instrHtml += `<div class="wi-example"><span class="wi-ex-what">${esc(what)}</span>${meta}</div>`;
+        } else if (mode === 'avoid') {
+          avoidBuf.push(t);
         } else {
+          flushAvoid();
           instrHtml += `<p class="wi-note">${esc(t)}</p>`;
         }
       }
+      flushAvoid();
     }
     return `
       <div class="sop-menti-section sop-menti-instructions" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">

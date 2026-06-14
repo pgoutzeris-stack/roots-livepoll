@@ -673,46 +673,53 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   display:inline-flex;
   align-items:center;
   gap:.5rem;
-  background:rgba(32,110,251,.08);
-  border:1px solid rgba(32,110,251,.2);
-  border-radius:8px;
-  padding:.5rem 1rem;
-  font-size:.9rem;
+  background:var(--brand-light,#eff6ff);
+  border:1px solid var(--line,#e2e8f0);
+  border-radius:99px;
+  padding:.45rem 1rem;
+  font-size:.85rem;
   font-weight:600;
-  color:var(--brand);
+  color:var(--brand,#206efb);
   margin:.75rem 0;
 }
-.workshop-instructions-card .wi-examples{
-  display:flex;
-  flex-direction:column;
-  gap:.5rem;
-  margin:1rem 0;
+.workshop-instructions-card .wi-format i{
+  color:var(--brand,#206efb);
 }
 .workshop-instructions-card .wi-example{
-  padding:.7rem 1rem;
-  background:var(--surface,#f8fafc);
-  border-left:3px solid #10b981;
-  border-radius:0 8px 8px 0;
-  font-size:.87rem;
-  line-height:1.5;
-  color:var(--ink);
-}
-.workshop-instructions-card .wi-bad{
-  border-left-color:#ef4444;
-  background:rgba(239,68,68,.04);
-  color:var(--muted);
-}
-.workshop-instructions-card .wi-timing{
   display:flex;
   align-items:center;
-  gap:.75rem;
-  padding:.6rem 1rem;
-  background:rgba(32,110,251,.05);
-  border-radius:8px;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:.5rem .9rem;
+  padding:.65rem .95rem;
+  background:var(--surface,#f8fafc);
+  border:1px solid var(--line,#e2e8f0);
+  border-radius:10px;
+  margin:.4rem 0;
+}
+.workshop-instructions-card .wi-ex-what{
   font-size:.88rem;
-  font-weight:600;
-  color:var(--brand);
-  margin-top:1rem;
+  line-height:1.4;
+  color:var(--ink,#0f172a);
+  font-weight:500;
+  flex:1 1 auto;
+  min-width:0;
+}
+.workshop-instructions-card .wi-ex-meta{
+  display:inline-flex;
+  align-items:center;
+  gap:.35rem;
+  flex:0 0 auto;
+}
+.workshop-instructions-card .wi-ex-who,
+.workshop-instructions-card .wi-ex-tool{
+  background:var(--brand-light,#eff6ff);
+  color:var(--brand,#206efb);
+  border-radius:99px;
+  padding:2px 8px;
+  font-size:.7rem;
+  font-weight:700;
+  white-space:nowrap;
 }
 
 /* ─── ICE Matrix — bessere Quadrant Labels ───────────────────── */
@@ -834,9 +841,43 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 
 /* ─── Instructions: wi-section-head + wi-note ───────────────── */
 .workshop-instructions-card .wi-section-head{
-  font-size:.88rem;font-weight:700;color:var(--ink);
-  margin:1rem 0 .4rem;
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  font-size:.9rem;font-weight:700;color:var(--ink,#0f172a);
+  margin:1.1rem 0 .5rem;
+}
+.workshop-instructions-card .wi-section-good i{
+  color:var(--brand,#206efb);
+}
+.workshop-instructions-card .wi-section-avoid i{
+  color:var(--muted,#475569);
+}
+.workshop-instructions-card .wi-avoid-tags{
+  display:flex;
+  flex-wrap:wrap;
+  gap:.4rem;
+  margin:.4rem 0;
+}
+.workshop-instructions-card .wi-avoid-tag{
+  display:inline-flex;
+  align-items:center;
+  gap:.35rem;
+  background:var(--surface,#f8fafc);
+  border:1px dashed var(--line,#e2e8f0);
+  color:var(--muted,#475569);
+  border-radius:99px;
+  padding:3px 10px;
+  font-size:.8rem;
+}
+.workshop-instructions-card .wi-avoid-tag::before{
+  content:"\f00d"; /* fa-xmark */
+  font-family:"Font Awesome 6 Free";
+  font-weight:900;
+  font-size:.65rem;
+  color:var(--muted,#475569);
+  opacity:.7;
 }
 .workshop-instructions-card .wi-note{
-  font-size:.82rem;color:var(--muted);margin:.5rem 0;line-height:1.5;
+  font-size:.85rem;color:var(--muted,#475569);margin:.6rem 0;line-height:1.5;
 }
