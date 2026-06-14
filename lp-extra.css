@@ -855,13 +855,14 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .ws-row--head .ws-c-rank{background:none;color:var(--muted);font-size:.68rem}
 .ws-row--top1 .ws-c-rank{background:linear-gradient(135deg,#206efb,#60a5fa)}
 .ws-row--top .ws-c-uc .ws-uc-text{font-weight:700}
-.ws-c-uc{min-width:0;display:flex;flex-direction:column;gap:.25rem}
-.ws-uc-text{font-size:.95rem;font-weight:600;color:var(--ink);line-height:1.35;word-break:break-word}
-.ws-uc-meta{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem .55rem}
+/* Use-Case-Zelle: Name oben, darunter linksbündig die blaue Track-Pill (+ ggf. echte Phase) */
+.ws-c-uc{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:.35rem}
+.ws-uc-text{font-size:.98rem;font-weight:600;color:var(--ink);line-height:1.4;overflow-wrap:anywhere}
+.ws-uc-meta{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem}
 .ws-uc-track{
   background:var(--brand-light,#eff6ff);color:var(--brand);
-  padding:1px 8px;border-radius:99px;font-weight:700;font-size:.66rem;
-  text-transform:uppercase;letter-spacing:.04em;
+  padding:2px 9px;border-radius:99px;font-weight:700;font-size:.64rem;
+  text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;
 }
 .ws-uc-phase{color:var(--muted);font-style:italic;font-size:.72rem}
 .ws-c-author{display:flex;align-items:center;gap:.4rem;min-width:0;color:var(--muted);font-size:.82rem;font-weight:600}
@@ -1016,7 +1017,8 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 .workshop-sop-panel--finale .workshop-sop-vote.active i{color:var(--brand)}
 
-/* — Pitch Session Badge: Icon-Abstand (Badge nutzt inline-flex) — */
+/* — Konsistente Finale-Pill (Pitch · Finale Priorisierung · Matrix) — */
+.sop-finale-badge{display:inline-flex;align-items:center;gap:.4rem}
 .sop-pitch-session .sop-menti-badge{gap:.4rem}
 
 /* — Finale-Vote (present): Live-Ergebnis-Label — */

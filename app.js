@@ -293,7 +293,9 @@ function aggregateAllTracksUseCases() {
     const c = slide.content || {};
     const trackKey = c.sopTrackClass || c.sopTrackKey;
     const trackLabel = c.sopTrackLabel || trackKey;
-    const phaseName = c.sopPhaseName || c.title || '';
+    // Nur die echte Phase verwenden — KEIN Fallback auf den Folientitel, der bei
+    // track-collect den Track-Namen wiederholt (führte zu doppeltem Track im UI).
+    const phaseName = c.sopPhaseName || '';
     if (!byTrackKey.has(trackKey)) {
       byTrackKey.set(trackKey, { trackKey, trackLabel, phases: [] });
       trackOrder.push(trackKey);
@@ -345,7 +347,7 @@ function renderAllTracksResultsHtml() {
     const theme = sopTrackTheme(trk.trackKey);
     const phasesHtml = trk.phases.filter((p) => p.items.length).map((p) => `
       <div class="sop-all-track-phase">
-        <div class="sop-all-track-phase-head">${esc(p.phase)}</div>
+        ${p.phase ? `<div class="sop-all-track-phase-head">${esc(p.phase)}</div>` : ''}
         <div class="sop-all-track-phase-items">${p.items.map((it) =>
           `<div class="sop-all-track-item">${esc(it.text)}</div>`
         ).join('')}</div>
@@ -1170,7 +1172,7 @@ function getTrackVoteOptionsGrouped(slide) {
       trk.phases.forEach((p) => {
         if (p.items.length) {
           groups.push({
-            phase: `${trk.trackLabel} · ${p.phase}`,
+            phase: p.phase ? `${trk.trackLabel} · ${p.phase}` : trk.trackLabel,
             card: '',
             options: p.items.map((item) => ({ id: `resp-${item.id}`, text: item.text, participant_id: item.participant_id })),
           });
@@ -1428,7 +1430,7 @@ function renderFinalVotePresentHtml(slide, visible) {
       <span class="ws-c-rank">${ranked ? i + 1 : '·'}</span>
       <span class="ws-c-uc">
         <span class="ws-uc-text">${esc(r.text)}</span>
-        <span class="ws-uc-meta"><span class="ws-uc-track">${esc(r.trackLabel)}</span>${r.phase ? `<span class="ws-uc-phase">${esc(r.phase)}</span>` : ''}</span>
+        <span class="ws-uc-meta"><span class="ws-uc-track">${esc(r.trackLabel)}</span>${r.phase && r.phase !== r.trackLabel ? `<span class="ws-uc-phase">${esc(r.phase)}</span>` : ''}</span>
       </span>
       <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
       <span class="ws-c-action ws-votes">
@@ -1639,6 +1641,12 @@ function isFinaleSlide(s) {
   const k = c.sopKind;
   return !!(st.sopPitchSession || st.sopAllTracksVote || st.sopAllTracksMatrix || c.sopAllTracksResults
     || k === 'pitch-session' || k === 'final-vote' || k === 'final-matrix' || k === 'all-tracks-summary');
+}
+
+// Konsistente Finale-Pill (Badge) für Pitch Session, Finale Priorisierung und Matrix.
+// Bewusst NICHT identisch mit der jeweiligen Folien-Überschrift.
+function renderFinalePillHtml() {
+  return `<div class="sop-menti-badge sop-finale-badge" style="background:var(--brand);color:#fff"><i class="fa-solid fa-flag-checkered"></i> Finale</div>`;
 }
 
 function renderSopFinalePanelHtml(currentIndex, { clickable = false, onNavigate } = {}) {
@@ -2072,7 +2080,7 @@ function renderSopContentHtml(c, editable = false) {
       : '<div class="present-wait-msg">Use Cases mit Autornamen erscheinen in der Live-Session.</div>';
     return `
       <div class="sop-menti-section sop-pitch-session">
-        <div class="sop-menti-badge" style="background:var(--brand);color:#fff"><i class="fa-solid fa-person-chalkboard"></i> Pitch Session</div>
+        ${renderFinalePillHtml()}
         ${titleEl}
         ${subEl}
         ${configEl}
@@ -2906,7 +2914,7 @@ function renderAllTracksUseCasesWithAuthors(timerSec = 120) {
           <span class="ws-c-rank">${n}</span>
           <span class="ws-c-uc">
             <span class="ws-uc-text">${esc(item.text)}</span>
-            <span class="ws-uc-meta"><span class="ws-uc-track">${esc(trk.trackLabel)}</span>${p.phase ? `<span class="ws-uc-phase">${esc(p.phase)}</span>` : ''}</span>
+            <span class="ws-uc-meta"><span class="ws-uc-track">${esc(trk.trackLabel)}</span>${p.phase && p.phase !== trk.trackLabel ? `<span class="ws-uc-phase">${esc(p.phase)}</span>` : ''}</span>
           </span>
           <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
           <span class="ws-c-action ws-timer" data-total="${timerSec}">
@@ -4520,6 +4528,7 @@ function renderPresent() {
 
   if (shouldUseVoteWorkshopUi(slide)) {
     stage.innerHTML = wrapMentiSlide(`
+      ${isFinaleSlide(slide) ? renderFinalePillHtml() : ''}
       <h1 class="menti-q-title">${esc(c.title || 'Priorisierung')}</h1>
       <p class="menti-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>
       <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`, slideIdx);
@@ -4535,6 +4544,7 @@ function renderPresent() {
   }
 
   stage.innerHTML = wrapMentiSlide(`
+    ${isFinaleSlide(slide) ? renderFinalePillHtml() : ''}
     ${!isSopWorkshopPresentation() && workshopMode ? renderWorkshopModeBadge(workshopMode) : ''}
     ${!isSopWorkshopPresentation() ? sopBadge : ''}
     <h1 class="menti-q-title ${c.mentiQuestion ? '' : 'present-slide-title'}" style="color:${esc(slideInk)}">${esc(c.title || c.prompt || 'Folie')}</h1>
