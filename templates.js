@@ -1,6 +1,42 @@
 /* Vorlagen – umfangreich, arbeitsalltagnah, vielfältige Folientypen */
-window.LP_TEMPLATE_STYLE = { bgColor: '#ffffff', textColor: '#0f172a', accentColor: '#206efb' };
+// Single source of truth for the default slide style (also exposed as LP_DEFAULT_STYLE further below).
+window.LP_DEFAULT_STYLE = { bgColor: '#ffffff', textColor: '#0f172a', accentColor: '#206efb' };
+window.LP_TEMPLATE_STYLE = window.LP_DEFAULT_STYLE;
 window.LP_TEMPLATE_SETTINGS = { anonymous: false, askName: true, showResultsLive: true, profanityFilter: true, multipleResponses: false };
+
+// Central sopKind discriminators — these string VALUES must stay in sync with the checks in app.js.
+window.LP_SOP_KIND = Object.freeze({
+  TRACK: 'track',
+  PHASE_OVERVIEW: 'phase-overview',
+  TRACK_OVERVIEW: 'track-overview',
+  WORKSHOP_GOAL: 'workshop-goal',
+  INSTRUCTIONS: 'instructions',
+  PHASE_WORKSHOP: 'phase-workshop',
+  TRACK_COLLECT: 'track-collect',
+  PHASE_VOTE: 'phase-vote',
+  TRACK_VOTE: 'track-vote',
+  TRACK_PRESENTATION: 'track-presentation',
+  ALL_TRACKS_SUMMARY: 'all-tracks-summary',
+  FINAL_MATRIX: 'final-matrix',
+  NEXT_STEPS: 'next-steps',
+  PITCH_SESSION: 'pitch-session',
+  FINAL_VOTE: 'final-vote',
+  CARD_WORKSHOP: 'card-workshop',
+});
+const SK = window.LP_SOP_KIND;
+
+// Single source of truth for the Impact/Effort matrix quadrants (used by sopIceMatrix + LP_DEFAULT_CONTENT).
+window.LP_ICE_QUADRANTS = {
+  qw: { label: 'Quick Win', icon: '🚀', desc: 'hoher Impact · niedriger Aufwand → sofort angehen' },
+  sb: { label: 'Strategic Bet', icon: '⭐', desc: 'hoher Impact · hoher Aufwand → langfristig planen' },
+  ts: { label: 'Time Sink', icon: '🔧', desc: 'niedriger Impact · hoher Aufwand → kritisch hinterfragen' },
+  dr: { label: 'Drop', icon: '❌', desc: 'niedriger Impact · niedriger Aufwand → weglassen' },
+};
+// Fresh shallow copy so per-slide content never shares one mutable quadrant object.
+function iceQuadrants() {
+  const q = window.LP_ICE_QUADRANTS;
+  return { qw: { ...q.qw }, sb: { ...q.sb }, ts: { ...q.ts }, dr: { ...q.dr } };
+}
 
 // ─── WORKSHOP-EINSTELLUNGEN (zentral anpassen) ────────────────────────────────
 // Gelten für alle Brainstorm-Sammelrunden in SOP- und Marketing-Vorlagen.
@@ -47,14 +83,12 @@ const SOP_TOOL_TRACKS = [
           {
             name: 'Bedarfserkennung / Problem Sensing',
             intro: 'Signale für einen möglichen Beratungsbedarf frühzeitig erkennen und qualifizieren.',
-            prompt: 'Welche KI hilft beim Erkennen und Qualifizieren von Beratungsbedarf?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: LinkedIn-Signal-Monitoring, News-Tracker zu Zielkunden, Intent-Scoring-Bot.',
-            voteMax: 2,
+            prompt: 'Welche KI hilft beim Erkennen und Qualifizieren von Beratungsbedarf?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: LinkedIn-Signal-Monitoring, News-Tracker zu Zielkunden, Intent-Scoring-Bot.',
           },
           {
             name: 'Erstgespräch / ROOTS Vorstellung',
             intro: 'ROOTS Positionierung, Arbeitsweise und Team im Erstkontakt überzeugend präsentieren.',
-            prompt: 'Welche KI macht den Erstkontakt persönlicher und schärfer?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: KI-personalisiertes Outreach, Auto-Recherche zum Kunden vorab, Pitch-Deck-Generator.',
-            voteMax: 2,
+            prompt: 'Welche KI macht den Erstkontakt persönlicher und schärfer?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: KI-personalisiertes Outreach, Auto-Recherche zum Kunden vorab, Pitch-Deck-Generator.',
           },
         ],
       },
@@ -65,26 +99,22 @@ const SOP_TOOL_TRACKS = [
           {
             name: 'Problem Verstehen',
             intro: 'Kundenproblem tief durchdringen — Symptome von Ursachen trennen.',
-            prompt: 'Welche KI macht Problem-Framing schneller und präziser?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: \"5-Why\"-Bot, Symptom-Ursache-Mapping, Auto-Transkript von Discovery-Calls.',
-            voteMax: 2,
+            prompt: 'Welche KI macht Problem-Framing schneller und präziser?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: \"5-Why\"-Bot, Symptom-Ursache-Mapping, Auto-Transkript von Discovery-Calls.',
           },
           {
             name: 'Zielstellung klären',
             intro: 'Gemeinsame Ziele, Erfolgskriterien und Erwartungen aller Stakeholder definieren.',
-            prompt: 'Welche KI hilft, Ziele schneller und klarer zu formulieren?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: SMART-Goal-Coach, KI-Moderator für Discovery-Calls, Highlight-Extraktion aus Transcripts.',
-            voteMax: 2,
+            prompt: 'Welche KI hilft, Ziele schneller und klarer zu formulieren?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: SMART-Goal-Coach, KI-Moderator für Discovery-Calls, Highlight-Extraktion aus Transcripts.',
           },
           {
             name: 'Initiale Analyse',
             intro: 'Erste faktenbasierte Einschätzung von Markt, Wettbewerb und Ist-Situation.',
-            prompt: 'Welche KI beschleunigt Markt- und Wettbewerbs-Analysen?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Perplexity Deep Research, Industry-Research-Bot, SWOT-Generator.',
-            voteMax: 2,
+            prompt: 'Welche KI beschleunigt Markt- und Wettbewerbs-Analysen?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Perplexity Deep Research, Industry-Research-Bot, SWOT-Generator.',
           },
           {
             name: 'Initiale Hypothese(n)',
             intro: 'Erste fundierte Hypothesen zur Problemlösung entwickeln und dokumentieren.',
-            prompt: 'Welche KI hilft beim Entwickeln und Schärfen erster Hypothesen?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Hypothesen-Generierung aus Interviews, Issue-Tree-Bot, LLM als Sparring-Partner.',
-            voteMax: 2,
+            prompt: 'Welche KI hilft beim Entwickeln und Schärfen erster Hypothesen?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Hypothesen-Generierung aus Interviews, Issue-Tree-Bot, LLM als Sparring-Partner.',
           },
         ],
       },
@@ -95,20 +125,17 @@ const SOP_TOOL_TRACKS = [
           {
             name: 'Projektablauf skizzieren',
             intro: 'Groben Projektplan, Vorgehensweise und Meilensteine für den Kunden skizzieren.',
-            prompt: 'Welche KI hilft beim schnellen Skizzieren eines überzeugenden Projektablaufs?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Workplan aus Scope-Doc, Timeline-Generator, Meilenstein-Template-AI.',
-            voteMax: 2,
+            prompt: 'Welche KI hilft beim schnellen Skizzieren eines überzeugenden Projektablaufs?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Auto-Workplan aus Scope-Doc, Timeline-Generator, Meilenstein-Template-AI.',
           },
           {
             name: 'KVA aufsetzen',
             intro: 'Kostenschätzung, Vertragsbasis und kommerzielles Angebot strukturieren.',
-            prompt: 'Welche KI unterstützt beim sauberen Aufsetzen eines KVA?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Aufwand-Predictor aus Scope, Pricing-Optimizer, Contract-Template-Filler.',
-            voteMax: 2,
+            prompt: 'Welche KI unterstützt beim sauberen Aufsetzen eines KVA?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Aufwand-Predictor aus Scope, Pricing-Optimizer, Contract-Template-Filler.',
           },
           {
             name: 'Kundenpitch oder E-Mail Kommunikation',
             intro: 'Angebot persönlich pitchen oder überzeugend schriftlich kommunizieren.',
-            prompt: 'Welche KI macht Pitch und Kommunikation schärfer und persönlicher?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Pitch-Deck-Optimizer, Personalisierungs-AI für E-Mails, Rehearsal-Coach-Bot.',
-            voteMax: 2,
+            prompt: 'Welche KI macht Pitch und Kommunikation schärfer und persönlicher?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Pitch-Deck-Optimizer, Personalisierungs-AI für E-Mails, Rehearsal-Coach-Bot.',
           },
         ],
       },
@@ -126,38 +153,32 @@ const SOP_TOOL_TRACKS = [
           {
             name: 'Vertrag',
             intro: 'Vertragsabschluss rechtssicher finalisieren und intern ablegen.',
-            prompt: 'Welche KI automatisiert oder beschleunigt den Vertragsabschluss?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Contract-Generator, Auto-Risk-Flag, E-Signature-Workflow.',
-            voteMax: 1,
+            prompt: 'Welche KI automatisiert oder beschleunigt den Vertragsabschluss?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Contract-Generator, Auto-Risk-Flag, E-Signature-Workflow.',
           },
           {
             name: 'Team-Staffing, Rollenverteilung',
             intro: 'Passendes Team zusammenstellen und Rollen klar zuweisen.',
-            prompt: 'Welche KI hilft beim smarten Team-Staffing und Rollen-Matching?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Skill-Matching-Bot, Rollen-Allokator aus Scope, Kapazitätsplanung-AI.',
-            voteMax: 2,
+            prompt: 'Welche KI hilft beim smarten Team-Staffing und Rollen-Matching?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Skill-Matching-Bot, Rollen-Allokator aus Scope, Kapazitätsplanung-AI.',
           },
           {
             name: 'Detaillierter Workplan & Projektplan',
             intro: 'Detaillierten Arbeitsplan mit Tasks, Verantwortlichkeiten und Timeline erstellen.',
-            prompt: 'Welche KI generiert oder optimiert Workpläne und Projektpläne?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Kanban aus Scope, Timeline-Generator, Projektplan-AI.',
-            voteMax: 2,
+            prompt: 'Welche KI generiert oder optimiert Workpläne und Projektpläne?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Auto-Kanban aus Scope, Timeline-Generator, Projektplan-AI.',
           },
           {
             name: 'Zugänge',
             intro: 'Benötigte System-, Tool- und Datenzugänge beschaffen und verwalten.',
-            prompt: 'Welche KI unterstützt beim Managen von Zugängen und Berechtigungen?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Access-Request-Tracker, Onboarding-Checkliste-AI, Permissioning-Bot.',
-            voteMax: 1,
+            prompt: 'Welche KI unterstützt beim Managen von Zugängen und Berechtigungen?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Access-Request-Tracker, Onboarding-Checkliste-AI, Permissioning-Bot.',
           },
           {
             name: 'Daten',
             intro: 'Relevante Datenquellen identifizieren, beschaffen und für Analysen vorbereiten.',
-            prompt: 'Welche KI hilft beim Identifizieren, Beschaffen und Aufbereiten von Daten?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Data-Catalog-AI, Auto-Data-Cleaning, Schema-Matching-Bot.',
-            voteMax: 2,
+            prompt: 'Welche KI hilft beim Identifizieren, Beschaffen und Aufbereiten von Daten?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Data-Catalog-AI, Auto-Data-Cleaning, Schema-Matching-Bot.',
           },
           {
             name: 'Kick-off / Client-Onboarding & Erwartungsmanagement',
             intro: 'Projekt formal starten, Stakeholder ausrichten und Erwartungen managen.',
-            prompt: 'Welche KI macht Kickoff und Erwartungsmanagement effektiver?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Kickoff-Agenda-Generator, Stakeholder-Map-AI, Expectation-Tracker.',
-            voteMax: 2,
+            prompt: 'Welche KI macht Kickoff und Erwartungsmanagement effektiver?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Kickoff-Agenda-Generator, Stakeholder-Map-AI, Expectation-Tracker.',
           },
         ],
       },
@@ -168,20 +189,17 @@ const SOP_TOOL_TRACKS = [
           {
             name: 'Datenanforderung & -erhebung',
             intro: 'Benötigte Daten beim Kunden anfragen und strukturiert erheben.',
-            prompt: 'Welche KI unterstützt bei Datenanforderung und -erhebung?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Data-Request-Template-AI, Survey-Generator, Auto-Follow-up für Datenlieferungen.',
-            voteMax: 2,
+            prompt: 'Welche KI unterstützt bei Datenanforderung und -erhebung?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Data-Request-Template-AI, Survey-Generator, Auto-Follow-up für Datenlieferungen.',
           },
           {
             name: 'IST-Analyse',
             intro: 'Aktuellen Zustand faktenbasiert analysieren, strukturieren und dokumentieren.',
-            prompt: 'Welche KI beschleunigt oder vertieft die IST-Analyse?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Dashboards aus Rohdaten, Process-Mining-AI, Anomalie-Detection.',
-            voteMax: 2,
+            prompt: 'Welche KI beschleunigt oder vertieft die IST-Analyse?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Auto-Dashboards aus Rohdaten, Process-Mining-AI, Anomalie-Detection.',
           },
           {
             name: 'Benchmarking',
             intro: 'Performance des Kunden gegen Markt, Wettbewerb und Best Practices messen.',
-            prompt: 'Welche KI liefert schnellere und tiefere Benchmark-Vergleiche?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Industry-Benchmark-Scraper, Competitive-Intelligence-AI, KPI-Vergleichs-Bot.',
-            voteMax: 2,
+            prompt: 'Welche KI liefert schnellere und tiefere Benchmark-Vergleiche?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Industry-Benchmark-Scraper, Competitive-Intelligence-AI, KPI-Vergleichs-Bot.',
           },
         ],
       },
@@ -192,38 +210,32 @@ const SOP_TOOL_TRACKS = [
           {
             name: '„So-What"-Extraktion aus Analysen',
             intro: 'Aus Rohdaten und Analysen handlungsrelevante Erkenntnisse ableiten.',
-            prompt: 'Welche KI hilft beim schnellen Destillieren von So-Whats?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Insight-Extraktion aus Analysen, LLM-Sparring für So-What-Test, Pattern-Erkennung.',
-            voteMax: 3,
+            prompt: 'Welche KI hilft beim schnellen Destillieren von So-Whats?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Auto-Insight-Extraktion aus Analysen, LLM-Sparring für So-What-Test, Pattern-Erkennung.',
           },
           {
             name: 'Storyline (Pyramid Principle)',
             intro: 'Argumentation nach dem Pyramid Principle logisch und überzeugend strukturieren.',
-            prompt: 'Welche KI unterstützt beim Aufbau einer starken Storyline?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Storyline-Coach-AI, Pyramid-Principle-Checker, Auto-Narrative-Generator.',
-            voteMax: 2,
+            prompt: 'Welche KI unterstützt beim Aufbau einer starken Storyline?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Storyline-Coach-AI, Pyramid-Principle-Checker, Auto-Narrative-Generator.',
           },
           {
             name: 'Priorisierung',
             intro: 'Empfehlungen nach Impact, Aufwand und Realisierbarkeit priorisieren.',
-            prompt: 'Welche KI hilft bei der strukturierten Priorisierung von Handlungsoptionen?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Impact-Effort-Matrix-AI, Decision-Support-Bot, Multi-Criteria-Priorisierung.',
-            voteMax: 2,
+            prompt: 'Welche KI hilft bei der strukturierten Priorisierung von Handlungsoptionen?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Impact-Effort-Matrix-AI, Decision-Support-Bot, Multi-Criteria-Priorisierung.',
           },
           {
             name: 'Business-Case',
             intro: 'Wirtschaftlichkeit der Empfehlung quantifizieren und plausibilisieren.',
-            prompt: 'Welche KI beschleunigt die Business-Case-Entwicklung?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Business-Case-Calculator, ROI-Modell-Generator, Sensitivitätsanalyse-AI.',
-            voteMax: 2,
+            prompt: 'Welche KI beschleunigt die Business-Case-Entwicklung?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Business-Case-Calculator, ROI-Modell-Generator, Sensitivitätsanalyse-AI.',
           },
           {
             name: 'Roadmap & Next Steps',
             intro: 'Umsetzungs-Roadmap und konkrete nächste Schritte definieren.',
-            prompt: 'Welche KI hilft bei der Entwicklung einer belastbaren Roadmap?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Roadmap aus Empfehlungen, Dependency-Mapper, Quick-Win-Identifier.',
-            voteMax: 2,
+            prompt: 'Welche KI hilft bei der Entwicklung einer belastbaren Roadmap?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Auto-Roadmap aus Empfehlungen, Dependency-Mapper, Quick-Win-Identifier.',
           },
           {
             name: 'Executive Summary',
             intro: 'Kernbotschaft und wichtigste Erkenntnisse für Entscheider prägnant zusammenfassen.',
-            prompt: 'Welche KI schreibt oder schärft Executive Summaries?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Exec-Summary-Generator, Zusammenfassungs-AI, One-Pager-Bot.',
-            voteMax: 2,
+            prompt: 'Welche KI schreibt oder schärft Executive Summaries?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Auto-Exec-Summary-Generator, Zusammenfassungs-AI, One-Pager-Bot.',
           },
         ],
       },
@@ -234,32 +246,27 @@ const SOP_TOOL_TRACKS = [
           {
             name: 'Charting',
             intro: 'Daten und Erkenntnisse in klare, überzeugende Charts und Visualisierungen übersetzen.',
-            prompt: 'Welche KI beschleunigt Charting und Datenvisualisierung?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Charting aus Excel, Chart-Empfehlungs-AI, Dataviz-Generator.',
-            voteMax: 2,
+            prompt: 'Welche KI beschleunigt Charting und Datenvisualisierung?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Auto-Charting aus Excel, Chart-Empfehlungs-AI, Dataviz-Generator.',
           },
           {
             name: '(Steering-Committee) Präsentation(en)',
             intro: 'Ergebnisse vor Kunden, Management oder Steering Committee überzeugend präsentieren.',
-            prompt: 'Welche KI unterstützt bei der Präsentation vor Entscheidern?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Präsentations-Coach-AI, Slide-Optimizer, Rehearsal-Bot.',
-            voteMax: 2,
+            prompt: 'Welche KI unterstützt bei der Präsentation vor Entscheidern?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Präsentations-Coach-AI, Slide-Optimizer, Rehearsal-Bot.',
           },
           {
             name: 'ggf. Q&A im JFX',
             intro: 'Fragen und kritische Einwände im JFX-Format souverän und präzise beantworten.',
-            prompt: 'Welche KI hilft, auf schwierige Fragen besser vorbereitet zu sein?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Fragen-Anticipation-Bot, Devil-Advocate-AI, Auto-FAQ aus Präsentationsinhalt.',
-            voteMax: 1,
+            prompt: 'Welche KI hilft, auf schwierige Fragen besser vorbereitet zu sein?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Fragen-Anticipation-Bot, Devil-Advocate-AI, Auto-FAQ aus Präsentationsinhalt.',
           },
           {
             name: 'Elevator Test für kommunikative Stärke der Empfehlung',
             intro: 'Empfehlung in 30 Sekunden klar, prägnant und überzeugend vertreten können.',
-            prompt: 'Welche KI hilft beim Schärfen des Elevator Pitches einer Empfehlung?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Pitch-Feedback-AI, Klarheits-Check-Bot, Elevator-Test-Simulator.',
-            voteMax: 1,
+            prompt: 'Welche KI hilft beim Schärfen des Elevator Pitches einer Empfehlung?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Pitch-Feedback-AI, Klarheits-Check-Bot, Elevator-Test-Simulator.',
           },
           {
             name: 'Auslieferung / Sign-off',
             intro: 'Finale Deliverables übergeben und formalen Abschluss mit dem Kunden sichern.',
-            prompt: 'Welche KI unterstützt bei der strukturierten Übergabe und dem Sign-off?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Deliverable-Checklist-AI, Sign-off-Workflow-Bot, Archive-Generator.',
-            voteMax: 1,
+            prompt: 'Welche KI unterstützt bei der strukturierten Übergabe und dem Sign-off?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Deliverable-Checklist-AI, Sign-off-Workflow-Bot, Archive-Generator.',
           },
         ],
       },
@@ -270,32 +277,27 @@ const SOP_TOOL_TRACKS = [
           {
             name: 'Capability Building & Training',
             intro: 'Kundenseitige Kompetenzen und Fähigkeiten für die Umsetzung systematisch aufbauen.',
-            prompt: 'Welche KI unterstützt Capability Building und Training?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Personalisierte Lernpfad-AI, Training-Content-Generator, Kompetenz-Gap-Analyse-Bot.',
-            voteMax: 2,
+            prompt: 'Welche KI unterstützt Capability Building und Training?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Personalisierte Lernpfad-AI, Training-Content-Generator, Kompetenz-Gap-Analyse-Bot.',
           },
           {
             name: 'Change-Management',
             intro: 'Veränderungsprozess strukturiert begleiten und Widerstände proaktiv managen.',
-            prompt: 'Welche KI macht Change-Management effektiver?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Stakeholder-Sentiment-Monitor, Change-Story-Generator, Widerstandsanalyse-AI.',
-            voteMax: 2,
+            prompt: 'Welche KI macht Change-Management effektiver?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Stakeholder-Sentiment-Monitor, Change-Story-Generator, Widerstandsanalyse-AI.',
           },
           {
             name: 'Governance',
             intro: 'Entscheidungsstrukturen und Steuerungsmechanismen für die Umsetzung etablieren.',
-            prompt: 'Welche KI hilft beim Aufsetzen effizienter Governance-Strukturen?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: RACI-Generator, Meeting-Cadence-Planer, Decision-Log-AI.',
-            voteMax: 1,
+            prompt: 'Welche KI hilft beim Aufsetzen effizienter Governance-Strukturen?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: RACI-Generator, Meeting-Cadence-Planer, Decision-Log-AI.',
           },
           {
             name: 'Pilot-Design & Durchführung',
             intro: 'Pilotprojekt konzipieren, kontrolliert durchführen und Ergebnisse bewerten.',
-            prompt: 'Welche KI unterstützt beim Design und der Auswertung von Pilots?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: A/B-Test-Design-AI, Pilot-Tracking-Dashboard, Ergebnis-Auswertungs-Bot.',
-            voteMax: 2,
+            prompt: 'Welche KI unterstützt beim Design und der Auswertung von Pilots?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: A/B-Test-Design-AI, Pilot-Tracking-Dashboard, Ergebnis-Auswertungs-Bot.',
           },
           {
             name: 'Monitoring',
             intro: 'Fortschritt und Wirkung der Implementierung systematisch messen und steuern.',
-            prompt: 'Welche KI automatisiert das Implementierungs-Monitoring?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: KPI-Tracker-AI, Anomalie-Alert-Bot, Auto-Fortschrittsbericht.',
-            voteMax: 2,
+            prompt: 'Welche KI automatisiert das Implementierungs-Monitoring?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: KPI-Tracker-AI, Anomalie-Alert-Bot, Auto-Fortschrittsbericht.',
           },
         ],
       },
@@ -313,32 +315,27 @@ const SOP_TOOL_TRACKS = [
           {
             name: 'Finale Übergabe',
             intro: 'Alle Ergebnisse, Dokumente und Deliverables strukturiert an den Kunden übergeben.',
-            prompt: 'Welche KI automatisiert oder verbessert die finale Projektübergabe?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Abschlussbericht, Übergabe-Checkliste-AI, Dokumentations-Bot.',
-            voteMax: 2,
+            prompt: 'Welche KI automatisiert oder verbessert die finale Projektübergabe?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Auto-Abschlussbericht, Übergabe-Checkliste-AI, Dokumentations-Bot.',
           },
           {
             name: 'Rechnung',
             intro: 'Leistungsabrechnung korrekt erstellen und Zahlungseingang sicherstellen.',
-            prompt: 'Welche KI unterstützt beim effizienten Rechnungs- und Zahlungsmanagement?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Invoicing-AI, Auto-Mahnwesen, Zahlungseingangs-Tracker.',
-            voteMax: 1,
+            prompt: 'Welche KI unterstützt beim effizienten Rechnungs- und Zahlungsmanagement?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Invoicing-AI, Auto-Mahnwesen, Zahlungseingangs-Tracker.',
           },
           {
             name: 'Team-Feedback & Evaluation (NPS)',
             intro: 'Projekterfahrungen intern und mit dem Kunden strukturiert bewerten.',
-            prompt: 'Welche KI hilft beim effizienten Einholen und Auswerten von Feedback?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: NPS-Bot, Sentiment-aus-Email, Auto-Theme-Extraktion aus Feedbacks.',
-            voteMax: 2,
+            prompt: 'Welche KI hilft beim effizienten Einholen und Auswerten von Feedback?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: NPS-Bot, Sentiment-aus-Email, Auto-Theme-Extraktion aus Feedbacks.',
           },
           {
             name: 'Internes Review & Learnings',
             intro: 'Projektlernpunkte intern dokumentieren und für künftige Projekte nutzbar machen.',
-            prompt: 'Welche KI verbessert unsere Retros und den Learnings-Speicher?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Retro-Facilitator-Bot, Auto-Learning-Database, Pattern-Detection across Projects.',
-            voteMax: 2,
+            prompt: 'Welche KI verbessert unsere Retros und den Learnings-Speicher?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Retro-Facilitator-Bot, Auto-Learning-Database, Pattern-Detection across Projects.',
           },
           {
             name: 'Interne Margin-Analyse',
             intro: 'Wirtschaftlichkeit des Projekts analysieren und Erkenntnisse für künftige Kalkulation ableiten.',
-            prompt: 'Welche KI unterstützt die Margin-Analyse und Projektkalkulation?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Profitabilitäts-Report, Stunden-Auswertungs-AI, Budget-vs-Actual-Analyse.',
-            voteMax: 2,
+            prompt: 'Welche KI unterstützt die Margin-Analyse und Projektkalkulation?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Auto-Profitabilitäts-Report, Stunden-Auswertungs-AI, Budget-vs-Actual-Analyse.',
           },
         ],
       },
@@ -349,20 +346,17 @@ const SOP_TOOL_TRACKS = [
           {
             name: 'KPI-Tracking',
             intro: 'Wirkung und Ergebnisse der umgesetzten Empfehlungen anhand von KPIs messen.',
-            prompt: 'Welche KI automatisiert das KPI-Tracking nach Projektabschluss?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: KPI-Dashboard-AI, Auto-Impact-Report, Anomalie-Alerting für Ziel-KPIs.',
-            voteMax: 2,
+            prompt: 'Welche KI automatisiert das KPI-Tracking nach Projektabschluss?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: KPI-Dashboard-AI, Auto-Impact-Report, Anomalie-Alerting für Ziel-KPIs.',
           },
           {
             name: 'Case-Study-Entwicklung',
             intro: 'Projekterfolge als überzeugende Case Study aufbereiten und vermarkten.',
-            prompt: 'Welche KI beschleunigt die Case-Study-Entwicklung?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Case-Study-Draft-Generator, Quote-Extraktion aus Calls, Reference-Letter-AI.',
-            voteMax: 2,
+            prompt: 'Welche KI beschleunigt die Case-Study-Entwicklung?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Case-Study-Draft-Generator, Quote-Extraktion aus Calls, Reference-Letter-AI.',
           },
           {
             name: 'Nachfrage weiterer Beratungsbedarf',
             intro: 'Folgeprojekte und neuen Beratungsbedarf beim Kunden proaktiv identifizieren.',
-            prompt: 'Welche KI hilft beim Erkennen und Adressieren von Folgebedarf?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Customer-Health-Score, Buying-Signal-Detection, Upsell-Pitch-Generator.',
-            voteMax: 2,
+            prompt: 'Welche KI hilft beim Erkennen und Adressieren von Folgebedarf?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Customer-Health-Score, Buying-Signal-Detection, Upsell-Pitch-Generator.',
           },
         ],
       },
@@ -396,35 +390,8 @@ function sopTrackIntro(track, trackIndex) {
     title: track.title,
     subtitle: track.phases.map((p) => p.name).join(' · '),
     body: track.intro,
-    sopKind: 'track',
+    sopKind: SK.TRACK,
     sopTrackIndex: trackIndex + 1,
-    ...sopMeta(track),
-  }, { workshopMode: 'orient' });
-}
-
-// SOP-Übersichtsfolie für eine Phase — erscheint DIREKT VOR dem Brainstorm dieser Phase.
-// Zeigt: Phasenname + Intro + alle Karten als strukturierte Liste.
-// sopBoard ist enthalten für spätere Erweiterung in app.js.
-function sopPhaseOverview(track, phase) {
-  return tplSlide('content', {
-    title: phase.name,
-    subtitle: track.title.replace(/^Track \d+: /, ''),
-    body: '',
-    sopKind: 'phase-overview',
-    sopBoard: [{ name: phase.name, cards: phase.cards.map((c) => c.name) }],
-    ...sopMeta(track, phase),
-  }, { workshopMode: 'orient' });
-}
-
-// SOP-Gesamtübersicht für einen Track — erscheint vor dem Track-Brainstorm.
-// Zeigt: alle Phasen mit ihren Karten als strukturierte Liste.
-function sopTrackOverview(track) {
-  return tplSlide('content', {
-    title: `SOP · ${track.title.replace(/^Track \d+: /, '')}`,
-    subtitle: '',
-    body: '',
-    sopKind: 'track-overview',
-    sopBoard: sopBoardData(track),
     ...sopMeta(track),
   }, { workshopMode: 'orient' });
 }
@@ -438,7 +405,7 @@ function sopWorkshopGoal() {
     title: 'Worum es heute geht',
     subtitle: 'Das Ziel des Workshops',
     body: 'Wir sammeln konkrete KI Use Cases aus eurem Arbeitsalltag, priorisieren sie gemeinsam und ordnen sie am Ende nach Impact und Aufwand ein.\n\nGesucht sind vor allem Quick Wins: viel Wirkung bei wenig Aufwand — die setzen wir zuerst um.',
-    sopKind: 'workshop-goal',
+    sopKind: SK.WORKSHOP_GOAL,
     mentiHero: false,
   }, { workshopMode: 'orient' });
 }
@@ -451,9 +418,9 @@ function sopWorkshopInstructions() {
   return tplSlide('content', {
     title: 'So formuliert ihr Use Cases',
     subtitle: `${timeMin} pro Runde · max. ${ws.brainstormMaxResponses} Use Cases pro Person`,
-    body: `Format: Use Case | Feature | Abhängigkeiten\n\nGute Use Cases:\nAufbau eines Rechnungstools mittels KI-Programmierung | Automatische Erkennung der Umsatzsteuer, EN 16931-konform | Rechnungen liegen im SharePoint\nDiscovery-Calls automatisch transkribieren | Highlights + Action Items markieren, Export nach Notion | Calls laufen über MS Teams\n\nBitte vermeiden:\nNeues vollautomatisiertes Rechnungstool\nKI für Rechnungen\n\nJe konkreter (Use Case · Feature · Abhängigkeiten), desto wertvoller für die Auswertung.`,
+    body: `Format: Use Case · Feature · Abhängigkeiten\n\nGute Use Cases:\nAufbau eines Rechnungstools mittels KI-Programmierung · Automatische Erkennung der Umsatzsteuer, EN 16931-konform · Rechnungen liegen im SharePoint\nDiscovery-Calls automatisch transkribieren · Highlights + Action Items markieren, Export nach Notion · Calls laufen über MS Teams\n\nBitte vermeiden:\nNeues vollautomatisiertes Rechnungstool\nKI für Rechnungen\n\nJe konkreter (Use Case · Feature · Abhängigkeiten), desto wertvoller für die Auswertung.`,
     mentiHero: false,
-    sopKind: 'instructions',
+    sopKind: SK.INSTRUCTIONS,
   }, { workshopMode: 'orient' });
 }
 
@@ -468,7 +435,7 @@ function sopPhaseBrainstorm(track, phase) {
     subtitle: track.title.replace(/^Track \d+: /, ''),
     prompt: `Welche KI seht ihr in dieser Phase? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\nFormat: Use Case · Feature · Abhängigkeiten — z. B. „Rechnungstool mit KI bauen · Umsatzsteuer-Erkennung, EN 16931 · Rechnungen im SharePoint"`,
     mentiQuestion: true,
-    sopKind: 'phase-workshop',
+    sopKind: SK.PHASE_WORKSHOP,
     sopBoard: [{ name: phase.name, cards: phase.cards.map((c) => c.name) }],
     ...sopMeta(track, phase),
   }, brainstormSettings());
@@ -485,23 +452,10 @@ function sopTrackBrainstorm(track) {
     subtitle: track.title,
     prompt: `Welche KI seht ihr in diesem Track? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\nFormat: Use Case · Feature · Abhängigkeiten — z. B. „Rechnungstool mit KI bauen · Umsatzsteuer-Erkennung, EN 16931 · Rechnungen im SharePoint"\n\nNutzt die SOP-Übersicht als Orientierung — alle Phasen und Karten sind mögliche Ansatzpunkte.`,
     mentiQuestion: true,
-    sopKind: 'track-collect',
+    sopKind: SK.TRACK_COLLECT,
     sopBoard: sopBoardData(track),
     ...sopMeta(track),
   }, brainstormSettings());
-}
-
-function sopPhaseVote(track, phase) {
-  return tplSlide('mc_multi', {
-    title: `Priorisierung · ${phase.name}`,
-    subtitle: track.title.replace(/^Track \d+: /, ''),
-    prompt: 'Wählt die drei wichtigsten KI Use Cases dieser Phase. Welche Ideen sollten zuerst weitergedacht oder pilotiert werden?',
-    mentiQuestion: true,
-    options: [],
-    maxSelections: 3,
-    sopKind: 'phase-vote',
-    ...sopMeta(track, phase),
-  }, { showResultsLive: true, sopPhaseVote: true, sopVoteMax: 3, workshopMode: 'decide', phaseVoteLeaderboardOnly: true });
 }
 
 function sopTrackVote(track, trackIndex) {
@@ -513,7 +467,7 @@ function sopTrackVote(track, trackIndex) {
     mentiQuestion: true,
     options: [],
     maxSelections: 3,
-    sopKind: 'track-vote',
+    sopKind: SK.TRACK_VOTE,
     sopBoard: sopBoardData(track),
     ...sopMeta(track),
   }, { showResultsLive: true, sopTrackVote: true, sopVoteMax: 3, workshopMode: 'decide' });
@@ -526,7 +480,7 @@ function sopTrackPresentationSession(track) {
     subtitle: 'Top-gewählte Use Cases · jetzt kurz vorstellen',
     body: `Die Abstimmung ist abgeschlossen — die meistgewählten Use Cases sind sichtbar.\n\nJede Person hat 1–2 Minuten: Was ist die KI-Idee? · Wer im Team profitiert? · Welches Tool kommt zum Einsatz?\n\nDanach: Top-Ideen gemeinsam in die ICE Matrix eintragen.`,
     mentiHero: false,
-    sopKind: 'track-presentation',
+    sopKind: SK.TRACK_PRESENTATION,
     ...sopMeta(track),
   }, { workshopMode: 'present', sopTrackPresentation: true });
 }
@@ -538,7 +492,7 @@ function sopAllTracksSummary() {
     title: 'Track-Top-3 im Überblick',
     subtitle: 'Aus den priorisierten Use Cases aller Tracks',
     body: 'Hier seht ihr die priorisierten Use Cases aus den Track-Abstimmungen. Diese Auswahl wandert im nächsten Schritt in die Impact/Effort-Matrix.',
-    sopKind: 'all-tracks-summary',
+    sopKind: SK.ALL_TRACKS_SUMMARY,
     sopAllTracksResults: true,
     mentiHero: true,
   }, { workshopMode: 'orient' });
@@ -558,13 +512,8 @@ function sopIceMatrix() {
     yAxisLabel: 'Impact',
     yAxisLow: 'niedrig',
     yAxisHigh: 'hoch',
-    quadrants: {
-      qw: { label: 'Quick Win', icon: '🚀', desc: 'hoher Impact · niedriger Aufwand → sofort angehen' },
-      sb: { label: 'Strategic Bet', icon: '⭐', desc: 'hoher Impact · hoher Aufwand → langfristig planen' },
-      ts: { label: 'Time Sink', icon: '🔧', desc: 'niedriger Impact · hoher Aufwand → kritisch hinterfragen' },
-      dr: { label: 'Drop', icon: '❌', desc: 'niedriger Impact · niedriger Aufwand → weglassen' },
-    },
-    sopKind: 'final-matrix',
+    quadrants: iceQuadrants(),
+    sopKind: SK.FINAL_MATRIX,
   }, { showResultsLive: true, sopAllTracksMatrix: true, sopMatrixCount: (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5), workshopMode: 'decide' });
 }
 
@@ -574,53 +523,29 @@ function sopWorkshopNextSteps() {
     title: 'Next Steps · konkrete Actions',
     subtitle: 'Aus der Priorisierung wird Umsetzung',
     body: 'Für die priorisierten Use Cases legen wir jetzt konkrete nächste Schritte fest — pro Use Case: Wer übernimmt? Was ist der erste Schritt? Bis wann?',
-    sopKind: 'next-steps',
+    sopKind: SK.NEXT_STEPS,
     mentiHero: false,
   }, { workshopMode: 'decide', sopNextSteps: true });
 }
 
 // ─── ABSCHLUSS-FOLIEN ──────────────────────────────────────────────────────────
 
+// Abschluss: eine Danke-Folie, danach anonymes Feedback. Bewusst ohne NPS.
 function sopWorkshopClose() {
   return [
-    tplSlide('section', {
-      title: 'Abschluss & Action Items',
-      subtitle: '⏱ 10 Min · Take-Aways, NPS und Danke',
-    }),
-    tplSlide('open', {
-      title: 'Mein persönlicher Top-1',
-      prompt: 'Welcher Use Case bleibt bei DIR hängen — und warum?',
-      subtitle: '⏱ 2 Min',
-    }),
-    tplSlide('open', {
-      title: 'Action Item für die nächsten 14 Tage',
-      prompt: 'Was machst du konkret damit in den kommenden 2 Wochen?',
-      subtitle: '⏱ 2 Min',
-    }),
-    tplSlide('scale', {
-      title: 'Workshop-Bewertung (NPS)',
-      prompt: 'Wie wahrscheinlich würdest du diesen Workshop einem Kollegen empfehlen?',
-      subtitle: '0 = gar nicht · 10 = absolut',
-      min: 0, max: 10,
-      minLabel: 'gar nicht',
-      maxLabel: 'absolut',
-    }, { anonymous: true }),
-    tplSlide('open', {
-      title: 'Eine Sache, die wir besser machen können',
-      prompt: 'Konstruktives Feedback für den nächsten Workshop?',
-      subtitle: 'Anonym · ⏱ 2 Min',
-    }, { anonymous: true }),
     tplSlide('content', {
       title: 'Danke! 🙌',
       body: 'Die Top-Use-Cases übergeben wir an die SOP-Owner.\nAction Items sammeln wir in Notion.\nKickoffs für die nominierten Use Cases folgen.\n\nLet\'s build the future of ROOTS.',
       mentiHero: true,
     }),
+    tplSlide('open', {
+      title: 'Dein Feedback',
+      prompt: 'Was nimmst du mit — und was sollten wir beim nächsten Workshop besser machen?',
+      subtitle: 'Anonym · ⏱ 2 Min',
+    }, { anonymous: true }),
   ];
 }
 
-// ─── BUILD ───────────────────────────────────────────────────────────────────
-//
-// mode:
 // ─── PITCH SESSION + FINALE ABSTIMMUNG ─────────────────────────────────────────
 
 function sopPitchSession() {
@@ -628,7 +553,7 @@ function sopPitchSession() {
     title: 'Pitch Session',
     subtitle: 'Jede Person stellt ihren Use Case kurz vor · 2 Minuten pro Person',
     body: '',
-    sopKind: 'pitch-session',
+    sopKind: SK.PITCH_SESSION,
     pitchTimerSec: 120,
   }, { workshopMode: 'present', sopPitchSession: true });
 }
@@ -643,14 +568,13 @@ function sopFinalAllTracksVote() {
     mentiQuestion: true,
     options: [],
     maxSelections: count,
-    sopKind: 'final-vote',
+    sopKind: SK.FINAL_VOTE,
     sopFairVote: true,
   }, { showResultsLive: true, sopAllTracksVote: true, sopFairVote: true, sopVoteMax: count, workshopMode: 'decide' });
 }
 
-//  'pro-phase' → Brainstorm je Phase (SOP-Board on Slide) → Track-Vote → Presentation Session → Pitch → ICE-Matrix
-//  'pro-track' → EIN Brainstorm (SOP-Board on Slide) → Pitch-Session → Faire Abstimmung → ICE-Matrix
-//  'phase'/'track' → legacy aliases
+//  'pro-phase' → Brainstorm je Phase → Track-Vote → Presentation Session → ICE-Matrix → Abschluss
+//  'pro-track' → EIN Brainstorm → Pitch-Session → faire Abstimmung → ICE-Matrix → Abschluss
 
 function buildSopKiWorkshopSlides(mode = 'pro-phase') {
   const slides = [];
@@ -662,8 +586,6 @@ function buildSopKiWorkshopSlides(mode = 'pro-phase') {
   const modeLabel = {
     'pro-phase': `Pro Phase ${timeMin ? '· ' + timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases · SOP-Kontext vor jeder Phase`,
     'pro-track': `Pro Track ${timeMin ? '· ' + timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases · alle Phasen auf einen Blick`,
-    phase:  `Pro Phase ${timeMin ? '· ' + timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases`,
-    track:  `Pro Track ${timeMin ? '· ' + timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases`,
   }[mode] || '';
 
   // 1. Opener
@@ -684,7 +606,7 @@ function buildSopKiWorkshopSlides(mode = 'pro-phase') {
   SOP_TOOL_TRACKS.forEach((track, ti) => {
     slides.push(sopTrackIntro(track, ti));
 
-    if (mode === 'pro-phase' || mode === 'phase') {
+    if (mode === 'pro-phase') {
       // Pro Phase: Brainstorm je Phase (SOP-Board sichtbar) → Track-Vote → Presentation Session
       track.phases.forEach((phase) => {
         slides.push(sopPhaseBrainstorm(track, phase));  // SOP-Board direkt auf Brainstorm-Slide
@@ -692,22 +614,24 @@ function buildSopKiWorkshopSlides(mode = 'pro-phase') {
       slides.push(sopTrackVote(track, ti));
       slides.push(sopTrackPresentationSession(track));
 
-    } else if (mode === 'pro-track' || mode === 'track') {
+    } else if (mode === 'pro-track') {
       // Pro Track: EIN Brainstorm (SOP-Board sichtbar) → kein Track-Vote → konsolidiert am Ende
       slides.push(sopTrackBrainstorm(track));   // SOP-Board direkt auf Brainstorm-Slide
     }
   });
 
-  // 4. Finale: Pitch-Session + Abstimmung + ICE-Matrix
-  if (mode === 'pro-track' || mode === 'track') {
+  // 4. Finale: Abstimmung + ICE-Matrix + Next Steps + Abschluss
+  if (mode === 'pro-track') {
+    // Pro Track: noch keine Präsentation gelaufen → Pitch-Session + faire Gesamt-Abstimmung.
     slides.push(sopPitchSession());
     slides.push(sopFinalAllTracksVote());
   } else {
+    // Pro Phase: pro Track gab es bereits eine Presentation Session → nur noch Gesamt-Überblick.
     slides.push(sopAllTracksSummary());
-    slides.push(sopPitchSession());
   }
   slides.push(sopIceMatrix());
   slides.push(sopWorkshopNextSteps());
+  slides.push(...sopWorkshopClose());
 
   return slides;
 }
@@ -717,34 +641,31 @@ window.SOP_TOOL_TRACKS = SOP_TOOL_TRACKS;
 // ─── LOCALSTORAGE: SOP-Struktur beim ersten Laden speichern ──────────────────
 (function () {
   const LS_KEY = 'lp_sop_tracks_v2';
+  // Immer die aktuelle In-Code-Struktur spiegeln, damit die Kopie nie veraltet.
   try {
-    const existing = localStorage.getItem(LS_KEY);
-    if (!existing) {
-      localStorage.setItem(LS_KEY, JSON.stringify(SOP_TOOL_TRACKS, null, 2));
-      console.info(
-        '%c[LP] SOP-Struktur in localStorage gespeichert%c  Key: ' + LS_KEY,
-        'background:#206efb;color:#fff;padding:2px 6px;border-radius:4px;font-weight:700',
-        'color:#64748b'
-      );
+    localStorage.setItem(LS_KEY, JSON.stringify(SOP_TOOL_TRACKS, null, 2));
+  } catch (e) {
+    console.warn('[LP] SOP-Struktur konnte nicht in localStorage geschrieben werden:', e);
+  }
+  // Export-Helfer robust anhängen — window.LP stammt aus lp-core.js (lädt vor templates.js).
+  window.LP = window.LP || {};
+  window.LP.exportSopTracks = function () {
+    let json;
+    try { json = localStorage.getItem(LS_KEY); } catch (_) { json = null; }
+    if (!json) json = JSON.stringify(SOP_TOOL_TRACKS, null, 2);
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(json)
+        .then(() => { if (window.toast) window.toast('SOP-Struktur in Zwischenablage kopiert ✓', 'success'); })
+        .catch(() => { console.log(json); });
+    } else {
+      console.log(json);
+      if (window.toast) window.toast('SOP-Struktur → siehe Konsole', 'info');
     }
-    if (window.LP) {
-      window.LP.exportSopTracks = function () {
-        const json = localStorage.getItem(LS_KEY) || JSON.stringify(SOP_TOOL_TRACKS, null, 2);
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(json).then(() => {
-            if (window.toast) window.toast('SOP-Struktur in Zwischenablage kopiert ✓', 'success');
-          });
-        } else {
-          console.log(json);
-          if (window.toast) window.toast('SOP-Struktur → siehe Konsole', 'info');
-        }
-        return json;
-      };
-    }
-  } catch (_) { /* quota */ }
+    return json;
+  };
 })();
 
-// ─── MARKETING SOP TRACKS (DEBUG) ───────────────────────────────────────────
+// ─── MARKETING SOP TRACKS ───────────────────────────────────────────
 const MARKETING_SOP_TRACKS = [
   {
     title: 'Track 1: Analyse & Insights',
@@ -758,26 +679,22 @@ const MARKETING_SOP_TRACKS = [
           {
             name: 'KPI-Tracking & Reporting',
             intro: 'Kampagnen-KPIs automatisch erfassen, aufbereiten und kommunizieren.',
-            prompt: 'Welche KI automatisiert KPI-Tracking & Reporting?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Auto-Dashboard, Anomalie-Alert, Performance-Digest.',
-            voteMax: 2,
+            prompt: 'Welche KI automatisiert KPI-Tracking & Reporting?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Auto-Dashboard, Anomalie-Alert, Performance-Digest.',
           },
           {
             name: 'Kanal-Performance',
             intro: 'Performance einzelner Kanäle (SEA, Social, Email, Display) vergleichen.',
-            prompt: 'Welche KI verbessert die Kanal-Performance-Analyse?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Cross-Channel-Reporting-AI, Budget-Optimizer, Creative-Performance-Tracker.',
-            voteMax: 2,
+            prompt: 'Welche KI verbessert die Kanal-Performance-Analyse?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Cross-Channel-Reporting-AI, Budget-Optimizer, Creative-Performance-Tracker.',
           },
           {
             name: 'Attribution & ROI',
             intro: 'Beitrag jedes Touchpoints zum Conversion-Pfad messen und bewerten.',
-            prompt: 'Welche KI macht Attribution und ROI-Messung präziser?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Multi-Touch-Attribution-AI, Incrementality-Testing-Bot, ROI-Calculator.',
-            voteMax: 2,
+            prompt: 'Welche KI macht Attribution und ROI-Messung präziser?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Multi-Touch-Attribution-AI, Incrementality-Testing-Bot, ROI-Calculator.',
           },
           {
             name: 'Content-Performance',
             intro: 'Wirksamkeit von Creatives, Texten und Formaten datenbasiert bewerten.',
-            prompt: 'Welche KI hilft bei der Content-Performance-Analyse?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Creative-Scoring-AI, A/B-Test-Analyzer, Copy-Performance-Tracker.',
-            voteMax: 2,
+            prompt: 'Welche KI hilft bei der Content-Performance-Analyse?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Creative-Scoring-AI, A/B-Test-Analyzer, Copy-Performance-Tracker.',
           },
         ],
       },
@@ -788,20 +705,17 @@ const MARKETING_SOP_TRACKS = [
           {
             name: 'Verhaltensanalyse',
             intro: 'Nutzerverhalten auf Website, App und Social systematisch analysieren.',
-            prompt: 'Welche KI macht Verhaltensanalysen schneller und tiefer?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Heatmap-AI, Session-Recording-Analyzer, Funnel-Optimizer.',
-            voteMax: 2,
+            prompt: 'Welche KI macht Verhaltensanalysen schneller und tiefer?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Heatmap-AI, Session-Recording-Analyzer, Funnel-Optimizer.',
           },
           {
             name: 'Segment-Identifikation',
             intro: 'Relevante Zielgruppensegmente aus Daten erkennen und beschreiben.',
-            prompt: 'Welche KI hilft bei der automatischen Segment-Identifikation?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Clustering-AI, Look-alike-Modell, Propensity-Scoring-Bot.',
-            voteMax: 2,
+            prompt: 'Welche KI hilft bei der automatischen Segment-Identifikation?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Clustering-AI, Look-alike-Modell, Propensity-Scoring-Bot.',
           },
           {
             name: 'Persona-Update',
             intro: 'Buyer Personas auf Basis neuer Daten und Insights aktualisieren.',
-            prompt: 'Welche KI unterstützt beim datengetriebenen Persona-Update?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Social-Listening-AI, Persona-Generator, Interview-Synthesis-Bot.',
-            voteMax: 2,
+            prompt: 'Welche KI unterstützt beim datengetriebenen Persona-Update?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Social-Listening-AI, Persona-Generator, Interview-Synthesis-Bot.',
           },
         ],
       },
@@ -812,20 +726,17 @@ const MARKETING_SOP_TRACKS = [
           {
             name: 'Synthese & Muster-Erkennung',
             intro: 'Erkenntnisse aus allen Quellen zusammenführen und übergreifende Muster identifizieren.',
-            prompt: 'Welche KI unterstützt die Synthese und Muster-Erkennung?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Cross-Channel-Insight-AI, Pattern-Detection-Bot, Auto-Briefing-Generator.',
-            voteMax: 2,
+            prompt: 'Welche KI unterstützt die Synthese und Muster-Erkennung?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Cross-Channel-Insight-AI, Pattern-Detection-Bot, Auto-Briefing-Generator.',
           },
           {
             name: 'Handlungsempfehlungen',
             intro: 'Aus gebündelten Erkenntnissen konkrete, priorisierte Empfehlungen ableiten.',
-            prompt: 'Welche KI hilft, Empfehlungen automatisch abzuleiten?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Insight-to-Action-AI, Priorisierungs-Bot, Recommendation-Engine.',
-            voteMax: 2,
+            prompt: 'Welche KI hilft, Empfehlungen automatisch abzuleiten?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Insight-to-Action-AI, Priorisierungs-Bot, Recommendation-Engine.',
           },
           {
             name: 'Strategie-Anpassung & Roadmap',
             intro: 'Strategie auf Basis der Erkenntnisse gezielt anpassen und Roadmap definieren.',
-            prompt: 'Welche KI beschleunigt das Strategie-Update und die Roadmap-Entwicklung?\nFormat: Was · Wer · Welches Tool\n\nBeispiele: Strategy-Update-AI, Roadmap-Generator, OKR-Alignment-Bot.',
-            voteMax: 2,
+            prompt: 'Welche KI beschleunigt das Strategie-Update und die Roadmap-Entwicklung?\nFormat: Use Case · Feature · Abhängigkeiten\n\nBeispiele: Strategy-Update-AI, Roadmap-Generator, OKR-Alignment-Bot.',
           },
         ],
       },
@@ -842,14 +753,14 @@ function sopCardBrainstorm(track, phase, card) {
     subtitle: phase.name,
     prompt: card.prompt || `Welche KI Use Cases seht ihr hier? Max. ${ws.brainstormMaxResponses} pro Person.\nFormat: Use Case · Feature · Abhängigkeiten`,
     mentiQuestion: true,
-    sopKind: 'card-workshop',
+    sopKind: SK.CARD_WORKSHOP,
     sopBoard: [{ name: phase.name, cards: phase.cards.map((c) => c.name) }],
     ...sopMeta(track, phase, card),
   }, brainstormSettings());
 }
 
-// ─── DEBUG · MARKETING SOP KI WORKSHOP ──────────────────────────────────────
-function buildDebugSopWorkshopSlides() {
+// ─── MARKETING SOP · KI WORKSHOP ──────────────────────────────────────
+function buildMarketingSopWorkshopSlides() {
   const slides = [];
   const ws = window.LP_WORKSHOP_SETTINGS;
   const timeMin = ws.brainstormTimeLimitSec > 0
@@ -912,14 +823,14 @@ window.LP_TEMPLATES = [
     slides: buildSopKiWorkshopSlides('pro-track'),
   },
   {
-    key: 'debug-marketing-sop-workshop',
-    category: 'DEBUG',
-    name: 'DEBUG · Marketing SOP Workshop',
+    key: 'roots-marketing-sop-workshop',
+    category: 'ROOTS · SOP & KI',
+    name: 'Marketing SOP · Pro Karte',
     desc: 'Marketing-SOP: je Karte KI Use Cases sammeln · Track-Top-3 · Presentation Session · ICE Matrix.',
     duration: '60–90 Min.',
     group: '6–20',
     tips: 'Pro Karte 5 Min. · max. 2 Use Cases · Auswertung nach Teilbereich.',
-    slides: buildDebugSopWorkshopSlides(),
+    slides: buildMarketingSopWorkshopSlides(),
   },
 ];
 
@@ -1008,7 +919,7 @@ window.LP_DEBUG_PARTICIPANTS = [
   { name: 'Lena Schmidt', emoji: '🦁', color: '#06b6d4' },
   { name: 'Tom Werner',   emoji: '🐸', color: '#a855f7' },
   { name: 'Sara Klein',   emoji: '🦄', color: '#ec4899' },
-  { name: 'Felix Bauer',  emoji: '🐙', color: '#06b6d4' },
+  { name: 'Felix Bauer',  emoji: '🐙', color: '#0ea5e9' },
 ];
 
 window.LP_SLIDE_TYPES = [
@@ -1031,11 +942,7 @@ window.LP_SLIDE_TYPES = [
   { type: 'priority_matrix', label: 'Priorisierungs-Matrix', icon: 'fa-table-cells-large', desc: 'Items per Drag-and-Drop in 2×2-Matrix einordnen' },
 ];
 
-window.LP_DEFAULT_STYLE = {
-  bgColor: '#ffffff',
-  textColor: '#0f172a',
-  accentColor: '#206efb',
-};
+// LP_DEFAULT_STYLE ist oben definiert (single source of truth).
 
 window.LP_INTERACTIVE_TYPES = new Set([
   'mc_single', 'mc_multi', 'yesno', 'wordcloud', 'open', 'scale', 'ranking',
@@ -1067,12 +974,7 @@ window.LP_DEFAULT_CONTENT = {
     prompt: 'Ziehe jeden Use Case in den passenden Quadranten.',
     xAxisLabel: 'Aufwand', xAxisLow: 'niedrig', xAxisHigh: 'hoch',
     yAxisLabel: 'Impact', yAxisLow: 'niedrig', yAxisHigh: 'hoch',
-    quadrants: {
-      qw: { label: 'Quick Win', icon: '🚀', desc: 'hoher Impact · niedriger Aufwand' },
-      sb: { label: 'Strategic Bet', icon: '⭐', desc: 'hoher Impact · hoher Aufwand' },
-      ts: { label: 'Time Sink', icon: '🔧', desc: 'niedriger Impact · hoher Aufwand' },
-      dr: { label: 'Drop', icon: '❌', desc: 'niedriger Impact · niedriger Aufwand' },
-    },
+    quadrants: iceQuadrants(),
   },
 };
 
