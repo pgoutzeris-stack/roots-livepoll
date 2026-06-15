@@ -1120,6 +1120,11 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .present-live-term-title i{color:#10b981}
 .plt-stat{display:inline-flex;align-items:center;gap:.3rem;color:#94a3b8}
 .plt-stat strong{color:#e2e8f0}
+.plt-db i{color:#60a5fa}
+.plt-db.is-ok{color:#34d399}
+.plt-db.is-ok strong{color:#34d399}
+.plt-db.is-warn{color:#fbbf24}
+.plt-db.is-warn strong{color:#fbbf24}
 .plt-conn{margin-left:auto;display:inline-flex;align-items:center;gap:.35rem;font-weight:700;padding:2px 8px;border-radius:99px}
 .plt-conn::before{content:"";width:7px;height:7px;border-radius:50%}
 .plt-conn.is-live{background:rgba(16,185,129,.16);color:#34d399}

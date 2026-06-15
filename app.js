@@ -4472,14 +4472,48 @@ function renderLiveTerminal() {
   const lines = log.slice(-80).reverse().map((l) =>
     `<div class="plt-line plt-${esc(l.kind)}"><span class="plt-time">${fmt(l.t)}</span><span class="plt-ico">${ico[l.kind] || '·'}</span><span class="plt-msg">${esc(l.msg)}</span></div>`
   ).join('');
+  // DB-Abgleich: tatsächliche Zeilen in Supabase vs. lokal sichtbare (echte) Antworten
+  const realLocal = (State.responses || []).filter((r) => !String(r.id).startsWith('debug-')).length;
+  const dbCount = State.liveDbCount;
+  const dbCls = dbCount == null ? '' : (dbCount >= realLocal ? 'is-ok' : 'is-warn');
+  const dbStat = dbCount == null
+    ? '<span class="plt-stat plt-db"><i class="fa-solid fa-database"></i> Supabase: prüfe …</span>'
+    : `<span class="plt-stat plt-db ${dbCls}"><i class="fa-solid fa-database"></i> Supabase: <strong>${dbCount}</strong>${realLocal > dbCount ? ` (${realLocal - dbCount} offen)` : ' ✓'}</span>`;
   el.innerHTML = `
     <div class="present-live-term-head">
       <span class="present-live-term-title"><i class="fa-solid fa-terminal"></i> Supabase Live</span>
-      <span class="plt-stat"><strong>${okCount}</strong> gespeichert</span>
+      ${dbStat}
       <span class="plt-stat"><strong>${errCount}</strong> Fehler</span>
       <span class="plt-conn is-${conn}">${esc(connLabel)}</span>
     </div>
     <div class="present-live-term-body">${lines || '<div class="plt-empty">Warte auf Live-Antworten …</div>'}</div>`;
+}
+
+// Abgleich mit Supabase: zählt die tatsächlich gespeicherten Zeilen und lädt nach,
+// falls der Realtime-Stream Events verpasst hat (Self-Heal nach WLAN-Aussetzern).
+async function verifyLivePersistence() {
+  if (!State.user || !State.session?.id) return;            // nur Host …
+  if (!['live', 'paused'].includes(State.session.status)) return; // … während laufender Session
+  if (!document.getElementById('present-live-terminal')) return;
+  try {
+    const { count, error } = await sb.from('lp_responses')
+      .select('id', { count: 'exact', head: true })
+      .eq('session_id', State.session.id);
+    if (error) { setLiveConn('err', `DB-Check fehlgeschlagen: ${error.message}`); return; }
+    State.liveDbCount = count ?? 0;
+    const realLocal = (State.responses || []).filter((r) => !String(r.id).startsWith('debug-')).length;
+    if (State.liveDbCount > realLocal) {
+      // Realtime hat Antworten verpasst → frisch aus Supabase nachladen.
+      liveDebugLog('info', `${State.liveDbCount - realLocal} Antwort(en) in Supabase, lokal noch nicht — lade nach …`);
+      const { data } = await sb.from('lp_responses').select('*').eq('session_id', State.session.id).order('created_at');
+      if (data) {
+        const debugOnly = (State.responses || []).filter((r) => String(r.id).startsWith('debug-'));
+        State.responses = [...data, ...debugOnly];
+        try { renderPresent(); } catch {}
+      }
+    }
+    renderLiveTerminal();
+  } catch { /* transienter Netzwerkfehler — nächster Tick versucht erneut */ }
 }
 
 function subscribeSessionChannel() {
@@ -5833,6 +5867,10 @@ async function flushPendingQueue() {
 
 setInterval(() => { void flushPendingQueue(); }, 15000);
 window.addEventListener('online', () => { void flushPendingQueue(); });
+
+// Periodischer Supabase-Abgleich (Host-Präsentation): bestätigt Persistenz + Self-Heal.
+setInterval(() => { void verifyLivePersistence(); }, 12000);
+window.addEventListener('online', () => { void verifyLivePersistence(); });
 
 /* ─── RESULTS ─── */
 async function openResults(sessionId) {
