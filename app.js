@@ -232,7 +232,7 @@ function renderSopQuestionBadge(c) {
   if (!c.sopPhaseName && !c.sopCardName) return '';
   const theme = sopTrackTheme(c.sopTrackClass);
   const parts = [c.sopTrackLabel, c.sopPhaseName, c.sopCardName].filter(Boolean);
-  return `<div class="sop-menti-q-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(parts.join(' · '))}</div>`;
+  return `<div class="sop-pslide-q-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(parts.join(' · '))}</div>`;
 }
 
 function getTrackBrainstormSlides(trackKey) {
@@ -797,7 +797,7 @@ function useCenteredLayout(slide) {
   if (c.layout === 'default') return false;
   if (c.layout === 'center') return true;
   if (slide.settings?.presentationClosing) return true;
-  if (c.mentiHero) return true;
+  if (c.isHeroSlide) return true;
   if (slide.slide_type === 'section' && !c.sopTrackClass) return true;
   if (
     slide.slide_type === 'content'
@@ -815,14 +815,14 @@ function useCenteredLayout(slide) {
 function renderCenteredSlideHtml(c, editable, opts = {}) {
   const icon = opts.icon || 'fa-signal';
   const titleEl = editable
-    ? `<div class="canvas-editable canvas-title menti-hero-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
-    : `<h1 class="menti-hero-title">${esc(c.title || '')}</h1>`;
+    ? `<div class="canvas-editable canvas-title pslide-hero-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+    : `<h1 class="pslide-hero-title">${esc(c.title || '')}</h1>`;
   const bodyEl = editable
-    ? `<div class="canvas-editable menti-hero-body" contenteditable="true" data-field="body">${esc(c.body || c.subtitle || '')}</div>`
-    : `<p class="menti-hero-body">${esc(c.body || c.subtitle || '').replace(/\n/g, '<br>')}</p>`;
+    ? `<div class="canvas-editable pslide-hero-body" contenteditable="true" data-field="body">${esc(c.body || c.subtitle || '')}</div>`
+    : `<p class="pslide-hero-body">${esc(c.body || c.subtitle || '').replace(/\n/g, '<br>')}</p>`;
   return `
-    <div class="menti-hero canvas-body-wrap">
-      <div class="canvas-centered-icon menti-hero-icon"><i class="fa-solid ${icon}"></i></div>
+    <div class="pslide-hero canvas-body-wrap">
+      <div class="canvas-centered-icon pslide-hero-icon"><i class="fa-solid ${icon}"></i></div>
       ${titleEl}
       ${bodyEl}
     </div>`;
@@ -1115,13 +1115,13 @@ function getWorkshopProgress(slideIndex) {
 }
 
 function renderWorkshopProgressHtml(slideIndex) {
-  return `<div class="menti-slide-counter">Folie ${slideIndex + 1} / ${State.slides.length}</div>`;
+  return `<div class="pslide-slide-counter">Folie ${slideIndex + 1} / ${State.slides.length}</div>`;
 }
 
-function wrapMentiSlide(bodyHtml, slideIndex) {
-  return `<div class="menti-slide">
+function wrapSlide(bodyHtml, slideIndex) {
+  return `<div class="pslide-slide">
     ${renderWorkshopProgressHtml(slideIndex)}
-    <div class="menti-slide-content">${bodyHtml}</div>
+    <div class="pslide-slide-content">${bodyHtml}</div>
   </div>`;
 }
 
@@ -1550,37 +1550,37 @@ function parseCollectPrompt(promptText) {
 
 function renderWorkshopCardCollectHtml(c, editable = false) {
   const titleEl = editable
-    ? `<div class="canvas-editable menti-q-title" contenteditable="true" data-field="title" data-placeholder="Titel der Folie…">${esc(c.title || '')}</div>`
-    : `<h1 class="menti-q-title">${esc(c.title || c.sopCardName || '')}</h1>`;
-  const subEl = c.subtitle ? `<p class="menti-crumb">${esc(c.subtitle)}</p>` : '';
+    ? `<div class="canvas-editable pslide-q-title" contenteditable="true" data-field="title" data-placeholder="Titel der Folie…">${esc(c.title || '')}</div>`
+    : `<h1 class="pslide-q-title">${esc(c.title || c.sopCardName || '')}</h1>`;
+  const subEl = c.subtitle ? `<p class="pslide-crumb">${esc(c.subtitle)}</p>` : '';
   // Beschreibung nur zeigen, wenn vorhanden — kein leeres Zweitfeld, das wie eine
   // doppelte Frage aussieht. (Bearbeitbar bleibt sie, sobald Text vorhanden ist.)
   const bodyTxt = (c.body && String(c.body).trim()) || '';
   const promptTxt = (c.prompt && String(c.prompt).trim()) || '';
   const hasBody = !!bodyTxt && bodyTxt !== promptTxt;
   const bodyEl = editable
-    ? (hasBody ? `<div class="canvas-editable menti-q-sub" contenteditable="true" data-field="body">${esc(c.body)}</div>` : '')
-    : (hasBody ? `<p class="menti-q-sub">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+    ? (hasBody ? `<div class="canvas-editable pslide-q-sub" contenteditable="true" data-field="body">${esc(c.body)}</div>` : '')
+    : (hasBody ? `<p class="pslide-q-sub">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
   const boardEl = !editable && c.sopBoard?.length ? `<div class="workshop-collect-board">${renderSopBoardPreview(c)}</div>` : '';
   // Editor: Rohtext der Frage direkt bearbeitbar lassen (keine Strukturierung).
   if (editable) {
-    const promptEl = `<div class="canvas-editable menti-q-prompt workshop-collect-prompt" contenteditable="true" data-field="prompt" data-placeholder="Frage / Aufgabe für die Teilnehmer…">${esc(c.prompt || '')}</div>`;
-    return `<div class="menti-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${boardEl}${promptEl}</div>`;
+    const promptEl = `<div class="canvas-editable pslide-q-prompt workshop-collect-prompt" contenteditable="true" data-field="prompt" data-placeholder="Frage / Aufgabe für die Teilnehmer…">${esc(c.prompt || '')}</div>`;
+    return `<div class="pslide-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${boardEl}${promptEl}</div>`;
   }
   // Generische Brainstorm-Folien (ohne SOP-Kontext) behalten die einfache
   // Prompt-Darstellung — nur SOP-Workshop-Folien werden strukturiert.
   const isSopCollect = !!(c.sopKind || c.sopBoard?.length);
   if (!isSopCollect) {
     const promptEl = c.prompt
-      ? `<p class="menti-q-prompt"><i class="fa-solid fa-circle-question workshop-q-icon"></i> ${esc(c.prompt).replace(/\n/g, '<br>')}</p>`
+      ? `<p class="pslide-q-prompt"><i class="fa-solid fa-circle-question workshop-q-icon"></i> ${esc(c.prompt).replace(/\n/g, '<br>')}</p>`
       : '';
-    return `<div class="menti-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${boardEl}${promptEl}</div>`;
+    return `<div class="pslide-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${boardEl}${promptEl}</div>`;
   }
   // SOP-Workshop: Frage strukturieren — Hauptfrage prominent, Format als
   // Hinweis-Chip, Orientierungs-Notiz unter dem SOP-Board (referenziert es).
   const { question, formatHint, note } = parseCollectPrompt(c.prompt);
   const questionEl = question
-    ? `<p class="menti-q-prompt workshop-collect-question"><i class="fa-solid fa-circle-question workshop-q-icon"></i><span>${esc(question)}</span></p>`
+    ? `<p class="pslide-q-prompt workshop-collect-question"><i class="fa-solid fa-circle-question workshop-q-icon"></i><span>${esc(question)}</span></p>`
     : '';
   const formatEl = formatHint
     ? `<div class="workshop-format-hint"><i class="fa-solid fa-pen-ruler"></i><span><strong>Format:</strong> ${esc(formatHint)}</span></div>`
@@ -1588,7 +1588,7 @@ function renderWorkshopCardCollectHtml(c, editable = false) {
   const noteEl = note
     ? `<p class="workshop-collect-note"><i class="fa-solid fa-lightbulb"></i><span>${esc(note)}</span></p>`
     : '';
-  return `<div class="menti-question-block workshop-collect-shell">${subEl}${titleEl}${questionEl}${formatEl}${bodyEl}${boardEl}${noteEl}</div>`;
+  return `<div class="pslide-question-block workshop-collect-shell">${subEl}${titleEl}${questionEl}${formatEl}${bodyEl}${boardEl}${noteEl}</div>`;
 }
 
 function renderParticipantWorkshopHeader(slideIndex) {
@@ -1596,9 +1596,9 @@ function renderParticipantWorkshopHeader(slideIndex) {
   return renderWorkshopProgressHtml(slideIndex);
 }
 
-function wrapMentiParticipantSlide(bodyHtml, slideIndex) {
+function wrapParticipantSlide(bodyHtml, slideIndex) {
   const header = isSopWorkshopPresentation() ? renderParticipantWorkshopHeader(slideIndex) : '';
-  return `<div class="menti-participant-slide">${header}<div class="menti-participant-content">${bodyHtml}</div></div>`;
+  return `<div class="pslide-participant-slide">${header}<div class="pslide-participant-content">${bodyHtml}</div></div>`;
 }
 
 function renderParticipantTrackVoteHtml(slide) {
@@ -1666,7 +1666,7 @@ function isFinaleSlide(s) {
 // Konsistente Finale-Pill (Badge) für Pitch Session, Finale Priorisierung und Matrix.
 // Bewusst NICHT identisch mit der jeweiligen Folien-Überschrift.
 function renderFinalePillHtml() {
-  return `<div class="sop-menti-badge sop-finale-badge" style="background:var(--brand);color:#fff"><i class="fa-solid fa-flag-checkered"></i> Finale</div>`;
+  return `<div class="sop-pslide-badge sop-finale-badge" style="background:var(--brand);color:#fff"><i class="fa-solid fa-flag-checkered"></i> Finale</div>`;
 }
 
 function renderSopFinalePanelHtml(currentIndex, { clickable = false, onNavigate } = {}) {
@@ -1935,17 +1935,17 @@ function renderSopSectionHtml(c, editable = false) {
   const theme = sopTrackTheme(c.sopTrackClass);
   const isTrack = c.sopKind === 'track';
   const titleEl = editable
-    ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title" data-placeholder="Titel…">${esc(c.title || '')}</div>`
-    : `<h1 class="sop-menti-title">${esc(c.title)}</h1>`;
+    ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title" data-placeholder="Titel…">${esc(c.title || '')}</div>`
+    : `<h1 class="sop-pslide-title">${esc(c.title)}</h1>`;
   const subEl = editable
-    ? `<div class="canvas-editable sop-menti-sub" contenteditable="true" data-field="subtitle" data-placeholder="Untertitel…">${esc(c.subtitle || '')}</div>`
-    : (c.subtitle ? `<p class="sop-menti-sub">${esc(c.subtitle)}</p>` : '');
+    ? `<div class="canvas-editable sop-pslide-sub" contenteditable="true" data-field="subtitle" data-placeholder="Untertitel…">${esc(c.subtitle || '')}</div>`
+    : (c.subtitle ? `<p class="sop-pslide-sub">${esc(c.subtitle)}</p>` : '');
   const bodyEl = editable
-    ? `<div class="canvas-editable sop-menti-body" contenteditable="true" data-field="body" data-placeholder="Einleitungstext…">${esc(c.body || '')}</div>`
-    : (c.body ? `<p class="sop-menti-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+    ? `<div class="canvas-editable sop-pslide-body" contenteditable="true" data-field="body" data-placeholder="Einleitungstext…">${esc(c.body || '')}</div>`
+    : (c.body ? `<p class="sop-pslide-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
   return `
-    <div class="sop-menti-section ${isTrack ? 'sop-menti-track' : 'sop-menti-phase'} ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
-      <div class="sop-menti-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel || 'SOP')}</div>
+    <div class="sop-pslide-section ${isTrack ? 'sop-pslide-track' : 'sop-pslide-phase'} ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+      <div class="sop-pslide-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel || 'SOP')}</div>
       ${titleEl}
       ${subEl}
       ${bodyEl}
@@ -1966,7 +1966,7 @@ function renderSopCardHtml(c, editable = false) {
     : `<p class="sop-card-body">${esc(c.body || '').replace(/\n/g, '<br>')}</p>`;
   return `
     <div class="sop-card-slide ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
-      <div class="sop-menti-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel)} · ${esc(c.sopPhaseName)}</div>
+      <div class="sop-pslide-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel)} · ${esc(c.sopPhaseName)}</div>
       <div class="sop-card-visual"><i class="fa-solid fa-file-lines"></i></div>
       ${titleEl}
       ${subEl}
@@ -1989,15 +1989,15 @@ function renderSopContentHtml(c, editable = false) {
   if (c.sopKind === 'card') return renderSopCardHtml(c, editable);
   if (c.sopAllTracksResults) {
     const titleEl = editable
-      ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
-      : `<h1 class="sop-menti-title">${esc(c.title)}</h1>`;
+      ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+      : `<h1 class="sop-pslide-title">${esc(c.title)}</h1>`;
     const bodyEl = editable
-      ? `<div class="canvas-editable sop-menti-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
-      : (c.body ? `<p class="sop-menti-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+      ? `<div class="canvas-editable sop-pslide-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+      : (c.body ? `<p class="sop-pslide-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
     const results = State.session ? renderAllTracksResultsHtml() : '<div class="present-wait-msg">Ergebnisse erscheinen in der Live-Session.</div>';
     return `
-      <div class="sop-menti-section sop-all-tracks-results-slide">
-        <div class="sop-menti-badge" style="background:#0f172a;color:#fff">Alle Tracks</div>
+      <div class="sop-pslide-section sop-all-tracks-results-slide">
+        <div class="sop-pslide-badge" style="background:#0f172a;color:#fff">Alle Tracks</div>
         ${titleEl}
         ${bodyEl}
         <div class="sop-track-results-wrap">${results}</div>
@@ -2006,15 +2006,15 @@ function renderSopContentHtml(c, editable = false) {
   if (c.sopTrackResults) {
     const theme = sopTrackTheme(c.sopTrackClass);
     const titleEl = editable
-      ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
-      : `<h1 class="sop-menti-title">${esc(c.title)}</h1>`;
+      ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+      : `<h1 class="sop-pslide-title">${esc(c.title)}</h1>`;
     const bodyEl = editable
-      ? `<div class="canvas-editable sop-menti-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
-      : (c.body ? `<p class="sop-menti-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+      ? `<div class="canvas-editable sop-pslide-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+      : (c.body ? `<p class="sop-pslide-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
     const results = State.session ? renderSopTrackResultsHtml(c.sopTrackKey) : '<div class="present-wait-msg">Ergebnisse erscheinen in der Live-Session.</div>';
     return `
-      <div class="sop-menti-section sop-track-results-slide ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
-        <div class="sop-menti-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel || 'Track')}</div>
+      <div class="sop-pslide-section sop-track-results-slide ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+        <div class="sop-pslide-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel || 'Track')}</div>
         ${titleEl}
         ${bodyEl}
         ${renderSopBoardPreview(c, editable)}
@@ -2024,14 +2024,14 @@ function renderSopContentHtml(c, editable = false) {
   // Zielbild-Folie — Workshop-Ziel mit Impact/Effort-Vorschau (Quick Wins als Ziel)
   if (c.sopKind === 'workshop-goal') {
     const titleEl = editable
-      ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
-      : `<h1 class="sop-menti-title">${esc(c.title || '')}</h1>`;
+      ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+      : `<h1 class="sop-pslide-title">${esc(c.title || '')}</h1>`;
     const subEl = editable
-      ? `<div class="canvas-editable sop-menti-sub" contenteditable="true" data-field="subtitle">${esc(c.subtitle || '')}</div>`
-      : (c.subtitle ? `<p class="sop-menti-sub">${esc(c.subtitle)}</p>` : '');
+      ? `<div class="canvas-editable sop-pslide-sub" contenteditable="true" data-field="subtitle">${esc(c.subtitle || '')}</div>`
+      : (c.subtitle ? `<p class="sop-pslide-sub">${esc(c.subtitle)}</p>` : '');
     const bodyEl = editable
-      ? `<div class="canvas-editable sop-menti-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
-      : (c.body ? `<p class="sop-menti-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+      ? `<div class="canvas-editable sop-pslide-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+      : (c.body ? `<p class="sop-pslide-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
     const goalMatrix = `
       <div class="goal-matrix">
         <div class="goal-matrix-yaxis"><i class="fa-solid fa-arrow-up"></i> Impact</div>
@@ -2044,8 +2044,8 @@ function renderSopContentHtml(c, editable = false) {
         <div class="goal-matrix-xaxis">Aufwand <i class="fa-solid fa-arrow-right"></i></div>
       </div>`;
     return `
-      <div class="sop-menti-section sop-menti-goal">
-        <div class="sop-menti-badge" style="background:var(--brand);color:#fff"><i class="fa-solid fa-bullseye"></i> Ziel</div>
+      <div class="sop-pslide-section sop-pslide-goal">
+        <div class="sop-pslide-badge" style="background:var(--brand);color:#fff"><i class="fa-solid fa-bullseye"></i> Ziel</div>
         ${titleEl}
         ${subEl}
         ${bodyEl}
@@ -2056,9 +2056,9 @@ function renderSopContentHtml(c, editable = false) {
   if (c.sopKind === 'instructions') {
     const theme = { accent: '#206efb', soft: 'rgba(32,110,251,.08)', badgeBg: '#206efb', badgeColor: '#fff' };
     const titleEl = editable
-      ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
-      : `<h1 class="sop-menti-title">${esc(c.title || '')}</h1>`;
-    const subEl = c.subtitle ? `<p class="sop-menti-sub">${esc(c.subtitle)}</p>` : '';
+      ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+      : `<h1 class="sop-pslide-title">${esc(c.title || '')}</h1>`;
+    const subEl = c.subtitle ? `<p class="sop-pslide-sub">${esc(c.subtitle)}</p>` : '';
     let instrHtml = '';
     if (c.body) {
       let mode = '';
@@ -2109,8 +2109,8 @@ function renderSopContentHtml(c, editable = false) {
       flushAvoid();
     }
     return `
-      <div class="sop-menti-section sop-menti-instructions" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
-        <div class="sop-menti-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">Workshop · So geht\'s</div>
+      <div class="sop-pslide-section sop-pslide-instructions" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+        <div class="sop-pslide-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">Workshop · So geht\'s</div>
         ${titleEl}
         ${subEl}
         <div class="workshop-instructions-card">${instrHtml}</div>
@@ -2119,14 +2119,14 @@ function renderSopContentHtml(c, editable = false) {
   // Next Steps — priorisierte Use Cases als Action-Planungskarten
   if (c.sopKind === 'next-steps') {
     const titleEl = editable
-      ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
-      : `<h1 class="sop-menti-title">${esc(c.title || '')}</h1>`;
+      ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+      : `<h1 class="sop-pslide-title">${esc(c.title || '')}</h1>`;
     const subEl = editable
-      ? `<div class="canvas-editable sop-menti-sub" contenteditable="true" data-field="subtitle">${esc(c.subtitle || '')}</div>`
-      : (c.subtitle ? `<p class="sop-menti-sub">${esc(c.subtitle)}</p>` : '');
+      ? `<div class="canvas-editable sop-pslide-sub" contenteditable="true" data-field="subtitle">${esc(c.subtitle || '')}</div>`
+      : (c.subtitle ? `<p class="sop-pslide-sub">${esc(c.subtitle)}</p>` : '');
     const bodyEl = editable
-      ? `<div class="canvas-editable sop-menti-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
-      : (c.body ? `<p class="sop-menti-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+      ? `<div class="canvas-editable sop-pslide-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+      : (c.body ? `<p class="sop-pslide-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
     const items = State.session ? getFinalPrioritizedUseCases() : [];
     const cards = items.length
       ? `<div class="next-steps-list">${items.map((it, i) => `
@@ -2140,7 +2140,7 @@ function renderSopContentHtml(c, editable = false) {
           </div>`).join('')}</div>`
       : '<div class="present-wait-msg">Die priorisierten Use Cases erscheinen hier, sobald die Impact/Effort-Matrix gefüllt ist.</div>';
     return `
-      <div class="sop-menti-section sop-menti-nextsteps">
+      <div class="sop-pslide-section sop-pslide-nextsteps">
         ${renderFinalePillHtml()}
         ${titleEl}
         ${subEl}
@@ -2155,9 +2155,9 @@ function renderSopContentHtml(c, editable = false) {
     const tSec = timerSec % 60;
     const tLabel = tMin > 0 ? `${tMin}:${String(tSec).padStart(2, '0')} Min` : `${tSec} Sek`;
     const titleEl = editable
-      ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
-      : `<h1 class="sop-menti-title">${esc(c.title || '')}</h1>`;
-    const subEl = c.subtitle ? `<p class="sop-menti-sub">${esc(c.subtitle)}</p>` : '';
+      ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+      : `<h1 class="sop-pslide-title">${esc(c.title || '')}</h1>`;
+    const subEl = c.subtitle ? `<p class="sop-pslide-sub">${esc(c.subtitle)}</p>` : '';
     // Kein globaler Timer mehr — jeder Use Case bekommt einen eigenen Timer (s.u.).
     // Im Editor nur die Dauer pro Pitch konfigurierbar.
     const configEl = editable
@@ -2167,7 +2167,7 @@ function renderSopContentHtml(c, editable = false) {
       ? renderAllTracksUseCasesWithAuthors(timerSec)
       : '<div class="present-wait-msg">Use Cases mit Autornamen erscheinen in der Live-Session.</div>';
     return `
-      <div class="sop-menti-section sop-pitch-session">
+      <div class="sop-pslide-section sop-pitch-session">
         ${renderFinalePillHtml()}
         ${titleEl}
         ${subEl}
@@ -2176,23 +2176,23 @@ function renderSopContentHtml(c, editable = false) {
       </div>`;
   }
   // Phase Overview, Track Overview, Presentation Session
-  // → rendern als sop-menti-section mit Track-Farbe und Board-Vorschau
+  // → rendern als sop-pslide-section mit Track-Farbe und Board-Vorschau
   if (c.sopKind === 'phase-overview' || c.sopKind === 'track-overview' || c.sopKind === 'track-presentation') {
     const theme = c.sopTrackClass
       ? sopTrackTheme(c.sopTrackClass)
       : { accent: '#206efb', soft: 'rgba(32,110,251,.08)', badgeBg: '#206efb', badgeColor: '#fff' };
     const titleEl = editable
-      ? `<div class="canvas-editable sop-menti-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
-      : `<h1 class="sop-menti-title">${esc(c.title || '')}</h1>`;
+      ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+      : `<h1 class="sop-pslide-title">${esc(c.title || '')}</h1>`;
     const subEl = editable
-      ? `<div class="canvas-editable sop-menti-sub" contenteditable="true" data-field="subtitle">${esc(c.subtitle || '')}</div>`
-      : (c.subtitle ? `<p class="sop-menti-sub">${esc(c.subtitle)}</p>` : '');
+      ? `<div class="canvas-editable sop-pslide-sub" contenteditable="true" data-field="subtitle">${esc(c.subtitle || '')}</div>`
+      : (c.subtitle ? `<p class="sop-pslide-sub">${esc(c.subtitle)}</p>` : '');
     const bodyEl = editable
-      ? `<div class="canvas-editable sop-menti-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
-      : (c.body ? `<p class="sop-menti-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+      ? `<div class="canvas-editable sop-pslide-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+      : (c.body ? `<p class="sop-pslide-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
     return `
-      <div class="sop-menti-section sop-menti-${c.sopKind} ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
-        <div class="sop-menti-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel || 'SOP')}</div>
+      <div class="sop-pslide-section sop-pslide-${c.sopKind} ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+        <div class="sop-pslide-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel || 'SOP')}</div>
         ${titleEl}
         ${subEl}
         ${bodyEl}
@@ -2202,16 +2202,16 @@ function renderSopContentHtml(c, editable = false) {
   return '';
 }
 
-function renderMentiHeroHtml(c, editable = false) {
+function renderHeroSlideHtml(c, editable = false) {
   const titleEl = editable
-    ? `<div class="canvas-editable menti-hero-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
-    : `<h1 class="menti-hero-title">${esc(c.title)}</h1>`;
+    ? `<div class="canvas-editable pslide-hero-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+    : `<h1 class="pslide-hero-title">${esc(c.title)}</h1>`;
   const bodyEl = editable
-    ? `<div class="canvas-editable menti-hero-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
-    : `<p class="menti-hero-body">${esc(c.body || '').replace(/\n/g, '<br>')}</p>`;
+    ? `<div class="canvas-editable pslide-hero-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+    : `<p class="pslide-hero-body">${esc(c.body || '').replace(/\n/g, '<br>')}</p>`;
   return `
-    <div class="menti-hero">
-      <div class="menti-hero-icon"><i class="fa-solid fa-signal"></i></div>
+    <div class="pslide-hero">
+      <div class="pslide-hero-icon"><i class="fa-solid fa-signal"></i></div>
       ${titleEl}
       ${bodyEl}
     </div>`;
@@ -2451,7 +2451,7 @@ async function openEditor(id) {
   const { data: pres } = await sb.from('lp_presentations').select('*').eq('id', id).single();
   const { data: slides } = await sb.from('lp_slides').select('*').eq('presentation_id', id).order('sort_order');
   State.presentation = pres;
-  State.slides = slides || [];
+  State.slides = normalizeSlides(slides);
   State.resultsDisplayMode = getPresentationSettings().resultsDisplayMode || 'percent';
   State.selectedSlideId = State.slides[0]?.id || null;
   $('#editor-title').value = pres.title;
@@ -3097,7 +3097,7 @@ function renderEditorCanvas() {
   }
   if (isBrainstormCollectSlide(slide)) {
     canvas.classList.remove('is-centered');
-    canvas.innerHTML = `${wrapMentiSlide(renderWorkshopCardCollectHtml(c, true), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Freitext sammeln${hasCollectChain(slide) ? ' · Ranking & Ergebnis folgen automatisch' : ''}</div>`;
+    canvas.innerHTML = `${wrapSlide(renderWorkshopCardCollectHtml(c, true), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Freitext sammeln${hasCollectChain(slide) ? ' · Ranking & Ergebnis folgen automatisch' : ''}</div>`;
     bindCanvasInlineEdit();
     return;
   }
@@ -3105,7 +3105,7 @@ function renderEditorCanvas() {
     canvas.classList.remove('is-centered');
     const max = slide.settings?.brainstormVoteMax || slide.settings?.slideAttachVoteMax || slide.settings?.sopVoteMax || slide.content?.maxSelections || 2;
     canvas.innerHTML = `${renderWorkshopModeBadge('decide')}
-      <div class="canvas-editable canvas-title menti-q-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>
+      <div class="canvas-editable canvas-title pslide-q-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>
       <p class="canvas-editable canvas-prompt" contenteditable="true" data-field="prompt">${esc(c.prompt || '')}</p>
       <div class="track-vote-editor-preview">${renderTrackVoteGroupedListHtml(slide)}</div>
       <div class="canvas-hint"><i class="fa-solid fa-info-circle"></i> Ideen aus Sammelfolie · max. ${max} Favoriten</div>`;
@@ -3122,7 +3122,7 @@ function renderEditorCanvas() {
         })()
       : `<div class="track-vote-editor-preview">${renderCardResultsPresentHtml(slide)}</div>`;
     canvas.innerHTML = `${renderWorkshopModeBadge('decide')}
-      <div class="canvas-editable canvas-title menti-q-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>
+      <div class="canvas-editable canvas-title pslide-q-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>
       <p class="canvas-editable canvas-prompt" contenteditable="true" data-field="body">${esc(c.body || '')}</p>
       ${preview}
       <div class="canvas-hint"><i class="fa-solid fa-trophy"></i> Ergebnisfolie · Vorschau im Präsentationsmodus mit Live-Daten</div>`;
@@ -3142,10 +3142,10 @@ function renderEditorCanvas() {
     bindCanvasInlineEdit();
     return;
   }
-  if (slide.slide_type === 'content' && (c.mentiHero || c.sopKind || c.sopTrackResults || c.sopKind === 'card-results')) {
-    const html = c.mentiHero ? renderMentiHeroHtml(c, true) : renderSopContentHtml(c, true);
+  if (slide.slide_type === 'content' && (c.isHeroSlide || c.sopKind || c.sopTrackResults || c.sopKind === 'card-results')) {
+    const html = c.isHeroSlide ? renderHeroSlideHtml(c, true) : renderSopContentHtml(c, true);
     if (html) {
-      canvas.classList.toggle('is-centered', c.mentiHero || useCenteredLayout(slide));
+      canvas.classList.toggle('is-centered', c.isHeroSlide || useCenteredLayout(slide));
       canvas.innerHTML = `${html}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel und Text direkt bearbeiten</div>`;
       bindCanvasInlineEdit();
       return;
@@ -3180,7 +3180,7 @@ function renderEditorCanvas() {
 
   canvas.innerHTML = `
     ${renderSopQuestionBadge(c)}
-    <div class="canvas-editable canvas-title ${c.mentiQuestion ? 'menti-q-title' : ''}" contenteditable="true" data-field="title" data-placeholder="Titel…">${esc(c.title || c.prompt || 'Folie')}</div>
+    <div class="canvas-editable canvas-title ${c.isQuestionSlide ? 'pslide-q-title' : ''}" contenteditable="true" data-field="title" data-placeholder="Titel…">${esc(c.title || c.prompt || 'Folie')}</div>
     ${body}
     <div class="canvas-hint"><i class="fa-solid fa-pen"></i> Direkt auf der Folie tippen zum Bearbeiten</div>`;
   bindCanvasInlineEdit();
@@ -4662,7 +4662,7 @@ function renderPresent() {
   const slideMuted = c.subtextColor || 'var(--muted)';
 
   if (slide.slide_type === 'section' && c.sopTrackClass) {
-    stage.innerHTML = wrapMentiSlide(`${renderSopSectionHtml(c)}`, State.session.current_slide_index || 0);
+    stage.innerHTML = wrapSlide(`${renderSopSectionHtml(c)}`, State.session.current_slide_index || 0);
     updatePresentHeader();
     updatePresentStats();
     renderPresentParticipants();
@@ -4673,7 +4673,7 @@ function renderPresent() {
   }
 
   if (slide.slide_type === 'section' && useCenteredLayout(slide)) {
-    stage.innerHTML = wrapMentiSlide(renderCenteredSlideHtml(c, false, { icon: 'fa-heading' }), State.session.current_slide_index || 0);
+    stage.innerHTML = wrapSlide(renderCenteredSlideHtml(c, false, { icon: 'fa-heading' }), State.session.current_slide_index || 0);
     updatePresentHeader();
     updatePresentStats();
     renderPresentParticipants();
@@ -4695,10 +4695,10 @@ function renderPresent() {
       const srcVisible = source ? getVisibleResponses(source.id) : [];
       const srcDisplay = source ? getTrackVoteDisplaySlide(source) : null;
       const srcAgg = srcDisplay ? window.LPViz.aggregateResponses(srcDisplay, srcVisible) : { total: 0 };
-      html = `${useCenteredLayout(slide) ? renderCenteredSlideHtml(c, false, { icon: 'fa-trophy' }) : `<h1 class="menti-q-title">${esc(c.title || 'Ergebnis')}</h1><p class="menti-q-prompt">${esc(c.body || '').replace(/\n/g, '<br>')}</p>`}
+      html = `${useCenteredLayout(slide) ? renderCenteredSlideHtml(c, false, { icon: 'fa-trophy' }) : `<h1 class="pslide-q-title">${esc(c.title || 'Ergebnis')}</h1><p class="pslide-q-prompt">${esc(c.body || '').replace(/\n/g, '<br>')}</p>`}
         <div class="viz-wrap viz-wrap-present">${srcDisplay ? window.LPViz.renderViz(srcDisplay, srcAgg, 'present', { displayMode: getResultsDisplayMode() }) : ''}</div>`;
     }
-    stage.innerHTML = wrapMentiSlide(html, State.session.current_slide_index || 0);
+    stage.innerHTML = wrapSlide(html, State.session.current_slide_index || 0);
     updatePresentHeader();
     updatePresentStats();
     renderPresentParticipants();
@@ -4708,17 +4708,17 @@ function renderPresent() {
     return;
   }
 
-  if (slide.slide_type === 'content' && (c.mentiHero || c.sopKind || c.sopTrackResults || isCardResultsSlide(slide))) {
+  if (slide.slide_type === 'content' && (c.isHeroSlide || c.sopKind || c.sopTrackResults || isCardResultsSlide(slide))) {
     let html;
     if (isCardResultsSlide(slide)) {
-      html = `<h1 class="menti-q-title">${esc(c.title || 'Ergebnis')}</h1>
-        <p class="menti-q-prompt">${esc(c.body || '').replace(/\n/g, '<br>')}</p>
+      html = `<h1 class="pslide-q-title">${esc(c.title || 'Ergebnis')}</h1>
+        <p class="pslide-q-prompt">${esc(c.body || '').replace(/\n/g, '<br>')}</p>
         <div class="viz-wrap viz-wrap-present">${renderCardResultsPresentHtml(slide)}</div>`;
     } else {
-      html = c.mentiHero ? renderMentiHeroHtml(c) : renderSopContentHtml(c);
+      html = c.isHeroSlide ? renderHeroSlideHtml(c) : renderSopContentHtml(c);
     }
     if (html) {
-      stage.innerHTML = wrapMentiSlide(html, State.session.current_slide_index || 0);
+      stage.innerHTML = wrapSlide(html, State.session.current_slide_index || 0);
       updatePresentHeader();
       updatePresentStats();
       renderPresentParticipants();
@@ -4730,7 +4730,7 @@ function renderPresent() {
   }
 
   if (slide.slide_type === 'content' && useCenteredLayout(slide) && !interactive) {
-    stage.innerHTML = wrapMentiSlide(`${renderCenteredSlideHtml(c, false, { icon: 'fa-align-center' })}
+    stage.innerHTML = wrapSlide(`${renderCenteredSlideHtml(c, false, { icon: 'fa-align-center' })}
       ${c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="" style="max-width:min(720px,90vw);border-radius:16px;margin-top:1rem">` : ''}
       ${viz ? `<div class="viz-wrap viz-wrap-present">${viz}</div>` : ''}`, State.session.current_slide_index || 0);
     updatePresentHeader();
@@ -4747,7 +4747,7 @@ function renderPresent() {
   const workshopMode = getWorkshopMode(slide);
 
   if (isBrainstormCollectSlide(slide)) {
-    stage.innerHTML = wrapMentiSlide(`
+    stage.innerHTML = wrapSlide(`
       ${renderWorkshopCardCollectHtml(c)}
       <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`, slideIdx);
     stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
@@ -4763,16 +4763,16 @@ function renderPresent() {
 
   if (shouldUseVoteWorkshopUi(slide)) {
     const voteInner = isFinaleSlide(slide)
-      ? `<div class="sop-menti-section sop-finale-section">
+      ? `<div class="sop-pslide-section sop-finale-section">
           ${renderFinalePillHtml()}
-          <h1 class="sop-menti-title">${esc(c.title || 'Priorisierung')}</h1>
-          ${c.prompt ? `<p class="sop-menti-sub">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : ''}
+          <h1 class="sop-pslide-title">${esc(c.title || 'Priorisierung')}</h1>
+          ${c.prompt ? `<p class="sop-pslide-sub">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : ''}
           <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}
         </div>`
-      : `<h1 class="menti-q-title">${esc(c.title || 'Priorisierung')}</h1>
-        <p class="menti-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>
+      : `<h1 class="pslide-q-title">${esc(c.title || 'Priorisierung')}</h1>
+        <p class="pslide-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>
         <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`;
-    stage.innerHTML = wrapMentiSlide(voteInner, slideIdx);
+    stage.innerHTML = wrapSlide(voteInner, slideIdx);
     stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
     stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
     updatePresentHeader();
@@ -4786,19 +4786,19 @@ function renderPresent() {
 
   if (isFinaleSlide(slide)) {
     // Finale-Folien (z. B. Impact/Effort-Matrix) im selben Stil wie Pitch Session +
-    // Finale Priorisierung: sop-menti-section + Pill + sop-menti-title.
-    stage.innerHTML = wrapMentiSlide(`<div class="sop-menti-section sop-finale-section">
+    // Finale Priorisierung: sop-pslide-section + Pill + sop-pslide-title.
+    stage.innerHTML = wrapSlide(`<div class="sop-pslide-section sop-finale-section">
       ${renderFinalePillHtml()}
-      <h1 class="sop-menti-title">${esc(c.title || 'Folie')}</h1>
-      ${c.prompt ? `<p class="sop-menti-sub">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : ''}
+      <h1 class="sop-pslide-title">${esc(c.title || 'Folie')}</h1>
+      ${c.prompt ? `<p class="sop-pslide-sub">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : ''}
       <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}
     </div>`, slideIdx);
   } else {
-    stage.innerHTML = wrapMentiSlide(`
+    stage.innerHTML = wrapSlide(`
       ${!isSopWorkshopPresentation() && workshopMode ? renderWorkshopModeBadge(workshopMode) : ''}
       ${!isSopWorkshopPresentation() ? sopBadge : ''}
-      <h1 class="menti-q-title ${c.mentiQuestion ? '' : 'present-slide-title'}" style="color:${esc(slideInk)}">${esc(c.title || c.prompt || 'Folie')}</h1>
-      <p class="menti-q-prompt ${c.mentiQuestion ? '' : 'present-slide-body'}" style="color:${esc(slideMuted)}">${esc(c.prompt || c.body || '').replace(/\n/g, '<br>')}</p>
+      <h1 class="pslide-q-title ${c.isQuestionSlide ? '' : 'present-slide-title'}" style="color:${esc(slideInk)}">${esc(c.title || c.prompt || 'Folie')}</h1>
+      <p class="pslide-q-prompt ${c.isQuestionSlide ? '' : 'present-slide-body'}" style="color:${esc(slideMuted)}">${esc(c.prompt || c.body || '').replace(/\n/g, '<br>')}</p>
       <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`, slideIdx);
   }
 
@@ -4991,6 +4991,12 @@ function normalizeSlideRecord(slide) {
   if (typeof next.settings === 'string') {
     try { next.settings = JSON.parse(next.settings); } catch { next.settings = {}; }
   }
+  // Legacy-Kompat: vor dem Rename gespeicherte Slides nutzten mentiHero/mentiQuestion.
+  const c = next.content;
+  if (c && typeof c === 'object') {
+    if (c.isHeroSlide === undefined && c.mentiHero !== undefined) c.isHeroSlide = c.mentiHero;
+    if (c.isQuestionSlide === undefined && c.mentiQuestion !== undefined) c.isQuestionSlide = c.mentiQuestion;
+  }
   return next;
 }
 
@@ -5163,7 +5169,7 @@ async function renderParticipantQuestion() {
   }
   if (!isInteractive(slide.slide_type)) {
     if (slide.slide_type === 'section' && slide.content?.sopTrackClass) {
-      root.innerHTML = wrapMentiParticipantSlide(`
+      root.innerHTML = wrapParticipantSlide(`
         <div class="participant-wait-block">
           ${renderSopSectionHtml(slide.content)}
           <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf den Vortragenden achten…</p>
@@ -5171,11 +5177,11 @@ async function renderParticipantQuestion() {
       finishParticipant();
       return;
     }
-    if (slide.slide_type === 'content' && (slide.content?.mentiHero || slide.content?.sopKind || slide.content?.sopTrackResults || isSopCardResultsSlide(slide))) {
-      const html = slide.content.mentiHero ? renderMentiHeroHtml(slide.content) : (isSopCardResultsSlide(slide) ? '' : renderSopContentHtml(slide.content));
+    if (slide.slide_type === 'content' && (slide.content?.isHeroSlide || slide.content?.sopKind || slide.content?.sopTrackResults || isSopCardResultsSlide(slide))) {
+      const html = slide.content.isHeroSlide ? renderHeroSlideHtml(slide.content) : (isSopCardResultsSlide(slide) ? '' : renderSopContentHtml(slide.content));
       if (html || isSopCardResultsSlide(slide)) {
-        root.innerHTML = wrapMentiParticipantSlide(`
-          <div class="participant-wait-block">${html || `<h1 class="menti-q-title">${esc(slide.content?.title || 'Ergebnis')}</h1><p class="menti-q-prompt">${esc(slide.content?.body || '')}</p>`}
+        root.innerHTML = wrapParticipantSlide(`
+          <div class="participant-wait-block">${html || `<h1 class="pslide-q-title">${esc(slide.content?.title || 'Ergebnis')}</h1><p class="pslide-q-prompt">${esc(slide.content?.body || '')}</p>`}
           <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf die Ergebnisse auf dem Beamer achten…</p></div>`, slideIndex);
         finishParticipant();
         return;
@@ -5186,11 +5192,11 @@ async function renderParticipantQuestion() {
     return;
   }
   if (hasAnsweredSlide(slide)) {
-    root.innerHTML = wrapMentiParticipantSlide(`
+    root.innerHTML = wrapParticipantSlide(`
       <div class="participant-sent-card">
         <div class="participant-sent-icon"><i class="fa-solid fa-check"></i></div>
-        <h1 class="menti-q-title">Antwort gesendet</h1>
-        <p class="menti-q-prompt">Danke! Bitte warte auf die nächste Karte…</p>
+        <h1 class="pslide-q-title">Antwort gesendet</h1>
+        <p class="pslide-q-prompt">Danke! Bitte warte auf die nächste Karte…</p>
       </div>`, slideIndex);
     finishParticipant();
     return;
@@ -5263,21 +5269,21 @@ async function renderParticipantQuestion() {
   const isDecide = shouldUseVoteWorkshopUi(slide);
   const cardClass = [
     'participant-card',
-    c.mentiQuestion || isWorkshop ? 'participant-menti-q' : '',
+    c.isQuestionSlide || isWorkshop ? 'participant-pslide-q' : '',
     getWorkshopMode(slide) ? `participant-mode-${getWorkshopMode(slide)}` : '',
-    isWorkshop ? 'participant-card-menti' : '',
+    isWorkshop ? 'participant-card-pslide' : '',
   ].filter(Boolean).join(' ');
 
-  root.innerHTML = wrapMentiParticipantSlide(`
+  root.innerHTML = wrapParticipantSlide(`
     <div class="${cardClass}">
       ${!isWorkshop ? `<div class="participant-header-row">
         ${participantAvatarHtml(State.participant, 'md')}
         <div><div class="participant-meta">Code ${esc(State.session.code)}${slide.settings?.anonymous ? ' · Anonym' : ''}</div><div class="participant-you">${esc(State.participant?.display_name || '')}</div></div>
       </div>` : ''}
       ${isCollect ? renderWorkshopCardCollectHtml(c) : ''}
-      ${isDecide ? `<h1 class="menti-q-title">${esc(c.title || 'Priorisierung')}</h1><p class="menti-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>` : ''}
-      ${!isCollect && !isDecide ? `<h1 class="menti-q-title">${esc(c.title || c.prompt || 'Frage')}</h1>` : ''}
-      ${!isCollect && !isDecide && c.prompt && c.title ? `<p class="menti-q-prompt">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : ''}
+      ${isDecide ? `<h1 class="pslide-q-title">${esc(c.title || 'Priorisierung')}</h1><p class="pslide-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>` : ''}
+      ${!isCollect && !isDecide ? `<h1 class="pslide-q-title">${esc(c.title || c.prompt || 'Frage')}</h1>` : ''}
+      ${!isCollect && !isDecide && c.prompt && c.title ? `<p class="pslide-q-prompt">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : ''}
       ${timeLimit ? `<div id="p-timer" class="p-timer">${timeLimit}s</div>` : ''}
       ${input}
     </div>`, slideIndex);

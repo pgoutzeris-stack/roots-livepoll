@@ -406,7 +406,7 @@ function sopWorkshopGoal() {
     subtitle: 'Das Ziel des Workshops',
     body: 'Wir sammeln konkrete KI Use Cases aus eurem Arbeitsalltag, priorisieren sie gemeinsam und ordnen sie am Ende nach Impact und Aufwand ein.\n\nGesucht sind vor allem Quick Wins: viel Wirkung bei wenig Aufwand — die setzen wir zuerst um.',
     sopKind: SK.WORKSHOP_GOAL,
-    mentiHero: false,
+    isHeroSlide: false,
   }, { workshopMode: 'orient' });
 }
 
@@ -419,7 +419,7 @@ function sopWorkshopInstructions() {
     title: 'So formuliert ihr Use Cases',
     subtitle: `${timeMin} pro Runde · max. ${ws.brainstormMaxResponses} Use Cases pro Person`,
     body: `Format: Use Case · Feature · Abhängigkeiten\n\nGute Use Cases:\nAufbau eines Rechnungstools mittels KI-Programmierung · Automatische Erkennung der Umsatzsteuer, EN 16931-konform · Rechnungen liegen im SharePoint\nDiscovery-Calls automatisch transkribieren · Highlights + Action Items markieren, Export nach Notion · Calls laufen über MS Teams\n\nBitte vermeiden:\nNeues vollautomatisiertes Rechnungstool\nKI für Rechnungen\n\nJe konkreter (Use Case · Feature · Abhängigkeiten), desto wertvoller für die Auswertung.`,
-    mentiHero: false,
+    isHeroSlide: false,
     sopKind: SK.INSTRUCTIONS,
   }, { workshopMode: 'orient' });
 }
@@ -434,7 +434,7 @@ function sopPhaseBrainstorm(track, phase) {
     body: '',
     subtitle: track.title.replace(/^Track \d+: /, ''),
     prompt: `Welche KI seht ihr in dieser Phase? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\nFormat: Use Case · Feature · Abhängigkeiten — z. B. „Rechnungstool mit KI bauen · Umsatzsteuer-Erkennung, EN 16931 · Rechnungen im SharePoint"`,
-    mentiQuestion: true,
+    isQuestionSlide: true,
     sopKind: SK.PHASE_WORKSHOP,
     sopBoard: [{ name: phase.name, cards: phase.cards.map((c) => c.name) }],
     ...sopMeta(track, phase),
@@ -451,7 +451,7 @@ function sopTrackBrainstorm(track) {
     body: '',
     subtitle: track.title,
     prompt: `Welche KI seht ihr in diesem Track? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\nFormat: Use Case · Feature · Abhängigkeiten — z. B. „Rechnungstool mit KI bauen · Umsatzsteuer-Erkennung, EN 16931 · Rechnungen im SharePoint"\n\nNutzt die SOP-Übersicht als Orientierung — alle Phasen und Karten sind mögliche Ansatzpunkte.`,
-    mentiQuestion: true,
+    isQuestionSlide: true,
     sopKind: SK.TRACK_COLLECT,
     sopBoard: sopBoardData(track),
     ...sopMeta(track),
@@ -464,7 +464,7 @@ function sopTrackVote(track, trackIndex) {
     title: `Top 3 priorisieren · ${label}`,
     subtitle: `Track ${trackIndex + 1} · alle gesammelten Use Cases`,
     prompt: 'Wählt die drei KI Use Cases, die in diesem Track den größten Hebel für ROOTS haben.\nNutzt die SOP-Übersicht als Kontext: In welchen Phasen zahlen die Ideen wirklich ein?',
-    mentiQuestion: true,
+    isQuestionSlide: true,
     options: [],
     maxSelections: 3,
     sopKind: SK.TRACK_VOTE,
@@ -479,7 +479,7 @@ function sopTrackPresentationSession(track) {
     title: `Presentation Session · ${track.title.replace(/^Track \d+: /, '')}`,
     subtitle: 'Top-gewählte Use Cases · jetzt kurz vorstellen',
     body: `Die Abstimmung ist abgeschlossen — die meistgewählten Use Cases sind sichtbar.\n\nJede Person hat 1–2 Minuten: Was ist die KI-Idee? · Wer im Team profitiert? · Welches Tool kommt zum Einsatz?\n\nDanach: Top-Ideen gemeinsam in die ICE Matrix eintragen.`,
-    mentiHero: false,
+    isHeroSlide: false,
     sopKind: SK.TRACK_PRESENTATION,
     ...sopMeta(track),
   }, { workshopMode: 'present', sopTrackPresentation: true });
@@ -494,7 +494,7 @@ function sopAllTracksSummary() {
     body: 'Hier seht ihr die priorisierten Use Cases aus den Track-Abstimmungen. Diese Auswahl wandert im nächsten Schritt in die Impact/Effort-Matrix.',
     sopKind: SK.ALL_TRACKS_SUMMARY,
     sopAllTracksResults: true,
-    mentiHero: true,
+    isHeroSlide: true,
   }, { workshopMode: 'orient' });
 }
 
@@ -524,7 +524,7 @@ function sopWorkshopNextSteps() {
     subtitle: 'Aus der Priorisierung wird Umsetzung',
     body: 'Für die priorisierten Use Cases legen wir jetzt konkrete nächste Schritte fest — pro Use Case: Wer übernimmt? Was ist der erste Schritt? Bis wann?',
     sopKind: SK.NEXT_STEPS,
-    mentiHero: false,
+    isHeroSlide: false,
   }, { workshopMode: 'decide', sopNextSteps: true });
 }
 
@@ -536,7 +536,7 @@ function sopWorkshopClose() {
     tplSlide('content', {
       title: 'Danke! 🙌',
       body: 'Die Top-Use-Cases übergeben wir an die SOP-Owner.\nAction Items sammeln wir in Notion.\nKickoffs für die nominierten Use Cases folgen.\n\nLet\'s build the future of ROOTS.',
-      mentiHero: true,
+      isHeroSlide: true,
     }),
     tplSlide('open', {
       title: 'Dein Feedback',
@@ -565,7 +565,7 @@ function sopFinalAllTracksVote() {
     title: 'Finale Priorisierung',
     subtitle: `Alle Use Cases · wähle deine Top ${count} (keine eigenen)`,
     prompt: `Welche ${count} Use Cases haben den größten Impact für euer Team?\nHinweis: Eigene Beiträge können nicht gewählt werden.`,
-    mentiQuestion: true,
+    isQuestionSlide: true,
     options: [],
     maxSelections: count,
     sopKind: SK.FINAL_VOTE,
@@ -593,7 +593,7 @@ function buildSopKiWorkshopSlides(mode = 'pro-phase') {
     title: 'SOP · KI Use-Case Workshop',
     subtitle: modeLabel,
     body: 'QR scannen · Name + Avatar wählen · los geht\'s!',
-    mentiHero: true,
+    isHeroSlide: true,
   }));
 
   // 2. Zielbild (worauf der Workshop hinausläuft)
@@ -752,7 +752,7 @@ function sopCardBrainstorm(track, phase, card) {
     body: '',
     subtitle: phase.name,
     prompt: card.prompt || `Welche KI Use Cases seht ihr hier? Max. ${ws.brainstormMaxResponses} pro Person.\nFormat: Use Case · Feature · Abhängigkeiten`,
-    mentiQuestion: true,
+    isQuestionSlide: true,
     sopKind: SK.CARD_WORKSHOP,
     sopBoard: [{ name: phase.name, cards: phase.cards.map((c) => c.name) }],
     ...sopMeta(track, phase, card),
@@ -772,7 +772,7 @@ function buildMarketingSopWorkshopSlides() {
     title: 'Marketing SOP · KI Use-Case Workshop',
     subtitle: `Pro Karte ${timeMin ? timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases pro Person`,
     body: 'QR scannen · Name + Avatar wählen · los geht\'s!',
-    mentiHero: true,
+    isHeroSlide: true,
   }));
 
   // Zielbild (worauf der Workshop hinausläuft)
