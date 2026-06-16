@@ -62,6 +62,7 @@ const State = {
 };
 
 localStorage.setItem('lp_device_id', State.deviceId);
+window.State = State; // lp-features.js liest window.State (top-level const ist im classic script nicht global)
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -4535,7 +4536,7 @@ function subscribeSessionChannel() {
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lp_responses', filter: `session_id=eq.${State.session.id}` }, (payload) => {
       window.LP?.channelHeartbeat(chName);
-      State.responses.push(payload.new);
+      if (!State.responses.some((r) => r.id === payload.new.id)) State.responses.push(payload.new);
       if (payload.new.participant_id) pushPresentActivity(payload.new.participant_id);
       const p = State.participants.find((x) => x.id === payload.new.participant_id);
       liveDebugLog('ok', `${esc(p?.display_name || 'Teilnehmer')} → ${responseSummary(payload.new)} gespeichert`);
@@ -5109,8 +5110,10 @@ async function joinSession(code, name, emoji, color) {
 
 function subscribeParticipantChannel() {
   if (State.sessionChannel) sb.removeChannel(State.sessionChannel);
-  State.sessionChannel = sb.channel(sessionChannelName(State.session.id))
+  const chName = sessionChannelName(State.session.id);
+  State.sessionChannel = sb.channel(chName)
     .on('broadcast', { event: 'session_sync' }, ({ payload }) => {
+      window.LP?.channelHeartbeat(chName);
       applySessionPatch(payload || {});
       if (State.session.status === 'ended') {
         handleParticipantSessionEnd();
@@ -5119,6 +5122,7 @@ function subscribeParticipantChannel() {
       void renderParticipantQuestion();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lp_sessions', filter: `id=eq.${State.session.id}` }, (payload) => {
+      window.LP?.channelHeartbeat(chName);
       applySessionPatch(payload.new || {});
       if (State.session.status === 'ended') {
         handleParticipantSessionEnd();
@@ -5127,19 +5131,22 @@ function subscribeParticipantChannel() {
       void renderParticipantQuestion();
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lp_responses', filter: `session_id=eq.${State.session.id}` }, () => {
+      window.LP?.channelHeartbeat(chName);
       void (async () => {
         await ensureParticipantResponses(true);
         await renderParticipantQuestion();
       })();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lp_responses', filter: `session_id=eq.${State.session.id}` }, () => {
+      window.LP?.channelHeartbeat(chName);
       void (async () => {
         await ensureParticipantResponses(true);
         const slide = State.slides[State.session.current_slide_index || 0];
         if (slide?.settings?.sopTrackVote || slide?.settings?.sopPhaseVote || slide?.settings?.sopCardVote || slide?.settings?.brainstormVote || slide?.slide_type === 'qa') await renderParticipantQuestion();
       })();
     })
-    .subscribe();
+    .subscribe((status) => { if (status === 'SUBSCRIBED') window.LP?.channelHeartbeat(chName); });
+  window.LP?.registerChannel(chName, () => subscribeParticipantChannel());
   startParticipantSync();
 }
 
@@ -5798,7 +5805,7 @@ async function renderQaList(slide) {
     ? list.sort((a, b) => (b.response?.upvotes || 0) - (a.response?.upvotes || 0)).slice(0, 10).map((r) => `
       <div class="qa-item">
         <span>${esc(r.response.text)}</span>
-        <button type="button" class="qa-up" data-id="${r.id}" data-votes="${r.response.upvotes || 0}">▲ ${r.response.upvotes || 0}</button>
+        <button type="button" class="qa-up" data-id="${r.id}" data-votes="${Number(r.response.upvotes) || 0}">▲ ${Number(r.response.upvotes) || 0}</button>
       </div>`).join('')
     : '<p style="color:var(--muted);font-size:.85rem">Noch keine Fragen</p>';
   el.querySelectorAll('.qa-up').forEach((btn) => btn.addEventListener('click', async () => {
@@ -5814,12 +5821,21 @@ async function renderQaList(slide) {
 async function submitResponse(response) {
   const slide = State.slides[State.session.current_slide_index || 0];
   if (!slide || !State.session.question_open) return;
+  if (State._submitting) return; // Doppel-Tap / langsames Netz: kein Zweit-Insert
+
   if (slide.settings?.askName && !State.participant?.display_name) {
     toast('Bitte mit Namen beitreten', 'warn');
     enterParticipantJoin();
     return;
   }
   if (response.text) response.text = filterProfanity(response.text, slide.settings?.profanityFilter !== false);
+
+  // Quiz: Korrektheit + Punkte in die Antwort schreiben — das Leaderboard liest response.correct/score.
+  if (slide.slide_type === 'quiz' && response && typeof response === 'object') {
+    const correctId = (slide.content.options || []).find((o) => o.correct)?.id;
+    response.correct = response.value === correctId;
+    response.score = response.correct ? 100 : 0;
+  }
 
   // Autor-Name direkt in der Antwort speichern (Snapshot), damit "Eingebracht von"
   // robust ist — unabhängig davon, ob der Teilnehmer beim Host gerade in
@@ -5836,11 +5852,13 @@ async function submitResponse(response) {
     is_hidden: !!slide.settings?.moderation,
   };
 
+  State._submitting = true;
   const { data, error } = await sb.from('lp_responses').insert(row).select().single();
   if (error) {
     State.pendingQueue.push(row);
     localStorage.setItem('lp_pending_queue', JSON.stringify(State.pendingQueue));
     toast('Offline gespeichert – wird nachgereicht', 'warn');
+    State._submitting = false;
     return;
   }
   if (data) {
@@ -5849,12 +5867,7 @@ async function submitResponse(response) {
     else State.responses.push(data);
   }
 
-  if (slide.slide_type === 'quiz') {
-    const correct = (slide.content.options || []).find((o) => o.correct)?.id;
-    const ok = response.value === correct;
-    State.quizScores[State.participant?.id] = (State.quizScores[State.participant?.id] || 0) + (ok ? 1 : 0);
-  }
-
+  State._submitting = false;
   markAnswered(slide.id);
   const modMsg = slide.settings?.moderation ? 'Antwort zur Freigabe gesendet.' : 'Antwort gesendet.';
   $('#participant-root').innerHTML = `<div class="participant-card"><h1>Danke!</h1><p>${modMsg} Warte auf die nächste Frage…</p></div>`;

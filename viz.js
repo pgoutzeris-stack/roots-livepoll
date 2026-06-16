@@ -87,7 +87,7 @@
       const sum = nums.reduce((a, b) => a + b, 0);
       const avg = nums.length ? sum / nums.length : 0;
       const sorted = [...nums].sort((a, b) => a - b);
-      const mid = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0;
+      const mid = !sorted.length ? 0 : sorted.length % 2 ? sorted[(sorted.length - 1) / 2] : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
       return { ...base, avg, median: mid, values: nums };
     }
 
@@ -157,12 +157,11 @@
 
   function renderViz(slide, agg, mode, options = {}) {
     const displayMode = options.displayMode || 'percent';
-    const light = mode === 'editor' || mode === 'results' || mode === 'present';
-    const textColor = light ? 'var(--ink)' : 'var(--ink)';
-    const trackBg = light ? 'rgba(15,23,42,.08)' : 'rgba(15,23,42,.08)';
-    const itemBg = light ? 'var(--surface)' : 'var(--surface)';
-    const itemBorder = light ? 'var(--line)' : 'var(--line)';
-    const wordColor = light ? 'var(--brand)' : 'var(--brand)';
+    const textColor = 'var(--ink)';
+    const trackBg = 'rgba(15,23,42,.08)';
+    const itemBg = 'var(--surface)';
+    const itemBorder = 'var(--line)';
+    const wordColor = 'var(--brand)';
 
     if (agg.type === 'mc_single' || agg.type === 'mc_multi' || agg.type === 'yesno' || agg.type === 'quiz' || agg.type === 'reaction') {
       const options = slide.content.options || [];
@@ -280,7 +279,7 @@
 
     if (agg.type === 'pin_image' && slide.content.imageUrl) {
       const pins = agg.pins || [];
-      return `<div style="position:relative;max-width:720px;margin:0 auto"><img src="${esc(slide.content.imageUrl)}" alt="" style="max-width:100%;border-radius:12px">${pins.map((p) => `<span style="position:absolute;left:${p.x}%;top:${p.y}%;transform:translate(-50%,-50%);font-size:1.5rem">📍</span>`).join('')}</div>`;
+      return `<div style="position:relative;max-width:720px;margin:0 auto"><img src="${esc(slide.content.imageUrl)}" alt="" style="max-width:100%;border-radius:12px">${pins.map((p) => `<span style="position:absolute;left:${+p.x || 0}%;top:${+p.y || 0}%;transform:translate(-50%,-50%);font-size:1.5rem">📍</span>`).join('')}</div>`;
     }
 
     if (agg.type === 'content' || agg.type === 'section') {

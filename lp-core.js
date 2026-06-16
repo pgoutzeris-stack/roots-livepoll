@@ -256,7 +256,7 @@
   };
 
   // Boot-Banner für Debugging
-  console.log(`%c ROOTS Live Poll %c build ${window.LP_BUILD} %c`,
+  console.info(`%c ROOTS Live Poll %c build ${window.LP_BUILD} %c`,
     'background:#206efb;color:#fff;padding:3px 8px;border-radius:4px 0 0 4px;font-weight:700',
     'background:#0f172a;color:#fff;padding:3px 8px;border-radius:0 4px 4px 0',
     '');
