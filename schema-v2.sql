@@ -205,3 +205,46 @@ create policy lp_audit_insert on public.lp_audit for insert
 -- Verify:
 --   select * from pg_constraint where conname like 'lp_%';
 --   select * from pg_indexes where tablename like 'lp_%';
+
+-- ═══════════════════════════════════════════════════════
+-- SECURITY HARDENING (2026-06) — applied via Supabase migration
+--   "security_hardening_safe_subset". Idempotent; safe subset only
+--   (verified against client write patterns — the client never performs
+--   the operations being locked down). Anonymous-participant write
+--   scoping (own-row only) still requires anonymous auth — see README.
+-- ═══════════════════════════════════════════════════════
+
+-- Anon could DELETE any Q&A upvote (was using=true). Client only inserts; cascade handles cleanup.
+drop policy if exists lp_qna_upvotes_delete on public.lp_qna_upvotes;
+
+-- Audit insert allowed anon rows (user_id IS NULL). Client never writes audit; require authenticated author.
+drop policy if exists lp_audit_insert on public.lp_audit;
+create policy lp_audit_insert on public.lp_audit
+  for insert to public
+  with check (user_id = auth.uid());
+
+-- Slides (incl. quiz answer keys) were anon-readable forever once any session hit 'ended'.
+-- Limit anon reads to active sessions; host still reads as presentation owner.
+drop policy if exists lp_slides_select on public.lp_slides;
+create policy lp_slides_select on public.lp_slides
+  for select to public
+  using (
+    public.lp_is_presentation_owner(presentation_id)
+    or exists (
+      select 1 from public.lp_sessions s
+      where s.presentation_id = lp_slides.presentation_id
+        and s.status = any (array['live'::text, 'paused'::text])
+    )
+  );
+
+-- Responses likewise stayed anon-readable after 'ended'. Host still reads via host_id.
+drop policy if exists lp_responses_select on public.lp_responses;
+create policy lp_responses_select on public.lp_responses
+  for select to public
+  using (
+    exists (
+      select 1 from public.lp_sessions s
+      where s.id = lp_responses.session_id
+        and (s.host_id = auth.uid() or s.status = any (array['live'::text, 'paused'::text]))
+    )
+  );
