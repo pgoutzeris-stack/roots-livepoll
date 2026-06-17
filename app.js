@@ -1618,14 +1618,14 @@ function renderParticipantTrackVoteHtml(slide) {
         <button type="button" class="btn-primary participant-submit" id="submit-split">Punkte senden</button>`;
     }
     return `<p class="vote-mode-hint">Wähle deine <strong>Top 3 Use Cases</strong> in diesem Track.</p>
-      ${renderTrackVoteGroupedListHtml(slide, { selectable: true })}
+      ${renderTrackVoteGroupedListHtml(slide, { selectable: true, fairVote: !!slide.settings?.sopFairVote })}
       <div id="fav-counter" class="top3-counter">0 / 3 gewählt</div>
       <button type="button" class="btn-ghost vote-mode-toggle" id="vote-mode-toggle">Expertenmodus: 100 Punkte</button>
       <button type="button" class="btn-primary participant-submit" id="submit-favorites">Top 3 senden</button>`;
   }
   if (scope?.kind === 'phase') {
     return `<p class="vote-mode-hint">Wähle deine <strong>Top ${max} KI Use Cases</strong> in dieser Phase.</p>
-      ${renderTrackVoteGroupedListHtml(slide, { selectable: true })}
+      ${renderTrackVoteGroupedListHtml(slide, { selectable: true, fairVote: !!slide.settings?.sopFairVote })}
       <div id="fav-counter" class="top3-counter">0 / ${max} gewählt</div>
       <button type="button" class="btn-primary participant-submit" id="submit-favorites">Priorisierung senden</button>`;
   }
@@ -1640,7 +1640,7 @@ function renderParticipantTrackVoteHtml(slide) {
       <button type="button" class="btn-primary participant-submit" id="submit-favorites">Priorisierung senden</button>`;
   }
   return `<p class="vote-mode-hint">Wähle <strong>maximal ${max} Lieblings-Use-Cases</strong> aus dem Brainstorming.</p>
-    ${renderTrackVoteGroupedListHtml(slide, { selectable: true })}
+    ${renderTrackVoteGroupedListHtml(slide, { selectable: true, fairVote: !!slide.settings?.sopFairVote })}
     <div id="fav-counter" class="top3-counter">0 / ${max} gewählt</div>
     <button type="button" class="btn-primary participant-submit" id="submit-favorites">Favoriten senden</button>`;
 }
@@ -3779,7 +3779,7 @@ async function restoreVersion(versionId, versions) {
   if (!ver) return;
   if (!await lpConfirm({ title: 'Version wiederherstellen?', desc: 'Die aktuellen Folien werden durch diese Version ersetzt.', okLabel: 'Ersetzen', variant: 'warning', icon: 'fa-clock-rotate-left' })) return;
   const snap = ver.snapshot;
-  await sb.from('lp_slides').delete().eq('presentation_id', State.presentation.id);
+  const oldIds = State.slides.map((s) => s.id);
   const rows = (snap.slides || []).map((s, i) => ({
     presentation_id: State.presentation.id,
     sort_order: i,
@@ -3787,7 +3787,10 @@ async function restoreVersion(versionId, versions) {
     content: s.content,
     settings: s.settings || { ...window.LP_DEFAULT_SETTINGS },
   }));
-  const { data: inserted } = await sb.from('lp_slides').insert(rows).select('*');
+  // Erst neue Folien einfuegen, dann alte loeschen — schlaegt der Insert fehl, bleibt die Praesentation intakt.
+  const { data: inserted, error: insErr } = await sb.from('lp_slides').insert(rows).select('*');
+  if (insErr || !inserted) { toast('Wiederherstellung fehlgeschlagen – nichts geaendert', 'error'); return; }
+  if (oldIds.length) await sb.from('lp_slides').delete().in('id', oldIds);
   if (snap.title) {
     await sb.from('lp_presentations').update({ title: snap.title }).eq('id', State.presentation.id);
     State.presentation.title = snap.title;
@@ -5134,7 +5137,9 @@ function subscribeParticipantChannel() {
       window.LP?.channelHeartbeat(chName);
       void (async () => {
         await ensureParticipantResponses(true);
-        await renderParticipantQuestion();
+        const slide = State.slides[State.session.current_slide_index || 0];
+        // Nur neu rendern, wenn die Ansicht fremde Beitraege zeigt — sonst gehen laufende Eingaben verloren.
+        if (slide?.settings?.sopTrackVote || slide?.settings?.sopPhaseVote || slide?.settings?.sopCardVote || slide?.settings?.brainstormVote || slide?.slide_type === 'qa') await renderParticipantQuestion();
       })();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lp_responses', filter: `session_id=eq.${State.session.id}` }, () => {
@@ -5493,6 +5498,9 @@ function renderParticipantMatrixHtml(slide) {
 function setupMatrixDragDrop(slide) {
   const wrap = document.querySelector('.lp-mx-wrap[data-slide-id="' + slide.id + '"]');
   if (!wrap) return;
+  if (State._matrixDnDAbort) State._matrixDnDAbort.abort(); // alte window-Listener entfernen
+  State._matrixDnDAbort = new AbortController();
+  const matrixDnDSignal = State._matrixDnDAbort.signal;
   const items = getMatrixItems(slide);
   const itemMeta = {};
   items.forEach((it) => { itemMeta[it.id] = { text: it.text, phase: it.phase, trackLabel: it.trackLabel }; });
@@ -5605,16 +5613,16 @@ function setupMatrixDragDrop(slide) {
       clearTimeout(longpressTimer); longpressTimer = null;
     }
     moveDrag(e);
-  });
+  }, { signal: matrixDnDSignal });
 
   window.addEventListener('pointerup', (e) => {
     if (longpressTimer) { clearTimeout(longpressTimer); longpressTimer = null; }
     if (dragging) endDrag(e);
-  });
+  }, { signal: matrixDnDSignal });
   window.addEventListener('pointercancel', (e) => {
     if (longpressTimer) { clearTimeout(longpressTimer); longpressTimer = null; }
     if (dragging) endDrag(e);
-  });
+  }, { signal: matrixDnDSignal });
 
   // Tap-to-cycle: tap an item to move it through quadrants (Mobile-friendly fallback)
   // Convention: pool -> qw -> sb -> ts -> dr -> pool
