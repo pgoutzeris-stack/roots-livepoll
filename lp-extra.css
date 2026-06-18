@@ -1864,7 +1864,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   margin-left:0!important;
   margin-right:0!important;
 }
-/* SOP-Board — Original-Kacheln, vergrößert für mehr Platz im Present-Modus */
+/* SOP-Board — Original-Kacheln, gleich groß & aligned im Present-Modus */
 .lp-sop-workshop.present-mode .sop-board-preview{
   margin-top:0;
   border-radius:14px;
@@ -1872,19 +1872,36 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   background:var(--bg);
 }
 .lp-sop-workshop.present-mode .sop-board-phases-row{
+  display:grid;
+  grid-auto-flow:column;
+  grid-auto-columns:minmax(min(260px,48vw),1fr);
+  gap:clamp(.85rem,1.6vw,1.15rem);
   padding:clamp(.85rem,1.6vw,1.1rem);
-  gap:clamp(.75rem,1.4vw,1rem);
+  align-items:stretch;
   scrollbar-width:thin;
 }
 .lp-sop-workshop.present-mode .sop-board-phase{
-  min-width:min(220px,44vw);
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  min-height:100%;
 }
 .lp-sop-workshop.present-mode .sop-board-phase-label{
   font-size:clamp(.82rem,1.4vw,.92rem);
-  margin-bottom:.15rem;
+  min-height:2.85rem;
+  margin-bottom:.55rem;
+  padding-bottom:.45rem;
+  display:flex;
+  align-items:flex-end;
+  flex-shrink:0;
+  line-height:1.25;
 }
 .lp-sop-workshop.present-mode .sop-board-cards{
+  flex:1;
+  display:grid;
+  grid-template-rows:repeat(var(--sop-max-cards,1),minmax(3.65rem,1fr));
   gap:clamp(.5rem,1vw,.65rem);
+  align-content:stretch;
 }
 .lp-sop-workshop.present-mode .sop-board-card,
 .lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .sop-board-card,
@@ -1897,10 +1914,26 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   box-shadow:var(--shadow);
   background:var(--surface);
   line-height:1.4;
+  min-height:3.65rem;
+  height:100%;
+  display:flex;
+  align-items:flex-start;
+  gap:.45rem;
+}
+.lp-sop-workshop.present-mode .sop-board-card span{
+  flex:1;
+  min-width:0;
+}
+.lp-sop-workshop.present-mode .sop-board-card--spacer{
+  visibility:hidden;
+  pointer-events:none;
+  box-shadow:none;
+  border-color:transparent;
+  background:transparent;
 }
 .lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .ws-orient-col--split-present .sop-board-phase,
 .lp-sop-workshop.present-mode.sop-split-stage .ws-split-sop-board .sop-board-phase{
-  min-width:min(260px,48vw);
+  min-width:0;
 }
 .lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .ws-orient-col--split-present .sop-board-phase-label,
 .lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .workshop-collect-shell--split .sop-board-phase-label{

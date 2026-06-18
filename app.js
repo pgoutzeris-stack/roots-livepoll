@@ -2027,7 +2027,7 @@ function isFinaleSlide(s) {
   const c = s.content || {};
   const k = c.sopKind;
   return !!(st.sopPitchSession || st.sopAllTracksVote || st.sopAllTracksMatrix || st.sopNextSteps || c.sopAllTracksResults
-    || k === 'pitch-session' || k === 'final-vote' || k === 'final-matrix' || k === 'next-steps' || k === 'all-tracks-summary');
+    || k === 'pitch-session' || k === 'final-vote' || k === 'group-vote' || k === 'final-matrix' || k === 'next-steps' || k === 'all-tracks-summary');
 }
 
 // Konsistente Finale-Pill (Badge) für Pitch Session, Finale Priorisierung und Matrix.
@@ -2217,7 +2217,10 @@ function renderSopFinalePanelHtml(currentIndex, { clickable = false, onNavigate 
   const findIdx = (predicate) => State.slides.findIndex(predicate);
   const summaryIdx = findIdx((s) => s.content?.sopAllTracksResults || s.content?.sopKind === 'all-tracks-summary');
   const pitchIdx = findIdx((s) => s.settings?.sopPitchSession || s.content?.sopKind === 'pitch-session');
-  const voteIdx = findIdx((s) => s.settings?.sopAllTracksVote || s.content?.sopKind === 'final-vote');
+  const voteIdx = findIdx((s) => {
+    const c = s.content || {};
+    return s.settings?.sopAllTracksVote || c.sopKind === 'final-vote' || c.sopKind === 'group-vote';
+  });
   const matrixIdx = findIdx((s) => s.settings?.sopAllTracksMatrix || s.content?.sopKind === 'final-matrix');
   const nextStepsIdx = findIdx((s) => s.settings?.sopNextSteps || s.content?.sopKind === 'next-steps');
 
@@ -2500,14 +2503,21 @@ function renderSopBoardPreview(c, editable = false, { hideTrackHeader = false } 
   const ed = (field, val, cls) => editable
     ? `<span class="canvas-editable ${cls}" contenteditable="true" data-field="${field}">${esc(val)}</span>`
     : esc(val);
-  const cols = board.map((phase) => `
-    <div class="sop-board-phase ${phase.name === content.sopPhaseName || board.length === 1 ? 'active' : ''}">
-      <div class="sop-board-phase-label">${ed('phase', phase.name, 'sop-board-phase-name')}</div>
-      <div class="sop-board-cards">${(phase.cards || []).map((card) => `
+  const maxCards = Math.max(1, ...board.map((phase) => (phase.cards || []).length));
+  const cols = board.map((phase) => {
+    const cards = (phase.cards || []).map((card) => `
         <div class="sop-board-card ${card === content.sopCardName || (content.sopKind === 'card' && card === content.title) ? 'active' : ''}">
           <i class="fa-solid fa-file-lines"></i><span>${esc(card)}</span>
-        </div>`).join('')}</div>
-    </div>`).join('');
+        </div>`).join('');
+    const spacers = Array(Math.max(0, maxCards - (phase.cards || []).length)).fill(0).map(() => (
+      '<div class="sop-board-card sop-board-card--spacer" aria-hidden="true"><span>&nbsp;</span></div>'
+    )).join('');
+    return `
+    <div class="sop-board-phase ${phase.name === content.sopPhaseName || board.length === 1 ? 'active' : ''}">
+      <div class="sop-board-phase-label">${ed('phase', phase.name, 'sop-board-phase-name')}</div>
+      <div class="sop-board-cards">${cards}${spacers}</div>
+    </div>`;
+  }).join('');
   const headerHtml = hideTrackHeader ? '' : `
       <div class="sop-board-track-header">
         <span class="sop-board-track-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">Track ${trackIdx}</span>
@@ -2516,7 +2526,7 @@ function renderSopBoardPreview(c, editable = false, { hideTrackHeader = false } 
   return `
     <div class="sop-board-preview${hideTrackHeader ? ' sop-board-preview--no-header' : ''} ${esc(content.sopTrackClass || '')} ${esc(content.sopKind || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
       ${headerHtml}
-      <div class="sop-board-phases-row">${cols}</div>
+      <div class="sop-board-phases-row" style="--sop-phase-count:${board.length};--sop-max-cards:${maxCards}">${cols}</div>
     </div>`;
 }
 

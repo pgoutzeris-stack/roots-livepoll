@@ -724,7 +724,8 @@ function buildSopKiWorkshopSlides(mode = 'pro-phase') {
     slides.push(sopPitchSession());
     slides.push(sopFinalAllTracksVote());
   } else {
-    // Pro Phase: pro Track gab es bereits eine Presentation Session → nur noch Gesamt-Überblick.
+    // Pro Phase: pro Track gab es bereits eine Presentation Session → Pitch, dann Gesamt-Überblick.
+    slides.push(sopPitchSession());
     slides.push(sopAllTracksSummary());
   }
   slides.push(sopIceMatrix());
@@ -1017,8 +1018,8 @@ function buildMarketingSopWorkshopSlides() {
     slides.push(sopTrackPresentationSession(track));
   });
 
-  // Finale: Übersicht + ICE-Matrix + Next Steps + Abschluss
-  // Cross-Track-Überblick nur sinnvoll, wenn es mehr als einen Track gibt.
+  // Finale: Pitch → Übersicht (optional) → ICE-Matrix → Next Steps → Abschluss
+  slides.push(sopPitchSession());
   if (MARKETING_SOP_TRACKS.length > 1) slides.push(sopAllTracksSummary());
   slides.push(sopIceMatrix());
   slides.push(sopWorkshopNextSteps());
@@ -1113,8 +1114,8 @@ function buildDualSopSequentialWorkshopSlides() {
     slides.push(tagSeqSlide(sopTrackBrainstorm(t), 'consulting', i, conTrackCount));
   });
 
-  slides.push(tagDualSharedSlide(dualCombinedVote()));
   slides.push(tagDualSharedSlide(sopPitchSession()));
+  slides.push(tagDualSharedSlide(dualCombinedVote()));
   slides.push(tagDualSharedSlide(sopIceMatrix()));
   slides.push(tagDualSharedSlide(sopWorkshopNextSteps()));
   sopWorkshopClose().forEach((s) => slides.push(tagDualSharedSlide(s)));
@@ -1217,8 +1218,8 @@ function buildDualSopParallelWorkshopSlides() {
     if (SOP_TOOL_TRACKS[i]) slides.push(hiddenBrainstormSlide(SOP_TOOL_TRACKS[i], 'consulting', i));
   }
 
-  slides.push(tagDualSharedSlide(dualCombinedVote()));
   slides.push(tagDualSharedSlide(sopPitchSession()));
+  slides.push(tagDualSharedSlide(dualCombinedVote()));
   slides.push(tagDualSharedSlide(sopIceMatrix()));
   slides.push(tagDualSharedSlide(sopWorkshopNextSteps()));
   sopWorkshopClose().forEach((s) => slides.push(tagDualSharedSlide(s)));
@@ -1231,7 +1232,7 @@ window.LP_TEMPLATES = [
     key: 'roots-sop-ki-workshop-phase',
     category: 'ROOTS · SOP & KI',
     name: 'SOP-Workshop · Pro Phase',
-    desc: 'SOP-Kontext je Phase → Brainstorm → Track-Vote → Presentation Session → ICE Matrix.',
+    desc: 'SOP-Kontext je Phase → Brainstorm → Track-Vote → Presentation Session → Pitch → Übersicht → ICE Matrix.',
     duration: '90–150 Min.',
     group: '6–25',
     tips: 'Höchste Tiefe. SOP-Übersicht vor jedem Brainstorm. 5 Min. / max. 2 Use Cases je Phase — 10 Phasen × 5 Min ≈ 50 Min nur Sammeln, plus Votes/Presentations/Matrix.',
@@ -1264,7 +1265,7 @@ window.LP_TEMPLATES = [
     desc: 'Erst Internal-SOP, dann Consulting-SOP · keine Split-View · EINE konsolidierte Priorisierung + gemeinsame ICE-Matrix.',
     duration: '90–120 Min.',
     group: '5–25',
-    tips: 'Pro Track eine Sammel-Folie mit SOP-Board. Internal komplett durch, danach Consulting. Am Ende Gesamt-Priorisierung, Pitch und Matrix über beide SOPs.',
+    tips: 'Pro Track eine Sammel-Folie mit SOP-Board. Internal komplett durch, danach Consulting. Pitch Session, dann Gesamt-Priorisierung, Matrix und Abschluss.',
     slides: buildDualSopSequentialWorkshopSlides(),
   },
   {
@@ -1274,7 +1275,7 @@ window.LP_TEMPLATES = [
     desc: 'Beide SOPs gleichzeitig · eine Sammel-Folie pro Track · Split-View mit voller SOP-Breite · Host-Zuweisung · konsolidierte Priorisierung + Matrix.',
     duration: '90–120 Min.',
     group: '5–25',
-    tips: 'Pro Track nur eine Host-Folie (Sammeln mit SOP im Split). QR-Join → Host weist Internal/Consulting zu. Priorisierung, Pitch, Matrix konsolidiert.',
+    tips: 'Pro Track nur eine Host-Folie (Sammeln mit SOP im Split). QR-Join → Host weist Internal/Consulting zu. Pitch Session, dann Gesamt-Priorisierung, Matrix und Abschluss.',
     slides: buildDualSopParallelWorkshopSlides(),
   },
 ];
