@@ -1739,12 +1739,12 @@ function renderDualSopSplitView(slide, columnRenderer) {
   };
   const singleSideClass = singleSide ? ` sop-split-single-side sop-split-single-side--${singleSide}` : '';
   if (singleSide === 'internal') {
-    return `<div class="sop-split-grid sop-split-grid--flat sop-split-active sop-split-slides sop-split-full${singleSideClass}">
+    return `<div class="sop-split-grid sop-split-active sop-split-slides sop-split-full${singleSideClass}">
       ${renderSopSplitColumn('internal', renderBody('internal'), { trackName: trackNames.internal })}
     </div>`;
   }
   if (singleSide === 'consulting') {
-    return `<div class="sop-split-grid sop-split-grid--flat sop-split-active sop-split-slides sop-split-full${singleSideClass}">
+    return `<div class="sop-split-grid sop-split-active sop-split-slides sop-split-full${singleSideClass}">
       ${renderSopSplitColumn('consulting', renderBody('consulting'), { trackName: trackNames.consulting })}
     </div>`;
   }
@@ -1752,7 +1752,7 @@ function renderDualSopSplitView(slide, columnRenderer) {
     const idle = !((group === 'internal' ? window.INTERNAL_SOP_TRACKS : window.SOP_TOOL_TRACKS)?.[pairIdx]);
     return renderSopSplitColumn(group, renderBody(group), { trackName: trackNames[group], idle });
   };
-  return `<div class="sop-split-grid sop-split-grid--flat sop-split-active sop-split-slides sop-split-full${singleSideClass}">
+  return `<div class="sop-split-grid sop-split-active sop-split-slides sop-split-full${singleSideClass}">
     ${col('internal')}
     ${col('consulting')}
   </div>`;
@@ -1775,14 +1775,9 @@ function renderBrainstormSlideColumn(slide) {
 function renderSopSplitColumn(group, bodyHtml, { trackName = '', idle = false } = {}) {
   const meta = getSopGroupMeta(group);
   const short = meta.shortLabel || meta.label.replace(/\s+SOP$/, '');
-  const trackLine = trackName
-    ? `<span class="sop-split-col-track">${esc(trackName)}</span>`
-    : '';
-  return `<div class="sop-split-col sop-split-col--${group}${idle ? ' sop-split-col--idle' : ''}">
-      <header class="sop-split-col-head">
-        <span class="sop-split-col-kicker"><i class="fa-solid ${meta.icon}"></i> ${esc(short)}</span>
-        ${trackLine}
-      </header>
+  const headerLabel = trackName ? `${short} · ${trackName}` : meta.label;
+  return `<div class="sop-split-col${idle ? ' sop-split-col--idle' : ''}">
+      <div class="sop-split-col-head sop-split-col-head--${group}"><i class="fa-solid ${meta.icon}"></i> ${esc(headerLabel)}</div>
       <div class="sop-split-col-body">${bodyHtml}</div>
     </div>`;
 }
@@ -2353,14 +2348,14 @@ function renderSopFinalePanelHtml(currentIndex, { clickable = false, onNavigate 
   const matrixIdx = findIdx((s) => s.settings?.sopAllTracksMatrix || s.content?.sopKind === 'final-matrix');
   const nextStepsIdx = findIdx((s) => s.settings?.sopNextSteps || s.content?.sopKind === 'next-steps');
 
-  let html = `<div class="workshop-sop-panel ws-nav-panel workshop-sop-panel--finale">
+  let html = `<div class="workshop-sop-panel workshop-sop-panel--finale">
     <div class="workshop-sop-panel-head"><i class="fa-solid fa-flag-checkered"></i> Finale</div>`;
   (window.SOP_TOOL_TRACKS || []).forEach((t) => {
     html += `<div class="workshop-sop-later-item">${esc(t.title.replace(/^Track \d+: /, ''))} · Abgeschlossen</div>`;
   });
   const step = (idx, icon, label) => {
     if (idx < 0) return '';
-    return `<button type="button" class="ws-nav-item ws-nav-item--step${currentIndex === idx ? ' is-active' : ''}" data-slide-index="${idx}">
+    return `<button type="button" class="workshop-sop-vote${currentIndex === idx ? ' active' : ''}" data-slide-index="${idx}">
       <i class="fa-solid ${icon}"></i><span>${esc(label)}</span>
     </button>`;
   };
@@ -2378,48 +2373,6 @@ function renderSopFinalePanelHtml(currentIndex, { clickable = false, onNavigate 
   };
 }
 
-function findDualTrackBrainstormIdx(group, trackClass) {
-  return State.slides.findIndex((s) => {
-    const c = s.content || {};
-    return s.slide_type === 'brainstorm'
-      && c.sopGroup === group
-      && (c.sopTrackClass === trackClass || c.sopTrackKey === trackClass);
-  });
-}
-
-function renderDualSopSequentialPanelHtml(currentIndex, { clickable = false, onNavigate } = {}) {
-  const G = window.LP_SOP_GROUP_META;
-  const section = (group, tracks) => {
-    const meta = G[group];
-    if (!tracks?.length) return '';
-    let block = `<div class="ws-nav-section ws-nav-section--${group}">
-      <div class="ws-nav-section-label"><i class="fa-solid ${meta.icon}"></i> ${esc(meta.shortLabel)}</div>`;
-    tracks.forEach((track, i) => {
-      const idx = findDualTrackBrainstormIdx(group, track.class);
-      const active = currentIndex === idx;
-      const title = track.title.replace(/^Track \d+: /, '');
-      block += `<button type="button" class="ws-nav-item${active ? ' is-active' : ''}" data-slide-index="${idx}" ${idx < 0 ? 'disabled' : ''}>
-        <span class="ws-nav-item-kicker">Track ${i + 1}</span>
-        <span class="ws-nav-item-title">${esc(title)}</span>
-      </button>`;
-    });
-    block += '</div>';
-    return block;
-  };
-  const html = `<div class="workshop-sop-panel ws-nav-panel dual-sop-sequential">
-    <div class="workshop-sop-panel-head"><i class="fa-solid fa-arrows-left-right"></i> Dual-SOP · Nacheinander</div>
-    ${section('internal', window.INTERNAL_SOP_TRACKS)}
-    ${section('consulting', window.SOP_TOOL_TRACKS)}
-  </div>`;
-  return {
-    html,
-    bind(container) {
-      if (!clickable || !onNavigate) return;
-      bindSopWorkshopPanelClicks(container, onNavigate);
-    },
-  };
-}
-
 function renderDualSopParallelPanelHtml(currentIndex, { clickable = false, onNavigate } = {}) {
   const pairCount = Math.max(
     (window.INTERNAL_SOP_TRACKS || []).length,
@@ -2429,20 +2382,20 @@ function renderDualSopParallelPanelHtml(currentIndex, { clickable = false, onNav
     const c = s.content || {};
     return c.sopKind === kind && c.sopDualPairIndex === pairIndex;
   });
-  let html = `<div class="workshop-sop-panel ws-nav-panel dual-sop-parallel">
+  let html = `<div class="workshop-sop-panel dual-sop-parallel">
     <div class="workshop-sop-panel-head"><i class="fa-solid fa-table-columns"></i> Dual-SOP · Parallel</div>`;
   for (let i = 0; i < pairCount; i += 1) {
     const collectIdx = findPairIdx('dual-pair-collect', i);
     const active = currentIndex === collectIdx;
     const trackTitle = (window.INTERNAL_SOP_TRACKS?.[i]?.title || window.SOP_TOOL_TRACKS?.[i]?.title || `Track ${i + 1}`)
       .replace(/^Track \d+: /, '');
-    html += `<div class="ws-nav-group${active ? ' is-current' : ''}">
-      <div class="ws-nav-group-label">
-        <span class="ws-nav-item-kicker">Track ${i + 1}</span>
-        <span class="ws-nav-item-title">${esc(trackTitle)}</span>
+    html += `<div class="workshop-sop-phase${active ? ' is-current' : ''}">
+      <div class="workshop-sop-panel-track is-label">
+        <span class="workshop-sop-panel-badge">Track ${i + 1}</span>
+        <span class="workshop-sop-panel-title">${esc(trackTitle)}</span>
       </div>`;
     if (collectIdx >= 0) {
-      html += `<button type="button" class="ws-nav-item ws-nav-item--step${currentIndex === collectIdx ? ' is-active' : ''}" data-slide-index="${collectIdx}">
+      html += `<button type="button" class="workshop-sop-step${currentIndex === collectIdx ? ' active' : ''}" data-slide-index="${collectIdx}">
         <i class="fa-solid fa-lightbulb"></i> Use Cases sammeln
       </button>`;
     }
@@ -2469,9 +2422,6 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
   }
   if (isDualSopParallelWorkshop()) {
     return renderDualSopParallelPanelHtml(currentIndex, { clickable, onNavigate });
-  }
-  if (isDualSopWorkshop()) {
-    return renderDualSopSequentialPanelHtml(currentIndex, { clickable, onNavigate });
   }
   const tracks = window.SOP_TOOL_TRACKS || [];
   const activeTrackKey = getActiveTrackKey(currentIndex);
@@ -2515,8 +2465,8 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
   // Pro-Track-Struktur: nur ein Brainstorm-Schritt, KEINE Phasen-Liste (die Phasen
   // sind als Orientierung im SOP-Board auf der Folie sichtbar, nicht in der Nav).
   if (trackBrainstormIdx >= 0) {
-    html += `<button type="button" class="workshop-sop-step ${currentIndex === trackBrainstormIdx ? 'active' : ''}" data-slide-index="${trackBrainstormIdx}" title="Use Cases sammeln">
-      <i class="fa-solid fa-lightbulb"></i> Sammeln
+    html += `<button type="button" class="workshop-sop-step ${currentIndex === trackBrainstormIdx ? 'active' : ''}" data-slide-index="${trackBrainstormIdx}" title="Brainstorming">
+      <i class="fa-solid fa-lightbulb"></i> Brainstorm
     </button>`;
   }
 
@@ -2547,8 +2497,8 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
         <span>${esc(phase.name)}</span>
       </button>`;
     if (phaseBrainstormIdx >= 0) {
-      html += `<button type="button" class="workshop-sop-step ${currentIndex === phaseBrainstormIdx ? 'active' : ''}" data-slide-index="${phaseBrainstormIdx}" title="Use Cases sammeln">
-        <i class="fa-solid fa-lightbulb"></i> Sammeln
+      html += `<button type="button" class="workshop-sop-step ${currentIndex === phaseBrainstormIdx ? 'active' : ''}" data-slide-index="${phaseBrainstormIdx}" title="Brainstorming">
+        <i class="fa-solid fa-lightbulb"></i> Brainstorm
       </button>`;
     }
     if (phaseVoteIdx >= 0) {
