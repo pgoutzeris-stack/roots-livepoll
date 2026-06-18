@@ -2062,7 +2062,7 @@ function renderDualPairCollectColumn(group, pairIdx) {
   const theme = sopTrackTheme(track.class);
   const boardContent = trackToSopBoardContent(track, pairIdx);
   let html = `<div class="ws-split-sop-board ws-orient-col ws-orient-col--split-present" style="--sop-accent:${theme.accent}">
-    ${renderSopPhaseCarouselHtml(boardContent)}
+    ${renderSopBoardPresentHtml(boardContent, false, { hideTrackHeader: true, alignCards: true })}
   </div>`;
   if (brainstormSlide) {
     html += `<div class="ws-split-collect-viz ws-split-collect-viz--idle">
@@ -2084,7 +2084,7 @@ function renderDualPairOrientColumn(group, pairIdx) {
   const theme = sopTrackTheme(track.class);
   const boardContent = trackToSopBoardContent(track, pairIdx);
   return `<div class="ws-orient-col ws-orient-col--split-present" style="--sop-accent:${theme.accent}">
-    ${renderSopPhaseCarouselHtml(boardContent)}
+    ${renderSopBoardPresentHtml(boardContent, false, { hideTrackHeader: true, alignCards: true })}
   </div>`;
 }
 
@@ -2268,26 +2268,11 @@ function brainstormSlideForDualPair(group, pairIdx) {
     || null;
 }
 
-function renderSopPhaseCarouselHtml(c) {
-  const content = enrichSopContentForCollect(c);
-  const board = content.sopBoard || [];
-  if (!board.length) return '';
-  const theme = sopTrackTheme(content.sopTrackClass);
-  const slides = board.map((phase, pi) => `
-      <div class="sop-phase-carousel-slide${pi === 0 ? ' is-active' : ''}${phase.name === content.sopPhaseName ? ' is-context' : ''}" data-index="${pi}">
-        <div class="sop-phase-carousel-head">
-          <h3 class="sop-phase-carousel-title">${esc(phase.name)}</h3>
-        </div>
-      </div>`).join('');
-  const dots = board.map((_, i) => `
-    <button type="button" class="sop-phase-carousel-dot${i === 0 ? ' is-active' : ''}" data-index="${i}" aria-label="Stufe ${i + 1}"></button>`).join('');
-  return `
-    <div class="sop-phase-carousel" data-autoplay="4500" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
-      <div class="sop-phase-carousel-viewport">
-        <div class="sop-phase-carousel-track" style="--sop-carousel-count:${board.length}">${slides}</div>
-      </div>
-      ${board.length > 1 ? `<div class="sop-phase-carousel-dots">${dots}</div>` : ''}
-    </div>`;
+/** Moderator/Beamer: volles SOP-Board; Auto-Scroll nur bei Overflow (initSopBoardAutoScroll). */
+function renderSopBoardPresentHtml(c, editable = false, opts = {}) {
+  const inner = renderSopBoardPreview(c, editable, opts);
+  if (!inner || editable) return inner;
+  return `<div class="sop-board-autoscroll" data-autoplay="5500">${inner}</div>`;
 }
 
 function sopBoardCardName(card) {
@@ -2318,33 +2303,122 @@ function renderSopPhaseStackHtml(c) {
   return `<div class="sop-phase-stack" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">${phases}</div>`;
 }
 
-function initSopPhaseCarousels(root = document) {
+function initSopBoardAutoScroll(root = document) {
   const scope = root?.querySelectorAll ? root : document;
-  scope.querySelectorAll('.sop-phase-carousel').forEach((wrap) => {
-    wrap._carouselCleanup?.();
-    delete wrap.dataset.carouselInit;
+  scope.querySelectorAll('.sop-board-autoscroll').forEach((wrap) => {
+    wrap._autoscrollCleanup?.();
+    delete wrap.dataset.autoscrollInit;
+    wrap.classList.remove('is-overflow', 'is-fit', 'is-measuring');
+    wrap.querySelector('.sop-board-autoscroll-dots')?.remove();
   });
-  scope.querySelectorAll('.sop-phase-carousel:not([data-carousel-init])').forEach((wrap) => {
-    wrap.dataset.carouselInit = '1';
-    const track = wrap.querySelector('.sop-phase-carousel-track');
-    const slides = [...wrap.querySelectorAll('.sop-phase-carousel-slide')];
-    const dots = [...wrap.querySelectorAll('.sop-phase-carousel-dot')];
-    if (!track || slides.length <= 1) return;
+  scope.querySelectorAll('.sop-board-autoscroll:not([data-autoscroll-init])').forEach((wrap) => {
+    wrap.dataset.autoscrollInit = '1';
+    const row = wrap.querySelector('.sop-board-phases-row');
+    if (!row) return;
+    const phases = [...row.querySelectorAll('.sop-board-phase')];
+    if (phases.length <= 1) return;
+
+    const intervalMs = Number(wrap.dataset.autoplay) || 5500;
+    let positions = [];
     let idx = 0;
     let timer = null;
-    const intervalMs = Number(wrap.dataset.autoplay) || 4500;
-    const show = (next) => {
-      idx = ((next % slides.length) + slides.length) % slides.length;
-      track.style.transform = `translateX(-${idx * 100}%)`;
-      slides.forEach((s, i) => s.classList.toggle('is-active', i === idx));
-      dots.forEach((d, i) => d.classList.toggle('is-active', i === idx));
+    let rafId = null;
+    let dotsEl = null;
+
+    const measureOverflow = () => {
+      wrap.classList.remove('is-overflow', 'is-fit');
+      wrap.classList.add('is-measuring');
+      row.scrollLeft = 0;
+      const overflow = row.scrollWidth > row.clientWidth + 4;
+      wrap.classList.remove('is-measuring');
+      if (!overflow) {
+        wrap.classList.add('is-fit');
+        return null;
+      }
+      wrap.classList.add('is-overflow');
+      const snaps = phases.map((phase) => {
+        const maxScroll = Math.max(0, row.scrollWidth - row.clientWidth);
+        return Math.min(Math.max(0, phase.offsetLeft - row.offsetLeft), maxScroll);
+      });
+      return [...new Set(snaps.map((p) => Math.round(p)))];
     };
-    dots.forEach((d) => d.addEventListener('click', () => {
-      show(Number(d.dataset.index) || 0);
-      if (timer) { clearInterval(timer); timer = setInterval(() => show(idx + 1), intervalMs); }
-    }));
-    timer = setInterval(() => show(idx + 1), intervalMs);
-    wrap._carouselCleanup = () => { if (timer) clearInterval(timer); };
+
+    const buildDots = (count) => {
+      if (!dotsEl) {
+        dotsEl = document.createElement('div');
+        dotsEl.className = 'sop-board-autoscroll-dots';
+        wrap.appendChild(dotsEl);
+      }
+      dotsEl.innerHTML = '';
+      if (count <= 1) {
+        dotsEl.classList.add('hidden');
+        return;
+      }
+      dotsEl.classList.remove('hidden');
+      for (let i = 0; i < count; i++) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `sop-board-autoscroll-dot${i === 0 ? ' is-active' : ''}`;
+        btn.dataset.index = String(i);
+        btn.setAttribute('aria-label', `Board-Ausschnitt ${i + 1}`);
+        btn.addEventListener('click', () => goTo(i, true));
+        dotsEl.appendChild(btn);
+      }
+    };
+
+    const smoothScrollTo = (target) => {
+      const start = row.scrollLeft;
+      const diff = target - start;
+      if (Math.abs(diff) < 2) return;
+      const duration = 850;
+      const startTime = performance.now();
+      const step = (now) => {
+        const t = Math.min(1, (now - startTime) / duration);
+        const ease = t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
+        row.scrollLeft = start + diff * ease;
+        if (t < 1) rafId = requestAnimationFrame(step);
+      };
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(step);
+    };
+
+    const goTo = (next, userClick = false) => {
+      if (!positions.length) return;
+      idx = ((next % positions.length) + positions.length) % positions.length;
+      smoothScrollTo(positions[idx]);
+      dotsEl?.querySelectorAll('.sop-board-autoscroll-dot').forEach((d, i) => {
+        d.classList.toggle('is-active', i === idx);
+      });
+      if (userClick && timer) {
+        clearInterval(timer);
+        timer = setInterval(() => goTo(idx + 1), intervalMs);
+      }
+    };
+
+    const setup = () => {
+      if (timer) clearInterval(timer);
+      timer = null;
+      row.scrollLeft = 0;
+      idx = 0;
+      positions = measureOverflow() || [];
+      if (positions.length <= 1) {
+        dotsEl?.remove();
+        dotsEl = null;
+        return;
+      }
+      buildDots(positions.length);
+      timer = setInterval(() => goTo(idx + 1), intervalMs);
+    };
+
+    setup();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => setup()) : null;
+    ro?.observe(row);
+    ro?.observe(wrap);
+    wrap._autoscrollCleanup = () => {
+      if (timer) clearInterval(timer);
+      if (rafId) cancelAnimationFrame(rafId);
+      ro?.disconnect();
+    };
   });
 }
 
@@ -2364,10 +2438,11 @@ function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false,
   let boardInner = '';
   if (participantMode && displayContent.sopBoard?.length) {
     boardInner = renderSopPhaseStackHtml(displayContent);
-  } else if (!editable && !splitCol && displayContent.sopBoard?.length) {
-    boardInner = renderSopPhaseCarouselHtml(displayContent);
   } else if (displayContent.sopBoard?.length) {
-    boardInner = renderSopBoardPreview(displayContent, false, { hideTrackHeader: shellMode, alignCards: !!(shellMode || splitCol) });
+    const boardOpts = { hideTrackHeader: shellMode, alignCards: !!(shellMode || splitCol) };
+    boardInner = editable
+      ? renderSopBoardPreview(displayContent, true, boardOpts)
+      : renderSopBoardPresentHtml(displayContent, false, boardOpts);
   }
   const boardEl = !editable && displayContent.sopBoard?.length && !hideBoard
     ? `<div class="workshop-collect-board">${boardInner}</div>`
@@ -3006,7 +3081,9 @@ function renderSopSectionHtml(c, editable = false, { shellMode = false, splitCol
     <div class="sop-pslide-section sop-pslide-section--shell ${isTrack ? 'sop-pslide-track' : 'sop-pslide-phase'} ${esc(content.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
       ${colTitle}
       ${bodyEl}
-      ${renderSopBoardPreview(content, editable, { hideTrackHeader: shellMode, alignCards: splitCol })}
+      ${editable
+        ? renderSopBoardPreview(content, editable, { hideTrackHeader: shellMode, alignCards: splitCol })
+        : renderSopBoardPresentHtml(content, false, { hideTrackHeader: shellMode, alignCards: splitCol })}
     </div>`;
   }
   const titleEl = editable
@@ -4830,7 +4907,7 @@ function finalizePresentUi(slide) {
   else stopHeroAiFx();
   if (isWorkshopClosingSlide(slide)) initClosingAiFx($('#present-stage'));
   else stopClosingAiFx();
-  initSopPhaseCarousels($('#present-stage'));
+  initSopBoardAutoScroll($('#present-stage'));
 }
 
 async function deleteSlide(id) {
