@@ -980,36 +980,28 @@ function buildDualSopWorkshopSlides() {
     }, { showResultsLive: true, sopAllTracksVote: true, sopGroup: group, sopVoteMax: n, workshopMode: 'decide' });
   }
 
-  // 1. Opener
+  // 1. Opener (Join)
   slides.push(tplSlide('content', {
     title: 'SOP · KI Use-Case Workshop',
-    subtitle: 'Internal + Consulting · parallel',
+    subtitle: 'Internal + Consulting · zwei Teams parallel',
     body: 'QR scannen · Name + Avatar wählen · los geht\'s!',
     isHeroSlide: true,
   }));
 
-  // 2. Teilnehmer-Intro (zwei Teams)
+  // 2. Zielbild + 3. Instruktionen
+  slides.push(sopWorkshopGoal());
+  slides.push(sopWorkshopInstructions());
+
+  // 4. Teilnehmer-Intro (zwei Teams) — direkt vor dem Start, gebrandet, Internal zuerst
   slides.push(tplSlide('content', {
     title: 'Wer ist dabei?',
-    subtitle: 'Zwei Teams · zwei SOPs · parallel',
-    body: 'INTERNAL SOP\nRichard Erbler · Jannick Müller · Pano Goutzeris\n\nCONSULTING SOP\nManuel Stankovic · Rod Mitecki',
+    subtitle: 'Zwei Teams · zwei SOPs · wir starten mit dem internen SOP',
+    body: 'Internal SOP\nRichard Erbler · Jannick Müller · Pano Goutzeris\n\nConsulting SOP\nManuel Stankovic · Rod Mitecki',
     sopKind: 'participants',
     isHeroSlide: false,
   }, { workshopMode: 'orient' }));
 
-  // 3. Zielbild + 4. Instruktionen
-  slides.push(sopWorkshopGoal());
-  slides.push(sopWorkshopInstructions());
-
-  // 5. CONSULTING: Track-Intro + Track-Brainstorm (Gruppe consulting)
-  SOP_TOOL_TRACKS.forEach((t, i) => {
-    slides.push(sopTrackIntro(t, i));
-    const s = sopTrackBrainstorm(t);
-    s.content.sopGroup = 'consulting';
-    slides.push(s);
-  });
-
-  // 6. INTERNAL: Track-Intro + Track-Brainstorm (Gruppe internal)
+  // 5. INTERNAL zuerst: Track-Intro + Track-Brainstorm (Gruppe internal)
   INTERNAL_SOP_TRACKS.forEach((t, i) => {
     slides.push(sopTrackIntro(t, i));
     const s = sopTrackBrainstorm(t);
@@ -1017,11 +1009,29 @@ function buildDualSopWorkshopSlides() {
     slides.push(s);
   });
 
-  // 7. + 8. Getrennte Priorisierung (Speaker-Switch zwischen den beiden Votes)
-  slides.push(groupVote('consulting', 'Consulting'));
-  slides.push(groupVote('internal', 'Internal'));
+  // 6. CONSULTING danach: Track-Intro + Track-Brainstorm (Gruppe consulting)
+  SOP_TOOL_TRACKS.forEach((t, i) => {
+    slides.push(sopTrackIntro(t, i));
+    const s = sopTrackBrainstorm(t);
+    s.content.sopGroup = 'consulting';
+    slides.push(s);
+  });
 
-  // 9.–12. Pitch · gemeinsame ICE-Matrix · Next Steps · Abschluss
+  // 7. Gemeinsamer Überblick: Use Cases BEIDER SOPs aggregiert (Brücke in die Priorisierung)
+  slides.push(tplSlide('content', {
+    title: 'Beide SOPs im Überblick',
+    subtitle: 'Alle gesammelten KI Use Cases · Internal + Consulting',
+    body: 'Hier laufen die Use Cases aus beiden SOPs zusammen. Aus dieser Gesamtsicht priorisieren wir als Nächstes — erst Internal, dann Consulting — und ordnen die Favoriten gemeinsam in die Impact/Effort-Matrix ein.',
+    sopKind: SK.ALL_TRACKS_SUMMARY,
+    sopAllTracksResults: true,
+    isHeroSlide: false,
+  }, { workshopMode: 'orient' }));
+
+  // 8. + 9. Getrennte Priorisierung (Speaker-Switch) — Internal zuerst
+  slides.push(groupVote('internal', 'Internal'));
+  slides.push(groupVote('consulting', 'Consulting'));
+
+  // 10.–13. Pitch · gemeinsame ICE-Matrix · Next Steps · Abschluss
   slides.push(sopPitchSession());
   slides.push(sopIceMatrix());
   slides.push(sopWorkshopNextSteps());

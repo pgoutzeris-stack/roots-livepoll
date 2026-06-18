@@ -1211,6 +1211,13 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   font-size:.78rem;font-weight:800;text-transform:uppercase;
   letter-spacing:.06em;color:var(--brand);margin:0 0 .5rem;
 }
+/* Mitglieder-Reihen mit Avatar-Initialen in den Team-Blöcken */
+.sop-pslide-participants .sop-team-grid{display:flex;flex-direction:column;gap:1rem;margin-top:1.25rem}
+.sop-pslide-participants .sop-team-title i{margin-right:.35rem}
+.sop-team-members{display:flex;flex-direction:column;gap:.55rem;margin-top:.2rem}
+.sop-team-member{display:flex;align-items:center;gap:.6rem;font-size:1rem;font-weight:600;color:var(--ink)}
+.sop-team-ava{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;flex-shrink:0}
+.sop-team-member--empty{color:var(--muted);font-weight:500}
 @media (min-width:769px){
   .sop-pslide-participants .sop-pslide-body:has(.sop-team-block),
   .sop-pslide-participants .sop-team-grid{

@@ -2202,7 +2202,45 @@ function renderSopContentHtml(c, editable = false) {
         ${renderSopBoardPreview(c, editable)}
       </div>`;
   }
-  // Generischer SOP-Content-Fallback (z. B. sopKind 'participants') — sonst wuerde die Folie leer rendern.
+  // Teilnehmer-/Teams-Folie — gebrandet wie die anderen Intro-Folien (Badge + Team-Karten)
+  if (c.sopKind === 'participants') {
+    const titleEl = editable
+      ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+      : `<h1 class="sop-pslide-title">${esc(c.title || '')}</h1>`;
+    const subEl = editable
+      ? `<div class="canvas-editable sop-pslide-sub" contenteditable="true" data-field="subtitle">${esc(c.subtitle || '')}</div>`
+      : (c.subtitle ? `<p class="sop-pslide-sub">${esc(c.subtitle)}</p>` : '');
+    // Teams aus dem Body parsen: Blöcke (Leerzeile getrennt) → 1. Zeile = Label, Rest = Mitglieder (· oder ,)
+    const blocks = String(c.body || '').split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+    const teamThemes = [sopTrackTheme('track-people'), sopTrackTheme('track-pre'), sopTrackTheme('track-knowledge')];
+    const teams = blocks.map((block) => {
+      const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
+      return {
+        label: lines[0] || '',
+        members: lines.slice(1).join(' · ').split(/·|,/).map((m) => m.trim()).filter(Boolean),
+      };
+    });
+    const teamsHtml = teams.length
+      ? `<div class="sop-team-grid">${teams.map((t, i) => {
+          const th = teamThemes[i % teamThemes.length];
+          const members = t.members.length
+            ? `<div class="sop-team-members">${t.members.map((m) => `<span class="sop-team-member"><span class="sop-team-ava" style="background:${th.soft};color:${th.badgeColor}">${esc((m.trim()[0] || '?').toUpperCase())}</span>${esc(m)}</span>`).join('')}</div>`
+            : '<div class="sop-team-members"><span class="sop-team-member sop-team-member--empty">Noch offen</span></div>';
+          return `<div class="sop-team-block" style="border-left-color:${th.badgeColor}">
+            <div class="sop-team-title" style="color:${th.badgeColor}"><i class="fa-solid fa-people-group"></i> ${esc(t.label)}</div>
+            ${members}
+          </div>`;
+        }).join('')}</div>`
+      : (c.body ? `<p class="sop-pslide-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+    return `
+      <div class="sop-pslide-section sop-pslide-participants">
+        <div class="sop-pslide-badge" style="background:var(--brand);color:#fff"><i class="fa-solid fa-users"></i> Teilnehmer</div>
+        ${titleEl}
+        ${subEl}
+        ${teamsHtml}
+      </div>`;
+  }
+  // Generischer SOP-Content-Fallback (sonst wuerde eine unbekannte sopKind-Folie leer rendern).
   {
     const titleEl = editable
       ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
