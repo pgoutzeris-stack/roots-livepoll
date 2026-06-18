@@ -243,6 +243,36 @@
   }
 
   // ─── DEBUG HOOK ──────────────────────────────────────
+  const BOOT_REQUIRED = [
+    { key: 'LP_TEMPLATES', label: 'templates.js' },
+    { key: 'LPViz', label: 'viz.js' },
+    { key: 'State', label: 'app.js (State)' },
+    { key: 'LPApp', label: 'app.js (LPApp)' },
+    { key: 'renderPresent', label: 'app.js (renderPresent)' },
+    { key: 'renderDashboard', label: 'app.js (renderDashboard)' },
+    { key: 'toast', label: 'app.js (toast)' },
+  ];
+
+  function bootStatus() {
+    const missing = BOOT_REQUIRED.filter(({ key }) => {
+      if (key === 'State') return !window.State;
+      return typeof window[key] === 'undefined';
+    }).map(({ key, label }) => `${key} (${label})`);
+    return { ok: !missing.length, missing, build: window.LP_BUILD };
+  }
+
+  function logBootStatus(context) {
+    const st = bootStatus();
+    if (st.ok) {
+      console.info(`%c[LP] Boot OK %c build ${st.build}${context ? ` · ${context}` : ''}`,
+        'color:#059669;font-weight:700', 'color:inherit');
+    } else {
+      console.error('[LP] Boot incomplete — fehlende Globals:', st.missing);
+      if (window.toast) window.toast('App nicht vollständig geladen — bitte Hard-Refresh (⌘⇧R)', 'error');
+    }
+    return st;
+  }
+
   window.LP = {
     sb: sbCall,
     registerChannel,
@@ -253,6 +283,8 @@
     reportError,
     errors: () => errorBuffer.slice(),
     clearErrors: () => { errorBuffer.length = 0; localStorage.removeItem('lp_error_log'); },
+    bootStatus,
+    logBootStatus,
   };
 
   // Boot-Banner für Debugging
@@ -260,4 +292,7 @@
     'background:#206efb;color:#fff;padding:3px 8px;border-radius:4px 0 0 4px;font-weight:700',
     'background:#0f172a;color:#fff;padding:3px 8px;border-radius:0 4px 4px 0',
     '');
+
+  window.addEventListener('lp-app-ready', () => logBootStatus('lp-app-ready'));
+  window.addEventListener('load', () => setTimeout(() => logBootStatus('load'), 50));
 })();

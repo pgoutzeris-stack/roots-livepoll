@@ -19,6 +19,9 @@
 
   const origRenderPresent = window.renderPresent;
   const origRenderParticipantQuestion = window.renderParticipantQuestion;
+  let hooksInstalled = false;
+  let presentBase = null;
+  let participantBase = null;
   const State = window.State || {};
 
   // ═════════════════════════════════════════════════════════════
@@ -288,7 +291,8 @@
   // 7) HOOK INTO RENDER PIPELINE
   // ═════════════════════════════════════════════════════════════
   function wrappedRenderPresent(...args) {
-    const result = typeof origRenderPresent === 'function' ? origRenderPresent(...args) : undefined;
+    const fn = presentBase || origRenderPresent || window.renderPresentNow;
+    const result = typeof fn === 'function' ? fn(...args) : undefined;
     try {
       const slide = window.currentSessionSlide?.();
       if (!slide) { Timer.stop(); return result; }
@@ -326,7 +330,8 @@
   }
 
   async function wrappedRenderParticipantQuestion(...args) {
-    const result = typeof origRenderParticipantQuestion === 'function' ? await origRenderParticipantQuestion(...args) : undefined;
+    const fn = participantBase || origRenderParticipantQuestion || window.renderParticipantQuestion;
+    const result = typeof fn === 'function' ? await fn(...args) : undefined;
     try {
       const slide = window.currentSessionSlide?.();
       if (!slide) return result;
@@ -348,15 +353,34 @@
 
   // Install wrappers (deferred so app.js fully loaded)
   function installHooks() {
-    if (typeof window.renderPresent === 'function') {
-      window.renderPresent = wrappedRenderPresent;
+    if (hooksInstalled) return true;
+    presentBase = typeof origRenderPresent === 'function' ? origRenderPresent : window.renderPresentNow;
+    participantBase = typeof origRenderParticipantQuestion === 'function'
+      ? origRenderParticipantQuestion
+      : window.renderParticipantQuestion;
+    if (typeof presentBase !== 'function' || typeof participantBase !== 'function') return false;
+    window.renderPresent = wrappedRenderPresent;
+    window.renderParticipantQuestion = wrappedRenderParticipantQuestion;
+    if (window.LPApp) {
+      window.LPApp.renderPresent = window.renderPresent;
+      window.LPApp.renderParticipantQuestion = window.renderParticipantQuestion;
     }
-    if (typeof window.renderParticipantQuestion === 'function') {
-      window.renderParticipantQuestion = wrappedRenderParticipantQuestion;
-    }
+    hooksInstalled = true;
+    return true;
   }
-  if (document.readyState === 'complete') installHooks();
-  else window.addEventListener('load', installHooks);
+
+  function tryInstallHooks() {
+    if (installHooks()) return;
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      if (installHooks() || tries >= 40) clearInterval(timer);
+    }, 50);
+  }
+
+  window.addEventListener('lp-app-ready', () => tryInstallHooks());
+  if (document.readyState === 'complete') tryInstallHooks();
+  else window.addEventListener('load', tryInstallHooks);
 
   // ═════════════════════════════════════════════════════════════
   // 8) REACTION BROADCAST LISTENER

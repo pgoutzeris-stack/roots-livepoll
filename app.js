@@ -2948,11 +2948,26 @@ function bindDashboardSelection() {
 
   let marqueeEl = null;
   let marqueeActive = false;
+  let cardDrag = null;
   let startX = 0;
   let startY = 0;
   let marqueeAdditive = false;
   let marqueeBase = new Set();
   const DRAG_THRESHOLD = 5;
+
+  const beginMarquee = (clientX, clientY, additive) => {
+    marqueeActive = true;
+    startX = clientX;
+    startY = clientY;
+    marqueeAdditive = additive;
+    marqueeBase = additive ? new Set(getDashSelectedIds()) : new Set();
+    if (!additive) getDashSelectedIds().clear();
+    marqueeEl = document.createElement('div');
+    marqueeEl.className = 'dash-marquee';
+    marqueeEl.setAttribute('aria-hidden', 'true');
+    content.appendChild(marqueeEl);
+    content.classList.add('dash-selecting');
+  };
 
   const rectsIntersect = (a, b) => !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
 
@@ -2995,23 +3010,27 @@ function bindDashboardSelection() {
 
     const card = e.target.closest('.board-card');
     marqueeAdditive = e.metaKey || e.ctrlKey;
-    if (card) return;
+    if (card && !marqueeAdditive) {
+      cardDrag = { x: e.clientX, y: e.clientY };
+      return;
+    }
+    if (card && marqueeAdditive) return;
 
-    marqueeActive = true;
-    startX = e.clientX;
-    startY = e.clientY;
-    marqueeBase = marqueeAdditive ? new Set(getDashSelectedIds()) : new Set();
-    if (!marqueeAdditive) getDashSelectedIds().clear();
-
-    marqueeEl = document.createElement('div');
-    marqueeEl.className = 'dash-marquee';
-    marqueeEl.setAttribute('aria-hidden', 'true');
-    content.appendChild(marqueeEl);
-    content.classList.add('dash-selecting');
+    beginMarquee(e.clientX, e.clientY, marqueeAdditive);
     e.preventDefault();
   });
 
   document.addEventListener('mousemove', (e) => {
+    if (cardDrag && !marqueeActive) {
+      const dx = Math.abs(e.clientX - cardDrag.x);
+      const dy = Math.abs(e.clientY - cardDrag.y);
+      if (dx >= DRAG_THRESHOLD || dy >= DRAG_THRESHOLD) {
+        beginMarquee(cardDrag.x, cardDrag.y, false);
+        cardDrag = null;
+      } else {
+        return;
+      }
+    }
     if (!marqueeActive) return;
     const dx = Math.abs(e.clientX - startX);
     const dy = Math.abs(e.clientY - startY);
@@ -3021,6 +3040,7 @@ function bindDashboardSelection() {
   });
 
   document.addEventListener('mouseup', () => {
+    cardDrag = null;
     if (!marqueeActive) return;
     marqueeActive = false;
     marqueeEl?.remove();
@@ -3042,15 +3062,23 @@ function bindDashboardSelection() {
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
     if (!$('#screen-dashboard')?.classList.contains('active')) return;
-    if (!getDashSelectedIds().size) return;
-    clearDashSelection();
+    if (e.key === 'Escape' && getDashSelectedIds().size) {
+      clearDashSelection();
+      return;
+    }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && getDashSelectedIds().size) {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      void deletePresentationsByIds([...getDashSelectedIds()]);
+    }
   });
 }
 
 function renderDashboard() {
   const grid = $('#presentations-grid');
+  if (!grid) return;
   const list = filteredPresentations();
   const selected = getDashSelectedIds();
   const visibleIds = new Set(list.map((p) => p.id));
@@ -6869,6 +6897,62 @@ window.addEventListener('hashchange', routeFromHash);
 window.addEventListener('roots-auth-ready', (e) => { if (e.detail?.session) void onAuthSession(e.detail.session); });
 sb.auth.onAuthStateChange((_ev, session) => { if (session) void onAuthSession(session); });
 
+function exposeLpAppGlobals() {
+  const api = {
+    State,
+    toast,
+    lpConfirm,
+    lpPrompt,
+    renderDashboard,
+    loadPresentations,
+    renderPresent,
+    renderPresentNow,
+    renderParticipantQuestion,
+    broadcastSessionPatch,
+    applySessionPatch,
+    routeFromHash,
+    openEditor,
+    goDashboard,
+    currentSessionSlide,
+    changeSlide,
+    nextSlide: () => changeSlide(1),
+    prevSlide: () => changeSlide(-1),
+    deletePresentationsByIds,
+    clearDashSelection,
+    getDashSelectedIds,
+    toggleDashSelection,
+    selectDashRange,
+    bindDashboardSelection,
+    closeModal,
+  };
+  window.LPApp = api;
+  window.toast = toast;
+  window.lpConfirm = lpConfirm;
+  window.lpPrompt = lpPrompt;
+  window.renderDashboard = renderDashboard;
+  window.loadPresentations = loadPresentations;
+  window.renderPresent = renderPresent;
+  window.renderPresentNow = renderPresentNow;
+  window.renderParticipantQuestion = renderParticipantQuestion;
+  window.broadcastSessionPatch = broadcastSessionPatch;
+  window.applySessionPatch = applySessionPatch;
+  window.routeFromHash = routeFromHash;
+  window.openEditor = openEditor;
+  window.goDashboard = goDashboard;
+  window.currentSessionSlide = currentSessionSlide;
+  window.changeSlide = changeSlide;
+  window.nextSlide = api.nextSlide;
+  window.prevSlide = api.prevSlide;
+  window.closeModal = closeModal;
+  window.LP = window.LP || {};
+  window.LP.app = api;
+  window.LP.boot = { ok: true, at: Date.now(), build: window.LP_BUILD };
+  try {
+    window.dispatchEvent(new CustomEvent('lp-app-ready', { detail: { app: api } }));
+  } catch (_) { /* noop */ }
+}
+
+exposeLpAppGlobals();
 bindUi();
 void flushPendingQueue();
 if (isJoinRoute()) {
