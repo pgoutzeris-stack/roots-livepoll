@@ -1864,35 +1864,48 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   margin-left:0!important;
   margin-right:0!important;
 }
-/* SOP-Board — flat im Present-Modus */
+/* SOP-Board — Original-Kacheln, vergrößert für mehr Platz im Present-Modus */
 .lp-sop-workshop.present-mode .sop-board-preview{
   margin-top:0;
-  border-radius:0;
+  border-radius:14px;
   box-shadow:none;
-  background:transparent;
+  background:var(--bg);
 }
 .lp-sop-workshop.present-mode .sop-board-phases-row{
-  padding:.75rem 0;
-  gap:.85rem;
+  padding:clamp(.85rem,1.6vw,1.1rem);
+  gap:clamp(.75rem,1.4vw,1rem);
   scrollbar-width:thin;
 }
 .lp-sop-workshop.present-mode .sop-board-phase{
-  min-width:min(200px,42vw);
+  min-width:min(220px,44vw);
+}
+.lp-sop-workshop.present-mode .sop-board-phase-label{
+  font-size:clamp(.82rem,1.4vw,.92rem);
+  margin-bottom:.15rem;
+}
+.lp-sop-workshop.present-mode .sop-board-cards{
+  gap:clamp(.5rem,1vw,.65rem);
 }
 .lp-sop-workshop.present-mode .sop-board-card,
 .lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .sop-board-card,
 .lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .ws-orient-col--split-present .sop-board-card,
 .lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .workshop-collect-shell--split .sop-board-card{
-  font-size:.82rem;
-  padding:.42rem 0;
-  border-radius:0;
-  border:none;
-  border-bottom:1px solid rgba(148,163,184,.22);
-  box-shadow:none;
-  background:transparent;
+  font-size:clamp(.88rem,1.5vw,1.05rem);
+  padding:clamp(.55rem,1.1vw,.68rem) clamp(.62rem,1.2vw,.78rem);
+  border-radius:16px;
+  border:1px solid var(--line);
+  box-shadow:var(--shadow);
+  background:var(--surface);
+  line-height:1.4;
 }
 .lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .ws-orient-col--split-present .sop-board-phase,
-.lp-sop-workshop.present-mode.sop-split-stage .ws-split-sop-board .sop-board-phase{min-width:min(240px,46vw)}
+.lp-sop-workshop.present-mode.sop-split-stage .ws-split-sop-board .sop-board-phase{
+  min-width:min(260px,48vw);
+}
+.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .ws-orient-col--split-present .sop-board-phase-label,
+.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .workshop-collect-shell--split .sop-board-phase-label{
+  font-size:clamp(.78rem,1.3vw,.88rem);
+}
 /* Split-View — maximale Fläche für SOP-Boards */
 .lp-sop-workshop.present-mode.sop-split-stage .present-stage{
   padding:clamp(.4rem,.9vw,.65rem) clamp(.4rem,1.1vw,.85rem) 4.75rem;
@@ -1915,12 +1928,13 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-sop-workshop.present-mode .sop-split-grid{gap:clamp(.65rem,1.4vw,.85rem)}
 .lp-sop-workshop.present-mode .sop-split-col{
   border:none;
-  border-radius:0;
-  box-shadow:none;
-  background:transparent;
+  border-radius:16px;
+  box-shadow:var(--shadow);
+  background:var(--bg);
+  overflow:hidden;
 }
 .lp-sop-workshop.present-mode .sop-split-col-head{
-  background:transparent;
+  background:var(--surface);
   border-bottom:1px solid var(--line);
 }
 .lp-sop-workshop.present-mode .sop-split-col-body{padding:clamp(.75rem,1.5vw,1rem)}
@@ -1936,11 +1950,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .workshop-collect-shell--split .workshop-collect-note,
 .lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .ws-orient-col--split-present .sop-board-preview,
 .lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .workshop-collect-shell--split .sop-board-preview{
-  font-size:.95rem;
-}
-.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .ws-orient-col--split-present .sop-board-phase-label,
-.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .workshop-collect-shell--split .sop-board-phase-label{
-  font-size:.72rem;
+  font-size:clamp(.95rem,1.5vw,1.05rem);
 }
 /* Inhalts-Module innerhalb ws-body — flat, ohne Karten-Boxen */
 .lp-sop-workshop.present-mode .ws-body .ws-goal-copy{
@@ -2051,7 +2061,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 .lp-sop-workshop.present-mode.sop-split-stage .ws-split-sop-board{
   flex:1 1 auto;
-  min-height:min(50vh,560px);
+  min-height:min(54vh,600px);
   overflow:auto;
   display:flex;
   flex-direction:column;
@@ -2069,7 +2079,9 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-sop-workshop.present-mode.sop-split-stage .ws-split-sop-board .sop-board-phases-row{
   flex:1;
   align-items:stretch;
-  min-height:min(44vh,500px);
+  min-height:min(48vh,540px);
+  padding:clamp(.75rem,1.4vw,1rem);
+  gap:clamp(.8rem,1.5vw,1.05rem);
 }
 .lp-sop-workshop.present-mode.sop-split-stage .ws-split-collect-viz{
   flex:0 0 auto;
