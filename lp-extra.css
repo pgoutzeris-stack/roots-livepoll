@@ -668,8 +668,8 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 
 /* ─── Workshop Instructions Slide (content type) ─────────────── */
 .workshop-instructions-card{
-  max-width:780px;
-  margin:0 auto;
+  max-width:none;
+  margin:0;
 }
 /* Formel: Use Case + Feature + Abhängigkeiten als Label-Kette */
 .workshop-instructions-card .wi-formula{
@@ -1481,4 +1481,223 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .lp-mx-quad,.lp-matrix-result-cell.lp-mx-quad{padding:.55rem;min-height:100px}
   .ws-title{font-size:1.55rem}
   .lp-mx-axis-name{font-size:.62rem}
+}
+
+/* ═══════ WS-PRESENT v3 · State-of-the-art Workshop Slides ═══════ */
+/* Behebt Konflikte mit styles.css (zentriert) und vereinheitlicht alle Folien. */
+.lp-sop-workshop.present-mode .present-stage{
+  justify-content:flex-start;
+  align-items:stretch;
+  text-align:left;
+  padding:clamp(.85rem,2vw,1.35rem) clamp(.85rem,2.5vw,2rem) 5.25rem;
+  background:var(--bg);
+}
+.lp-sop-workshop.present-mode .present-stage h1{margin-bottom:0}
+.lp-sop-workshop.present-mode .pslide-slide{
+  width:100%;
+  max-width:min(1280px,100%);
+  margin:0 auto;
+  padding:0;
+  min-height:0;
+}
+.lp-sop-workshop.present-mode .pslide-slide-content,
+.lp-sop-workshop.present-mode .pslide-slide-content--ws{
+  align-items:stretch;
+  justify-content:flex-start;
+  text-align:left;
+  padding:0;
+  gap:0;
+  width:100%;
+}
+.lp-sop-workshop.present-mode .ws-slide{
+  background:linear-gradient(180deg,var(--surface) 0%,var(--bg) 100%);
+  border:1px solid var(--line);
+  border-radius:20px;
+  padding:clamp(1rem,2.2vw,1.55rem) clamp(1rem,2.4vw,1.75rem);
+  box-shadow:0 14px 44px rgba(15,23,42,.07);
+  gap:clamp(.75rem,1.6vw,1rem);
+}
+.lp-sop-workshop.present-mode .ws-slide-head{
+  padding-bottom:.7rem;
+  border-bottom:1px solid var(--line);
+  margin-bottom:.1rem;
+}
+.lp-sop-workshop.present-mode .ws-title{
+  font-size:clamp(1.55rem,2.8vw,2.25rem);
+  font-weight:900;
+  letter-spacing:-.025em;
+  line-height:1.1;
+}
+.lp-sop-workshop.present-mode .ws-lead{
+  font-size:.92rem;
+  font-weight:600;
+  color:var(--muted);
+  max-width:none;
+  padding-left:.1rem;
+}
+.lp-sop-workshop.present-mode .ws-body,
+.lp-sop-workshop.present-mode .ws-body-inner{
+  width:100%;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:.85rem;
+}
+.lp-sop-workshop.present-mode .ws-pill{
+  font-size:.64rem;
+  padding:.32rem .7rem;
+}
+.lp-sop-workshop.present-mode .ws-chip{
+  font-size:.68rem;
+  padding:.24rem .55rem;
+}
+/* Legacy-Zentrierung in WS-Kontext neutralisieren */
+.lp-sop-workshop.present-mode .sop-pslide-section,
+.lp-sop-workshop.present-mode .pslide-question-block,
+.lp-sop-workshop.present-mode .workshop-collect-shell{
+  text-align:left;
+  margin:0;
+  max-width:none;
+  padding:0;
+  width:100%;
+}
+.lp-sop-workshop.present-mode .sop-pslide-body,
+.lp-sop-workshop.present-mode .sop-pslide-sub{
+  text-align:left;
+  margin-left:0;
+  margin-right:0;
+  max-width:none;
+}
+.lp-sop-workshop.present-mode .pslide-q-title,
+.lp-sop-workshop.present-mode .pslide-q-prompt,
+.lp-sop-workshop.present-mode .pslide-q-sub{
+  margin-left:0!important;
+  margin-right:0!important;
+  max-width:none!important;
+  text-align:left!important;
+}
+.lp-sop-workshop.present-mode .viz-wrap,
+.lp-sop-workshop.present-mode .viz-wrap-present{
+  width:100%!important;
+  max-width:none!important;
+  margin-top:.5rem!important;
+  margin-left:0!important;
+  margin-right:0!important;
+}
+/* SOP-Board */
+.lp-sop-workshop.present-mode .sop-board-preview{
+  margin-top:0;
+  border-radius:14px;
+  box-shadow:none;
+  background:var(--bg);
+}
+.lp-sop-workshop.present-mode .sop-board-phases-row{
+  padding:.75rem;
+  gap:.65rem;
+  scrollbar-width:thin;
+}
+.lp-sop-workshop.present-mode .sop-board-phase{
+  min-width:min(200px,42vw);
+}
+.lp-sop-workshop.present-mode .sop-board-card{
+  font-size:.8rem;
+  padding:.48rem .58rem;
+  border-radius:10px;
+}
+/* Split-View */
+.lp-sop-workshop.present-mode.sop-split-stage .present-stage{padding-top:clamp(.65rem,1.5vw,1rem)}
+.lp-sop-workshop.present-mode .sop-split-grid{gap:clamp(.65rem,1.4vw,.85rem)}
+.lp-sop-workshop.present-mode .sop-split-col{
+  border-radius:16px;
+  box-shadow:0 8px 28px rgba(15,23,42,.06);
+}
+.lp-sop-workshop.present-mode .sop-split-col-body{padding:clamp(.75rem,1.5vw,1rem)}
+.lp-sop-workshop.present-mode.sop-split-stage .ws-title{font-size:clamp(1.35rem,2.2vw,1.75rem)}
+.lp-sop-workshop.present-mode.sop-split-stage .ws-slide{padding:clamp(.85rem,1.8vw,1.25rem)}
+/* Inhalts-Module innerhalb ws-body */
+.lp-sop-workshop.present-mode .ws-body .ws-hero-body{
+  font-size:.98rem;
+  line-height:1.65;
+  color:var(--ink);
+  padding:1rem 1.15rem;
+  background:var(--bg);
+  border:1px solid var(--line);
+  border-radius:14px;
+  border-left:4px solid var(--brand);
+}
+.lp-sop-workshop.present-mode .ws-body .workshop-instructions-card{
+  max-width:none;
+  margin:0;
+  padding:1rem 1.1rem;
+  background:var(--bg);
+  border:1px solid var(--line);
+  border-radius:14px;
+}
+.lp-sop-workshop.present-mode .ws-body .goal-matrix{
+  max-width:min(680px,100%);
+  margin:0;
+}
+.lp-sop-workshop.present-mode .ws-body .sop-team-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));
+  gap:.85rem;
+}
+.lp-sop-workshop.present-mode .ws-body .sop-team-block{
+  padding:.85rem 1rem;
+  border-radius:14px;
+}
+.lp-sop-workshop.present-mode .ws-body .workshop-collect-shell--compact .workshop-collect-question{
+  font-size:1.02rem;
+  font-weight:700;
+  margin:.1rem 0 .45rem;
+  max-width:none;
+}
+.lp-sop-workshop.present-mode .ws-body .workshop-format-hint,
+.lp-sop-workshop.present-mode .ws-body .workshop-collect-note{
+  max-width:none;
+}
+.lp-sop-workshop.present-mode .ws-body .finale-vote,
+.lp-sop-workshop.present-mode .ws-body .ws-board{
+  max-width:none;
+  margin:0;
+}
+.lp-sop-workshop.present-mode .ws-body .lp-mx-frame{max-width:none;margin:0}
+.lp-sop-workshop.present-mode .ws-body .next-steps-list{
+  margin-top:0;
+  grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));
+}
+.lp-sop-workshop.present-mode .ws-body .pitch-hint{
+  padding:.55rem .75rem;
+  background:var(--brand-light);
+  border-radius:10px;
+  border:1px solid rgba(32,110,251,.15);
+}
+.lp-sop-workshop.present-mode .ws-col-title{
+  font-size:1rem;
+  padding-bottom:.35rem;
+  border-bottom:1px solid var(--line);
+  margin-bottom:.45rem;
+}
+/* Teilnehmer: gleiche WS-Shell */
+.lp-sop-workshop.participant-mode .ws-slide{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:1rem 1.1rem;
+  text-align:left;
+}
+.lp-sop-workshop.participant-mode .ws-title{font-size:1.35rem}
+@media(max-width:760px){
+  .lp-sop-workshop.present-mode .present-stage{padding:.65rem .75rem 5rem}
+  .lp-sop-workshop.present-mode .ws-slide{border-radius:16px;padding:.9rem}
+  .lp-sop-workshop.present-mode .sop-board-phase{min-width:min(170px,78vw)}
+  .lp-sop-workshop.present-mode .ws-row{grid-template-columns:1.5rem minmax(0,1fr) auto}
+}
+@media (prefers-color-scheme:dark){
+  .lp-sop-workshop.present-mode .ws-slide{
+    background:linear-gradient(180deg,var(--surface) 0%,rgba(15,23,42,.35) 100%);
+    box-shadow:0 14px 44px rgba(0,0,0,.25);
+  }
+  .lp-sop-workshop.present-mode .ws-body .workshop-instructions-card,
+  .lp-sop-workshop.present-mode .ws-body .ws-hero-body{background:rgba(255,255,255,.03)}
 }

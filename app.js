@@ -1128,9 +1128,10 @@ function renderWorkshopProgressHtml(slideIndex) {
 }
 
 function wrapSlide(bodyHtml, slideIndex) {
-  return `<div class="pslide-slide">
-    ${renderWorkshopProgressHtml(slideIndex)}
-    <div class="pslide-slide-content">${bodyHtml}</div>
+  const ws = isSopWorkshopPresentation();
+  return `<div class="pslide-slide${ws ? ' pslide-slide--ws' : ''}">
+    ${ws ? '' : renderWorkshopProgressHtml(slideIndex)}
+    <div class="pslide-slide-content${ws ? ' pslide-slide-content--ws' : ''}">${bodyHtml}</div>
   </div>`;
 }
 
@@ -2000,7 +2001,7 @@ function renderWsSlideShell({ pillIcon, pillLabel, pillTone = 'brand', title, ch
     </header>
     ${title ? `<h1 class="ws-title">${esc(title)}</h1>` : ''}
     ${leadHtml}
-    ${main ? `<div class="ws-body">${main}</div>` : ''}
+    ${main ? `<div class="ws-body"><div class="ws-body-inner">${main}</div></div>` : ''}
   </section>`;
 }
 
