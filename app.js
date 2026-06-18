@@ -29,6 +29,10 @@ const State = {
   authMode: 'signin',
   dashFilter: 'all',
   search: '',
+  dashSelectedIds: null,
+  dashLastSelectedId: null,
+  dashMarqueeDragging: false,
+  dashSelectionBound: false,
   presentations: [],
   presentation: null,
   slides: [],
@@ -2849,13 +2853,216 @@ function filteredPresentations() {
   return list;
 }
 
+function getDashSelectedIds() {
+  if (!(State.dashSelectedIds instanceof Set)) State.dashSelectedIds = new Set();
+  return State.dashSelectedIds;
+}
+
+function clearDashSelection() {
+  getDashSelectedIds().clear();
+  State.dashLastSelectedId = null;
+  syncDashSelectionUi();
+}
+
+function toggleDashSelection(id) {
+  const ids = getDashSelectedIds();
+  if (ids.has(id)) ids.delete(id);
+  else ids.add(id);
+  State.dashLastSelectedId = id;
+  syncDashSelectionUi();
+}
+
+function selectDashRange(fromId, toId) {
+  const list = filteredPresentations();
+  const i1 = list.findIndex((p) => p.id === fromId);
+  const i2 = list.findIndex((p) => p.id === toId);
+  if (i1 < 0 || i2 < 0) {
+    toggleDashSelection(toId);
+    return;
+  }
+  const [a, b] = i1 < i2 ? [i1, i2] : [i2, i1];
+  for (let i = a; i <= b; i += 1) getDashSelectedIds().add(list[i].id);
+  State.dashLastSelectedId = toId;
+  syncDashSelectionUi();
+}
+
+function syncDashSelectionUi() {
+  const ids = getDashSelectedIds();
+  const grid = $('#presentations-grid');
+  grid?.querySelectorAll('.board-card').forEach((card) => {
+    const on = ids.has(card.dataset.id);
+    card.classList.toggle('is-selected', on);
+    card.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  const count = ids.size;
+  const toolbar = $('.dash-toolbar');
+  let bar = $('#dash-selection-bar');
+  if (!count) {
+    bar?.remove();
+    toolbar?.classList.remove('has-selection');
+    return;
+  }
+  toolbar?.classList.add('has-selection');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'dash-selection-bar';
+    bar.className = 'dash-selection-bar';
+    toolbar?.insertBefore(bar, toolbar.querySelector('.dash-search-wrap'));
+  }
+  bar.innerHTML = `
+    <span class="dash-selection-count"><strong>${count}</strong> ausgewählt</span>
+    <button type="button" class="btn-ghost dash-selection-clear" data-clear-selection><i class="fa-solid fa-xmark"></i> Aufheben</button>
+    <button type="button" class="btn-danger dash-selection-delete" data-bulk-delete><i class="fa-solid fa-trash"></i> Löschen</button>`;
+}
+
+async function deletePresentationsByIds(ids) {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (!unique.length) return;
+  const n = unique.length;
+  const desc = n === 1
+    ? 'Die Präsentation und alle Folien werden dauerhaft entfernt.'
+    : `${n} Präsentationen und alle zugehörigen Folien werden dauerhaft entfernt.`;
+  if (!await lpConfirm({
+    title: n === 1 ? 'Präsentation löschen?' : `${n} Präsentationen löschen?`,
+    desc,
+    okLabel: 'Löschen',
+    variant: 'danger',
+    icon: 'fa-trash',
+  })) return;
+  const { error } = await sb.from('lp_presentations').delete().in('id', unique);
+  if (error) { toast(error.message, 'error'); return; }
+  unique.forEach((id) => getDashSelectedIds().delete(id));
+  if (!getDashSelectedIds().size) State.dashLastSelectedId = null;
+  await loadPresentations();
+  renderDashboard();
+  toast(n === 1 ? 'Präsentation gelöscht' : `${n} Präsentationen gelöscht`, 'success');
+}
+
+function bindDashboardSelection() {
+  if (State.dashSelectionBound) return;
+  State.dashSelectionBound = true;
+
+  const content = $('.dash-content');
+  const toolbar = $('.dash-toolbar');
+  if (!content) return;
+
+  let marqueeEl = null;
+  let marqueeActive = false;
+  let startX = 0;
+  let startY = 0;
+  let marqueeAdditive = false;
+  let marqueeBase = new Set();
+  const DRAG_THRESHOLD = 5;
+
+  const rectsIntersect = (a, b) => !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+
+  const updateMarqueeSelection = (clientX, clientY) => {
+    const contentRect = content.getBoundingClientRect();
+    const scrollTop = content.scrollTop;
+    const selRect = {
+      left: Math.min(startX, clientX) - contentRect.left,
+      top: Math.min(startY, clientY) - contentRect.top + scrollTop,
+      right: Math.max(startX, clientX) - contentRect.left,
+      bottom: Math.max(startY, clientY) - contentRect.top + scrollTop,
+    };
+    if (marqueeEl) {
+      marqueeEl.style.left = `${selRect.left}px`;
+      marqueeEl.style.top = `${selRect.top}px`;
+      marqueeEl.style.width = `${selRect.right - selRect.left}px`;
+      marqueeEl.style.height = `${selRect.bottom - selRect.top}px`;
+    }
+    const hitIds = new Set(marqueeBase);
+    content.querySelectorAll('.board-card').forEach((card) => {
+      const cr = card.getBoundingClientRect();
+      const cardRect = {
+        left: cr.left - contentRect.left,
+        top: cr.top - contentRect.top + scrollTop,
+        right: cr.right - contentRect.left,
+        bottom: cr.bottom - contentRect.top + scrollTop,
+      };
+      if (rectsIntersect(selRect, cardRect)) hitIds.add(card.dataset.id);
+    });
+    State.dashSelectedIds = hitIds;
+    syncDashSelectionUi();
+  };
+
+  content.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    if (!$('#screen-dashboard')?.classList.contains('active')) return;
+    if (e.target.closest('.board-action-btn')) return;
+    if (e.target.closest('#card-create')) return;
+    if (e.target.closest('#dash-selection-bar')) return;
+
+    const card = e.target.closest('.board-card');
+    marqueeAdditive = e.metaKey || e.ctrlKey;
+    if (card) return;
+
+    marqueeActive = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    marqueeBase = marqueeAdditive ? new Set(getDashSelectedIds()) : new Set();
+    if (!marqueeAdditive) getDashSelectedIds().clear();
+
+    marqueeEl = document.createElement('div');
+    marqueeEl.className = 'dash-marquee';
+    marqueeEl.setAttribute('aria-hidden', 'true');
+    content.appendChild(marqueeEl);
+    content.classList.add('dash-selecting');
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!marqueeActive) return;
+    const dx = Math.abs(e.clientX - startX);
+    const dy = Math.abs(e.clientY - startY);
+    if (dx < DRAG_THRESHOLD && dy < DRAG_THRESHOLD) return;
+    State.dashMarqueeDragging = true;
+    updateMarqueeSelection(e.clientX, e.clientY);
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!marqueeActive) return;
+    marqueeActive = false;
+    marqueeEl?.remove();
+    marqueeEl = null;
+    content.classList.remove('dash-selecting');
+    setTimeout(() => { State.dashMarqueeDragging = false; }, 0);
+  });
+
+  toolbar?.addEventListener('click', (e) => {
+    if (e.target.closest('[data-clear-selection]')) {
+      e.preventDefault();
+      clearDashSelection();
+      return;
+    }
+    if (e.target.closest('[data-bulk-delete]')) {
+      e.preventDefault();
+      void deletePresentationsByIds([...getDashSelectedIds()]);
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!$('#screen-dashboard')?.classList.contains('active')) return;
+    if (!getDashSelectedIds().size) return;
+    clearDashSelection();
+  });
+}
+
 function renderDashboard() {
   const grid = $('#presentations-grid');
   const list = filteredPresentations();
+  const selected = getDashSelectedIds();
+  const visibleIds = new Set(list.map((p) => p.id));
+  selected.forEach((id) => { if (!visibleIds.has(id)) selected.delete(id); });
+
   grid.innerHTML = `
     <div class="create-card" id="card-create"><i class="fa-solid fa-plus"></i><span>Neue Präsentation</span></div>
-    ${list.map((p) => `
-      <article class="board-card" data-id="${p.id}">
+    ${list.map((p) => {
+      const isSel = selected.has(p.id);
+      return `
+      <article class="board-card${isSel ? ' is-selected' : ''}" data-id="${p.id}" aria-selected="${isSel ? 'true' : 'false'}">
+        <span class="board-select-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
         <div class="board-thumb"><i class="fa-solid fa-signal"></i></div>
         <div class="board-meta">
           <div class="board-name">${esc(p.title)}</div>
@@ -2867,12 +3074,27 @@ function renderDashboard() {
           <button type="button" class="board-action-btn" data-act="dup" title="Duplizieren"><i class="fa-solid fa-copy"></i></button>
           <button type="button" class="board-action-btn" data-act="del" title="Löschen"><i class="fa-solid fa-trash"></i></button>
         </div>
-      </article>`).join('')}`;
+      </article>`;
+    }).join('')}`;
   grid.querySelector('#card-create')?.addEventListener('click', () => createPresentation());
   grid.querySelectorAll('.board-card').forEach((card) => {
     card.addEventListener('click', (e) => {
       if (e.target.closest('.board-action-btn')) return;
-      openEditor(card.dataset.id);
+      if (State.dashMarqueeDragging) { e.preventDefault(); return; }
+      const id = card.dataset.id;
+      const isMeta = e.metaKey || e.ctrlKey;
+      if (isMeta) {
+        e.preventDefault();
+        toggleDashSelection(id);
+        return;
+      }
+      if (e.shiftKey && State.dashLastSelectedId) {
+        e.preventDefault();
+        selectDashRange(State.dashLastSelectedId, id);
+        return;
+      }
+      if (getDashSelectedIds().size) clearDashSelection();
+      openEditor(id);
     });
     card.querySelector('[data-act="fav"]')?.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -2894,11 +3116,11 @@ function renderDashboard() {
     });
     card.querySelector('[data-act="del"]')?.addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (!await lpConfirm({ title: 'Präsentation löschen?', desc: 'Die Präsentation und alle Folien werden dauerhaft entfernt.', okLabel: 'Löschen', variant: 'danger', icon: 'fa-trash' })) return;
-      await sb.from('lp_presentations').delete().eq('id', card.dataset.id);
-      await loadPresentations(); renderDashboard();
+      await deletePresentationsByIds([card.dataset.id]);
     });
   });
+  syncDashSelectionUi();
+  bindDashboardSelection();
 }
 
 async function createPresentation(templateKey) {
