@@ -959,12 +959,70 @@ function buildMarketingSopWorkshopSlides() {
   return slides;
 }
 
-// ─── DUAL SOP · KI WORKSHOP (Internal + Consulting parallel) ──────────
-// Beide SOPs parallel sammeln · Host weist Teilnehmer zu · gemeinsame Priorisierung + ICE-Matrix.
-function buildDualSopWorkshopSlides() {
+// ─── DUAL SOP · SEQUENZIELL (Internal, dann Consulting — kein Split-View) ─────
+function buildDualSopSequentialWorkshopSlides() {
   const slides = [];
 
-  // EINE gemeinsame Priorisierung über BEIDE SOPs (kein sopGroup → alle Tracks beider SOPs).
+  function combinedVote() {
+    const n = (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
+    return tplSlide('mc_multi', {
+      title: 'Gesamt-Priorisierung · beide SOPs',
+      subtitle: `Wählt die Top ${n} KI Use Cases aus Internal + Consulting`,
+      prompt: `Welche ${n} Use Cases haben über beide SOPs hinweg den größten Hebel für ROOTS?`,
+      isQuestionSlide: true,
+      options: [],
+      maxSelections: n,
+      sopKind: 'group-vote',
+    }, { showResultsLive: true, sopAllTracksVote: true, sopVoteMax: n, workshopMode: 'decide' });
+  }
+
+  function tagSeqSlide(slide, group) {
+    slide.content.sopGroup = group;
+    slide.content.sopGroupLabel = group === 'internal' ? 'Internal SOP' : 'Consulting SOP';
+    return slide;
+  }
+
+  slides.push(tplSlide('content', {
+    title: 'SOP · KI Use-Case Workshop',
+    subtitle: 'Internal + Consulting · nacheinander',
+    body: 'QR scannen · Name + Avatar wählen · los geht\'s!',
+    isHeroSlide: true,
+  }));
+
+  slides.push(sopWorkshopGoal());
+  slides.push(sopWorkshopInstructions());
+
+  slides.push(tplSlide('content', {
+    title: 'Wer ist dabei?',
+    subtitle: 'Zwei Teams · zwei SOPs · wir starten mit dem internen SOP',
+    body: 'Internal SOP\nRichard Erbler · Jannick Müller · Pano Goutzeris\n\nConsulting SOP\nManuel Stankovic · Rod Mitecki',
+    sopKind: 'participants',
+    isHeroSlide: false,
+  }, { workshopMode: 'orient' }));
+
+  INTERNAL_SOP_TRACKS.forEach((t, i) => {
+    slides.push(tagSeqSlide(sopTrackIntro(t, i), 'internal'));
+    slides.push(tagSeqSlide(sopTrackBrainstorm(t), 'internal'));
+  });
+
+  SOP_TOOL_TRACKS.forEach((t, i) => {
+    slides.push(tagSeqSlide(sopTrackIntro(t, i), 'consulting'));
+    slides.push(tagSeqSlide(sopTrackBrainstorm(t), 'consulting'));
+  });
+
+  slides.push(combinedVote());
+  slides.push(sopPitchSession());
+  slides.push(sopIceMatrix());
+  slides.push(sopWorkshopNextSteps());
+  slides.push(...sopWorkshopClose());
+
+  return slides;
+}
+
+// ─── DUAL SOP · PARALLEL (Internal + Consulting gleichzeitig · Split-View) ──
+function buildDualSopParallelWorkshopSlides() {
+  const slides = [];
+
   function combinedVote() {
     const n = (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
     return tplSlide('mc_multi', {
@@ -982,22 +1040,21 @@ function buildDualSopWorkshopSlides() {
     slide.content.sopGroup = group;
     slide.content.sopGroupLabel = group === 'internal' ? 'Internal SOP' : 'Consulting SOP';
     slide.content.sopDualPairIndex = pairIndex;
+    slide.content.sopDualParallel = true;
     return slide;
   }
 
-  // 1. Opener (Join)
   slides.push(tplSlide('content', {
     title: 'SOP · KI Use-Case Workshop',
     subtitle: 'Internal + Consulting · zwei Teams parallel',
     body: 'QR scannen · Name + Avatar wählen · Host weist euch euer SOP-Team zu · los geht\'s!',
     isHeroSlide: true,
+    sopDualParallel: true,
   }));
 
-  // 2. Zielbild + 3. Instruktionen
   slides.push(sopWorkshopGoal());
   slides.push(sopWorkshopInstructions());
 
-  // 4. Teilnehmer-Intro (zwei Teams) — vor dem parallelen Start
   slides.push(tplSlide('content', {
     title: 'Wer ist dabei?',
     subtitle: 'Zwei SOPs · parallel · Host weist Teilnehmer den Teams zu',
@@ -1006,7 +1063,6 @@ function buildDualSopWorkshopSlides() {
     isHeroSlide: false,
   }, { workshopMode: 'orient' }));
 
-  // 5. Track-Paare parallel: je Runde Internal + Consulting nebeneinander (Split-View am Beamer)
   const pairCount = Math.max(INTERNAL_SOP_TRACKS.length, SOP_TOOL_TRACKS.length);
   for (let i = 0; i < pairCount; i += 1) {
     if (INTERNAL_SOP_TRACKS[i]) {
@@ -1023,10 +1079,7 @@ function buildDualSopWorkshopSlides() {
     }
   }
 
-  // 6. EINE konsolidierte Priorisierung über beide SOPs (kein Split)
   slides.push(combinedVote());
-
-  // 10.–13. Pitch · gemeinsame ICE-Matrix · Next Steps · Abschluss
   slides.push(sopPitchSession());
   slides.push(sopIceMatrix());
   slides.push(sopWorkshopNextSteps());
@@ -1067,14 +1120,24 @@ window.LP_TEMPLATES = [
     slides: buildMarketingSopWorkshopSlides(),
   },
   {
-    key: 'roots-sop-dual-internal-consulting',
+    key: 'roots-sop-dual-internal-consulting-sequential',
     category: 'ROOTS · SOP & KI',
-    name: 'Internal + Consulting · Pro Track',
-    desc: 'Beide SOPs parallel · Split-View auf Track-Intro + Brainstorm (volle Breite) · Host weist Teilnehmer zu · EINE konsolidierte Priorisierung + gemeinsame ICE-Matrix.',
+    name: 'Internal + Consulting · nacheinander',
+    desc: 'Erst Internal-SOP, dann Consulting-SOP · keine Split-View · EINE konsolidierte Priorisierung + gemeinsame ICE-Matrix.',
     duration: '90–120 Min.',
     group: '5–25',
-    tips: 'QR-Join → Host weist jedem Teilnehmer Internal oder Consulting zu. Am Beamer laufen beide SOPs im Split-View parallel (Track-Intro + Brainstorm). Priorisierung, Pitch und Matrix zeigen alle Use Cases konsolidiert — ohne Split.',
-    slides: buildDualSopWorkshopSlides(),
+    tips: 'Klassischer Ablauf: Internal komplett durch, danach Consulting. Alle sammeln gemeinsam an derselben Folie. Am Ende eine Gesamt-Priorisierung, Pitch und Matrix über beide SOPs.',
+    slides: buildDualSopSequentialWorkshopSlides(),
+  },
+  {
+    key: 'roots-sop-dual-internal-consulting-parallel',
+    category: 'ROOTS · SOP & KI',
+    name: 'Internal + Consulting · parallel',
+    desc: 'Beide SOPs gleichzeitig · Split-View auf Track-Intro + Brainstorm · Host weist Teilnehmer zu · EINE konsolidierte Priorisierung + gemeinsame ICE-Matrix.',
+    duration: '90–120 Min.',
+    group: '5–25',
+    tips: 'QR-Join → Host weist jedem Teilnehmer Internal oder Consulting zu. Am Beamer laufen beide SOPs im Split-View parallel. Priorisierung, Pitch und Matrix zeigen alle Use Cases konsolidiert — ohne Split.',
+    slides: buildDualSopParallelWorkshopSlides(),
   },
 ];
 

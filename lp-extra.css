@@ -1378,7 +1378,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .sop-split-slides .viz-wrap-present{margin-top:.75rem}
 
 /* Host: SOP-Zuweisung pro Teilnehmer (Dual-Workshop) */
-.lp-dual-sop .present-participants-bar{display:block!important;max-width:min(560px,92vw)}
+.lp-dual-sop-parallel .present-participants-bar{display:block!important;max-width:min(560px,92vw)}
 .present-participant-chip--dual{align-items:center;gap:.35rem;padding:.35rem .5rem .35rem .35rem}
 .present-participant-name{max-width:8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.78rem}
 .sop-assign-btns{display:inline-flex;gap:2px;margin-left:.15rem}

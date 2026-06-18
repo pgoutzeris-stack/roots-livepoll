@@ -1426,6 +1426,18 @@ function isDualSopWorkshop() {
   return groups.has('internal') && groups.has('consulting');
 }
 
+// Split-View + parallele Teilnehmer-Zuweisung nur bei explizit paralleler Dual-SOP-Vorlage.
+function isDualSopParallelWorkshop() {
+  if ((State.slides || []).some((s) => s.content?.sopDualParallel)) return true;
+  if (!isDualSopWorkshop()) return false;
+  const intBrain = brainstormSlidesOfGroup('internal');
+  const conIntroIdx = (State.slides || []).findIndex((s) => s.content?.sopGroup === 'consulting' && s.content?.sopKind === 'track');
+  const lastIntBrainIdx = intBrain.length
+    ? (State.slides || []).findIndex((s) => s.id === intBrain[intBrain.length - 1].id)
+    : -1;
+  return conIntroIdx >= 0 && lastIntBrainIdx >= 0 && conIntroIdx < lastIntBrainIdx;
+}
+
 function getDualSopPairIndex(slide) {
   if (!slide) return null;
   if (slide.content?.sopDualPairIndex != null) return slide.content.sopDualPairIndex;
@@ -1453,7 +1465,7 @@ function findDualSopSlideByPair(group, pairIndex, slideType) {
 }
 
 function resolveParticipantSlide(slide) {
-  if (!slide || !isDualSopWorkshop() || !State.participant) return slide;
+  if (!slide || !isDualSopParallelWorkshop() || !State.participant) return slide;
   if (isFinaleSlide(slide) || slide.settings?.sopAllTracksVote || slide.settings?.sopAllTracksMatrix || slide.settings?.sopPitchSession) return slide;
   const group = getParticipantSopGroup(State.participant.id);
   if (!group || slide.content?.sopGroup === group) return slide;
@@ -1475,7 +1487,7 @@ async function assignParticipantSopGroup(participantId, group) {
 }
 
 function participantChipHtml(p) {
-  if (!isDualSopWorkshop() || !State.session) return `<div class="present-participant-chip">${participantAvatarHtml(p, 'sm')}<span>${esc(p.display_name || 'Gast')}</span></div>`;
+  if (!isDualSopParallelWorkshop() || !State.session) return `<div class="present-participant-chip">${participantAvatarHtml(p, 'sm')}<span>${esc(p.display_name || 'Gast')}</span></div>`;
   const assigned = getParticipantSopGroup(p.id);
   const activeInternal = assigned === 'internal' ? ' is-active' : '';
   const activeConsulting = assigned === 'consulting' ? ' is-active' : '';
@@ -1956,7 +1968,7 @@ function renderSopWorkshopNavHtml(currentIndex, options = {}) {
 function syncSopWorkshopShell(mode, slideIndex) {
   const isSop = isSopWorkshopPresentation();
   document.body.classList.toggle('lp-sop-workshop', isSop);
-  document.body.classList.toggle('lp-dual-sop', isDualSopWorkshop());
+  document.body.classList.toggle('lp-dual-sop-parallel', isDualSopParallelWorkshop());
   document.body.classList.toggle('lp-sop-focus', isSop && State.sopFocusMode);
   document.body.classList.toggle('lp-sop-panels', isSop && State.showPresentPanels);
   document.body.classList.toggle('editor-mode', mode === 'editor');
@@ -3230,7 +3242,7 @@ function bindPitchTimers(stage) {
 
 // Split-View: beide SOPs nebeneinander auf Track-Intro + Brainstorm bis zur Gesamt-Priorisierung.
 function supportsSopSplit(slide) {
-  if (!isDualSopWorkshop() || isFinaleSlide(slide)) return false;
+  if (!isDualSopParallelWorkshop() || isFinaleSlide(slide)) return false;
   if (slide?.settings?.sopAllTracksVote) return false;
   const c = slide?.content || {};
   if (slide?.slide_type === 'brainstorm' && (c.sopGroup === 'internal' || c.sopGroup === 'consulting')) return true;
@@ -5388,7 +5400,7 @@ async function renderParticipantQuestion() {
     finishParticipant();
     return;
   }
-  if (isDualSopWorkshop() && isBrainstormCollectSlide(hostSlide) && !getParticipantSopGroup(State.participant?.id)) {
+  if (isDualSopParallelWorkshop() && isBrainstormCollectSlide(hostSlide) && !getParticipantSopGroup(State.participant?.id)) {
     root.innerHTML = wrapParticipantSlide(`
       <div class="participant-wait-block participant-sop-unassigned">
         <h1 class="pslide-q-title">SOP-Zuweisung ausstehend</h1>
