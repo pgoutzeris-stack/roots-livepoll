@@ -386,6 +386,7 @@ function sopBoardData(track, phaseFilter) {
     cards: p.cards.map((c) => c.name),
   }));
 }
+window.sopBoardData = sopBoardData;
 
 function sopTrackIntro(track, trackIndex) {
   return tplSlide('section', {
@@ -394,6 +395,7 @@ function sopTrackIntro(track, trackIndex) {
     body: track.intro,
     sopKind: SK.TRACK,
     sopTrackIndex: trackIndex + 1,
+    sopBoard: sopBoardData(track),
     ...sopMeta(track),
   }, { workshopMode: 'orient' });
 }

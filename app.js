@@ -900,7 +900,7 @@ async function toggleSimulationMode() {
 function isBrainstormCollectSlide(slide) {
   if (!slide || !COLLECT_CHAIN_TYPES.has(slide.slide_type)) return false;
   const c = slide.content || {};
-  if (isSopWorkshopPresentation() && (c.sopKind === 'phase-workshop' || c.sopKind === 'card-workshop' || c.sopKind === 'track-collect' || c.sopCardName)) return true;
+  if (isSopWorkshopPresentation() && (c.sopKind === 'dual-pair-collect' || c.sopKind === 'phase-workshop' || c.sopKind === 'card-workshop' || c.sopKind === 'track-collect' || c.sopCardName)) return true;
   return hasCollectChain(slide);
 }
 
@@ -1025,6 +1025,16 @@ function getSopSlideContext(slide) {
   }
   if (c.sopKind === 'track') {
     return { trackKey: c.sopTrackKey || c.sopTrackClass, phaseName: null, cardName: null, kind: 'track-intro' };
+  }
+  if (c.sopKind === 'dual-pair-orient' || c.sopKind === 'dual-pair-collect') {
+    const pairIdx = c.sopDualPairIndex ?? 0;
+    const track = window.INTERNAL_SOP_TRACKS?.[pairIdx] || window.SOP_TOOL_TRACKS?.[pairIdx];
+    return {
+      trackKey: track?.class || null,
+      phaseName: null,
+      cardName: null,
+      kind: c.sopKind === 'dual-pair-collect' ? 'track-collect' : 'track-intro',
+    };
   }
   return null;
 }
@@ -1508,10 +1518,38 @@ function participantChipHtml(p) {
 }
 
 // Eine vollständige Brainstorm-Slide als Spalte (Frage + Board + Live-Bubbles DIESER Slide).
+function findSopTrackByClass(className) {
+  if (!className) return null;
+  const all = [...(window.INTERNAL_SOP_TRACKS || []), ...(window.SOP_TOOL_TRACKS || [])];
+  return all.find((t) => t.class === className) || null;
+}
+
+function enrichSopContent(c) {
+  if (!c || c.sopBoard?.length) return c || {};
+  const track = c.sopTrackClass ? findSopTrackByClass(c.sopTrackClass) : null;
+  if (!track) return c || {};
+  return { ...c, ...trackToSopBoardContent(track, (c.sopTrackIndex || 1) - 1) };
+}
+
+function workshopDisplayTitle(c) {
+  const raw = typeof c === 'string' ? c : (c?.title || c?.sopTrackLabel || '');
+  return String(raw)
+    .replace(/^Track \d+:\s*/, '')
+    .replace(/^Track \d+\s*·\s*/, '')
+    .replace(/^KI Use Cases\s*·\s*/, '')
+    .trim();
+}
+
+function phaseChipsFromSubtitle(subtitle) {
+  if (!subtitle) return [];
+  return String(subtitle).split(' · ').map((s) => s.trim()).filter(Boolean)
+    .map((label) => ({ icon: 'fa-bookmark', label }));
+}
+
 function renderBrainstormSlideColumn(slide) {
   if (!slide) return '<div class="present-wait-msg">Kein entsprechender Track in diesem SOP.</div>';
   const visible = getVisibleResponses(slide.id);
-  return `${renderWorkshopCardCollectHtml(slide.content || {})}
+  return `${renderWorkshopCardCollectHtml(enrichSopContent(slide.content || {}), false, { shellMode: true, splitCol: true })}
     <div class="viz-wrap viz-wrap-present">${renderBrainstormPresentViz(slide, visible)}</div>`;
 }
 
@@ -1523,17 +1561,35 @@ function renderSopSplitColumn(group, label, icon, bodyHtml) {
     </div>`;
 }
 
+function trackToSopBoardContent(track, pairIdx) {
+  if (!track) return null;
+  const boardFn = typeof window.sopBoardData === 'function' ? window.sopBoardData : null;
+  return {
+    sopKind: 'track-collect',
+    sopTrackClass: track.class,
+    sopTrackIndex: pairIdx + 1,
+    sopTrackLabel: track.title.replace(/^Track \d+: /, ''),
+    sopBoard: boardFn ? boardFn(track) : (track.phases || []).map((p) => ({
+      name: p.name,
+      cards: (p.cards || []).map((card) => card.name || card),
+    })),
+  };
+}
+
 function renderDualPairOrientColumn(group, pairIdx) {
   const tracks = group === 'internal' ? window.INTERNAL_SOP_TRACKS : window.SOP_TOOL_TRACKS;
   const track = tracks?.[pairIdx];
   if (!track) return '<div class="ws-empty"><i class="fa-regular fa-circle"></i></div>';
   const theme = sopTrackTheme(track.class);
-  const phases = (track.phases || []).map((p) =>
-    `<span class="ws-chip ws-chip--sm"><i class="fa-solid fa-bookmark"></i>${esc(p.name)}</span>`).join('');
+  const boardContent = trackToSopBoardContent(track, pairIdx);
+  const intro = track.intro
+    ? `<p class="ws-orient-intro">${esc(track.intro).replace(/\n/g, '<br>')}</p>`
+    : '';
   return `<div class="ws-orient-col" style="--sop-accent:${theme.accent}">
     <span class="ws-orient-num">Track ${pairIdx + 1}</span>
     <h2 class="ws-orient-title">${esc(track.title.replace(/^Track \d+: /, ''))}</h2>
-    <div class="ws-chips ws-chips--wrap">${phases}</div>
+    ${intro}
+    ${renderSopBoardPreview(boardContent, false, { hideTrackHeader: true })}
   </div>`;
 }
 
@@ -1550,7 +1606,9 @@ function renderSopSectionSplitView(currentSlide) {
   const pairIdx = getDualSopPairIndex(currentSlide);
   const intSlide = trackIntroSlidesOfGroup('internal')[pairIdx];
   const conSlide = trackIntroSlidesOfGroup('consulting')[pairIdx];
-  const colBody = (s) => s ? renderSopSectionHtml(s.content) : '<div class="present-wait-msg">Kein Track in diesem SOP.</div>';
+  const colBody = (s) => s
+    ? renderSopSectionHtml(enrichSopContent(s.content), false, { shellMode: true, splitCol: true })
+    : '<div class="present-wait-msg">Kein Track in diesem SOP.</div>';
   return `<div class="sop-split-grid sop-split-active sop-split-slides sop-split-full">
     ${renderSopSplitColumn('internal', 'Internal SOP', 'fa-building', colBody(intSlide))}
     ${renderSopSplitColumn('consulting', 'Consulting SOP', 'fa-handshake', colBody(conSlide))}
@@ -1707,37 +1765,22 @@ function parseCollectPrompt(promptText) {
   return { question, formatHint, note: noteLines.join(' ') };
 }
 
-function renderWorkshopCardCollectHtml(c, editable = false) {
+function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false, splitCol = false } = {}) {
+  const content = enrichSopContent(c);
   const titleEl = editable
-    ? `<div class="canvas-editable pslide-q-title" contenteditable="true" data-field="title" data-placeholder="Titel der Folie…">${esc(c.title || '')}</div>`
-    : `<h1 class="pslide-q-title">${esc(c.title || c.sopCardName || '')}</h1>`;
-  const subEl = c.subtitle ? `<p class="pslide-crumb">${esc(c.subtitle)}</p>` : '';
-  // Beschreibung nur zeigen, wenn vorhanden — kein leeres Zweitfeld, das wie eine
-  // doppelte Frage aussieht. (Bearbeitbar bleibt sie, sobald Text vorhanden ist.)
-  const bodyTxt = (c.body && String(c.body).trim()) || '';
-  const promptTxt = (c.prompt && String(c.prompt).trim()) || '';
+    ? `<div class="canvas-editable pslide-q-title" contenteditable="true" data-field="title" data-placeholder="Titel der Folie…">${esc(content.title || '')}</div>`
+    : `<h1 class="pslide-q-title">${esc(content.title || content.sopCardName || '')}</h1>`;
+  const subEl = content.subtitle ? `<p class="pslide-crumb">${esc(content.subtitle)}</p>` : '';
+  const bodyTxt = (content.body && String(content.body).trim()) || '';
+  const promptTxt = (content.prompt && String(content.prompt).trim()) || '';
   const hasBody = !!bodyTxt && bodyTxt !== promptTxt;
   const bodyEl = editable
-    ? (hasBody ? `<div class="canvas-editable pslide-q-sub" contenteditable="true" data-field="body">${esc(c.body)}</div>` : '')
-    : (hasBody ? `<p class="pslide-q-sub">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
-  const boardEl = !editable && c.sopBoard?.length ? `<div class="workshop-collect-board">${renderSopBoardPreview(c)}</div>` : '';
-  // Editor: Rohtext der Frage direkt bearbeitbar lassen (keine Strukturierung).
-  if (editable) {
-    const promptEl = `<div class="canvas-editable pslide-q-prompt workshop-collect-prompt" contenteditable="true" data-field="prompt" data-placeholder="Frage / Aufgabe für die Teilnehmer…">${esc(c.prompt || '')}</div>`;
-    return `<div class="pslide-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${boardEl}${promptEl}</div>`;
-  }
-  // Generische Brainstorm-Folien (ohne SOP-Kontext) behalten die einfache
-  // Prompt-Darstellung — nur SOP-Workshop-Folien werden strukturiert.
-  const isSopCollect = !!(c.sopKind || c.sopBoard?.length);
-  if (!isSopCollect) {
-    const promptEl = c.prompt
-      ? `<p class="pslide-q-prompt"><i class="fa-solid fa-circle-question workshop-q-icon"></i> ${esc(c.prompt).replace(/\n/g, '<br>')}</p>`
-      : '';
-    return `<div class="pslide-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${boardEl}${promptEl}</div>`;
-  }
-  // SOP-Workshop: Frage strukturieren — Hauptfrage prominent, Format als
-  // Hinweis-Chip, Orientierungs-Notiz unter dem SOP-Board (referenziert es).
-  const { question, formatHint, note } = parseCollectPrompt(c.prompt);
+    ? (hasBody ? `<div class="canvas-editable pslide-q-sub" contenteditable="true" data-field="body">${esc(content.body)}</div>` : '')
+    : (hasBody ? `<p class="pslide-q-sub">${esc(content.body).replace(/\n/g, '<br>')}</p>` : '');
+  const boardEl = !editable && content.sopBoard?.length
+    ? `<div class="workshop-collect-board">${renderSopBoardPreview(content, false, { hideTrackHeader: shellMode })}</div>`
+    : '';
+  const { question, formatHint, note } = parseCollectPrompt(content.prompt);
   const questionEl = question
     ? `<p class="pslide-q-prompt workshop-collect-question"><i class="fa-solid fa-circle-question workshop-q-icon"></i><span>${esc(question)}</span></p>`
     : '';
@@ -1747,6 +1790,23 @@ function renderWorkshopCardCollectHtml(c, editable = false) {
   const noteEl = note
     ? `<p class="workshop-collect-note"><i class="fa-solid fa-lightbulb"></i><span>${esc(note)}</span></p>`
     : '';
+  if (editable) {
+    const promptEl = `<div class="canvas-editable pslide-q-prompt workshop-collect-prompt" contenteditable="true" data-field="prompt" data-placeholder="Frage / Aufgabe für die Teilnehmer…">${esc(content.prompt || '')}</div>`;
+    return `<div class="pslide-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${boardEl}${promptEl}</div>`;
+  }
+  if (shellMode) {
+    const colTitle = splitCol
+      ? `<h2 class="ws-col-title">${esc(workshopDisplayTitle(content))}</h2>`
+      : '';
+    return `<div class="pslide-question-block workshop-collect-shell workshop-collect-shell--compact">${colTitle}${questionEl}${formatEl}${boardEl}${noteEl}</div>`;
+  }
+  const isSopCollect = !!(content.sopKind || content.sopBoard?.length);
+  if (!isSopCollect) {
+    const promptEl = content.prompt
+      ? `<p class="pslide-q-prompt"><i class="fa-solid fa-circle-question workshop-q-icon"></i> ${esc(content.prompt).replace(/\n/g, '<br>')}</p>`
+      : '';
+    return `<div class="pslide-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${boardEl}${promptEl}</div>`;
+  }
   return `<div class="pslide-question-block workshop-collect-shell">${subEl}${titleEl}${questionEl}${formatEl}${bodyEl}${boardEl}${noteEl}</div>`;
 }
 
@@ -1929,6 +1989,50 @@ function renderSopFinalePanelHtml(currentIndex, { clickable = false, onNavigate 
   };
 }
 
+function renderDualSopParallelPanelHtml(currentIndex, { clickable = false, onNavigate } = {}) {
+  const pairCount = Math.max(
+    (window.INTERNAL_SOP_TRACKS || []).length,
+    (window.SOP_TOOL_TRACKS || []).length,
+  );
+  const findPairIdx = (kind, pairIndex) => State.slides.findIndex((s) => {
+    const c = s.content || {};
+    return c.sopKind === kind && c.sopDualPairIndex === pairIndex;
+  });
+  let html = `<div class="workshop-sop-panel dual-sop-parallel">
+    <div class="workshop-sop-panel-head"><i class="fa-solid fa-table-columns"></i> Dual-SOP · Parallel</div>`;
+  for (let i = 0; i < pairCount; i += 1) {
+    const orientIdx = findPairIdx('dual-pair-orient', i);
+    const collectIdx = findPairIdx('dual-pair-collect', i);
+    const active = currentIndex === orientIdx || currentIndex === collectIdx;
+    const trackTitle = (window.INTERNAL_SOP_TRACKS?.[i]?.title || window.SOP_TOOL_TRACKS?.[i]?.title || `Track ${i + 1}`)
+      .replace(/^Track \d+: /, '');
+    html += `<div class="workshop-sop-phase${active ? ' is-current' : ''}">
+      <div class="workshop-sop-panel-track is-label">
+        <span class="workshop-sop-panel-badge">Track ${i + 1}</span>
+        <span class="workshop-sop-panel-title">${esc(trackTitle)}</span>
+      </div>`;
+    if (orientIdx >= 0) {
+      html += `<button type="button" class="workshop-sop-step${currentIndex === orientIdx ? ' active' : ''}" data-slide-index="${orientIdx}">
+        <i class="fa-solid fa-map"></i> Überblick
+      </button>`;
+    }
+    if (collectIdx >= 0) {
+      html += `<button type="button" class="workshop-sop-step${currentIndex === collectIdx ? ' active' : ''}" data-slide-index="${collectIdx}">
+        <i class="fa-solid fa-lightbulb"></i> Brainstorm
+      </button>`;
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  return {
+    html,
+    bind(container) {
+      if (!clickable || !onNavigate) return;
+      bindSopWorkshopPanelClicks(container, onNavigate);
+    },
+  };
+}
+
 function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigate } = {}) {
   // Finale-Folien (Pitch Session, Finale-Priorisierung, Impact/Effort-Matrix) haben
   // keinen aktiven Track — sie bekommen ein eigenes Finale-Panel mit den drei
@@ -1937,6 +2041,9 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
   // LETZTEN Track) für die Finale-Folien NICHT greift.
   if (isFinaleSlide(State.slides[currentIndex])) {
     return renderSopFinalePanelHtml(currentIndex, { clickable, onNavigate });
+  }
+  if (isDualSopParallelWorkshop()) {
+    return renderDualSopParallelPanelHtml(currentIndex, { clickable, onNavigate });
   }
   const tracks = window.SOP_TOOL_TRACKS || [];
   const activeTrackKey = getActiveTrackKey(currentIndex);
@@ -2129,55 +2236,73 @@ function syncSopWorkshopShell(mode, slideIndex) {
   else participantPanel?.classList.add('hidden');
 }
 
-function renderSopBoardPreview(c, editable = false) {
-  if (c.sopKind === 'track') return '';
-  const board = c.sopBoard || [];
+function renderSopBoardPreview(c, editable = false, { hideTrackHeader = false } = {}) {
+  const content = enrichSopContent(c);
+  if (content.sopKind === 'track' && !content.sopBoard?.length) return '';
+  const board = content.sopBoard || [];
   if (!board.length) return '';
-  const theme = sopTrackTheme(c.sopTrackClass);
-  const trackIdx = c.sopTrackIndex || 1;
-  const boardTitle = board.length === 1 && c.sopPhaseName
-    ? c.sopPhaseName
-    : (c.sopTrackLabel || c.title || 'SOP');
+  const theme = sopTrackTheme(content.sopTrackClass);
+  const trackIdx = content.sopTrackIndex || 1;
+  const boardTitle = board.length === 1 && content.sopPhaseName
+    ? content.sopPhaseName
+    : (content.sopTrackLabel || content.title || 'SOP');
   const ed = (field, val, cls) => editable
     ? `<span class="canvas-editable ${cls}" contenteditable="true" data-field="${field}">${esc(val)}</span>`
     : esc(val);
   const cols = board.map((phase) => `
-    <div class="sop-board-phase ${phase.name === c.sopPhaseName || board.length === 1 ? 'active' : ''}">
+    <div class="sop-board-phase ${phase.name === content.sopPhaseName || board.length === 1 ? 'active' : ''}">
       <div class="sop-board-phase-label">${ed('phase', phase.name, 'sop-board-phase-name')}</div>
       <div class="sop-board-cards">${(phase.cards || []).map((card) => `
-        <div class="sop-board-card ${card === c.sopCardName || (c.sopKind === 'card' && card === c.title) ? 'active' : ''}">
+        <div class="sop-board-card ${card === content.sopCardName || (content.sopKind === 'card' && card === content.title) ? 'active' : ''}">
           <i class="fa-solid fa-file-lines"></i><span>${esc(card)}</span>
         </div>`).join('')}</div>
     </div>`).join('');
-  return `
-    <div class="sop-board-preview ${esc(c.sopTrackClass || '')} ${esc(c.sopKind || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+  const headerHtml = hideTrackHeader ? '' : `
       <div class="sop-board-track-header">
         <span class="sop-board-track-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">Track ${trackIdx}</span>
         <span class="sop-board-track-name">${ed('title', boardTitle, 'sop-board-track-title')}</span>
-      </div>
+      </div>`;
+  return `
+    <div class="sop-board-preview ${esc(content.sopTrackClass || '')} ${esc(content.sopKind || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+      ${headerHtml}
       <div class="sop-board-phases-row">${cols}</div>
     </div>`;
 }
 
-function renderSopSectionHtml(c, editable = false) {
-  const theme = sopTrackTheme(c.sopTrackClass);
-  const isTrack = c.sopKind === 'track';
+function renderSopSectionHtml(c, editable = false, { shellMode = false, splitCol = false } = {}) {
+  const content = enrichSopContent(c);
+  const theme = sopTrackTheme(content.sopTrackClass);
+  const isTrack = content.sopKind === 'track';
+  if (shellMode && !editable) {
+    const colTitle = splitCol
+      ? `<h2 class="ws-col-title">${esc(workshopDisplayTitle(content))}</h2>`
+      : '';
+    const bodyEl = content.body
+      ? `<p class="sop-pslide-body sop-pslide-body--shell">${esc(content.body).replace(/\n/g, '<br>')}</p>`
+      : '';
+    return `
+    <div class="sop-pslide-section sop-pslide-section--shell ${isTrack ? 'sop-pslide-track' : 'sop-pslide-phase'} ${esc(content.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+      ${colTitle}
+      ${bodyEl}
+      ${renderSopBoardPreview(content, editable, { hideTrackHeader: shellMode })}
+    </div>`;
+  }
   const titleEl = editable
-    ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title" data-placeholder="Titel…">${esc(c.title || '')}</div>`
-    : `<h1 class="sop-pslide-title">${esc(c.title)}</h1>`;
+    ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title" data-placeholder="Titel…">${esc(content.title || '')}</div>`
+    : `<h1 class="sop-pslide-title">${esc(content.title)}</h1>`;
   const subEl = editable
-    ? `<div class="canvas-editable sop-pslide-sub" contenteditable="true" data-field="subtitle" data-placeholder="Untertitel…">${esc(c.subtitle || '')}</div>`
-    : (c.subtitle ? `<p class="sop-pslide-sub">${esc(c.subtitle)}</p>` : '');
+    ? `<div class="canvas-editable sop-pslide-sub" contenteditable="true" data-field="subtitle" data-placeholder="Untertitel…">${esc(content.subtitle || '')}</div>`
+    : (content.subtitle ? `<p class="sop-pslide-sub">${esc(content.subtitle)}</p>` : '');
   const bodyEl = editable
-    ? `<div class="canvas-editable sop-pslide-body" contenteditable="true" data-field="body" data-placeholder="Einleitungstext…">${esc(c.body || '')}</div>`
-    : (c.body ? `<p class="sop-pslide-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+    ? `<div class="canvas-editable sop-pslide-body" contenteditable="true" data-field="body" data-placeholder="Einleitungstext…">${esc(content.body || '')}</div>`
+    : (content.body ? `<p class="sop-pslide-body">${esc(content.body).replace(/\n/g, '<br>')}</p>` : '');
   return `
-    <div class="sop-pslide-section ${isTrack ? 'sop-pslide-track' : 'sop-pslide-phase'} ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
-      <div class="sop-pslide-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel || 'SOP')}</div>
+    <div class="sop-pslide-section ${isTrack ? 'sop-pslide-track' : 'sop-pslide-phase'} ${esc(content.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+      <div class="sop-pslide-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(content.sopTrackLabel || 'SOP')}</div>
       ${titleEl}
       ${subEl}
       ${bodyEl}
-      ${renderSopBoardPreview(c, editable)}
+      ${renderSopBoardPreview(content, editable)}
     </div>`;
 }
 
@@ -3408,9 +3533,29 @@ function renderEditorCanvas() {
     bindCanvasInlineEdit();
     return;
   }
+  if (slide.slide_type === 'content' && c.sopKind === 'dual-pair-orient') {
+    canvas.classList.remove('is-centered');
+    const meta = getSlideShellMeta(slide);
+    const chips = [{ icon: 'fa-table-columns', label: 'Parallel' }, { icon: 'fa-map', label: `Track ${(getDualSopPairIndex(slide) || 0) + 1}` }];
+    canvas.innerHTML = `${wrapSlide(renderWsSlideShell({
+      ...meta, title: c.title, chips, main: renderDualPairOrientSplitView(slide),
+    }), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-eye"></i> Split-View im Präsentationsmodus · SOP-Boards aus Track-Daten</div>`;
+    bindCanvasInlineEdit();
+    return;
+  }
   if (isBrainstormCollectSlide(slide)) {
     canvas.classList.remove('is-centered');
-    canvas.innerHTML = `${wrapSlide(renderWorkshopCardCollectHtml(c, true), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Freitext sammeln${hasCollectChain(slide) ? ' · Ranking & Ergebnis folgen automatisch' : ''}</div>`;
+    if (shouldUseSopSplit(slide)) {
+      const meta = getSlideShellMeta(slide);
+      canvas.innerHTML = `${wrapSlide(renderWsSlideShell({
+        ...meta,
+        title: c.title || c.sopCardName,
+        chips: [{ icon: 'fa-table-columns', label: 'Parallel' }],
+        main: renderBrainstormSplitViz(slide),
+      }), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-eye"></i> Split-View · SOP-Boards aus den verknüpften Brainstorm-Folien</div>`;
+    } else {
+      canvas.innerHTML = `${wrapSlide(renderWorkshopCardCollectHtml(c, true), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Freitext sammeln${hasCollectChain(slide) ? ' · Ranking & Ergebnis folgen automatisch' : ''}</div>`;
+    }
     bindCanvasInlineEdit();
     return;
   }
@@ -3455,7 +3600,7 @@ function renderEditorCanvas() {
     bindCanvasInlineEdit();
     return;
   }
-  if (slide.slide_type === 'content' && (c.isHeroSlide || c.sopKind || c.sopTrackResults || c.sopKind === 'card-results')) {
+  if (slide.slide_type === 'content' && (c.isHeroSlide || c.sopKind || c.sopTrackResults || c.sopKind === 'card-results') && c.sopKind !== 'dual-pair-orient') {
     const html = c.isHeroSlide ? renderHeroSlideHtml(c, true) : renderSopContentHtml(c, true);
     if (html) {
       canvas.classList.toggle('is-centered', c.isHeroSlide || useCenteredLayout(slide));
@@ -4903,7 +5048,15 @@ function updatePresentHeader() {
 }
 
 function renderPresent() {
-  const slide = currentSessionSlide();
+  const slideIdx = State.session?.current_slide_index || 0;
+  const slide = State.slides[slideIdx];
+  if (slide && isNavHiddenSlide(slide)) {
+    const next = advanceSlideIndex(slideIdx, 1);
+    if (next !== slideIdx) {
+      void goToSlide(next);
+      return;
+    }
+  }
   const stage = $('#present-stage');
   if (!slide) { stage.innerHTML = '<h1>Keine Folien</h1>'; return; }
   stage.classList.remove('sop-split-stage');
@@ -4978,11 +5131,37 @@ function renderPresent() {
   const slideInk = c.textColor || 'var(--ink)';
   const slideMuted = c.subtextColor || 'var(--muted)';
 
+  if (slide.slide_type === 'content' && c.sopKind === 'dual-pair-orient') {
+    const meta = getSlideShellMeta(slide);
+    const pairIdx = getDualSopPairIndex(slide) || 0;
+    const chips = [{ icon: 'fa-table-columns', label: 'Parallel' }, { icon: 'fa-map', label: `Track ${pairIdx + 1}` }];
+    stage.innerHTML = wrapSlide(renderWsSlideShell({
+      ...meta, title: `Track ${pairIdx + 1}`, chips, main: renderDualPairOrientSplitView(slide),
+    }), slideIdx);
+    stage.classList.add('sop-split-stage');
+    updatePresentHeader();
+    updatePresentStats();
+    renderPresentParticipants();
+    void renderQrCode();
+    syncSopWorkshopShell('present', slideIdx);
+    finalizePresentUi(slide);
+    return;
+  }
+
   if (slide.slide_type === 'section' && c.sopTrackClass) {
     const splitOn = shouldUseSopSplit(slide);
     const meta = getSlideShellMeta(slide);
-    const main = splitOn ? renderSopSectionSplitView(slide) : renderSopSectionHtml(c);
-    stage.innerHTML = wrapSlide(renderWsSlideShell({ ...meta, title: c.title, chips: c.subtitle ? [{ icon: 'fa-layer-group', label: c.subtitle.split(' · ')[0] }] : [], main }), State.session.current_slide_index || 0);
+    const enriched = enrichSopContent(c);
+    const main = splitOn ? renderSopSectionSplitView(slide) : renderSopSectionHtml(enriched, false, { shellMode: true });
+    stage.innerHTML = wrapSlide(renderWsSlideShell({
+      ...meta,
+      title: workshopDisplayTitle(enriched),
+      chips: [
+        c.sopGroupLabel ? { icon: c.sopGroup === 'internal' ? 'fa-building' : 'fa-handshake', label: c.sopGroupLabel } : null,
+        ...phaseChipsFromSubtitle(c.subtitle),
+      ].filter(Boolean),
+      main,
+    }), slideIdx);
     stage.classList.toggle('sop-split-stage', splitOn);
     updatePresentHeader();
     updatePresentStats();
@@ -5029,7 +5208,7 @@ function renderPresent() {
     return;
   }
 
-  if (slide.slide_type === 'content' && (c.isHeroSlide || c.sopKind || c.sopTrackResults || isCardResultsSlide(slide))) {
+  if (slide.slide_type === 'content' && (c.isHeroSlide || c.sopKind || c.sopTrackResults || isCardResultsSlide(slide)) && c.sopKind !== 'dual-pair-orient') {
     let html;
     if (isCardResultsSlide(slide)) {
       html = `<h1 class="pslide-q-title">${esc(c.title || 'Ergebnis')}</h1>
@@ -5064,39 +5243,23 @@ function renderPresent() {
   }
 
   const sopBadge = renderSopQuestionBadge(c);
-  const slideIdx = State.session.current_slide_index || 0;
   const workshopMode = getWorkshopMode(slide);
-
-  if (slide.slide_type === 'content' && c.sopKind === 'dual-pair-orient') {
-    const meta = getSlideShellMeta(slide);
-    const chips = [{ icon: 'fa-table-columns', label: 'Parallel' }, { icon: 'fa-map', label: `Track ${(getDualSopPairIndex(slide) || 0) + 1}` }];
-    stage.innerHTML = wrapSlide(renderWsSlideShell({
-      ...meta, title: c.title, chips, main: renderDualPairOrientSplitView(slide),
-    }), slideIdx);
-    stage.classList.add('sop-split-stage');
-    updatePresentHeader();
-    updatePresentStats();
-    renderPresentParticipants();
-    void renderQrCode();
-    syncSopWorkshopShell('present', slideIdx);
-    finalizePresentUi(slide);
-    return;
-  }
 
   if (isBrainstormCollectSlide(slide)) {
     const splitOn = shouldUseSopSplit(slide);
     const meta = getSlideShellMeta(slide);
+    const enriched = enrichSopContent(c);
     const chips = [
-      c.sopGroupLabel ? { icon: 'fa-users', label: c.sopGroupLabel } : null,
+      c.sopGroupLabel ? { icon: c.sopGroup === 'internal' ? 'fa-building' : 'fa-handshake', label: c.sopGroupLabel } : null,
       { icon: 'fa-clock', label: `${Math.round((slide.settings?.timeLimitSec || window.LP_WORKSHOP_SETTINGS?.brainstormTimeLimitSec || 300) / 60)} Min.` },
       { icon: 'fa-hashtag', label: `max. ${window.LP_WORKSHOP_SETTINGS?.brainstormMaxResponses || 2} UC` },
     ].filter(Boolean);
     const collectInner = splitOn
       ? renderBrainstormSplitViz(slide)
-      : `${renderWorkshopCardCollectHtml(c)}<div class="viz-wrap viz-wrap-present">${viz}</div>`;
+      : `${renderWorkshopCardCollectHtml(enriched, false, { shellMode: true })}<div class="viz-wrap viz-wrap-present">${viz}</div>`;
     stage.innerHTML = wrapSlide(renderWsSlideShell({
       ...meta,
-      title: c.title || c.sopCardName,
+      title: workshopDisplayTitle(enriched) || c.sopCardName,
       chips,
       main: `${collectInner}${modPanel}`,
     }), slideIdx);
@@ -5540,7 +5703,7 @@ async function renderParticipantQuestion() {
   if (hostSlide?.content?.sopKind === 'dual-pair-orient') {
     root.innerHTML = wrapParticipantSlide(`
       <div class="participant-wait-block ws-slide ws-slide--orient">
-        <header class="ws-slide-head"><span class="ws-pill ws-pill--orient"><i class="fa-solid fa-map"></i> Track</span></div>
+        <header class="ws-slide-head"><span class="ws-pill ws-pill--orient"><i class="fa-solid fa-map"></i> Track</span></header>
         <h1 class="ws-title">${esc(hostSlide.content?.title || 'Überblick')}</h1>
         <p class="ws-lead"><i class="fa-solid fa-eye"></i> Bitte auf den Beamer achten…</p>
       </div>`, slideIndex);

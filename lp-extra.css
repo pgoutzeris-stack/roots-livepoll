@@ -1412,6 +1412,19 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .ws-orient-col{display:flex;flex-direction:column;gap:.55rem;padding:.15rem 0}
 .ws-orient-num{font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--sop-accent,var(--brand))}
 .ws-orient-title{font-size:1.15rem;font-weight:800;line-height:1.2;margin:0;color:var(--ink)}
+.ws-orient-intro{font-size:.82rem;line-height:1.45;color:var(--muted);margin:0}
+.sop-split-slides .ws-orient-col .sop-board-preview{margin-top:.35rem;font-size:.78rem}
+.sop-split-slides .ws-orient-col .sop-board-card{font-size:.72rem;padding:.35rem .45rem}
+.sop-split-slides .ws-orient-col .sop-board-phase-label{font-size:.68rem}
+.sop-pslide-section--shell{padding:0}
+.sop-pslide-body--shell{font-size:.88rem;line-height:1.5;color:var(--muted);margin:0 0 .75rem}
+.workshop-collect-shell--compact{padding:0}
+.workshop-collect-shell--compact .workshop-collect-question{font-size:1rem;margin:.15rem 0 .45rem}
+.workshop-collect-shell--compact .workshop-format-hint{margin-bottom:.45rem}
+.ws-col-title{font-size:1.08rem;font-weight:800;line-height:1.2;margin:0 0 .55rem;color:var(--ink)}
+.sop-split-slides .sop-board-preview.sop-board-preview--no-header .sop-board-phases-row,
+.sop-pslide-section--shell .sop-board-preview .sop-board-phases-row,
+.workshop-collect-shell--compact .sop-board-phases-row{padding-top:.65rem}
 .ws-empty{color:var(--muted);opacity:.45;text-align:center;padding:1.5rem 0}
 .lp-sop-workshop .ws-body .viz-wrap{width:100%;max-width:none;margin-top:.35rem}
 .lp-sop-workshop.sop-split-stage .ws-title{font-size:clamp(1.5rem,3vw,2rem)}
