@@ -1562,6 +1562,28 @@ function renderSopSplitColumn(group, label, icon, bodyHtml) {
     </div>`;
 }
 
+function getDualPairTrackLabel(slide) {
+  const pairIdx = getDualSopPairIndex(slide) ?? 0;
+  const raw = window.INTERNAL_SOP_TRACKS?.[pairIdx]?.title
+    || window.SOP_TOOL_TRACKS?.[pairIdx]?.title
+    || `Track ${pairIdx + 1}`;
+  return workshopDisplayTitle({ title: raw });
+}
+
+function renderGoalMatrixPreview() {
+  const quad = (q, icon, label, hint, extra = '') => `<div class="lp-mx-quad lp-q-${q}">
+    <div class="lp-mx-quad-head"><span class="lp-mx-quad-ico"><i class="fa-solid ${icon}"></i></span><strong>${label}</strong></div>
+    <div class="lp-mx-quad-body"><span class="lp-mx-quad-hint">${hint}</span>${extra}</div>
+  </div>`;
+  const gridHtml = [
+    quad('qw', 'fa-rocket', 'Quick Win', 'viel Wirkung · wenig Aufwand', '<em class="lp-mx-quad-target">Hier wollen wir hin</em>'),
+    quad('sb', 'fa-star', 'Strategic Bet', 'viel Wirkung · viel Aufwand'),
+    quad('dr', 'fa-ban', 'Drop', 'wenig Wirkung · wenig Aufwand'),
+    quad('ts', 'fa-screwdriver-wrench', 'Time Sink', 'wenig Wirkung · viel Aufwand'),
+  ].join('');
+  return window.LPViz.renderMatrixFrame({ yLabel: 'Impact', xLabel: 'Aufwand', gridHtml });
+}
+
 function trackToSopBoardContent(track, pairIdx) {
   if (!track) return null;
   const boardFn = typeof window.sopBoardData === 'function' ? window.sopBoardData : null;
@@ -1583,13 +1605,7 @@ function renderDualPairOrientColumn(group, pairIdx) {
   if (!track) return '<div class="ws-empty"><i class="fa-regular fa-circle"></i></div>';
   const theme = sopTrackTheme(track.class);
   const boardContent = trackToSopBoardContent(track, pairIdx);
-  const intro = track.intro
-    ? `<p class="ws-orient-intro">${esc(track.intro).replace(/\n/g, '<br>')}</p>`
-    : '';
-  return `<div class="ws-orient-col" style="--sop-accent:${theme.accent}">
-    <span class="ws-orient-num">Track ${pairIdx + 1}</span>
-    <h2 class="ws-orient-title">${esc(track.title.replace(/^Track \d+: /, ''))}</h2>
-    ${intro}
+  return `<div class="ws-orient-col ws-orient-col--split-present" style="--sop-accent:${theme.accent}">
     ${renderSopBoardPreview(boardContent, false, { hideTrackHeader: true })}
   </div>`;
 }
@@ -1796,10 +1812,10 @@ function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false,
     return `<div class="pslide-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${boardEl}${promptEl}</div>`;
   }
   if (shellMode) {
-    const colTitle = splitCol
-      ? `<h2 class="ws-col-title">${esc(workshopDisplayTitle(content))}</h2>`
-      : '';
-    return `<div class="pslide-question-block workshop-collect-shell workshop-collect-shell--compact">${colTitle}${questionEl}${formatEl}${boardEl}${noteEl}</div>`;
+    const colTitle = splitCol ? '' : '';
+    const formatBlock = splitCol ? '' : formatEl;
+    const noteBlock = splitCol ? '' : noteEl;
+    return `<div class="pslide-question-block workshop-collect-shell workshop-collect-shell--compact${splitCol ? ' workshop-collect-shell--split' : ''}">${colTitle}${questionEl}${formatBlock}${boardEl}${noteBlock}</div>`;
   }
   const isSopCollect = !!(content.sopKind || content.sopBoard?.length);
   if (!isSopCollect) {
@@ -1896,7 +1912,7 @@ function getSlideShellMeta(slide) {
     if (slide.settings?.sopAllTracksMatrix || slide.slide_type === 'priority_matrix') return { pillIcon: 'fa-table-cells-large', pillLabel: 'Matrix', pillTone: 'finale' };
     return { pillIcon: 'fa-flag-checkered', pillLabel: 'Finale', pillTone: 'finale' };
   }
-  if (c.sopKind === 'dual-pair-orient') return { pillIcon: 'fa-map', pillLabel: 'Track', pillTone: 'orient' };
+  if (c.sopKind === 'dual-pair-orient') return { pillIcon: 'fa-map', pillLabel: 'Orientierung', pillTone: 'orient' };
   if (c.sopKind === 'dual-pair-collect') return { pillIcon: 'fa-lightbulb', pillLabel: 'Sammeln', pillTone: 'collect' };
   if (isBrainstormCollectSlide(slide)) return { pillIcon: 'fa-lightbulb', pillLabel: 'Brainstorm', pillTone: 'collect' };
   if (shouldUseVoteWorkshopUi(slide)) return { pillIcon: 'fa-ranking-star', pillLabel: 'Vote', pillTone: 'decide' };
@@ -1929,11 +1945,8 @@ function getWsPresentChips(slide) {
       { icon: 'fa-hashtag', label: `max. ${window.LP_WORKSHOP_SETTINGS?.brainstormMaxResponses || 2} UC` },
     );
   }
-  if (c.sopKind === 'dual-pair-orient') {
-    chips.push({ icon: 'fa-table-columns', label: 'Parallel' }, { icon: 'fa-map', label: `Track ${(getDualSopPairIndex(slide) || 0) + 1}` });
-  }
-  if (c.sopKind === 'instructions' && c.subtitle) {
-    chips.push({ icon: 'fa-stopwatch', label: c.subtitle });
+  if (c.sopKind === 'dual-pair-orient' || c.sopKind === 'dual-pair-collect') {
+    chips.push({ icon: 'fa-table-columns', label: 'Parallel' });
   }
   if (isFinaleSlide(slide) && !chips.length) {
     chips.push({ icon: 'fa-flag-checkered', label: 'Finale' });
@@ -1950,14 +1963,18 @@ function getWsPresentChips(slide) {
 function getWsPresentTitle(slide) {
   const c = slide?.content || {};
   if (slide?.slide_type === 'section' && c.sopTrackClass) return workshopDisplayTitle(enrichSopContent(c));
-  if (c.sopKind === 'dual-pair-orient') return `Track ${(getDualSopPairIndex(slide) || 0) + 1}`;
-  if (isBrainstormCollectSlide(slide)) return workshopDisplayTitle(enrichSopContent(c)) || c.sopCardName || c.title;
+  if (c.sopKind === 'dual-pair-orient') return getDualPairTrackLabel(slide);
+  if (c.sopKind === 'dual-pair-collect') return 'Use Cases sammeln';
+  if (isBrainstormCollectSlide(slide)) {
+    return workshopDisplayTitle(enrichSopContent(c)) || c.sopCardName || c.title;
+  }
   return c.title || c.prompt || 'Folie';
 }
 
 function getWsPresentLead(slide) {
   const c = slide?.content || {};
-  if (c.sopKind === 'instructions') return '';
+  if (c.sopKind === 'instructions') return c.subtitle || '';
+  if (c.sopKind === 'dual-pair-collect') return getDualPairTrackLabel(slide);
   if (c.sopKind === 'workshop-goal') return c.subtitle || '';
   if (c.sopKind === 'pitch-session') return c.subtitle || '';
   if (c.sopKind === 'next-steps') return c.subtitle || '';
@@ -1967,16 +1984,17 @@ function getWsPresentLead(slide) {
   return '';
 }
 
-function mountPresentWsSlide(stage, slide, slideIdx, { main = '', splitOn = false } = {}) {
+function mountPresentWsSlide(stage, slide, slideIdx, { main = '', splitOn = false, title = null, lead = null } = {}) {
   const meta = getSlideShellMeta(slide);
   stage.innerHTML = wrapSlide(renderWsSlideShell({
     ...meta,
-    title: getWsPresentTitle(slide),
+    title: title ?? getWsPresentTitle(slide),
     chips: getWsPresentChips(slide),
-    lead: getWsPresentLead(slide),
+    lead: lead ?? getWsPresentLead(slide),
     main,
   }), slideIdx);
   stage.classList.toggle('sop-split-stage', splitOn);
+  stage.dataset.splitOn = splitOn ? '1' : '';
   updatePresentHeader();
   updatePresentStats();
   renderPresentParticipants();
@@ -2341,7 +2359,7 @@ function renderSopBoardPreview(c, editable = false, { hideTrackHeader = false } 
         <span class="sop-board-track-name">${ed('title', boardTitle, 'sop-board-track-title')}</span>
       </div>`;
   return `
-    <div class="sop-board-preview ${esc(content.sopTrackClass || '')} ${esc(content.sopKind || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+    <div class="sop-board-preview${hideTrackHeader ? ' sop-board-preview--no-header' : ''} ${esc(content.sopTrackClass || '')} ${esc(content.sopKind || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
       ${headerHtml}
       <div class="sop-board-phases-row">${cols}</div>
     </div>`;
@@ -2464,27 +2482,21 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
     const bodyEl = editable
       ? `<div class="canvas-editable sop-pslide-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
       : (c.body ? `<p class="sop-pslide-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
-    const goalMatrix = `
-      <div class="goal-matrix">
-        <div class="goal-matrix-yaxis"><i class="fa-solid fa-arrow-up"></i> Impact</div>
-        <div class="goal-matrix-grid">
-          <div class="goal-q goal-q--qw"><i class="fa-solid fa-rocket"></i><strong>Quick Win</strong><span>viel Wirkung · wenig Aufwand</span><em>Hier wollen wir hin</em></div>
-          <div class="goal-q goal-q--sb"><i class="fa-solid fa-star"></i><strong>Strategic Bet</strong><span>viel Wirkung · viel Aufwand</span></div>
-          <div class="goal-q goal-q--dr"><i class="fa-solid fa-ban"></i><strong>Drop</strong><span>wenig Wirkung · wenig Aufwand</span></div>
-          <div class="goal-q goal-q--ts"><i class="fa-solid fa-screwdriver-wrench"></i><strong>Time Sink</strong><span>wenig Wirkung · viel Aufwand</span></div>
-        </div>
-        <div class="goal-matrix-xaxis"><span class="goal-axis-low">niedrig</span><span>Aufwand</span><span class="goal-axis-high">hoch <i class="fa-solid fa-arrow-right"></i></span></div>
-      </div>`;
+    const bodyShell = c.body
+      ? `<div class="ws-hero-body ws-hero-body--goal">${esc(c.body).replace(/\n/g, '<br>')}</div>`
+      : '';
+    const goalMatrix = renderGoalMatrixPreview();
     if (shellMode && !editable) {
-      return `<div class="ws-sop-main ws-sop-main--goal">${bodyEl}${goalMatrix}</div>`;
+      return `<div class="ws-sop-main ws-sop-main--goal">${bodyShell}<div class="ws-matrix-stage">${goalMatrix}</div></div>`;
     }
+    const legacyMatrix = goalMatrix;
     return `
       <div class="sop-pslide-section sop-pslide-goal">
         <div class="sop-pslide-badge" style="background:var(--brand);color:#fff"><i class="fa-solid fa-bullseye"></i> Ziel</div>
         ${titleEl}
         ${subEl}
         ${bodyEl}
-        ${goalMatrix}
+        ${legacyMatrix}
       </div>`;
   }
   // Instructions slide — structured ROOTS-Design layout
@@ -2544,7 +2556,7 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
       flushAvoid();
     }
     if (shellMode && !editable) {
-      return `<div class="ws-sop-main ws-sop-main--instructions"><div class="workshop-instructions-card">${instrHtml}</div></div>`;
+      return `<div class="ws-sop-main ws-sop-main--instructions"><div class="workshop-instructions-card workshop-instructions-card--present">${instrHtml}</div></div>`;
     }
     return `
       <div class="sop-pslide-section sop-pslide-instructions" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
@@ -5146,7 +5158,17 @@ function updatePresentHeader() {
   if (titleEl) titleEl.textContent = State.presentation?.title || 'Präsentation';
 }
 
+let _presentRenderRaf = 0;
+
 function renderPresent() {
+  if (_presentRenderRaf) return;
+  _presentRenderRaf = requestAnimationFrame(() => {
+    _presentRenderRaf = 0;
+    renderPresentNow();
+  });
+}
+
+function renderPresentNow() {
   const slideIdx = State.session?.current_slide_index || 0;
   const slide = State.slides[slideIdx];
   if (slide && isNavHiddenSlide(slide)) {
@@ -5157,8 +5179,7 @@ function renderPresent() {
     }
   }
   const stage = $('#present-stage');
-  if (!slide) { stage.innerHTML = '<h1>Keine Folien</h1>'; return; }
-  stage.classList.remove('sop-split-stage');
+  if (!slide) { stage.innerHTML = '<h1>Keine Folien</h1>'; stage.classList.remove('sop-split-stage'); return; }
   const c = slide.content || {};
   // DEBUG-Simulator: bei jedem Slide-Wechsel die Antworten für diesen Slide
   // zeitversetzt drippen (nur einmal pro Slide via triggeredSlides-Set)
@@ -5249,6 +5270,8 @@ function renderPresent() {
   }
 
   if (slide.slide_type === 'section' && useCenteredLayout(slide)) {
+    stage.classList.remove('sop-split-stage');
+    stage.dataset.splitOn = '';
     stage.innerHTML = wrapSlide(renderCenteredSlideHtml(c, false, { icon: 'fa-heading' }), State.session.current_slide_index || 0);
     updatePresentHeader();
     updatePresentStats();
@@ -5274,6 +5297,8 @@ function renderPresent() {
       html = `${useCenteredLayout(slide) ? renderCenteredSlideHtml(c, false, { icon: 'fa-trophy' }) : `<h1 class="pslide-q-title">${esc(c.title || 'Ergebnis')}</h1><p class="pslide-q-prompt">${esc(c.body || '').replace(/\n/g, '<br>')}</p>`}
         <div class="viz-wrap viz-wrap-present">${srcDisplay ? window.LPViz.renderViz(srcDisplay, srcAgg, 'present', { displayMode: getResultsDisplayMode() }) : ''}</div>`;
     }
+    stage.classList.remove('sop-split-stage');
+    stage.dataset.splitOn = '';
     stage.innerHTML = wrapSlide(html, State.session.current_slide_index || 0);
     updatePresentHeader();
     updatePresentStats();
@@ -5320,6 +5345,8 @@ function renderPresent() {
       html = c.isHeroSlide ? renderHeroSlideHtml(c) : renderSopContentHtml(c);
     }
     if (html) {
+      stage.classList.remove('sop-split-stage');
+      stage.dataset.splitOn = '';
       stage.innerHTML = wrapSlide(html, State.session.current_slide_index || 0);
       updatePresentHeader();
       updatePresentStats();
@@ -5332,6 +5359,8 @@ function renderPresent() {
   }
 
   if (slide.slide_type === 'content' && useCenteredLayout(slide) && !interactive) {
+    stage.classList.remove('sop-split-stage');
+    stage.dataset.splitOn = '';
     stage.innerHTML = wrapSlide(`${renderCenteredSlideHtml(c, false, { icon: 'fa-align-center' })}
       ${c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="" style="max-width:min(720px,90vw);border-radius:16px;margin-top:1rem">` : ''}
       ${viz ? `<div class="viz-wrap viz-wrap-present">${viz}</div>` : ''}`, State.session.current_slide_index || 0);
@@ -5372,13 +5401,19 @@ function renderPresent() {
   }
 
   if (isFinaleSlide(slide)) {
+    const isMatrix = slide.settings?.sopAllTracksMatrix || slide.slide_type === 'priority_matrix' || c.sopKind === 'final-matrix';
+    const vizBlock = isMatrix
+      ? `<div class="ws-matrix-stage"><div class="viz-wrap viz-wrap-present">${viz}</div></div>`
+      : `<div class="viz-wrap viz-wrap-present">${viz}</div>`;
     mountPresentWsSlide(stage, slide, slideIdx, {
-      main: `<div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`,
+      main: `${vizBlock}${modPanel}`,
     });
     stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
     stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
     return;
   } else {
+    stage.classList.remove('sop-split-stage');
+    stage.dataset.splitOn = '';
     stage.innerHTML = wrapSlide(`
       ${!isSopWorkshopPresentation() && workshopMode ? renderWorkshopModeBadge(workshopMode) : ''}
       ${!isSopWorkshopPresentation() ? sopBadge : ''}
