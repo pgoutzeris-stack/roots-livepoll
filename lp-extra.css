@@ -2933,6 +2933,174 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   border:1px solid rgba(32,110,251,.18);
 }
 
+/* ── Teilnehmer · Use Cases sammeln (einheitliche Breite + Carousel) ── */
+.lp-sop-workshop.participant-mode .pslide-participant-content,
+.lp-sop-workshop.participant-mode .participant-collect-card,
+.lp-sop-workshop.participant-mode .workshop-collect-shell--participant{
+  width:100%;
+  max-width:min(640px,100%);
+  margin-left:auto;
+  margin-right:auto;
+}
+.lp-dual-sop-workshop.participant-mode .workshop-collect-shell,
+.lp-dual-sop-workshop.participant-mode .sop-board-preview,
+.lp-dual-sop-workshop.participant-mode .pslide-participant-content{
+  max-width:min(640px,100%);
+  width:100%;
+}
+.participant-collect-title{
+  font-size:1.35rem;
+  font-weight:800;
+  margin:0 0 .65rem;
+  line-height:1.2;
+}
+.workshop-collect-shell--participant{
+  padding:0;
+  margin:0 0 .85rem;
+  border:none;
+  max-width:100%!important;
+}
+.workshop-collect-shell--participant .workshop-collect-question--plain{
+  font-size:.95rem;
+  line-height:1.45;
+  color:var(--muted);
+  margin:0 0 .75rem;
+  font-weight:500;
+}
+.workshop-collect-shell--participant .workshop-collect-board{
+  margin:0;
+  opacity:1;
+}
+.sop-phase-carousel{
+  width:100%;
+}
+.sop-phase-carousel-viewport{
+  overflow:hidden;
+  border-radius:16px;
+  border:1px solid var(--line);
+  background:linear-gradient(165deg,var(--sop-soft,rgba(32,110,251,.06)),#fff 55%);
+  box-shadow:0 8px 24px rgba(15,23,42,.06);
+}
+.sop-phase-carousel-track{
+  display:flex;
+  width:100%;
+  transition:transform .55s cubic-bezier(.22,1,.36,1);
+}
+.sop-phase-carousel-slide{
+  flex:0 0 100%;
+  min-width:100%;
+  padding:1rem 1rem .85rem;
+  box-sizing:border-box;
+}
+.sop-phase-carousel-head{
+  margin-bottom:.75rem;
+}
+.sop-phase-carousel-step{
+  display:inline-block;
+  font-size:.68rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  color:var(--sop-accent,var(--brand));
+  margin-bottom:.25rem;
+}
+.sop-phase-carousel-title{
+  font-size:1.05rem;
+  font-weight:800;
+  margin:0;
+  line-height:1.25;
+  color:var(--ink);
+}
+.sop-phase-carousel-list{
+  list-style:none;
+  margin:0;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  gap:.45rem;
+}
+.sop-phase-chip{
+  display:flex;
+  align-items:flex-start;
+  gap:.55rem;
+  padding:.55rem .7rem;
+  border-radius:12px;
+  background:#fff;
+  border:1px solid var(--line);
+  font-size:.88rem;
+  line-height:1.35;
+  color:var(--ink);
+}
+.sop-phase-chip.is-active{
+  border-color:rgba(32,110,251,.35);
+  background:var(--brand-light);
+  box-shadow:0 0 0 1px rgba(32,110,251,.12);
+}
+.sop-phase-chip-num{
+  flex-shrink:0;
+  width:1.35rem;
+  height:1.35rem;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:.68rem;
+  font-weight:800;
+  color:#fff;
+  background:var(--sop-accent,var(--brand));
+}
+.sop-phase-carousel-dots{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:.45rem;
+  margin-top:.65rem;
+}
+.sop-phase-carousel-dot{
+  width:8px;
+  height:8px;
+  padding:0;
+  border:none;
+  border-radius:999px;
+  background:var(--line);
+  cursor:pointer;
+  transition:width .25s ease,background .25s ease;
+}
+.sop-phase-carousel-dot.is-active{
+  width:22px;
+  background:var(--brand);
+}
+.participant-collect-fields{margin-top:.25rem}
+.participant-collect-card{padding-bottom:0!important}
+
+@media (max-width:768px){
+  .participant-collect-bar{
+    position:fixed;
+    left:0;right:0;bottom:0;
+    z-index:120;
+    padding:.75rem .85rem calc(.75rem + env(safe-area-inset-bottom));
+    background:#fff;
+    border-top:1px solid var(--line);
+    box-shadow:0 -8px 24px rgba(15,23,42,.1);
+    max-width:100%;
+  }
+  .participant-collect-bar .participant-submit-lg{
+    position:static;
+    width:100%;
+    margin:0;
+    min-height:52px;
+    font-size:1.05rem;
+    box-shadow:0 6px 16px rgba(32,110,251,.28);
+  }
+  .participant-collect-bar .participant-submit-lg::before{display:none}
+  #participant-root.participant-root:has(.participant-collect-bar){
+    padding-bottom:calc(76px + env(safe-area-inset-bottom));
+  }
+  .participant-collect-card{
+    padding-bottom:calc(80px + env(safe-area-inset-bottom))!important;
+  }
+}
+
 /* Teilnehmeransicht: immer helles Layout wie Moderator (kein Dark Mode) */
 #screen-participant,
 #screen-participant.active,

@@ -2224,18 +2224,15 @@ function parseCollectPrompt(promptText) {
 }
 
 function renderCollectPromptBar(slide) {
-  const { question, formatHint, note } = parseCollectPrompt(slide?.content?.prompt);
-  if (!question && !formatHint && !note) return '';
+  const { question, note } = parseCollectPrompt(slide?.content?.prompt);
+  if (!question && !note) return '';
   const questionEl = question
     ? `<p class="workshop-collect-question"><i class="fa-solid fa-circle-question workshop-q-icon"></i><span>${esc(question)}</span></p>`
-    : '';
-  const formatEl = formatHint
-    ? `<div class="workshop-format-hint"><i class="fa-solid fa-pen-ruler"></i><span><strong>Format:</strong> ${esc(formatHint)}</span></div>`
     : '';
   const noteEl = note
     ? `<p class="workshop-collect-note"><i class="fa-solid fa-lightbulb"></i><span>${esc(note)}</span></p>`
     : '';
-  return `<div class="ws-collect-prompt-bar workshop-collect-shell workshop-collect-shell--compact">${questionEl}${formatEl}${noteEl}</div>`;
+  return `<div class="ws-collect-prompt-bar workshop-collect-shell workshop-collect-shell--compact">${questionEl}${noteEl}</div>`;
 }
 
 function brainstormSlideForDualPair(group, pairIdx) {
@@ -2244,7 +2241,64 @@ function brainstormSlideForDualPair(group, pairIdx) {
     || null;
 }
 
-function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false, splitCol = false, hideBoard = false } = {}) {
+function renderSopPhaseCarouselHtml(c) {
+  const content = enrichSopContent(c);
+  const board = content.sopBoard || [];
+  if (!board.length) return '';
+  const theme = sopTrackTheme(content.sopTrackClass);
+  const slides = board.map((phase, pi) => {
+    const cards = (phase.cards || []).map((card, ci) => `
+      <li class="sop-phase-chip${card === content.sopCardName || (content.sopKind === 'card' && card === content.title) ? ' is-active' : ''}">
+        <span class="sop-phase-chip-num">${ci + 1}</span>
+        <span class="sop-phase-chip-label">${esc(card)}</span>
+      </li>`).join('');
+    return `
+      <div class="sop-phase-carousel-slide${pi === 0 ? ' is-active' : ''}" data-index="${pi}">
+        <div class="sop-phase-carousel-head">
+          <span class="sop-phase-carousel-step">Stufe ${pi + 1} / ${board.length}</span>
+          <h3 class="sop-phase-carousel-title">${esc(phase.name)}</h3>
+        </div>
+        <ul class="sop-phase-carousel-list">${cards}</ul>
+      </div>`;
+  }).join('');
+  const dots = board.map((_, i) => `
+    <button type="button" class="sop-phase-carousel-dot${i === 0 ? ' is-active' : ''}" data-index="${i}" aria-label="Stufe ${i + 1}"></button>`).join('');
+  return `
+    <div class="sop-phase-carousel" data-autoplay="4500" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
+      <div class="sop-phase-carousel-viewport">
+        <div class="sop-phase-carousel-track" style="--sop-carousel-count:${board.length}">${slides}</div>
+      </div>
+      ${board.length > 1 ? `<div class="sop-phase-carousel-dots">${dots}</div>` : ''}
+    </div>`;
+}
+
+function initSopPhaseCarousels(root = document) {
+  const scope = root?.querySelectorAll ? root : document;
+  scope.querySelectorAll('.sop-phase-carousel:not([data-carousel-init])').forEach((wrap) => {
+    wrap.dataset.carouselInit = '1';
+    const track = wrap.querySelector('.sop-phase-carousel-track');
+    const slides = [...wrap.querySelectorAll('.sop-phase-carousel-slide')];
+    const dots = [...wrap.querySelectorAll('.sop-phase-carousel-dot')];
+    if (!track || slides.length <= 1) return;
+    let idx = 0;
+    let timer = null;
+    const intervalMs = Number(wrap.dataset.autoplay) || 4500;
+    const show = (next) => {
+      idx = ((next % slides.length) + slides.length) % slides.length;
+      track.style.transform = `translateX(-${idx * 100}%)`;
+      slides.forEach((s, i) => s.classList.toggle('is-active', i === idx));
+      dots.forEach((d, i) => d.classList.toggle('is-active', i === idx));
+    };
+    dots.forEach((d) => d.addEventListener('click', () => {
+      show(Number(d.dataset.index) || 0);
+      if (timer) { clearInterval(timer); timer = setInterval(() => show(idx + 1), intervalMs); }
+    }));
+    timer = setInterval(() => show(idx + 1), intervalMs);
+    wrap._carouselCleanup = () => { if (timer) clearInterval(timer); };
+  });
+}
+
+function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false, splitCol = false, hideBoard = false, participantMode = false } = {}) {
   const content = enrichSopContent(c);
   const titleEl = editable
     ? `<div class="canvas-editable pslide-q-title" contenteditable="true" data-field="title" data-placeholder="Titel der Folie…">${esc(content.title || '')}</div>`
@@ -2257,28 +2311,27 @@ function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false,
     ? (hasBody ? `<div class="canvas-editable pslide-q-sub" contenteditable="true" data-field="body">${esc(content.body)}</div>` : '')
     : (hasBody ? `<p class="pslide-q-sub">${esc(content.body).replace(/\n/g, '<br>')}</p>` : '');
   const boardEl = !editable && content.sopBoard?.length && !hideBoard
-    ? `<div class="workshop-collect-board">${renderSopBoardPreview(content, false, { hideTrackHeader: shellMode, alignCards: !!(shellMode || splitCol) })}</div>`
+    ? `<div class="workshop-collect-board">${participantMode ? renderSopPhaseCarouselHtml(content) : renderSopBoardPreview(content, false, { hideTrackHeader: shellMode, alignCards: !!(shellMode || splitCol) })}</div>`
     : '';
-  const { question, formatHint, note } = parseCollectPrompt(content.prompt);
+  const { question, note } = parseCollectPrompt(content.prompt);
   const questionEl = question
-    ? `<p class="pslide-q-prompt workshop-collect-question"><i class="fa-solid fa-circle-question workshop-q-icon"></i><span>${esc(question)}</span></p>`
+    ? `<p class="pslide-q-prompt workshop-collect-question${participantMode ? ' workshop-collect-question--plain' : ''}">${participantMode ? esc(question) : `<i class="fa-solid fa-circle-question workshop-q-icon"></i><span>${esc(question)}</span>`}</p>`
     : '';
-  const formatEl = formatHint
-    ? `<div class="workshop-format-hint"><i class="fa-solid fa-pen-ruler"></i><span><strong>Format:</strong> ${esc(formatHint)}</span></div>`
-    : '';
-  const noteEl = note
+  const noteEl = note && !participantMode
     ? `<p class="workshop-collect-note"><i class="fa-solid fa-lightbulb"></i><span>${esc(note)}</span></p>`
     : '';
+  if (participantMode) {
+    return `<div class="workshop-collect-shell workshop-collect-shell--participant">${questionEl}${boardEl}</div>`;
+  }
   if (editable) {
     const promptEl = `<div class="canvas-editable pslide-q-prompt workshop-collect-prompt" contenteditable="true" data-field="prompt" data-placeholder="Frage / Aufgabe für die Teilnehmer…">${esc(content.prompt || '')}</div>`;
     return `<div class="pslide-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${boardEl}${promptEl}</div>`;
   }
   if (shellMode) {
-    const formatBlock = splitCol ? '' : formatEl;
     const noteBlock = splitCol ? '' : noteEl;
     const questionBlock = splitCol ? '' : questionEl;
     const boardBlock = (splitCol || hideBoard) ? '' : boardEl;
-    return `<div class="pslide-question-block workshop-collect-shell workshop-collect-shell--compact${splitCol ? ' workshop-collect-shell--split' : ''}">${questionBlock}${formatBlock}${boardBlock}${noteBlock}</div>`;
+    return `<div class="pslide-question-block workshop-collect-shell workshop-collect-shell--compact${splitCol ? ' workshop-collect-shell--split' : ''}">${questionBlock}${boardBlock}${noteBlock}</div>`;
   }
   const isSopCollect = !!(content.sopKind || content.sopBoard?.length);
   if (!isSopCollect) {
@@ -2287,7 +2340,7 @@ function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false,
       : '';
     return `<div class="pslide-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${boardEl}${promptEl}</div>`;
   }
-  return `<div class="pslide-question-block workshop-collect-shell">${subEl}${titleEl}${questionEl}${formatEl}${bodyEl}${boardEl}${noteEl}</div>`;
+  return `<div class="pslide-question-block workshop-collect-shell">${subEl}${titleEl}${questionEl}${bodyEl}${boardEl}${noteEl}</div>`;
 }
 
 function renderParticipantWorkshopHeader(slideIndex) {
@@ -2451,7 +2504,7 @@ function getWsPresentChips(slide) {
     }
     chips.push(
       { icon: 'fa-clock', label: `${Math.round((slide.settings?.timeLimitSec || window.LP_WORKSHOP_SETTINGS?.brainstormTimeLimitSec || 300) / 60)} Min.` },
-      { icon: 'fa-hashtag', label: `max. ${getCollectResponseLimit(slide)} UC` },
+      { icon: 'fa-hashtag', label: collectLimitPillLabel(slide) },
     );
   }
   if (c.sopKind === 'dual-pair-orient') {
@@ -2859,7 +2912,7 @@ function renderSopBoardPreview(c, editable = false, { hideTrackHeader = false, a
   const cols = board.map((phase) => {
     const cards = (phase.cards || []).map((card) => `
         <div class="sop-board-card ${card === content.sopCardName || (content.sopKind === 'card' && card === content.title) ? 'active' : ''}">
-          <i class="fa-solid fa-file-lines"></i><span>${esc(card)}</span>
+          <span>${esc(card)}</span>
         </div>`).join('');
     const spacers = alignCards ? Array(Math.max(0, maxCards - (phase.cards || []).length)).fill(0).map(() => (
       '<div class="sop-board-card sop-board-card--spacer" aria-hidden="true"><span>&nbsp;</span></div>'
@@ -7008,6 +7061,14 @@ function collectLimitLabel(limit) {
   return n === 1 ? '1 Use Case' : `${n} Use Cases`;
 }
 
+function collectLimitPillLabel(slide) {
+  const n = getCollectResponseLimit(slide);
+  const words = { 1: 'einen', 2: 'zwei', 3: 'drei', 4: 'vier', 5: 'fünf', 6: 'sechs', 7: 'sieben', 8: 'acht', 9: 'neun', 10: 'zehn' };
+  if (n === 1) return 'maximal einen Use Case';
+  const w = words[n] || String(n);
+  return `maximal ${w} Use Cases`;
+}
+
 function patchCollectPromptLimit(prompt, limit) {
   const text = String(prompt || '');
   const label = collectLimitLabel(limit);
@@ -7208,15 +7269,12 @@ async function renderParticipantQuestion() {
     const lim = Number(c.charLimit || 0);
     const maxAttr = lim > 0 ? ` maxlength="${lim}"` : '';
     const counter = lim > 0 ? `<div class="p-char-counter"><span id="p-char-n">0</span>/${lim}</div>` : '';
-    const collectCounter = isCollect && collectLimit > 0
-      ? `<div class="p-collect-counter" id="p-collect-counter">${collectSubmitted} / ${collectLimit} Use Cases</div>`
-      : '';
     if (isCollect) {
-      input = `${collectCounter}
+      input = `<div class="participant-collect-fields">
         <label class="join-label" for="p-text">Dein KI Use Case${collectLimit > 1 ? ` (${collectSubmitted + 1} von ${collectLimit})` : ''}</label>
         <textarea id="p-text" rows="4" class="participant-textarea participant-textarea-lg"${maxAttr} placeholder="${esc((collectDisplayContent.prompt || '').split('\n')[0] || 'Use Case beschreiben…')}"></textarea>
         ${counter}
-        <button type="button" class="btn-primary participant-submit participant-submit-lg" id="submit-text">Use Case senden</button>`;
+      </div>`;
     } else {
       input = `<textarea id="p-text" rows="3" class="participant-textarea"${maxAttr} placeholder="${esc(c.prompt || 'Antwort')}"></textarea>${counter}<button type="button" class="btn-primary participant-submit" id="submit-text">Senden</button>`;
     }
@@ -7268,22 +7326,24 @@ async function renderParticipantQuestion() {
   ].filter(Boolean).join(' ');
 
   root.innerHTML = wrapParticipantSlide(`
-    <div class="${cardClass}">
+    <div class="${cardClass}${isCollect ? ' participant-collect-card' : ''}">
       ${!isWorkshop ? `<div class="participant-header-row">
         ${participantAvatarHtml(State.participant, 'md')}
         <div><div class="participant-meta">Code ${esc(State.session.code)}${slide.settings?.anonymous ? ' · Anonym' : ''}</div><div class="participant-you">${esc(State.participant?.display_name || '')}</div></div>
       </div>` : ''}
       ${teamBadge}
-      ${isCollect ? renderWorkshopCardCollectHtml(collectDisplayContent) : ''}
+      ${isCollect ? `<h1 class="pslide-q-title participant-collect-title">${esc(c.title || 'Use Cases sammeln')}</h1>` : ''}
+      ${isCollect ? renderWorkshopCardCollectHtml(collectDisplayContent, false, { participantMode: true }) : ''}
       ${isDecide ? `<h1 class="pslide-q-title">${esc(c.title || 'Priorisierung')}</h1><p class="pslide-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>` : ''}
       ${!isCollect && !isDecide ? `<h1 class="pslide-q-title">${esc(c.title || c.prompt || 'Frage')}</h1>` : ''}
       ${!isCollect && !isDecide && c.prompt && c.title ? `<p class="pslide-q-prompt">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : ''}
       ${timeLimit ? `<div id="p-timer" class="p-timer">${timeLimit}s</div>` : ''}
       ${input}
-    </div>`, slideIndex);
+    </div>${isCollect ? `<div class="participant-collect-bar"><button type="button" class="btn-primary participant-submit participant-submit-lg" id="submit-text">Use Case senden</button></div>` : ''}`, slideIndex);
 
   if (timeLimit) startQuestionTimer(timeLimit);
   bindParticipantHandlers(slide);
+  initSopPhaseCarousels(root);
   finishParticipant();
 }
 
