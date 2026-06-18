@@ -533,10 +533,10 @@ function sopWorkshopIntro({ title, subtitle, body, exampleKey = 'consulting', op
 function sopPhaseBrainstorm(track, phase) {
   const ws = window.LP_WORKSHOP_SETTINGS;
   return tplSlide('brainstorm', {
-    title: `KI Use Cases · ${phase.name}`,
+    title: 'Use Cases sammeln',
     body: '',
-    subtitle: track.title.replace(/^Track \d+: /, ''),
-    prompt: `Welche KI seht ihr in dieser Phase? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\nFormat: Use Case · Feature · Abhängigkeiten — z. B. „Rechnungstool mit KI bauen · Umsatzsteuer-Erkennung, EN 16931 · Rechnungen im SharePoint"`,
+    subtitle: '',
+    prompt: `Welche KI Use Cases seht ihr in der Phase „${phase.name}"? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\nFormat: Use Case, Feature, Abhängigkeiten — z. B. „Rechnungstool mit KI bauen · Umsatzsteuer-Erkennung, EN 16931 · Rechnungen im SharePoint"`,
     isQuestionSlide: true,
     sopKind: SK.PHASE_WORKSHOP,
     sopBoard: [{ name: phase.name, cards: phase.cards.map((c) => c.name) }],
@@ -979,10 +979,10 @@ const MARKETING_SOP_TRACKS = [
 function sopCardBrainstorm(track, phase, card) {
   const ws = window.LP_WORKSHOP_SETTINGS;
   return tplSlide('brainstorm', {
-    title: card.name,
+    title: 'Use Cases sammeln',
     body: '',
-    subtitle: phase.name,
-    prompt: card.prompt || `Welche KI Use Cases seht ihr hier? Max. ${ws.brainstormMaxResponses} pro Person.\nFormat: Use Case · Feature · Abhängigkeiten`,
+    subtitle: '',
+    prompt: card.prompt || `Welche KI Use Cases seht ihr für „${card.name}"? Max. ${ws.brainstormMaxResponses} pro Person.\nFormat: Use Case, Feature, Abhängigkeiten`,
     isQuestionSlide: true,
     sopKind: SK.CARD_WORKSHOP,
     sopBoard: [{ name: phase.name, cards: phase.cards.map((c) => c.name) }],
@@ -1240,17 +1240,17 @@ window.LP_TEMPLATES = [
     key: 'roots-sop-ki-workshop-track',
     category: 'ROOTS · SOP & KI',
     name: 'SOP-Workshop · Pro Track',
-    desc: 'Alle Phasen auf einen Blick → Track-Brainstorm → Track-Vote → Presentation Session → ICE Matrix.',
+    desc: 'Alle Phasen auf einen Blick → Track-Brainstorm → Pitch Session → finale Priorisierung → ICE Matrix.',
     duration: '60–90 Min.',
     group: '6–25',
-    tips: 'Tempo-Format. Vollständige SOP-Übersicht als Kontext. 5 Min. / max. 2 Use Cases pro Track.',
+    tips: 'Tempo-Format. Vollständige SOP-Übersicht als Kontext. 5 Min. / max. 2 Use Cases pro Track. Am Ende Pitch, dann Gesamt-Priorisierung.',
     slides: buildSopKiWorkshopSlides('pro-track'),
   },
   {
     key: 'roots-marketing-sop-workshop',
     category: 'ROOTS · SOP & KI',
     name: 'Marketing SOP · Pro Karte',
-    desc: 'Marketing-SOP (1 Track, 10 Karten): je Karte KI Use Cases sammeln · Top-3 priorisieren · Presentation Session · ICE Matrix.',
+    desc: 'Marketing-SOP (1 Track, 10 Karten): je Karte sammeln · Top-3 priorisieren · Presentation Session · Pitch → ICE Matrix.',
     duration: '75–110 Min.',
     group: '6–20',
     tips: 'Pro Karte 5 Min. · max. 2 Use Cases. Achtung: 10 Karten × 5 Min ≈ 50 Min nur Sammeln — Zeitlimit ggf. in LP_WORKSHOP_SETTINGS senken.',

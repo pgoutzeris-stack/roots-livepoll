@@ -2175,7 +2175,7 @@ function getSlideShellMeta(slide) {
   if (c.sopKind === 'group-transition') return { pillIcon: 'fa-arrows-turn-right', pillLabel: 'Wechsel', pillTone: 'orient' };
   if (c.sopKind === 'dual-pair-orient') return { pillIcon: 'fa-map', pillLabel: 'Orientierung', pillTone: 'orient' };
   if (c.sopKind === 'dual-pair-collect') return { pillIcon: 'fa-lightbulb', pillLabel: 'Sammeln', pillTone: 'collect' };
-  if (isBrainstormCollectSlide(slide)) return { pillIcon: 'fa-lightbulb', pillLabel: 'Brainstorm', pillTone: 'collect' };
+  if (isBrainstormCollectSlide(slide)) return { pillIcon: 'fa-lightbulb', pillLabel: 'Sammeln', pillTone: 'collect' };
   if (shouldUseVoteWorkshopUi(slide)) return { pillIcon: 'fa-ranking-star', pillLabel: 'Vote', pillTone: 'decide' };
   if (slide?.slide_type === 'section' && c.sopTrackClass) return { pillIcon: 'fa-map', pillLabel: (c.sopTrackLabel || 'SOP').replace(/^Track \d+: /, ''), pillTone: 'orient' };
   if (c.isHeroSlide) return { pillIcon: 'fa-signal', pillLabel: 'Start', pillTone: 'brand' };
@@ -2216,6 +2216,15 @@ function getWsPresentChips(slide) {
     chips.push(...phaseChipsFromSubtitle(c.subtitle));
   }
   if (isBrainstormCollectSlide(slide)) {
+    if (c.sopTrackLabel) {
+      chips.push({ icon: 'fa-bookmark', label: workshopDisplayTitle(c) });
+    }
+    if (c.sopPhaseName) {
+      chips.push({ icon: 'fa-layer-group', label: c.sopPhaseName });
+    }
+    if (c.sopCardName) {
+      chips.push({ icon: 'fa-file-lines', label: c.sopCardName });
+    }
     chips.push(
       { icon: 'fa-clock', label: `${Math.round((slide.settings?.timeLimitSec || window.LP_WORKSHOP_SETTINGS?.brainstormTimeLimitSec || 300) / 60)} Min.` },
       { icon: 'fa-hashtag', label: `max. ${window.LP_WORKSHOP_SETTINGS?.brainstormMaxResponses || 2} UC` },
