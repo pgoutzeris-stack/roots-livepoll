@@ -1946,8 +1946,13 @@ function renderBrainstormSlideColumn(slide) {
     });
   }
   const visible = getVisibleResponses(slide.id);
+  if (visible.length) {
+    return `<div class="ws-collect-col ws-collect-col--live-only">
+      <div class="viz-wrap viz-wrap-present">${renderBrainstormPresentViz(slide, visible)}</div>
+    </div>`;
+  }
   return `${renderWorkshopCardCollectHtml(enrichSopContent(slide.content || {}), false, { shellMode: true, splitCol: true })}
-    <div class="viz-wrap viz-wrap-present">${renderBrainstormPresentViz(slide, visible)}</div>`;
+    <div class="present-wait-msg ws-collect-wait"><i class="fa-solid fa-lightbulb"></i> Use Cases erscheinen hier live …</div>`;
 }
 
 // Split-View (nur Beamer): links Internal-SOP, rechts Consulting-SOP — immer aktiv bis zur Gesamt-Priorisierung.
@@ -2015,15 +2020,27 @@ function renderDualPairCollectColumn(group, pairIdx) {
       title: 'Kein Track in diesem SOP.',
     });
   }
+  const brainstormSlide = brainstormSlideForDualPair(group, pairIdx);
+  const visible = brainstormSlide ? getVisibleResponses(brainstormSlide.id) : [];
+  const hasLive = visible.length > 0;
+
+  if (hasLive && brainstormSlide) {
+    return `<div class="ws-collect-col ws-collect-col--split-present ws-collect-col--live-only">
+      <div class="ws-split-collect-viz ws-split-collect-viz--solo">
+        <div class="viz-wrap viz-wrap-present">${renderBrainstormPresentViz(brainstormSlide, visible)}</div>
+      </div>
+    </div>`;
+  }
+
   const theme = sopTrackTheme(track.class);
   const boardContent = trackToSopBoardContent(track, pairIdx);
-  const brainstormSlide = brainstormSlidesOfGroup(group)[pairIdx];
   let html = `<div class="ws-split-sop-board ws-orient-col ws-orient-col--split-present" style="--sop-accent:${theme.accent}">
     ${renderSopBoardPreview(boardContent, false, { hideTrackHeader: true, alignCards: true })}
   </div>`;
   if (brainstormSlide) {
-    const visible = getVisibleResponses(brainstormSlide.id);
-    html += `<div class="ws-split-collect-viz"><div class="viz-wrap viz-wrap-present">${renderBrainstormPresentViz(brainstormSlide, visible)}</div></div>`;
+    html += `<div class="ws-split-collect-viz ws-split-collect-viz--idle">
+      <div class="present-wait-msg ws-collect-wait"><i class="fa-solid fa-lightbulb"></i> Use Cases erscheinen hier live …</div>
+    </div>`;
   }
   return `<div class="ws-collect-col ws-collect-col--split-present">${html}</div>`;
 }
@@ -2063,7 +2080,7 @@ function renderSopSectionSplitView(currentSlide) {
 }
 
 function renderBrainstormSplitViz(currentSlide) {
-  return renderDualSopSplitView(currentSlide, (group, pairIdx) => renderDualPairCollectColumn(group, pairIdx));
+  return `${renderCollectPromptBar(currentSlide)}${renderDualSopSplitView(currentSlide, (group, pairIdx) => renderDualPairCollectColumn(group, pairIdx))}`;
 }
 
 // Finale Priorisierung (Moderator/Beamer): moderne Tabelle — alle Use Cases mit
@@ -2206,7 +2223,28 @@ function parseCollectPrompt(promptText) {
   return { question, formatHint, note: noteLines.join(' ') };
 }
 
-function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false, splitCol = false } = {}) {
+function renderCollectPromptBar(slide) {
+  const { question, formatHint, note } = parseCollectPrompt(slide?.content?.prompt);
+  if (!question && !formatHint && !note) return '';
+  const questionEl = question
+    ? `<p class="workshop-collect-question"><i class="fa-solid fa-circle-question workshop-q-icon"></i><span>${esc(question)}</span></p>`
+    : '';
+  const formatEl = formatHint
+    ? `<div class="workshop-format-hint"><i class="fa-solid fa-pen-ruler"></i><span><strong>Format:</strong> ${esc(formatHint)}</span></div>`
+    : '';
+  const noteEl = note
+    ? `<p class="workshop-collect-note"><i class="fa-solid fa-lightbulb"></i><span>${esc(note)}</span></p>`
+    : '';
+  return `<div class="ws-collect-prompt-bar workshop-collect-shell workshop-collect-shell--compact">${questionEl}${formatEl}${noteEl}</div>`;
+}
+
+function brainstormSlideForDualPair(group, pairIdx) {
+  return findDualSopSlideByPair(group, pairIdx, 'brainstorm')
+    || brainstormSlidesOfGroup(group)[pairIdx]
+    || null;
+}
+
+function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false, splitCol = false, hideBoard = false } = {}) {
   const content = enrichSopContent(c);
   const titleEl = editable
     ? `<div class="canvas-editable pslide-q-title" contenteditable="true" data-field="title" data-placeholder="Titel der Folie…">${esc(content.title || '')}</div>`
@@ -2218,7 +2256,7 @@ function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false,
   const bodyEl = editable
     ? (hasBody ? `<div class="canvas-editable pslide-q-sub" contenteditable="true" data-field="body">${esc(content.body)}</div>` : '')
     : (hasBody ? `<p class="pslide-q-sub">${esc(content.body).replace(/\n/g, '<br>')}</p>` : '');
-  const boardEl = !editable && content.sopBoard?.length
+  const boardEl = !editable && content.sopBoard?.length && !hideBoard
     ? `<div class="workshop-collect-board">${renderSopBoardPreview(content, false, { hideTrackHeader: shellMode, alignCards: !!(shellMode || splitCol) })}</div>`
     : '';
   const { question, formatHint, note } = parseCollectPrompt(content.prompt);
@@ -2239,7 +2277,7 @@ function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false,
     const formatBlock = splitCol ? '' : formatEl;
     const noteBlock = splitCol ? '' : noteEl;
     const questionBlock = splitCol ? '' : questionEl;
-    const boardBlock = splitCol ? '' : boardEl;
+    const boardBlock = (splitCol || hideBoard) ? '' : boardEl;
     return `<div class="pslide-question-block workshop-collect-shell workshop-collect-shell--compact${splitCol ? ' workshop-collect-shell--split' : ''}">${questionBlock}${formatBlock}${boardBlock}${noteBlock}</div>`;
   }
   const isSopCollect = !!(content.sopKind || content.sopBoard?.length);
@@ -2416,7 +2454,7 @@ function getWsPresentChips(slide) {
       { icon: 'fa-hashtag', label: `max. ${window.LP_WORKSHOP_SETTINGS?.brainstormMaxResponses || 2} UC` },
     );
   }
-  if (c.sopKind === 'dual-pair-orient' || c.sopKind === 'dual-pair-collect') {
+  if (c.sopKind === 'dual-pair-orient') {
     chips.push({ icon: 'fa-table-columns', label: 'Parallel' });
   }
   if (c.sopKind === 'next-steps' || slide?.settings?.sopNextSteps) {
@@ -6525,9 +6563,11 @@ function renderPresentNow() {
   if (isBrainstormCollectSlide(slide)) {
     const splitOn = shouldUseSopSplit(slide);
     const enriched = enrichSopContent(c);
+    const visible = getVisibleResponses(slide.id);
+    const hideBoard = visible.length > 0;
     const collectInner = splitOn
       ? renderBrainstormSplitViz(slide)
-      : `${renderWorkshopCardCollectHtml(enriched, false, { shellMode: true })}<div class="viz-wrap viz-wrap-present">${viz}</div>`;
+      : `${renderWorkshopCardCollectHtml(enriched, false, { shellMode: true, hideBoard })}<div class="viz-wrap viz-wrap-present${hideBoard ? ' viz-wrap-present--solo' : ''}">${viz}</div>`;
     mountPresentWsSlide(stage, slide, slideIdx, {
       main: `${collectInner}${modPanel}`,
       splitOn,
