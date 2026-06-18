@@ -307,7 +307,7 @@ function aggregateAllTracksUseCases() {
       .filter((item) => item.text);
     byTrackKey.get(trackKey).phases.push({ phase: phaseName, items, slideId: slide.id });
     items.forEach((item) => allItems.push({
-      ...item, trackKey, trackLabel, phase: phaseName,
+      ...item, trackKey, trackLabel, phase: phaseName, sopGroup: c.sopGroup || null,
     }));
   });
   const byTrack = trackOrder.map((k) => byTrackKey.get(k));
@@ -344,7 +344,7 @@ function renderAllTracksResultsHtml() {
   if (!allItems.length) {
     return '<div class="present-wait-msg">Noch keine Use Cases gesammelt. Bitte zuerst die Phase-Brainstormings durchgehen.</div>';
   }
-  return `<div class="sop-all-tracks-results">${byTrack.map((trk) => {
+  const trackHtml = (trk) => {
     const theme = sopTrackTheme(trk.trackKey);
     const phasesHtml = trk.phases.filter((p) => p.items.length).map((p) => `
       <div class="sop-all-track-phase">
@@ -358,7 +358,24 @@ function renderAllTracksResultsHtml() {
       <div class="sop-all-track-head" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(trk.trackLabel || '')}</div>
       ${phasesHtml}
     </div>`;
-  }).join('')}
+  };
+  // Split-View: Internal-Tracks links, Consulting-Tracks rechts
+  const groupsPresent = new Set(byTrack.map((t) => t.sopGroup).filter(Boolean));
+  if (State.sopSplitView && groupsPresent.has('internal') && groupsPresent.has('consulting')) {
+    const colFor = (group, label, icon) => {
+      const inner = byTrack.filter((t) => t.sopGroup === group).map(trackHtml).join('')
+        || '<div class="present-wait-msg">Noch keine Use Cases.</div>';
+      return `<div class="sop-split-col">
+        <div class="sop-split-col-head sop-split-col-head--${group}"><i class="fa-solid ${icon}"></i> ${label}</div>
+        ${inner}
+      </div>`;
+    };
+    return `<div class="sop-all-tracks-results sop-split-active"><div class="sop-split-grid">
+      ${colFor('internal', 'Internal SOP', 'fa-building')}
+      ${colFor('consulting', 'Consulting SOP', 'fa-handshake')}
+    </div></div>`;
+  }
+  return `<div class="sop-all-tracks-results">${byTrack.map(trackHtml).join('')}
   <div class="sop-all-track-total">${allItems.length} Use Cases gesammelt · über alle Tracks</div>
 </div>`;
 }
@@ -1425,45 +1442,65 @@ function renderFinalVotePresentHtml(slide, visible) {
   const { voteCounts, totalVotes } = aggregateVoteResponses(slide, visible);
   const { votedCount, totalCount } = getCardVoteParticipation(slide);
   const partPct = totalCount ? Math.round((votedCount / totalCount) * 100) : 0;
-  const rows = allItems
+  const decorate = (items) => items
     .map((item) => ({ ...item, votes: voteCounts[`resp-${item.id}`] || 0 }))
     .sort((a, b) => b.votes - a.votes);
-  const maxVotes = Math.max(1, ...rows.map((r) => r.votes));
-  let html = `<div class="ws-board finale-vote">
-    <div class="ws-board-head">
+  const head = `<div class="ws-board-head">
       <span class="ws-board-stat"><i class="fa-solid fa-list-check"></i> ${allItems.length} Use Cases</span>
       <span class="ws-board-stat"><i class="fa-solid fa-users"></i> ${votedCount} / ${totalCount} abgestimmt</span>
       <span class="ws-board-stat ws-board-stat--accent"><i class="fa-solid fa-check-to-slot"></i> ${totalVotes} Stimmen</span>
       <span class="ws-board-progress"><span class="ws-board-progress-fill" style="width:${partPct}%"></span></span>
-    </div>
-    <div class="ws-table">
+    </div>`;
+  const tableFor = (rows) => {
+    if (!rows.length) return '<div class="present-wait-msg">Keine Use Cases in dieser Gruppe.</div>';
+    const maxVotes = Math.max(1, ...rows.map((r) => r.votes));
+    let h = `<div class="ws-table">
       <div class="ws-row ws-row--head">
         <span class="ws-c-rank">#</span>
         <span class="ws-c-uc">Use Case</span>
         <span class="ws-c-author">Eingebracht von</span>
         <span class="ws-c-action">Stimmen</span>
       </div>`;
-  rows.forEach((r, i) => {
-    const author = (State.participants || []).find((x) => x.id === r.participant_id);
-    const authorName = author?.display_name || r.authorName || '–';
-    const ranked = r.votes > 0;
-    const barPct = Math.round((r.votes / maxVotes) * 100);
-    const topClass = ranked && i < 3 ? ` ws-row--top ws-row--top${i + 1}` : '';
-    html += `<div class="ws-row${topClass}">
-      <span class="ws-c-rank">${i + 1}</span>
-      <span class="ws-c-uc">
-        <span class="ws-uc-text">${esc(r.text)}</span>
-        <span class="ws-uc-meta"><span class="ws-uc-track">${esc(r.trackLabel)}</span>${r.phase && r.phase !== r.trackLabel ? `<span class="ws-uc-phase">${esc(r.phase)}</span>` : ''}</span>
-      </span>
-      <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
-      <span class="ws-c-action ws-votes">
-        <span class="ws-votebar"><span class="ws-votebar-fill" style="width:${barPct}%"></span></span>
-        <strong class="ws-votenum">${r.votes}</strong>
-      </span>
+    rows.forEach((r, i) => {
+      const author = (State.participants || []).find((x) => x.id === r.participant_id);
+      const authorName = author?.display_name || r.authorName || '–';
+      const ranked = r.votes > 0;
+      const barPct = Math.round((r.votes / maxVotes) * 100);
+      const topClass = ranked && i < 3 ? ` ws-row--top ws-row--top${i + 1}` : '';
+      h += `<div class="ws-row${topClass}">
+        <span class="ws-c-rank">${i + 1}</span>
+        <span class="ws-c-uc">
+          <span class="ws-uc-text">${esc(r.text)}</span>
+          <span class="ws-uc-meta"><span class="ws-uc-track">${esc(r.trackLabel)}</span>${r.phase && r.phase !== r.trackLabel ? `<span class="ws-uc-phase">${esc(r.phase)}</span>` : ''}</span>
+        </span>
+        <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
+        <span class="ws-c-action ws-votes">
+          <span class="ws-votebar"><span class="ws-votebar-fill" style="width:${barPct}%"></span></span>
+          <strong class="ws-votenum">${r.votes}</strong>
+        </span>
+      </div>`;
+    });
+    h += `</div>`;
+    return h;
+  };
+  // Split-View: zwei Spalten (links Internal, rechts Consulting)
+  if (State.sopSplitView && supportsSopSplit(slide)) {
+    const internal = decorate(allItems.filter((it) => it.sopGroup === 'internal'));
+    const consulting = decorate(allItems.filter((it) => it.sopGroup === 'consulting'));
+    return `<div class="ws-board finale-vote sop-split-active">${head}
+      <div class="sop-split-grid">
+        <div class="sop-split-col">
+          <div class="sop-split-col-head sop-split-col-head--internal"><i class="fa-solid fa-building"></i> Internal SOP <span class="sop-split-col-count">${internal.length}</span></div>
+          ${tableFor(internal)}
+        </div>
+        <div class="sop-split-col">
+          <div class="sop-split-col-head sop-split-col-head--consulting"><i class="fa-solid fa-handshake"></i> Consulting SOP <span class="sop-split-col-count">${consulting.length}</span></div>
+          ${tableFor(consulting)}
+        </div>
+      </div>
     </div>`;
-  });
-  html += `</div></div>`;
-  return html;
+  }
+  return `<div class="ws-board finale-vote">${head}${tableFor(decorate(allItems))}</div>`;
 }
 
 function renderTrackVotePresentHtml(slide, visible) {
@@ -3112,40 +3149,30 @@ function bindPitchTimers(stage) {
   });
 }
 
-// Internal/Consulting-Switch — auf ALLEN SOP-Slides ab dem ersten SOP-Slide.
-// Dient zugleich als Badge (aktives Segment = aktueller SOP) und als Quick-Switch,
-// um beide Gruppen parallel zu brainstormen.
-function injectSopSwitchBar() {
-  const groupSlides = (State.slides || [])
-    .map((s, i) => ({ s, i }))
-    .filter(({ s }) => s.content?.sopGroup === 'internal' || s.content?.sopGroup === 'consulting');
-  if (!groupSlides.length) return;
-  const groups = ['internal', 'consulting'];
-  const present = new Set(groupSlides.map(({ s }) => s.content.sopGroup));
-  if (!groups.every((g) => present.has(g))) return; // nur im Dual-SOP-Workshop
-  const cur = State.session?.current_slide_index || 0;
-  const firstSopIdx = Math.min(...groupSlides.map(({ i }) => i));
-  if (cur < firstSopIdx) return; // Switch erst ab dem ersten SOP-Slide
+// Split-View: zeigt auf den SOP-Abstimmungs-/Übersichts-Slides beide SOPs
+// nebeneinander (links Internal, rechts Consulting) — per Icon-Toggle in der Top-Bar.
+// Nur sinnvoll, wenn beide Gruppen (internal + consulting) im Workshop existieren.
+function supportsSopSplit(slide) {
+  const c = slide?.content || {};
+  const st = slide?.settings || {};
+  if (!(st.sopAllTracksVote || c.sopAllTracksResults)) return false;
+  const groups = new Set((State.slides || []).map((s) => s.content?.sopGroup).filter(Boolean));
+  return groups.has('internal') && groups.has('consulting');
+}
+
+function injectSopSplitToggle(slide) {
+  if (!supportsSopSplit(slide)) return;
   const stage = $('#present-stage');
-  if (!stage || stage.querySelector('.sop-switch-bar')) return;
-  const labelFor = { internal: 'Internal SOP', consulting: 'Consulting SOP' };
-  const iconFor = { internal: 'fa-building', consulting: 'fa-handshake' };
-  // Sprungziel: erstes Brainstorm der Gruppe (sonst erster Slide der Gruppe).
-  const jumpIdx = (g) => {
-    const brain = groupSlides.find(({ s }) => s.content.sopGroup === g && s.slide_type === 'brainstorm');
-    if (brain) return brain.i;
-    const any = groupSlides.find(({ s }) => s.content.sopGroup === g);
-    return any ? any.i : -1;
-  };
-  const curGroup = State.slides[cur]?.content?.sopGroup || null;
-  const btns = groups.map((g) => {
-    const target = jumpIdx(g);
-    const active = curGroup === g;
-    return `<button type="button" class="sop-switch-btn${active ? ' is-active' : ''}" data-sop-switch-idx="${target}" aria-pressed="${active}"><i class="fa-solid ${iconFor[g]}"></i> ${esc(labelFor[g])}</button>`;
-  }).join('');
-  stage.insertAdjacentHTML('afterbegin', `<div class="sop-switch-bar" role="tablist" aria-label="SOP wechseln"><span class="sop-switch-label">SOP:</span>${btns}</div>`);
-  stage.querySelectorAll('.sop-switch-bar .sop-switch-btn').forEach((b) => {
-    b.onclick = () => { const idx = Number(b.dataset.sopSwitchIdx); if (Number.isFinite(idx) && idx >= 0) goToSlide(idx); };
+  if (!stage || stage.querySelector('.sop-split-bar')) return;
+  const on = !!State.sopSplitView;
+  stage.insertAdjacentHTML('afterbegin', `<div class="sop-split-bar">
+    <button type="button" class="sop-split-toggle${on ? ' is-active' : ''}" id="sop-split-toggle" aria-pressed="${on}" title="Split-View: beide SOPs nebeneinander zeigen">
+      <i class="fa-solid fa-table-columns"></i><span>${on ? 'Split-View an' : 'Split-View'}</span>
+    </button>
+  </div>`);
+  stage.querySelector('#sop-split-toggle')?.addEventListener('click', () => {
+    State.sopSplitView = !State.sopSplitView;
+    renderPresent();
   });
 }
 
@@ -3154,7 +3181,7 @@ function finalizePresentUi(slide) {
   bindResultsDisplayToggle($('#present-stage'));
   maybeLaunchResultsConfetti(slide);
   bindPitchTimers($('#present-stage'));
-  injectSopSwitchBar();
+  injectSopSplitToggle(slide);
 }
 
 async function deleteSlide(id) {
