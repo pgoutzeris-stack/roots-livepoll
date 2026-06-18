@@ -621,12 +621,12 @@ function sopIceMatrix() {
   }, { showResultsLive: true, sopAllTracksMatrix: true, sopMatrixCount: (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5), workshopMode: 'decide' });
 }
 
-// Next Steps: aus den priorisierten Use Cases konkrete Actions ableiten.
+// Next Steps: Quick Wins aus der Matrix → Action Log (Host pflegt Verantwortliche & Deadlines).
 function sopWorkshopNextSteps() {
   return tplSlide('content', {
-    title: 'Next Steps · konkrete Actions',
-    subtitle: 'Aus der Priorisierung wird Umsetzung',
-    body: 'Für die priorisierten Use Cases legen wir jetzt konkrete nächste Schritte fest — pro Use Case: Wer übernimmt? Was ist der erste Schritt? Bis wann?',
+    title: 'Next Steps',
+    subtitle: '',
+    body: 'Was sind die nächsten Schritte für unsere Quick Wins? Pro Use Case legen wir Verantwortliche, Deadlines und konkrete Actions fest.',
     sopKind: SK.NEXT_STEPS,
     isHeroSlide: false,
   }, { workshopMode: 'decide', sopNextSteps: true });

@@ -437,10 +437,9 @@ function aggregateTopFinalVotedUseCases(limit = 12) {
     .map((item) => ({ id: item.id, text: item.text, phase: item.phase, trackLabel: item.trackLabel, score: item.score, votes: item.votes }));
 }
 
-// Die final priorisierten Use Cases (genau die, die in der Matrix gelandet sind) —
-// für die Next-Steps-Folie.
+// Die final priorisierten Use Cases (genau die, die in der Matrix gelandet sind).
 function getFinalPrioritizedUseCases() {
-  const matrixSlide = (State.slides || []).find((s) => s.settings?.sopAllTracksMatrix);
+  const matrixSlide = getMatrixSlide();
   if (matrixSlide) {
     const items = getMatrixItems(matrixSlide);
     if (items && items.length) return items;
@@ -448,6 +447,181 @@ function getFinalPrioritizedUseCases() {
   const voteSlide = (State.slides || []).find((s) => s.settings?.sopAllTracksVote);
   const count = Number(voteSlide?.settings?.sopVoteMax || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
   return aggregateTopFinalVotedUseCases(count);
+}
+
+const NEXT_STEP_STATUSES = [
+  { id: 'planned', label: 'Geplant' },
+  { id: 'progress', label: 'In Arbeit' },
+  { id: 'blocked', label: 'Blockiert' },
+  { id: 'done', label: 'Erledigt' },
+];
+
+function getMatrixSlide() {
+  return (State.slides || []).find((s) => s.settings?.sopAllTracksMatrix || s.content?.sopKind === 'final-matrix') || null;
+}
+
+function aggregateMatrixQuadrantItems(slide, quadrant = 'qw') {
+  if (!slide) return [];
+  const items = getMatrixItems(slide);
+  const itemMeta = {};
+  items.forEach((it) => { itemMeta[it.id] = { text: it.text, phase: it.phase, trackLabel: it.trackLabel }; });
+  const itemPlacements = {};
+  getVisibleResponses(slide.id).forEach((r) => {
+    const m = r.response?.matrix || {};
+    const meta = r.response?.meta || {};
+    Object.entries(m).forEach(([itemId, q]) => {
+      if (!['qw', 'sb', 'ts', 'dr'].includes(q)) return;
+      if (!itemPlacements[itemId]) itemPlacements[itemId] = { qw: 0, sb: 0, ts: 0, dr: 0 };
+      itemPlacements[itemId][q] += 1;
+      if (meta[itemId]) itemMeta[itemId] = { ...itemMeta[itemId], ...meta[itemId] };
+    });
+  });
+  const result = [];
+  Object.entries(itemPlacements).forEach(([id, counts]) => {
+    const max = Math.max(counts.qw, counts.sb, counts.ts, counts.dr);
+    if (max === 0) return;
+    const winner = ['qw', 'sb', 'ts', 'dr'].find((q) => counts[q] === max);
+    if (winner !== quadrant) return;
+    const meta = itemMeta[id] || items.find((it) => it.id === id) || {};
+    result.push({
+      id,
+      text: meta.text || id,
+      phase: meta.phase || '',
+      trackLabel: meta.trackLabel || '',
+      votes: counts[winner],
+      total: counts.qw + counts.sb + counts.ts + counts.dr,
+    });
+  });
+  if (!result.length) {
+    const placements = loadMatrixLocal(slide.id);
+    items.filter((it) => placements[it.id] === quadrant).forEach((it) => {
+      result.push({ id: it.id, text: it.text, phase: it.phase || '', trackLabel: it.trackLabel || '' });
+    });
+  }
+  return result.sort((a, b) => (b.votes || 0) - (a.votes || 0) || String(a.text).localeCompare(String(b.text), 'de'));
+}
+
+function getQuickWinMatrixUseCases() {
+  const matrixSlide = getMatrixSlide();
+  if (!matrixSlide) return [];
+  return aggregateMatrixQuadrantItems(matrixSlide, 'qw');
+}
+
+function defaultNextStepAction() {
+  return { owner: '', dueDate: '', nextStep: '', status: 'planned', notes: '' };
+}
+
+function getNextStepActions() {
+  return State.session?.settings?.nextStepActions || {};
+}
+
+function formatNextStepDate(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(`${iso}T12:00:00`);
+    return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch {
+    return iso;
+  }
+}
+
+function renderNextStepsActionLogHtml({ editable = false } = {}) {
+  const items = State.session ? getQuickWinMatrixUseCases() : [];
+  const actions = getNextStepActions();
+  const participants = State.participants || [];
+  if (!items.length) {
+    return `<div class="ws-board ws-action-log">
+      <div class="present-wait-msg"><i class="fa-solid fa-table-cells-large"></i> Die Quick Wins aus der Impact/Effort-Matrix erscheinen hier, sobald Use Cases im Quick-Win-Quadrant liegen.</div>
+    </div>`;
+  }
+  const filled = items.filter((it) => {
+    const a = actions[it.id] || {};
+    return a.owner || a.dueDate || a.nextStep || (a.status && a.status !== 'planned') || a.notes;
+  }).length;
+  const head = `<div class="ws-board-head ws-board-head--actionlog">
+      <span class="ws-board-stat"><i class="fa-solid fa-rocket"></i> ${items.length} Quick Win${items.length === 1 ? '' : 's'}</span>
+      <span class="ws-board-stat ws-board-stat--accent"><i class="fa-solid fa-list-check"></i> ${filled} / ${items.length} mit Action</span>
+      ${editable ? '<span class="ws-board-stat"><i class="fa-solid fa-pen"></i> Nur Host bearbeitet</span>' : ''}
+    </div>`;
+  const statusLabel = (id) => NEXT_STEP_STATUSES.find((s) => s.id === id)?.label || 'Geplant';
+  const row = (it, i) => {
+    const a = { ...defaultNextStepAction(), ...(actions[it.id] || {}) };
+    const ownerCell = editable
+      ? `<input type="text" class="ns-input" list="ns-owner-suggestions" data-ns-field="owner" data-ns-item="${esc(it.id)}" value="${esc(a.owner)}" placeholder="Name" />`
+      : `<span class="ns-value${a.owner ? '' : ' ns-value--empty'}">${a.owner ? esc(a.owner) : '–'}</span>`;
+    const dueCell = editable
+      ? `<input type="date" class="ns-input ns-input--date" data-ns-field="dueDate" data-ns-item="${esc(it.id)}" value="${esc(a.dueDate)}" />`
+      : `<span class="ns-value${a.dueDate ? '' : ' ns-value--empty'}">${a.dueDate ? esc(formatNextStepDate(a.dueDate)) : '–'}</span>`;
+    const stepCell = editable
+      ? `<input type="text" class="ns-input" data-ns-field="nextStep" data-ns-item="${esc(it.id)}" value="${esc(a.nextStep)}" placeholder="Erster Schritt…" />`
+      : `<span class="ns-value${a.nextStep ? '' : ' ns-value--empty'}">${a.nextStep ? esc(a.nextStep) : '–'}</span>`;
+    const statusCell = editable
+      ? `<select class="ns-input ns-select" data-ns-field="status" data-ns-item="${esc(it.id)}">${NEXT_STEP_STATUSES.map((s) => `<option value="${s.id}"${a.status === s.id ? ' selected' : ''}>${esc(s.label)}</option>`).join('')}</select>`
+      : `<span class="ns-status ns-status--${esc(a.status || 'planned')}">${esc(statusLabel(a.status))}</span>`;
+    const notesCell = editable
+      ? `<input type="text" class="ns-input" data-ns-field="notes" data-ns-item="${esc(it.id)}" value="${esc(a.notes)}" placeholder="Notiz…" />`
+      : `<span class="ns-value ns-value--notes${a.notes ? '' : ' ns-value--empty'}">${a.notes ? esc(a.notes) : '–'}</span>`;
+    return `<div class="ws-row ws-row--action${editable ? ' ws-row--action-edit' : ''}" data-ns-item="${esc(it.id)}">
+        <span class="ws-c-rank">${i + 1}</span>
+        <span class="ws-c-uc">
+          <span class="ws-uc-text">${esc(it.text)}</span>
+          ${(it.trackLabel || it.phase) ? `<span class="ws-uc-meta">${it.trackLabel ? `<span class="ws-uc-track">${esc(it.trackLabel)}</span>` : ''}${it.phase && it.phase !== it.trackLabel ? `<span class="ws-uc-phase">${esc(it.phase)}</span>` : ''}</span>` : ''}
+        </span>
+        <span class="ws-c-owner">${ownerCell}</span>
+        <span class="ws-c-due">${dueCell}</span>
+        <span class="ws-c-step">${stepCell}</span>
+        <span class="ws-c-status">${statusCell}</span>
+        <span class="ws-c-notes">${notesCell}</span>
+      </div>`;
+  };
+  const datalist = editable && participants.length
+    ? `<datalist id="ns-owner-suggestions">${participants.map((p) => `<option value="${esc(p.display_name || '')}"></option>`).join('')}</datalist>`
+    : '';
+  return `${datalist}<div class="ws-board ws-action-log">${head}
+    <div class="ws-table ws-table--actionlog">
+      <div class="ws-row ws-row--head ws-row--action">
+        <span class="ws-c-rank">#</span>
+        <span class="ws-c-uc">Quick Win · Use Case</span>
+        <span class="ws-c-owner">Verantwortlich</span>
+        <span class="ws-c-due">Bis wann</span>
+        <span class="ws-c-step">Nächster Schritt</span>
+        <span class="ws-c-status">Status</span>
+        <span class="ws-c-notes">Notiz</span>
+      </div>
+      ${items.map(row).join('')}
+    </div>
+  </div>`;
+}
+
+let _nextStepSaveTimer = 0;
+
+async function saveNextStepActions(actions) {
+  if (!State.session?.id || !State.user) return;
+  const settings = { ...(State.session.settings || {}), nextStepActions: actions };
+  const { error } = await sb.from('lp_sessions').update({ settings }).eq('id', State.session.id);
+  if (error) return;
+  State.session.settings = settings;
+  try {
+    State.sessionChannel?.send({ type: 'broadcast', event: 'session_sync', payload: { settings } });
+  } catch { /* channel may not be ready */ }
+}
+
+function bindNextStepsActionLog(root) {
+  if (!root || !State.user) return;
+  root.querySelectorAll('.ns-input').forEach((el) => {
+    const handler = () => {
+      const itemId = el.dataset.nsItem;
+      const field = el.dataset.nsField;
+      if (!itemId || !field) return;
+      const actions = { ...getNextStepActions() };
+      actions[itemId] = { ...defaultNextStepAction(), ...(actions[itemId] || {}), [field]: el.value };
+      State.session.settings = { ...(State.session.settings || {}), nextStepActions: actions };
+      clearTimeout(_nextStepSaveTimer);
+      _nextStepSaveTimer = setTimeout(() => { void saveNextStepActions(actions); }, 450);
+    };
+    el.addEventListener('input', handler);
+    el.addEventListener('change', handler);
+  });
 }
 
 function aggregateCardUseCases(trackKey, phaseName, cardName) {
@@ -2155,6 +2329,10 @@ function renderFinalePillHtml() {
   return `<span class="ws-pill ws-pill--finale"><i class="fa-solid fa-flag-checkered"></i> Finale</span>`;
 }
 
+function renderNextStepsPillHtml() {
+  return `<span class="ws-pill ws-pill--finale"><i class="fa-solid fa-list-check"></i> Next Steps · Actions</span>`;
+}
+
 function getWorkshopModePill(workshopMode) {
   const pills = {
     orient: { pillIcon: 'fa-compass', pillLabel: 'Orientierung', pillTone: 'orient' },
@@ -2167,6 +2345,9 @@ function getWorkshopModePill(workshopMode) {
 
 function getSlideShellMeta(slide) {
   const c = slide?.content || {};
+  if (c.sopKind === 'next-steps' || slide?.settings?.sopNextSteps) {
+    return { pillIcon: 'fa-list-check', pillLabel: 'Next Steps', pillTone: 'finale' };
+  }
   if (isFinaleSlide(slide)) {
     if (slide.settings?.sopPitchSession || c.sopKind === 'pitch-session') return { pillIcon: 'fa-person-chalkboard', pillLabel: 'Pitch', pillTone: 'finale' };
     if (slide.settings?.sopAllTracksVote || c.sopKind === 'final-vote') return { pillIcon: 'fa-ranking-star', pillLabel: 'Priorisierung', pillTone: 'finale' };
@@ -2188,7 +2369,6 @@ function getSlideShellMeta(slide) {
   if (c.sopKind === 'workshop-goal') return { pillIcon: 'fa-bullseye', pillLabel: 'Ziel', pillTone: 'brand' };
   if (c.sopKind === 'instructions') return { pillIcon: 'fa-pen-ruler', pillLabel: 'Format', pillTone: 'brand' };
   if (c.sopKind === 'participants') return { pillIcon: 'fa-user-group', pillLabel: 'Zuweisung', pillTone: 'orient' };
-  if (c.sopKind === 'next-steps' || slide?.settings?.sopNextSteps) return { pillIcon: 'fa-list-check', pillLabel: 'Actions', pillTone: 'finale' };
   if (c.sopKind === 'group-vote' || c.sopKind === 'final-vote') return { pillIcon: 'fa-ranking-star', pillLabel: 'Priorisierung', pillTone: 'finale' };
   if (slide?.settings?.presentationClosing || (c.isHeroSlide && /danke/i.test(String(c.title || '')))) {
     return { pillIcon: 'fa-heart', pillLabel: 'Abschluss', pillTone: 'muted' };
@@ -2239,7 +2419,9 @@ function getWsPresentChips(slide) {
   if (c.sopKind === 'dual-pair-orient' || c.sopKind === 'dual-pair-collect') {
     chips.push({ icon: 'fa-table-columns', label: 'Parallel' });
   }
-  if (isFinaleSlide(slide) && !chips.length) {
+  if (c.sopKind === 'next-steps' || slide?.settings?.sopNextSteps) {
+    chips.push({ icon: 'fa-list-check', label: 'Next Steps' });
+  } else if (isFinaleSlide(slide) && !chips.length) {
     chips.push({ icon: 'fa-flag-checkered', label: 'Finale' });
   }
   if (c.subtitle && c.isHeroSlide && !c.sopKind) {
@@ -2268,7 +2450,7 @@ function getWsPresentLead(slide) {
   if (isBrainstormCollectSlide(slide) && isSopWorkshopPresentation()) return '';
   if (c.sopKind === 'workshop-goal') return c.subtitle || '';
   if (c.sopKind === 'pitch-session') return c.subtitle || '';
-  if (c.sopKind === 'next-steps') return c.subtitle || '';
+  if (c.sopKind === 'next-steps') return c.body || '';
   if (shouldUseVoteWorkshopUi(slide) && c.prompt) return String(c.prompt).split('\n')[0];
   if (slide?.slide_type === 'priority_matrix' && c.subtitle) return c.subtitle;
   if (c.sopKind === 'participants') return c.subtitle || '';
@@ -2352,9 +2534,11 @@ function renderSopFinalePanelHtml(currentIndex, { clickable = false, onNavigate 
   });
   const matrixIdx = findIdx((s) => s.settings?.sopAllTracksMatrix || s.content?.sopKind === 'final-matrix');
   const nextStepsIdx = findIdx((s) => s.settings?.sopNextSteps || s.content?.sopKind === 'next-steps');
+  const onNextSteps = State.slides[currentIndex]?.content?.sopKind === 'next-steps'
+    || State.slides[currentIndex]?.settings?.sopNextSteps;
 
   let html = `<div class="workshop-sop-panel workshop-sop-panel--finale">
-    <div class="workshop-sop-panel-head"><i class="fa-solid fa-flag-checkered"></i> Finale</div>`;
+    <div class="workshop-sop-panel-head"><i class="fa-solid ${onNextSteps ? 'fa-list-check' : 'fa-flag-checkered'}"></i> ${onNextSteps ? 'Next Steps · Actions' : 'Finale'}</div>`;
   (window.SOP_TOOL_TRACKS || []).forEach((t) => {
     html += `<div class="workshop-sop-later-item">${esc(t.title.replace(/^Track \d+: /, ''))} · Abgeschlossen</div>`;
   });
@@ -2861,39 +3045,24 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
         <div class="workshop-instructions-card">${instrHtml}</div>
       </div>`;
   }
-  // Next Steps — priorisierte Use Cases als Action-Planungskarten
+  // Next Steps — Quick Wins aus der Matrix als Action Log
   if (c.sopKind === 'next-steps') {
     const titleEl = editable
       ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
       : `<h1 class="sop-pslide-title">${esc(c.title || '')}</h1>`;
-    const subEl = editable
-      ? `<div class="canvas-editable sop-pslide-sub" contenteditable="true" data-field="subtitle">${esc(c.subtitle || '')}</div>`
-      : (c.subtitle ? `<p class="sop-pslide-sub">${esc(c.subtitle)}</p>` : '');
     const bodyEl = editable
       ? `<div class="canvas-editable sop-pslide-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
       : (c.body ? `<p class="sop-pslide-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
-    const items = State.session ? getFinalPrioritizedUseCases() : [];
-    const cards = items.length
-      ? `<div class="next-steps-list">${items.map((it, i) => `
-          <div class="next-step-card">
-            <div class="ns-uc"><span class="ns-num">${i + 1}</span><span class="ns-uc-text">${esc(it.text)}</span></div>
-            <div class="ns-fields">
-              <div class="ns-field"><span class="ns-label"><i class="fa-solid fa-user"></i> Verantwortlich</span><span class="ns-slot"></span></div>
-              <div class="ns-field"><span class="ns-label"><i class="fa-solid fa-flag-checkered"></i> Erster Schritt</span><span class="ns-slot"></span></div>
-              <div class="ns-field"><span class="ns-label"><i class="fa-solid fa-calendar-day"></i> Bis wann</span><span class="ns-slot"></span></div>
-            </div>
-          </div>`).join('')}</div>`
-      : '<div class="present-wait-msg">Die priorisierten Use Cases erscheinen hier, sobald die Impact/Effort-Matrix gefüllt ist.</div>';
+    const log = renderNextStepsActionLogHtml({ editable: !!(State.user && shellMode) });
     if (shellMode && !editable) {
-      return `<div class="ws-sop-main ws-sop-main--nextsteps">${bodyEl}${cards}</div>`;
+      return `<div class="ws-sop-main ws-sop-main--nextsteps">${log}</div>`;
     }
     return `
       <div class="sop-pslide-section sop-pslide-nextsteps">
-        ${renderFinalePillHtml()}
+        ${renderNextStepsPillHtml()}
         ${titleEl}
-        ${subEl}
         ${bodyEl}
-        ${cards}
+        ${log}
       </div>`;
   }
   // Pitch Session — alle Use Cases mit Autornamen + Timer
@@ -4505,6 +4674,9 @@ function finalizePresentUi(slide) {
   maybeLaunchClosingCelebration(slide);
   bindPitchTimers($('#present-stage'));
   bindPresentParticipantAssign();
+  if (slide?.content?.sopKind === 'next-steps' || slide?.settings?.sopNextSteps) {
+    bindNextStepsActionLog($('#present-stage'));
+  }
   if (isWorkshopOpeningSlide(slide)) initHeroAiFx($('#present-stage'));
   else stopHeroAiFx();
   if (isWorkshopClosingSlide(slide)) initClosingAiFx($('#present-stage'));
@@ -5844,6 +6016,9 @@ function applySessionPatch(patch) {
     State.matrixItemsBySlide = { ...(State.matrixItemsBySlide || {}), ...patch.matrixItems };
   }
   const { matrixItems, ...rest } = patch || {};
+  if (rest.settings) {
+    rest.settings = { ...(State.session.settings || {}), ...rest.settings };
+  }
   State.session = { ...State.session, ...rest };
   const newAssign = State.participant?.id
     ? State.session.settings?.dualSopAssignments?.[State.participant.id]
@@ -5851,6 +6026,10 @@ function applySessionPatch(patch) {
   if (State.participant && newAssign && newAssign !== prevAssign && newAssign !== State.sopAssignSeen) {
     State.sopAssignSeen = newAssign;
     showSopAssignCelebration(newAssign);
+  }
+  const slide = State.slides?.[State.session.current_slide_index || 0];
+  if (patch?.settings?.nextStepActions && slide && (slide.content?.sopKind === 'next-steps' || slide.settings?.sopNextSteps)) {
+    if (State.participant) void renderParticipantQuestion();
   }
 }
 
@@ -6586,6 +6765,13 @@ function normalizeSlideRecord(slide) {
     if (c.isHeroSlide && !c.sopKind && /danke|abschluss|thank/i.test(String(c.title || ''))) {
       c.sopKind = 'workshop-close';
     }
+    if (c.sopKind === 'next-steps') {
+      if (/konkrete actions/i.test(String(c.title || ''))) c.title = 'Next Steps';
+      if (/priorisierung wird umsetzung/i.test(String(c.subtitle || ''))) c.subtitle = '';
+      if (!c.body || /Wer übernimmt\?/i.test(String(c.body || ''))) {
+        c.body = 'Was sind die nächsten Schritte für unsere Quick Wins? Pro Use Case legen wir Verantwortliche, Deadlines und konkrete Actions fest.';
+      }
+    }
   }
   return next;
 }
@@ -6800,6 +6986,15 @@ async function renderParticipantQuestion() {
       <div class="participant-wait-block participant-pitch-block">
         ${renderParticipantPitchHtml()}
         <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf die Pitch Session auf dem Beamer achten…</p>
+      </div>`, slideIndex);
+    finishParticipant();
+    return;
+  }
+  if (hostSlide?.content?.sopKind === 'next-steps' || hostSlide?.settings?.sopNextSteps) {
+    root.innerHTML = wrapParticipantSlide(`
+      <div class="participant-wait-block participant-nextsteps-block">
+        ${renderNextStepsActionLogHtml({ editable: false })}
+        <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Der Host pflegt das Action Log live — bitte auf den Beamer achten.</p>
       </div>`, slideIndex);
     finishParticipant();
     return;
