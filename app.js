@@ -1825,9 +1825,36 @@ function findSopTrackByClass(className) {
 
 function enrichSopContent(c) {
   if (!c || c.sopBoard?.length) return c || {};
-  const track = c.sopTrackClass ? findSopTrackByClass(c.sopTrackClass) : null;
+  const track = resolveTrackForCollect(c);
   if (!track) return c || {};
-  return { ...c, ...trackToSopBoardContent(track, (c.sopTrackIndex || 1) - 1) };
+  return { ...c, ...trackToSopBoardContent(track, trackPairIndex(c)) };
+}
+
+function trackPairIndex(c) {
+  if (Number.isFinite(c?.sopDualPairIndex)) return c.sopDualPairIndex;
+  return (Number(c?.sopTrackIndex) || 1) - 1;
+}
+
+function resolveTrackForCollect(c) {
+  if (!c) return null;
+  if (c.sopTrackClass) return findSopTrackByClass(c.sopTrackClass);
+  if (c.sopGroup && Number.isFinite(c.sopDualPairIndex)) {
+    const tracks = c.sopGroup === 'internal'
+      ? (window.INTERNAL_SOP_TRACKS || [])
+      : (window.SOP_TOOL_TRACKS || []);
+    return tracks[c.sopDualPairIndex] || null;
+  }
+  return null;
+}
+
+/** Volle Track-SOP für Carousel (alle Phasen), auch wenn die Folie nur eine Phase enthält. */
+function enrichSopContentForCollect(c) {
+  if (!c) return {};
+  const track = resolveTrackForCollect(c);
+  if (track) {
+    return { ...c, ...trackToSopBoardContent(track, trackPairIndex(c)) };
+  }
+  return enrichSopContent(c);
 }
 
 function workshopDisplayTitle(c) {
@@ -2035,7 +2062,7 @@ function renderDualPairCollectColumn(group, pairIdx) {
   const theme = sopTrackTheme(track.class);
   const boardContent = trackToSopBoardContent(track, pairIdx);
   let html = `<div class="ws-split-sop-board ws-orient-col ws-orient-col--split-present" style="--sop-accent:${theme.accent}">
-    ${renderSopBoardPreview(boardContent, false, { hideTrackHeader: true, alignCards: true })}
+    ${renderSopPhaseCarouselHtml(boardContent)}
   </div>`;
   if (brainstormSlide) {
     html += `<div class="ws-split-collect-viz ws-split-collect-viz--idle">
@@ -2057,7 +2084,7 @@ function renderDualPairOrientColumn(group, pairIdx) {
   const theme = sopTrackTheme(track.class);
   const boardContent = trackToSopBoardContent(track, pairIdx);
   return `<div class="ws-orient-col ws-orient-col--split-present" style="--sop-accent:${theme.accent}">
-    ${renderSopBoardPreview(boardContent, false, { hideTrackHeader: true, alignCards: true })}
+    ${renderSopPhaseCarouselHtml(boardContent)}
   </div>`;
 }
 
@@ -2242,25 +2269,16 @@ function brainstormSlideForDualPair(group, pairIdx) {
 }
 
 function renderSopPhaseCarouselHtml(c) {
-  const content = enrichSopContent(c);
+  const content = enrichSopContentForCollect(c);
   const board = content.sopBoard || [];
   if (!board.length) return '';
   const theme = sopTrackTheme(content.sopTrackClass);
-  const slides = board.map((phase, pi) => {
-    const cards = (phase.cards || []).map((card, ci) => `
-      <li class="sop-phase-chip${card === content.sopCardName || (content.sopKind === 'card' && card === content.title) ? ' is-active' : ''}">
-        <span class="sop-phase-chip-num">${ci + 1}</span>
-        <span class="sop-phase-chip-label">${esc(card)}</span>
-      </li>`).join('');
-    return `
-      <div class="sop-phase-carousel-slide${pi === 0 ? ' is-active' : ''}" data-index="${pi}">
+  const slides = board.map((phase, pi) => `
+      <div class="sop-phase-carousel-slide${pi === 0 ? ' is-active' : ''}${phase.name === content.sopPhaseName ? ' is-context' : ''}" data-index="${pi}">
         <div class="sop-phase-carousel-head">
-          <span class="sop-phase-carousel-step">Stufe ${pi + 1} / ${board.length}</span>
           <h3 class="sop-phase-carousel-title">${esc(phase.name)}</h3>
         </div>
-        <ul class="sop-phase-carousel-list">${cards}</ul>
-      </div>`;
-  }).join('');
+      </div>`).join('');
   const dots = board.map((_, i) => `
     <button type="button" class="sop-phase-carousel-dot${i === 0 ? ' is-active' : ''}" data-index="${i}" aria-label="Stufe ${i + 1}"></button>`).join('');
   return `
@@ -2274,6 +2292,10 @@ function renderSopPhaseCarouselHtml(c) {
 
 function initSopPhaseCarousels(root = document) {
   const scope = root?.querySelectorAll ? root : document;
+  scope.querySelectorAll('.sop-phase-carousel').forEach((wrap) => {
+    wrap._carouselCleanup?.();
+    delete wrap.dataset.carouselInit;
+  });
   scope.querySelectorAll('.sop-phase-carousel:not([data-carousel-init])').forEach((wrap) => {
     wrap.dataset.carouselInit = '1';
     const track = wrap.querySelector('.sop-phase-carousel-track');
@@ -2310,8 +2332,12 @@ function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false,
   const bodyEl = editable
     ? (hasBody ? `<div class="canvas-editable pslide-q-sub" contenteditable="true" data-field="body">${esc(content.body)}</div>` : '')
     : (hasBody ? `<p class="pslide-q-sub">${esc(content.body).replace(/\n/g, '<br>')}</p>` : '');
-  const boardEl = !editable && content.sopBoard?.length && !hideBoard
-    ? `<div class="workshop-collect-board">${participantMode ? renderSopPhaseCarouselHtml(content) : renderSopBoardPreview(content, false, { hideTrackHeader: shellMode, alignCards: !!(shellMode || splitCol) })}</div>`
+  const displayContent = (!editable && !splitCol) ? enrichSopContentForCollect(content) : enrichSopContent(content);
+  const useCarousel = !editable && !splitCol && displayContent.sopBoard?.length;
+  const boardEl = !editable && displayContent.sopBoard?.length && !hideBoard
+    ? `<div class="workshop-collect-board">${useCarousel
+      ? renderSopPhaseCarouselHtml(displayContent)
+      : renderSopBoardPreview(displayContent, false, { hideTrackHeader: shellMode, alignCards: !!(shellMode || splitCol) })}</div>`
     : '';
   const { question, note } = parseCollectPrompt(content.prompt);
   const questionEl = question
@@ -2496,15 +2522,9 @@ function getWsPresentChips(slide) {
     if (c.sopTrackLabel) {
       chips.push({ icon: 'fa-bookmark', label: workshopDisplayTitle(c) });
     }
-    if (c.sopPhaseName) {
-      chips.push({ icon: 'fa-layer-group', label: c.sopPhaseName });
-    }
-    if (c.sopCardName) {
-      chips.push({ icon: 'fa-file-lines', label: c.sopCardName });
-    }
     chips.push(
       { icon: 'fa-clock', label: `${Math.round((slide.settings?.timeLimitSec || window.LP_WORKSHOP_SETTINGS?.brainstormTimeLimitSec || 300) / 60)} Min.` },
-      { icon: 'fa-hashtag', label: collectLimitPillLabel(slide) },
+      { icon: 'fa-list-ol', label: collectLimitPillLabel(slide) },
     );
   }
   if (c.sopKind === 'dual-pair-orient') {
@@ -2538,7 +2558,10 @@ function getWsPresentTitle(slide) {
 function getWsPresentLead(slide) {
   const c = slide?.content || {};
   if (c.sopKind === 'instructions') return c.subtitle || '';
-  if (isBrainstormCollectSlide(slide) && isSopWorkshopPresentation()) return '';
+  if (isBrainstormCollectSlide(slide)) {
+    const { question } = parseCollectPrompt(c.prompt);
+    return question || '';
+  }
   if (c.sopKind === 'workshop-goal') return c.subtitle || '';
   if (c.sopKind === 'pitch-session') return c.subtitle || '';
   if (c.sopKind === 'next-steps') return c.body || '';
@@ -4774,6 +4797,7 @@ function finalizePresentUi(slide) {
   else stopHeroAiFx();
   if (isWorkshopClosingSlide(slide)) initClosingAiFx($('#present-stage'));
   else stopClosingAiFx();
+  initSopPhaseCarousels($('#present-stage'));
 }
 
 async function deleteSlide(id) {
@@ -7325,21 +7349,29 @@ async function renderParticipantQuestion() {
     isWorkshop ? 'participant-card-pslide' : '',
   ].filter(Boolean).join(' ');
 
-  root.innerHTML = wrapParticipantSlide(`
-    <div class="${cardClass}${isCollect ? ' participant-collect-card' : ''}">
+  root.innerHTML = wrapParticipantSlide(isCollect ? `
+    <div class="participant-ws-slide-wrap">
+      ${renderWsSlideShell({
+        ...getSlideShellMeta(slide),
+        title: getWsPresentTitle(slide),
+        chips: getWsPresentChips(slide),
+        lead: getWsPresentLead(slide),
+        main: `${teamBadge}${renderWorkshopCardCollectHtml(collectDisplayContent, false, { participantMode: true })}${input}`,
+      })}
+    </div>
+    <div class="participant-collect-bar"><button type="button" class="btn-primary participant-submit participant-submit-lg" id="submit-text">Use Case senden</button></div>` : `
+    <div class="${cardClass}">
       ${!isWorkshop ? `<div class="participant-header-row">
         ${participantAvatarHtml(State.participant, 'md')}
         <div><div class="participant-meta">Code ${esc(State.session.code)}${slide.settings?.anonymous ? ' · Anonym' : ''}</div><div class="participant-you">${esc(State.participant?.display_name || '')}</div></div>
       </div>` : ''}
       ${teamBadge}
-      ${isCollect ? `<h1 class="pslide-q-title participant-collect-title">${esc(c.title || 'Use Cases sammeln')}</h1>` : ''}
-      ${isCollect ? renderWorkshopCardCollectHtml(collectDisplayContent, false, { participantMode: true }) : ''}
       ${isDecide ? `<h1 class="pslide-q-title">${esc(c.title || 'Priorisierung')}</h1><p class="pslide-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>` : ''}
       ${!isCollect && !isDecide ? `<h1 class="pslide-q-title">${esc(c.title || c.prompt || 'Frage')}</h1>` : ''}
       ${!isCollect && !isDecide && c.prompt && c.title ? `<p class="pslide-q-prompt">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : ''}
       ${timeLimit ? `<div id="p-timer" class="p-timer">${timeLimit}s</div>` : ''}
       ${input}
-    </div>${isCollect ? `<div class="participant-collect-bar"><button type="button" class="btn-primary participant-submit participant-submit-lg" id="submit-text">Use Case senden</button></div>` : ''}`, slideIndex);
+    </div>`, slideIndex);
 
   if (timeLimit) startQuestionTimer(timeLimit);
   bindParticipantHandlers(slide);
