@@ -24,8 +24,22 @@ window.LP_SOP_KIND = Object.freeze({
   CARD_WORKSHOP: 'card-workshop',
   DUAL_PAIR_ORIENT: 'dual-pair-orient',
   DUAL_PAIR_COLLECT: 'dual-pair-collect',
+  GROUP_VOTE: 'group-vote',
+  PARTICIPANTS: 'participants',
 });
 const SK = window.LP_SOP_KIND;
+
+// ─── DUAL-SOP TEAMS (zentral anpassen) ────────────────────────────────────────
+// Wer welchem SOP zugeordnet ist. Wird in beiden Dual-Vorlagen verwendet, statt
+// die Namen fest in den Folientext zu schreiben.
+window.LP_DUAL_SOP_TEAMS = {
+  internal: ['Richard Erbler', 'Jannick Müller', 'Pano Goutzeris'],
+  consulting: ['Manuel Stankovic', 'Rod Mitecki'],
+};
+function dualTeamsBody() {
+  const t = window.LP_DUAL_SOP_TEAMS;
+  return `Internal SOP\n${t.internal.join(' · ')}\n\nConsulting SOP\n${t.consulting.join(' · ')}`;
+}
 
 // Single source of truth for the Impact/Effort matrix quadrants (used by sopIceMatrix + LP_DEFAULT_CONTENT).
 window.LP_ICE_QUADRANTS = {
@@ -414,18 +428,41 @@ function sopWorkshopGoal() {
   }, { workshopMode: 'orient' });
 }
 
-function sopWorkshopInstructions() {
+// Beispiel-Sets je Kontext — damit die Instruktionen zum jeweiligen SOP passen.
+window.LP_INSTRUCTION_EXAMPLES = {
+  consulting: 'Aufbau eines Rechnungstools mittels KI-Programmierung · Automatische Erkennung der Umsatzsteuer, EN 16931-konform · Rechnungen liegen im SharePoint\nDiscovery-Calls automatisch transkribieren · Highlights + Action Items markieren, Export nach Notion · Calls laufen über MS Teams',
+  marketing: 'Creative-Varianten automatisch generieren · Hook + Format je Zielgruppe, Export nach Meta Ads · Briefing liegt in Figma\nKampagnen-Reporting automatisieren · KPI-Digest mit Anomalie-Alerts, wöchentlich · Daten aus GA4 + Meta',
+};
+
+function sopWorkshopInstructions(exampleKey = 'consulting') {
   const ws = window.LP_WORKSHOP_SETTINGS;
   const timeMin = ws.brainstormTimeLimitSec > 0
     ? `${Math.round(ws.brainstormTimeLimitSec / 60)} Minuten`
     : 'offene Zeit';
+  const examples = window.LP_INSTRUCTION_EXAMPLES[exampleKey] || window.LP_INSTRUCTION_EXAMPLES.consulting;
   return tplSlide('content', {
     title: 'So formuliert ihr Use Cases',
     subtitle: `${timeMin} pro Runde · max. ${ws.brainstormMaxResponses} Use Cases pro Person`,
-    body: `Format: Use Case · Feature · Abhängigkeiten\n\nGute Use Cases:\nAufbau eines Rechnungstools mittels KI-Programmierung · Automatische Erkennung der Umsatzsteuer, EN 16931-konform · Rechnungen liegen im SharePoint\nDiscovery-Calls automatisch transkribieren · Highlights + Action Items markieren, Export nach Notion · Calls laufen über MS Teams\n\nBitte vermeiden:\nNeues vollautomatisiertes Rechnungstool\nKI für Rechnungen\n\nJe konkreter (Use Case · Feature · Abhängigkeiten), desto wertvoller für die Auswertung.`,
+    body: `Format: Use Case · Feature · Abhängigkeiten\n\nGute Use Cases:\n${examples}\n\nBitte vermeiden:\nNeues vollautomatisiertes Rechnungstool\nKI für Rechnungen\n\nJe konkreter (Use Case · Feature · Abhängigkeiten), desto wertvoller für die Auswertung.`,
     isHeroSlide: false,
     sopKind: SK.INSTRUCTIONS,
   }, { workshopMode: 'orient' });
+}
+
+// Gemeinsamer Workshop-Auftakt: Opener → Zielbild → Instruktionen.
+// Wird von allen Vorlagen genutzt, statt die drei Folien je Builder zu duplizieren.
+function sopWorkshopIntro({ title, subtitle, body, exampleKey = 'consulting', openerExtra = {} } = {}) {
+  return [
+    tplSlide('content', {
+      title,
+      subtitle,
+      body: body || 'QR scannen · Name + Avatar wählen · los geht\'s!',
+      isHeroSlide: true,
+      ...openerExtra,
+    }),
+    sopWorkshopGoal(),
+    sopWorkshopInstructions(exampleKey),
+  ];
 }
 
 // ─── SOP PHASE BRAINSTORM ─────────────────────────────────────────────────────
@@ -592,21 +629,14 @@ function buildSopKiWorkshopSlides(mode = 'pro-phase') {
     'pro-track': `Pro Track ${timeMin ? '· ' + timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases · alle Phasen auf einen Blick`,
   }[mode] || '';
 
-  // 1. Opener
-  slides.push(tplSlide('content', {
+  // 1.–3. Opener → Zielbild → Instruktionen (gemeinsamer Auftakt)
+  slides.push(...sopWorkshopIntro({
     title: 'SOP · KI Use-Case Workshop',
     subtitle: modeLabel,
-    body: 'QR scannen · Name + Avatar wählen · los geht\'s!',
-    isHeroSlide: true,
+    exampleKey: 'consulting',
   }));
 
-  // 2. Zielbild (worauf der Workshop hinausläuft)
-  slides.push(sopWorkshopGoal());
-
-  // 3. Instruktions-Folie (Format, Timing, Limit)
-  slides.push(sopWorkshopInstructions());
-
-  // 3. Per Track
+  // 4. Per Track
   SOP_TOOL_TRACKS.forEach((track, ti) => {
     slides.push(sopTrackIntro(track, ti));
 
@@ -800,32 +830,8 @@ const INTERNAL_SOP_TRACKS = [
 
 window.INTERNAL_SOP_TRACKS = INTERNAL_SOP_TRACKS;
 
-// ─── LOCALSTORAGE: SOP-Struktur beim ersten Laden speichern ──────────────────
-(function () {
-  const LS_KEY = 'lp_sop_tracks_v2';
-  // Immer die aktuelle In-Code-Struktur spiegeln, damit die Kopie nie veraltet.
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(SOP_TOOL_TRACKS, null, 2));
-  } catch (e) {
-    console.warn('[LP] SOP-Struktur konnte nicht in localStorage geschrieben werden:', e);
-  }
-  // Export-Helfer robust anhängen — window.LP stammt aus lp-core.js (lädt vor templates.js).
-  window.LP = window.LP || {};
-  window.LP.exportSopTracks = function () {
-    let json;
-    try { json = localStorage.getItem(LS_KEY); } catch (_) { json = null; }
-    if (!json) json = JSON.stringify(SOP_TOOL_TRACKS, null, 2);
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(json)
-        .then(() => { if (window.toast) window.toast('SOP-Struktur in Zwischenablage kopiert ✓', 'success'); })
-        .catch(() => { console.log(json); });
-    } else {
-      console.log(json);
-      if (window.toast) window.toast('SOP-Struktur → siehe Konsole', 'info');
-    }
-    return json;
-  };
-})();
+// Hinweis: Der localStorage-Spiegel + Export-Helfer steht am Dateiende,
+// damit er alle drei SOP-Strukturen (inkl. Marketing) erfassen kann.
 
 // ─── MARKETING SOP TRACKS ───────────────────────────────────────────
 const MARKETING_SOP_TRACKS = [
@@ -929,19 +935,12 @@ function buildMarketingSopWorkshopSlides() {
     ? `${Math.round(ws.brainstormTimeLimitSec / 60)} Min.`
     : '';
 
-  // Opener
-  slides.push(tplSlide('content', {
+  // Opener → Zielbild → Instruktionen (Marketing-Beispiele)
+  slides.push(...sopWorkshopIntro({
     title: 'Marketing SOP · KI Use-Case Workshop',
     subtitle: `Pro Karte ${timeMin ? timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases pro Person`,
-    body: 'QR scannen · Name + Avatar wählen · los geht\'s!',
-    isHeroSlide: true,
+    exampleKey: 'marketing',
   }));
-
-  // Zielbild (worauf der Workshop hinausläuft)
-  slides.push(sopWorkshopGoal());
-
-  // Instruktions-Folie
-  slides.push(sopWorkshopInstructions());
 
   MARKETING_SOP_TRACKS.forEach((track, ti) => {
     slides.push(sopTrackIntro(track, ti));
@@ -955,7 +954,8 @@ function buildMarketingSopWorkshopSlides() {
   });
 
   // Finale: Übersicht + ICE-Matrix + Next Steps + Abschluss
-  slides.push(sopAllTracksSummary());
+  // Cross-Track-Überblick nur sinnvoll, wenn es mehr als einen Track gibt.
+  if (MARKETING_SOP_TRACKS.length > 1) slides.push(sopAllTracksSummary());
   slides.push(sopIceMatrix());
   slides.push(sopWorkshopNextSteps());
   slides.push(...sopWorkshopClose());
@@ -963,22 +963,39 @@ function buildMarketingSopWorkshopSlides() {
   return slides;
 }
 
+// ─── DUAL-SOP GEMEINSAME HELFER ───────────────────────────────────────────────
+// Von sequenzieller UND paralleler Dual-Vorlage genutzt (kein doppelter Code).
+
+// Gesamt-Priorisierung über beide SOPs. Faire Abstimmung: eigene Beiträge sind
+// nicht wählbar (sopFairVote) — konsistent mit der Single-SOP-Finalabstimmung.
+function dualCombinedVote() {
+  const n = (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
+  return tplSlide('mc_multi', {
+    title: 'Gesamt-Priorisierung · beide SOPs',
+    subtitle: `Wählt die Top ${n} KI Use Cases aus Internal + Consulting`,
+    prompt: `Welche ${n} Use Cases haben über beide SOPs hinweg den größten Hebel für ROOTS?\nHinweis: Eigene Beiträge können nicht gewählt werden.`,
+    isQuestionSlide: true,
+    options: [],
+    maxSelections: n,
+    sopKind: SK.GROUP_VOTE,
+    sopFairVote: true,
+  }, { showResultsLive: true, sopAllTracksVote: true, sopFairVote: true, sopVoteMax: n, workshopMode: 'decide' });
+}
+
+// Teilnehmer-/Team-Folie. Namen kommen aus LP_DUAL_SOP_TEAMS (zentral konfigurierbar).
+function dualParticipantsSlide(subtitle) {
+  return tplSlide('content', {
+    title: 'Wer ist dabei?',
+    subtitle,
+    body: dualTeamsBody(),
+    sopKind: SK.PARTICIPANTS,
+    isHeroSlide: false,
+  }, { workshopMode: 'orient' });
+}
+
 // ─── DUAL SOP · SEQUENZIELL (Internal, dann Consulting — kein Split-View) ─────
 function buildDualSopSequentialWorkshopSlides() {
   const slides = [];
-
-  function combinedVote() {
-    const n = (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
-    return tplSlide('mc_multi', {
-      title: 'Gesamt-Priorisierung · beide SOPs',
-      subtitle: `Wählt die Top ${n} KI Use Cases aus Internal + Consulting`,
-      prompt: `Welche ${n} Use Cases haben über beide SOPs hinweg den größten Hebel für ROOTS?`,
-      isQuestionSlide: true,
-      options: [],
-      maxSelections: n,
-      sopKind: 'group-vote',
-    }, { showResultsLive: true, sopAllTracksVote: true, sopVoteMax: n, workshopMode: 'decide' });
-  }
 
   function tagSeqSlide(slide, group) {
     slide.content.sopGroup = group;
@@ -986,23 +1003,13 @@ function buildDualSopSequentialWorkshopSlides() {
     return slide;
   }
 
-  slides.push(tplSlide('content', {
+  slides.push(...sopWorkshopIntro({
     title: 'SOP · KI Use-Case Workshop',
     subtitle: 'Internal + Consulting · nacheinander',
-    body: 'QR scannen · Name + Avatar wählen · los geht\'s!',
-    isHeroSlide: true,
+    exampleKey: 'consulting',
   }));
 
-  slides.push(sopWorkshopGoal());
-  slides.push(sopWorkshopInstructions());
-
-  slides.push(tplSlide('content', {
-    title: 'Wer ist dabei?',
-    subtitle: 'Zwei Teams · zwei SOPs · wir starten mit dem internen SOP',
-    body: 'Internal SOP\nRichard Erbler · Jannick Müller · Pano Goutzeris\n\nConsulting SOP\nManuel Stankovic · Rod Mitecki',
-    sopKind: 'participants',
-    isHeroSlide: false,
-  }, { workshopMode: 'orient' }));
+  slides.push(dualParticipantsSlide('Zwei Teams · zwei SOPs · wir starten mit dem internen SOP'));
 
   INTERNAL_SOP_TRACKS.forEach((t, i) => {
     slides.push(tagSeqSlide(sopTrackIntro(t, i), 'internal'));
@@ -1014,7 +1021,7 @@ function buildDualSopSequentialWorkshopSlides() {
     slides.push(tagSeqSlide(sopTrackBrainstorm(t), 'consulting'));
   });
 
-  slides.push(combinedVote());
+  slides.push(dualCombinedVote());
   slides.push(sopPitchSession());
   slides.push(sopIceMatrix());
   slides.push(sopWorkshopNextSteps());
@@ -1026,18 +1033,21 @@ function buildDualSopSequentialWorkshopSlides() {
 // ─── DUAL SOP · PARALLEL (Internal + Consulting gleichzeitig · Split-View) ──
 function buildDualSopParallelWorkshopSlides() {
   const slides = [];
+  const pairCount = Math.max(INTERNAL_SOP_TRACKS.length, SOP_TOOL_TRACKS.length);
+  const trackName = (t) => t?.title?.replace(/^Track \d+: /, '') || '';
 
-  function combinedVote() {
-    const n = (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
-    return tplSlide('mc_multi', {
-      title: 'Gesamt-Priorisierung · beide SOPs',
-      subtitle: `Wählt die Top ${n} KI Use Cases aus Internal + Consulting`,
-      prompt: `Welche ${n} Use Cases haben über beide SOPs hinweg den größten Hebel für ROOTS?`,
-      isQuestionSlide: true,
-      options: [],
-      maxSelections: n,
-      sopKind: 'group-vote',
-    }, { showResultsLive: true, sopAllTracksVote: true, sopVoteMax: n, workshopMode: 'decide' });
+  // Welche SOPs sind in diesem Paar vertreten? Bei ungleicher Track-Zahl
+  // (Internal 5, Consulting 3) sind die letzten Paare einseitig.
+  function pairInfo(pairIndex) {
+    const internal = INTERNAL_SOP_TRACKS[pairIndex] || null;
+    const consulting = SOP_TOOL_TRACKS[pairIndex] || null;
+    const sides = [];
+    if (internal) sides.push('internal');
+    if (consulting) sides.push('consulting');
+    const labelParts = [];
+    if (internal) labelParts.push(`Internal: ${trackName(internal)}`);
+    if (consulting) labelParts.push(`Consulting: ${trackName(consulting)}`);
+    return { internal, consulting, sides, label: labelParts.join('  ·  '), singleSide: sides.length === 1 ? sides[0] : null };
   }
 
   function tagDualSlide(slide, group, pairIndex) {
@@ -1048,47 +1058,42 @@ function buildDualSopParallelWorkshopSlides() {
     return slide;
   }
 
-  slides.push(tplSlide('content', {
+  slides.push(...sopWorkshopIntro({
     title: 'SOP · KI Use-Case Workshop',
     subtitle: 'Internal + Consulting · zwei Teams parallel',
     body: 'QR scannen · Name + Avatar wählen · Host weist euch euer SOP-Team zu · los geht\'s!',
-    isHeroSlide: true,
-    sopDualParallel: true,
+    exampleKey: 'consulting',
+    openerExtra: { sopDualParallel: true },
   }));
 
-  slides.push(sopWorkshopGoal());
-  slides.push(sopWorkshopInstructions());
-
-  slides.push(tplSlide('content', {
-    title: 'Wer ist dabei?',
-    subtitle: 'Zwei SOPs · parallel · Host weist Teilnehmer den Teams zu',
-    body: 'Internal SOP\nRichard Erbler · Jannick Müller · Pano Goutzeris\n\nConsulting SOP\nManuel Stankovic · Rod Mitecki',
-    sopKind: 'participants',
-    isHeroSlide: false,
-  }, { workshopMode: 'orient' }));
+  slides.push(dualParticipantsSlide('Zwei SOPs · parallel · Host weist Teilnehmer den Teams zu'));
 
   function dualPairOrientSlide(pairIndex) {
+    const info = pairInfo(pairIndex);
     const n = pairIndex + 1;
     return tplSlide('content', {
-      title: `Track ${n}`,
-      subtitle: 'Überblick · parallel',
+      title: `Track ${n} von ${pairCount}`,
+      subtitle: info.label || 'Überblick · parallel',
       sopKind: SK.DUAL_PAIR_ORIENT,
       sopDualPairIndex: pairIndex,
       sopDualParallel: true,
+      sopDualSingleSide: info.singleSide,
     }, { workshopMode: 'orient' });
   }
 
   function dualPairCollectAnchor(pairIndex) {
     const ws = window.LP_WORKSHOP_SETTINGS;
+    const info = pairInfo(pairIndex);
     const n = pairIndex + 1;
     return tplSlide('brainstorm', {
       title: `Track ${n} · Use Cases`,
-      subtitle: 'Brainstorm · parallel',
+      subtitle: info.label || 'Brainstorm · parallel',
       prompt: `KI Use Cases sammeln · max. ${ws.brainstormMaxResponses} pro Person\nFormat: Use Case · Feature · Abhängigkeiten`,
       isQuestionSlide: true,
       sopKind: SK.DUAL_PAIR_COLLECT,
       sopDualPairIndex: pairIndex,
       sopDualParallel: true,
+      sopDualSingleSide: info.singleSide,
     }, brainstormSettings());
   }
 
@@ -1098,7 +1103,6 @@ function buildDualSopParallelWorkshopSlides() {
     return s;
   }
 
-  const pairCount = Math.max(INTERNAL_SOP_TRACKS.length, SOP_TOOL_TRACKS.length);
   for (let i = 0; i < pairCount; i += 1) {
     slides.push(dualPairOrientSlide(i));
     slides.push(dualPairCollectAnchor(i));
@@ -1106,7 +1110,7 @@ function buildDualSopParallelWorkshopSlides() {
     if (SOP_TOOL_TRACKS[i]) slides.push(hiddenBrainstormSlide(SOP_TOOL_TRACKS[i], 'consulting', i));
   }
 
-  slides.push(combinedVote());
+  slides.push(dualCombinedVote());
   slides.push(sopPitchSession());
   slides.push(sopIceMatrix());
   slides.push(sopWorkshopNextSteps());
@@ -1123,7 +1127,7 @@ window.LP_TEMPLATES = [
     desc: 'SOP-Kontext je Phase → Brainstorm → Track-Vote → Presentation Session → ICE Matrix.',
     duration: '90–150 Min.',
     group: '6–25',
-    tips: 'Höchste Tiefe. SOP-Übersicht vor jedem Brainstorm. 5 Min. / max. 2 Use Cases je Phase.',
+    tips: 'Höchste Tiefe. SOP-Übersicht vor jedem Brainstorm. 5 Min. / max. 2 Use Cases je Phase — 10 Phasen × 5 Min ≈ 50 Min nur Sammeln, plus Votes/Presentations/Matrix.',
     slides: buildSopKiWorkshopSlides('pro-phase'),
   },
   {
@@ -1140,10 +1144,10 @@ window.LP_TEMPLATES = [
     key: 'roots-marketing-sop-workshop',
     category: 'ROOTS · SOP & KI',
     name: 'Marketing SOP · Pro Karte',
-    desc: 'Marketing-SOP: je Karte KI Use Cases sammeln · Track-Top-3 · Presentation Session · ICE Matrix.',
-    duration: '60–90 Min.',
+    desc: 'Marketing-SOP (1 Track, 10 Karten): je Karte KI Use Cases sammeln · Top-3 priorisieren · Presentation Session · ICE Matrix.',
+    duration: '75–110 Min.',
     group: '6–20',
-    tips: 'Pro Karte 5 Min. · max. 2 Use Cases · Auswertung nach Teilbereich.',
+    tips: 'Pro Karte 5 Min. · max. 2 Use Cases. Achtung: 10 Karten × 5 Min ≈ 50 Min nur Sammeln — Zeitlimit ggf. in LP_WORKSHOP_SETTINGS senken.',
     slides: buildMarketingSopWorkshopSlides(),
   },
   {
@@ -1322,3 +1326,38 @@ window.LP_DEFAULT_SETTINGS = {
   profanityFilter: true,
   askName: true,
 };
+
+// ─── LOCALSTORAGE: SOP-Strukturen beim Laden spiegeln + Export-Helfer ─────────
+// Steht bewusst am Dateiende: alle drei SOP-Strukturen sind hier initialisiert.
+(function () {
+  const LS_KEY = 'lp_sop_tracks_v2';        // bestehender Key (Consulting) — rückwärtskompatibel
+  const LS_KEY_ALL = 'lp_sop_tracks_all_v1'; // alle SOPs gebündelt
+  const all = {
+    consulting: SOP_TOOL_TRACKS,
+    internal: INTERNAL_SOP_TRACKS,
+    marketing: MARKETING_SOP_TRACKS,
+  };
+  // Immer die aktuelle In-Code-Struktur spiegeln, damit die Kopie nie veraltet.
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(SOP_TOOL_TRACKS, null, 2));
+    localStorage.setItem(LS_KEY_ALL, JSON.stringify(all, null, 2));
+  } catch (e) {
+    console.warn('[LP] SOP-Struktur konnte nicht in localStorage geschrieben werden:', e);
+  }
+  // Export-Helfer robust anhängen — window.LP stammt aus lp-core.js (lädt vor templates.js).
+  window.LP = window.LP || {};
+  // which: 'consulting' | 'internal' | 'marketing' | 'all' (Default: all)
+  window.LP.exportSopTracks = function (which = 'all') {
+    const payload = which === 'all' ? all : (all[which] || all.consulting);
+    const json = JSON.stringify(payload, null, 2);
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(json)
+        .then(() => { if (window.toast) window.toast(`SOP-Struktur (${which}) in Zwischenablage kopiert ✓`, 'success'); })
+        .catch(() => { console.log(json); });
+    } else {
+      console.log(json);
+      if (window.toast) window.toast('SOP-Struktur → siehe Konsole', 'info');
+    }
+    return json;
+  };
+})();
