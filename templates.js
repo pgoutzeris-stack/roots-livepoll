@@ -27,6 +27,7 @@ window.LP_SOP_KIND = Object.freeze({
   GROUP_VOTE: 'group-vote',
   GROUP_TRANSITION: 'group-transition',
   PARTICIPANTS: 'participants',
+  WORKSHOP_CLOSE: 'workshop-close',
 });
 const SK = window.LP_SOP_KIND;
 
@@ -640,6 +641,7 @@ function sopWorkshopClose() {
       title: 'Danke! 🙌',
       body: 'Die Top-Use-Cases übergeben wir an die SOP-Owner.\nAction Items sammeln wir in Notion.\nKickoffs für die nominierten Use Cases folgen.\n\nLet\'s build the future of ROOTS.',
       isHeroSlide: true,
+      sopKind: SK.WORKSHOP_CLOSE,
     }),
     tplSlide('open', {
       title: 'Dein Feedback',

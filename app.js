@@ -65,7 +65,9 @@ const State = {
   participantResponsesAt: 0,
   pitchTimers: {},
   sopAssignSeen: null,
+  closingCelebrationSlideId: null,
   heroAiRaf: 0,
+  closingAiRaf: 0,
 };
 
 localStorage.setItem('lp_device_id', State.deviceId);
@@ -2181,7 +2183,8 @@ function getSlideShellMeta(slide) {
   if (isBrainstormCollectSlide(slide)) return { pillIcon: 'fa-lightbulb', pillLabel: 'Sammeln', pillTone: 'collect' };
   if (shouldUseVoteWorkshopUi(slide)) return { pillIcon: 'fa-ranking-star', pillLabel: 'Vote', pillTone: 'decide' };
   if (slide?.slide_type === 'section' && c.sopTrackClass) return { pillIcon: 'fa-map', pillLabel: (c.sopTrackLabel || 'SOP').replace(/^Track \d+: /, ''), pillTone: 'orient' };
-  if (c.isHeroSlide) return { pillIcon: 'fa-signal', pillLabel: 'Start', pillTone: 'brand' };
+  if (c.isHeroSlide && !isWorkshopClosingSlide(slide)) return { pillIcon: 'fa-signal', pillLabel: 'Start', pillTone: 'brand' };
+  if (c.sopKind === 'workshop-close') return { pillIcon: 'fa-heart', pillLabel: 'Abschluss', pillTone: 'muted' };
   if (c.sopKind === 'workshop-goal') return { pillIcon: 'fa-bullseye', pillLabel: 'Ziel', pillTone: 'brand' };
   if (c.sopKind === 'instructions') return { pillIcon: 'fa-pen-ruler', pillLabel: 'Format', pillTone: 'brand' };
   if (c.sopKind === 'participants') return { pillIcon: 'fa-user-group', pillLabel: 'Zuweisung', pillTone: 'orient' };
@@ -2991,6 +2994,150 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
         ${bodyEl}
       </div>`;
   }
+}
+
+function isWorkshopClosingSlide(slide) {
+  if (!slide) return false;
+  const c = slide.content || {};
+  if (c.sopKind === 'workshop-close') return true;
+  if (slide.settings?.presentationClosing) return true;
+  if (c.isHeroSlide && /danke|abschluss|thank/i.test(String(c.title || ''))) return true;
+  return false;
+}
+
+function isWorkshopOpeningSlide(slide) {
+  if (!slide?.content?.isHeroSlide) return false;
+  return !isWorkshopClosingSlide(slide);
+}
+
+function getWorkshopCloseStats() {
+  const { allItems } = aggregateAllTracksUseCases();
+  const useCases = allItems.length;
+  const participants = State.participants?.length || 0;
+  const tracks = new Set(allItems.map((i) => i.trackKey).filter(Boolean)).size;
+  return { useCases, participants, tracks };
+}
+
+function renderClosingSlideHtml(c, editable = false, opts = {}) {
+  const { shellMode = false, presentFx = false } = opts;
+  const bodyHtml = editable
+    ? `<div class="canvas-editable pslide-hero-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+    : `<div class="ws-closing-body">${esc(c.body || '').replace(/\n/g, '<br>')}</div>`;
+  if (shellMode && !editable && presentFx) {
+    const stats = State.session ? getWorkshopCloseStats() : null;
+    const statsHtml = stats && (stats.useCases || stats.participants)
+      ? `<div class="ws-closing-stats">
+          ${stats.useCases ? `<span class="ws-closing-stat"><strong>${stats.useCases}</strong> Use Cases</span>` : ''}
+          ${stats.participants ? `<span class="ws-closing-stat"><strong>${stats.participants}</strong> Teilnehmer</span>` : ''}
+          ${stats.tracks ? `<span class="ws-closing-stat"><strong>${stats.tracks}</strong> Tracks</span>` : ''}
+        </div>`
+      : '';
+    const subEl = c.subtitle
+      ? `<p class="ws-closing-kicker">${esc(c.subtitle)}</p>`
+      : '<p class="ws-closing-kicker">Workshop abgeschlossen</p>';
+    return `
+      <div class="ws-closing-stage">
+        <canvas class="ws-closing-ai-canvas" aria-hidden="true"></canvas>
+        <div class="ws-closing-sparkles" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="ws-closing-glow ws-closing-glow--a" aria-hidden="true"></div>
+        <div class="ws-closing-glow ws-closing-glow--b" aria-hidden="true"></div>
+        <div class="ws-closing-content">
+          <div class="ws-closing-icon-ring"><i class="fa-solid fa-champagne-glasses"></i></div>
+          <h1 class="ws-closing-title ws-closing-title--shimmer">${esc(c.title || 'Danke!')}</h1>
+          ${subEl}
+          ${statsHtml}
+          ${bodyHtml}
+        </div>
+      </div>`;
+  }
+  if (shellMode && !editable) return bodyHtml;
+  const titleEl = editable
+    ? `<div class="canvas-editable pslide-hero-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+    : `<h1 class="pslide-hero-title">${esc(c.title || '')}</h1>`;
+  return `
+    <div class="pslide-hero pslide-hero--closing">
+      <div class="pslide-hero-icon"><i class="fa-solid fa-heart"></i></div>
+      ${titleEl}
+      ${bodyHtml.replace('ws-closing-body', 'pslide-hero-body')}
+    </div>`;
+}
+
+function stopClosingAiFx() {
+  if (State.closingAiRaf) {
+    cancelAnimationFrame(State.closingAiRaf);
+    State.closingAiRaf = 0;
+  }
+  document.querySelector('.ws-closing-stage')?._closingAiCleanup?.();
+}
+
+function initClosingAiFx(stage) {
+  stopClosingAiFx();
+  const wrap = stage?.querySelector('.ws-closing-stage');
+  const canvas = wrap?.querySelector('.ws-closing-ai-canvas');
+  if (!wrap || !canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const particles = [];
+  const colors = ['#206efb', '#10b981', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4'];
+  const resize = () => {
+    const rect = wrap.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${rect.height}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!particles.length) {
+      const count = Math.min(36, Math.max(16, Math.floor(rect.width / 32)));
+      for (let i = 0; i < count; i += 1) {
+        particles.push({
+          x: Math.random() * rect.width,
+          y: Math.random() * rect.height,
+          vx: (Math.random() - 0.5) * 0.28,
+          vy: 0.15 + Math.random() * 0.45,
+          r: 1.5 + Math.random() * 2.5,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          a: 0.2 + Math.random() * 0.5,
+        });
+      }
+    }
+  };
+  resize();
+  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null;
+  ro?.observe(wrap);
+  const tick = () => {
+    const w = wrap.clientWidth;
+    const h = wrap.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+    particles.forEach((p) => {
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.y > h + 8) { p.y = -8; p.x = Math.random() * w; }
+      if (p.x < -8) p.x = w + 8;
+      if (p.x > w + 8) p.x = -8;
+      ctx.beginPath();
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.a;
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    State.closingAiRaf = requestAnimationFrame(tick);
+  };
+  State.closingAiRaf = requestAnimationFrame(tick);
+  wrap._closingAiCleanup = () => {
+    stopClosingAiFx();
+    ro?.disconnect();
+  };
+}
+
+function maybeLaunchClosingCelebration(slide) {
+  if (!isWorkshopClosingSlide(slide)) return;
+  if (State.closingCelebrationSlideId === slide.id) return;
+  State.closingCelebrationSlideId = slide.id;
+  launchResultsConfetti(4800);
 }
 
 function renderHeroSlideHtml(c, editable = false, opts = {}) {
@@ -4326,10 +4473,13 @@ function finalizePresentUi(slide) {
   updatePresentToolbarUi(slide);
   bindResultsDisplayToggle($('#present-stage'));
   maybeLaunchResultsConfetti(slide);
+  maybeLaunchClosingCelebration(slide);
   bindPitchTimers($('#present-stage'));
   bindPresentParticipantAssign();
-  if (slide?.content?.isHeroSlide) initHeroAiFx($('#present-stage'));
+  if (isWorkshopOpeningSlide(slide)) initHeroAiFx($('#present-stage'));
   else stopHeroAiFx();
+  if (isWorkshopClosingSlide(slide)) initClosingAiFx($('#present-stage'));
+  else stopClosingAiFx();
 }
 
 async function deleteSlide(id) {
@@ -4429,15 +4579,17 @@ function renderEditorCanvas() {
     return;
   }
   if (slide.settings?.presentationClosing) {
-    canvas.innerHTML = `${renderCenteredSlideHtml(c, true, { icon: 'fa-heart' })}
-      <div class="canvas-hint"><i class="fa-solid fa-pen"></i> Abschlussfolie · zentriertes Layout</div>`;
+    canvas.innerHTML = `${renderClosingSlideHtml(c, true)}
+      <div class="canvas-hint"><i class="fa-solid fa-champagne-glasses"></i> Abschlussfolie · Celebration-Layout im Present-Modus</div>`;
     bindCanvasInlineEdit();
     return;
   }
   if (slide.slide_type === 'content' && (c.isHeroSlide || c.sopKind || c.sopTrackResults || c.sopKind === 'card-results') && c.sopKind !== 'dual-pair-orient') {
-    const html = c.isHeroSlide ? renderHeroSlideHtml(c, true) : renderSopContentHtml(c, true);
+    const html = isWorkshopClosingSlide(slide)
+      ? renderClosingSlideHtml(c, true)
+      : (c.isHeroSlide ? renderHeroSlideHtml(c, true) : renderSopContentHtml(c, true));
     if (html) {
-      canvas.classList.toggle('is-centered', c.isHeroSlide || useCenteredLayout(slide));
+      canvas.classList.toggle('is-centered', isWorkshopClosingSlide(slide) || isWorkshopOpeningSlide(slide) || useCenteredLayout(slide));
       canvas.innerHTML = `${html}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Titel und Text direkt bearbeiten</div>`;
       bindCanvasInlineEdit();
       return;
@@ -5939,8 +6091,9 @@ function renderPresentNow() {
     }
   }
   const stage = $('#present-stage');
-  if (!slide) { stage.innerHTML = '<h1>Keine Folien</h1>'; stage.classList.remove('sop-split-stage', 'ws-hero-present-stage'); stopHeroAiFx(); return; }
-  stage.classList.toggle('ws-hero-present-stage', !!(slide.content?.isHeroSlide && isSopWorkshopPresentation()));
+  if (!slide) { stage.innerHTML = '<h1>Keine Folien</h1>'; stage.classList.remove('sop-split-stage', 'ws-hero-present-stage', 'ws-closing-present-stage'); stopHeroAiFx(); stopClosingAiFx(); return; }
+  stage.classList.toggle('ws-hero-present-stage', !!(isWorkshopOpeningSlide(slide) && isSopWorkshopPresentation()));
+  stage.classList.toggle('ws-closing-present-stage', !!(isWorkshopClosingSlide(slide) && (isSopWorkshopPresentation() || slide.settings?.presentationClosing)));
   const c = slide.content || {};
   // DEBUG-Simulator: bei jedem Slide-Wechsel die Antworten für diesen Slide
   // zeitversetzt drippen (nur einmal pro Slide via triggeredSlides-Set)
@@ -6056,7 +6209,9 @@ function renderPresentNow() {
       html = `${renderCenteredSlideHtml(c, false, { icon: 'fa-chart-column' })}
         <div class="viz-wrap viz-wrap-present">${renderPresentationResultsPresentHtml()}</div>`;
     } else if (slide.settings?.presentationClosing) {
-      html = renderCenteredSlideHtml(c, false, { icon: 'fa-heart' });
+      html = isSopWorkshopPresentation()
+        ? renderClosingSlideHtml(c, false, { shellMode: true, presentFx: true })
+        : renderClosingSlideHtml(c, false, { shellMode: true, presentFx: true });
     } else {
       const source = State.slides.find((s) => s.id === slide.content?.resultsSourceId);
       const srcVisible = source ? getVisibleResponses(source.id) : [];
@@ -6067,6 +6222,7 @@ function renderPresentNow() {
     }
     stage.classList.remove('sop-split-stage');
     stage.dataset.splitOn = '';
+    stage.classList.toggle('ws-closing-present-stage', !!slide.settings?.presentationClosing);
     stage.innerHTML = wrapSlide(html, State.session.current_slide_index || 0);
     updatePresentHeader();
     updatePresentStats();
@@ -6077,7 +6233,20 @@ function renderPresentNow() {
     return;
   }
 
-  if (isSopWorkshopPresentation() && slide.slide_type === 'content' && c.isHeroSlide && !isCardResultsSlide(slide)) {
+  if (isSopWorkshopPresentation() && slide.slide_type === 'content' && isWorkshopClosingSlide(slide)) {
+    stage.classList.remove('sop-split-stage');
+    stage.dataset.splitOn = '';
+    stage.innerHTML = wrapSlide(renderClosingSlideHtml(c, false, { shellMode: true, presentFx: true }), slideIdx);
+    updatePresentHeader();
+    updatePresentStats();
+    renderPresentParticipants();
+    void renderQrCode();
+    syncSopWorkshopShell('present', slideIdx);
+    finalizePresentUi(slide);
+    return;
+  }
+
+  if (isSopWorkshopPresentation() && slide.slide_type === 'content' && isWorkshopOpeningSlide(slide) && !isCardResultsSlide(slide)) {
     stage.classList.remove('sop-split-stage');
     stage.dataset.splitOn = '';
     stage.innerHTML = wrapSlide(renderHeroSlideHtml(c, false, { shellMode: true, presentFx: true }), slideIdx);
@@ -6391,6 +6560,9 @@ function normalizeSlideRecord(slide) {
   if (c && typeof c === 'object') {
     if (c.isHeroSlide === undefined && c.mentiHero !== undefined) c.isHeroSlide = c.mentiHero;
     if (c.isQuestionSlide === undefined && c.mentiQuestion !== undefined) c.isQuestionSlide = c.mentiQuestion;
+    if (c.isHeroSlide && !c.sopKind && /danke|abschluss|thank/i.test(String(c.title || ''))) {
+      c.sopKind = 'workshop-close';
+    }
   }
   return next;
 }
@@ -6609,6 +6781,16 @@ async function renderParticipantQuestion() {
     finishParticipant();
     return;
   }
+  if (isWorkshopClosingSlide(hostSlide)) {
+    root.innerHTML = wrapParticipantSlide(`
+      <div class="participant-wait-block participant-closing-block">
+        ${renderClosingSlideHtml(hostSlide.content || {}, false, { shellMode: true, presentFx: true })}
+        <p class="participant-sop-wait"><i class="fa-solid fa-comment"></i> Gleich folgt noch kurzes Feedback…</p>
+      </div>`, slideIndex);
+    maybeLaunchClosingCelebration(hostSlide);
+    finishParticipant();
+    return;
+  }
   if (hostSlide?.content?.sopKind === 'dual-pair-orient') {
     root.innerHTML = wrapParticipantSlide(`
       <div class="participant-wait-block ws-slide ws-slide--orient">
@@ -6629,10 +6811,12 @@ async function renderParticipantQuestion() {
       finishParticipant();
       return;
     }
-    if (slide.slide_type === 'content' && (slide.content?.isHeroSlide || slide.content?.sopKind || slide.content?.sopTrackResults || isSopCardResultsSlide(slide))) {
-      const html = slide.content.isHeroSlide
-        ? renderHeroSlideHtml(slide.content, false, { shellMode: true, presentFx: true })
-        : (isSopCardResultsSlide(slide) ? '' : renderSopContentHtml(slide.content));
+    if (slide.slide_type === 'content' && (slide.content?.isHeroSlide || slide.content?.sopKind === 'workshop-close' || slide.content?.sopKind || slide.content?.sopTrackResults || isSopCardResultsSlide(slide))) {
+      const html = isWorkshopClosingSlide(slide)
+        ? renderClosingSlideHtml(slide.content, false, { shellMode: true, presentFx: true })
+        : (slide.content.isHeroSlide
+          ? renderHeroSlideHtml(slide.content, false, { shellMode: true, presentFx: true })
+          : (isSopCardResultsSlide(slide) ? '' : renderSopContentHtml(slide.content)));
       if (html || isSopCardResultsSlide(slide)) {
         root.innerHTML = wrapParticipantSlide(`
           <div class="participant-wait-block">${html || `<h1 class="pslide-q-title">${esc(slide.content?.title || 'Ergebnis')}</h1><p class="pslide-q-prompt">${esc(slide.content?.body || '')}</p>`}
