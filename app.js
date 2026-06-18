@@ -2202,7 +2202,25 @@ function renderSopContentHtml(c, editable = false) {
         ${renderSopBoardPreview(c, editable)}
       </div>`;
   }
-  return '';
+  // Generischer SOP-Content-Fallback (z. B. sopKind 'participants') — sonst wuerde die Folie leer rendern.
+  {
+    const titleEl = editable
+      ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
+      : (c.title ? `<h1 class="sop-pslide-title">${esc(c.title)}</h1>` : '');
+    const subEl = editable
+      ? `<div class="canvas-editable sop-pslide-sub" contenteditable="true" data-field="subtitle">${esc(c.subtitle || '')}</div>`
+      : (c.subtitle ? `<p class="sop-pslide-sub">${esc(c.subtitle)}</p>` : '');
+    const bodyEl = editable
+      ? `<div class="canvas-editable sop-pslide-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+      : (c.body ? `<p class="sop-pslide-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+    if (!c.title && !c.subtitle && !c.body && !editable) return '';
+    return `
+      <div class="sop-pslide-section sop-pslide-${esc(c.sopKind || 'content')}">
+        ${titleEl}
+        ${subEl}
+        ${bodyEl}
+      </div>`;
+  }
 }
 
 function renderHeroSlideHtml(c, editable = false) {
