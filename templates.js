@@ -552,10 +552,10 @@ function sopPhaseBrainstorm(track, phase) {
 function sopTrackBrainstorm(track) {
   const ws = window.LP_WORKSHOP_SETTINGS;
   return tplSlide('brainstorm', {
-    title: `KI Use Cases · ${track.title.replace(/^Track \d+: /, '')}`,
+    title: 'Use Cases sammeln',
     body: '',
-    subtitle: track.title,
-    prompt: `Welche KI seht ihr in diesem Track? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\nFormat: Use Case · Feature · Abhängigkeiten — z. B. „Rechnungstool mit KI bauen · Umsatzsteuer-Erkennung, EN 16931 · Rechnungen im SharePoint"\n\nNutzt die SOP-Übersicht als Orientierung — alle Phasen und Karten sind mögliche Ansatzpunkte.`,
+    subtitle: '',
+    prompt: `Welche KI Use Cases seht ihr in diesem Track? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\nFormat: Use Case, Feature, Abhängigkeiten — z. B. „Rechnungstool mit KI bauen · Umsatzsteuer-Erkennung, EN 16931 · Rechnungen im SharePoint"\n\nNutzt die SOP-Übersicht als Orientierung — alle Phasen und Karten sind mögliche Ansatzpunkte.`,
     isQuestionSlide: true,
     sopKind: SK.TRACK_COLLECT,
     sopBoard: sopBoardData(track),
@@ -1104,14 +1104,12 @@ function buildDualSopSequentialWorkshopSlides() {
   ));
 
   INTERNAL_SOP_TRACKS.forEach((t, i) => {
-    slides.push(tagSeqSlide(sopTrackIntro(t, i), 'internal', i, intTrackCount));
     slides.push(tagSeqSlide(sopTrackBrainstorm(t), 'internal', i, intTrackCount));
   });
 
   slides.push(dualGroupTransitionSlide(intTrackCount));
 
   SOP_TOOL_TRACKS.forEach((t, i) => {
-    slides.push(tagSeqSlide(sopTrackIntro(t, i), 'consulting', i, conTrackCount));
     slides.push(tagSeqSlide(sopTrackBrainstorm(t), 'consulting', i, conTrackCount));
   });
 
@@ -1188,31 +1186,14 @@ function buildDualSopParallelWorkshopSlides() {
     dualParticipantsSlide('Zwei SOPs parallel. Der Host weist Teilnehmer den Teams zu.'),
   ));
 
-  function dualPairOrientSlide(pairIndex) {
-    const info = pairInfo(pairIndex);
-    const n = pairIndex + 1;
-    return tplSlide('content', {
-      title: `Track ${n} von ${pairCount}`,
-      subtitle: info.subtitle,
-      sopKind: SK.DUAL_PAIR_ORIENT,
-      sopDualPairIndex: pairIndex,
-      sopDualParallel: true,
-      sopDualSingleSide: info.singleSide,
-      internalTrackName: info.internalTrackName,
-      consultingTrackName: info.consultingTrackName,
-      ...dualBothGroupsFields(),
-      ...dualParallelProgress(pairIndex, pairCount),
-    }, { workshopMode: 'orient' });
-  }
-
   function dualPairCollectAnchor(pairIndex) {
     const ws = window.LP_WORKSHOP_SETTINGS;
     const info = pairInfo(pairIndex);
     const n = pairIndex + 1;
     return tplSlide('brainstorm', {
-      title: `Track ${n} · Use Cases`,
-      subtitle: info.subtitle,
-      prompt: `KI Use Cases sammeln · max. ${ws.brainstormMaxResponses} pro Person\nFormat: Use Case · Feature · Abhängigkeiten`,
+      title: 'Use Cases sammeln',
+      subtitle: '',
+      prompt: `Welche KI Use Cases seht ihr in diesem Track? Max. ${ws.brainstormMaxResponses} pro Person.\nFormat: Use Case, Feature, Abhängigkeiten`,
       isQuestionSlide: true,
       sopKind: SK.DUAL_PAIR_COLLECT,
       sopDualPairIndex: pairIndex,
@@ -1220,7 +1201,6 @@ function buildDualSopParallelWorkshopSlides() {
       sopDualSingleSide: info.singleSide,
       internalTrackName: info.internalTrackName,
       consultingTrackName: info.consultingTrackName,
-      ...dualBothGroupsFields(),
       ...dualParallelProgress(pairIndex, pairCount),
     }, brainstormSettings());
   }
@@ -1232,7 +1212,6 @@ function buildDualSopParallelWorkshopSlides() {
   }
 
   for (let i = 0; i < pairCount; i += 1) {
-    slides.push(dualPairOrientSlide(i));
     slides.push(dualPairCollectAnchor(i));
     if (INTERNAL_SOP_TRACKS[i]) slides.push(hiddenBrainstormSlide(INTERNAL_SOP_TRACKS[i], 'internal', i));
     if (SOP_TOOL_TRACKS[i]) slides.push(hiddenBrainstormSlide(SOP_TOOL_TRACKS[i], 'consulting', i));
@@ -1285,17 +1264,17 @@ window.LP_TEMPLATES = [
     desc: 'Erst Internal-SOP, dann Consulting-SOP · keine Split-View · EINE konsolidierte Priorisierung + gemeinsame ICE-Matrix.',
     duration: '90–120 Min.',
     group: '5–25',
-    tips: 'Klassischer Ablauf: Internal komplett durch, danach Consulting. Alle sammeln gemeinsam an derselben Folie. Am Ende eine Gesamt-Priorisierung, Pitch und Matrix über beide SOPs.',
+    tips: 'Pro Track eine Sammel-Folie mit SOP-Board. Internal komplett durch, danach Consulting. Am Ende Gesamt-Priorisierung, Pitch und Matrix über beide SOPs.',
     slides: buildDualSopSequentialWorkshopSlides(),
   },
   {
     key: 'roots-sop-dual-internal-consulting-parallel',
     category: 'ROOTS · SOP & KI',
     name: 'Internal + Consulting · parallel',
-    desc: 'Beide SOPs gleichzeitig · 2 Folien pro Track (Überblick + Sammeln) · Split-View · Host-Zuweisung · konsolidierte Priorisierung + Matrix.',
+    desc: 'Beide SOPs gleichzeitig · eine Sammel-Folie pro Track · Split-View mit voller SOP-Breite · Host-Zuweisung · konsolidierte Priorisierung + Matrix.',
     duration: '90–120 Min.',
     group: '5–25',
-    tips: 'Pro Track nur 2 Host-Folien (Überblick → Sammeln) — kein Doppel-Klick. QR-Join → Host weist Internal/Consulting zu. Split-View am Beamer. Priorisierung, Pitch, Matrix konsolidiert.',
+    tips: 'Pro Track nur eine Host-Folie (Sammeln mit SOP im Split). QR-Join → Host weist Internal/Consulting zu. Priorisierung, Pitch, Matrix konsolidiert.',
     slides: buildDualSopParallelWorkshopSlides(),
   },
 ];

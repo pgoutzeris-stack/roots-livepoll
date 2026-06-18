@@ -1704,6 +1704,28 @@ function trackToSopBoardContent(track, pairIdx) {
   };
 }
 
+function renderDualPairCollectColumn(group, pairIdx) {
+  const tracks = group === 'internal' ? window.INTERNAL_SOP_TRACKS : window.SOP_TOOL_TRACKS;
+  const track = tracks?.[pairIdx];
+  if (!track) {
+    return renderSopEmptyState({
+      icon: getSopGroupMeta(group).icon,
+      title: 'Kein Track in diesem SOP.',
+    });
+  }
+  const theme = sopTrackTheme(track.class);
+  const boardContent = trackToSopBoardContent(track, pairIdx);
+  const brainstormSlide = brainstormSlidesOfGroup(group)[pairIdx];
+  let html = `<div class="ws-split-sop-board ws-orient-col ws-orient-col--split-present" style="--sop-accent:${theme.accent}">
+    ${renderSopBoardPreview(boardContent, false, { hideTrackHeader: true })}
+  </div>`;
+  if (brainstormSlide) {
+    const visible = getVisibleResponses(brainstormSlide.id);
+    html += `<div class="ws-split-collect-viz"><div class="viz-wrap viz-wrap-present">${renderBrainstormPresentViz(brainstormSlide, visible)}</div></div>`;
+  }
+  return `<div class="ws-collect-col ws-collect-col--split-present">${html}</div>`;
+}
+
 function renderDualPairOrientColumn(group, pairIdx) {
   const tracks = group === 'internal' ? window.INTERNAL_SOP_TRACKS : window.SOP_TOOL_TRACKS;
   const track = tracks?.[pairIdx];
@@ -1739,9 +1761,7 @@ function renderSopSectionSplitView(currentSlide) {
 }
 
 function renderBrainstormSplitViz(currentSlide) {
-  return renderDualSopSplitView(currentSlide, (group, pairIdx) => (
-    renderBrainstormSlideColumn(brainstormSlidesOfGroup(group)[pairIdx])
-  ));
+  return renderDualSopSplitView(currentSlide, (group, pairIdx) => renderDualPairCollectColumn(group, pairIdx));
 }
 
 // Finale Priorisierung (Moderator/Beamer): moderne Tabelle — alle Use Cases mit
@@ -1914,10 +1934,11 @@ function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false,
     return `<div class="pslide-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${boardEl}${promptEl}</div>`;
   }
   if (shellMode) {
-    const colTitle = splitCol ? '' : '';
     const formatBlock = splitCol ? '' : formatEl;
     const noteBlock = splitCol ? '' : noteEl;
-    return `<div class="pslide-question-block workshop-collect-shell workshop-collect-shell--compact${splitCol ? ' workshop-collect-shell--split' : ''}">${colTitle}${questionEl}${formatBlock}${boardEl}${noteBlock}</div>`;
+    const questionBlock = splitCol ? '' : questionEl;
+    const boardBlock = splitCol ? '' : boardEl;
+    return `<div class="pslide-question-block workshop-collect-shell workshop-collect-shell--compact${splitCol ? ' workshop-collect-shell--split' : ''}">${questionBlock}${formatBlock}${boardBlock}${noteBlock}</div>`;
   }
   const isSopCollect = !!(content.sopKind || content.sopBoard?.length);
   if (!isSopCollect) {
@@ -2096,7 +2117,7 @@ function getWsPresentTitle(slide) {
   const c = slide?.content || {};
   if (slide?.slide_type === 'section' && c.sopTrackClass) return workshopDisplayTitle(enrichSopContent(c));
   if (c.sopKind === 'dual-pair-orient') return getDualPairTrackLabel(slide);
-  if (c.sopKind === 'dual-pair-collect') return 'Use Cases sammeln';
+  if (isBrainstormCollectSlide(slide) && isSopWorkshopPresentation()) return 'Use Cases sammeln';
   if (isBrainstormCollectSlide(slide)) {
     return workshopDisplayTitle(enrichSopContent(c)) || c.sopCardName || c.title;
   }
@@ -2106,7 +2127,7 @@ function getWsPresentTitle(slide) {
 function getWsPresentLead(slide) {
   const c = slide?.content || {};
   if (c.sopKind === 'instructions') return c.subtitle || '';
-  if (c.sopKind === 'dual-pair-collect') return getDualPairTrackLabel(slide);
+  if (isBrainstormCollectSlide(slide) && isSopWorkshopPresentation()) return '';
   if (c.sopKind === 'workshop-goal') return c.subtitle || '';
   if (c.sopKind === 'pitch-session') return c.subtitle || '';
   if (c.sopKind === 'next-steps') return c.subtitle || '';
@@ -2229,9 +2250,8 @@ function renderDualSopParallelPanelHtml(currentIndex, { clickable = false, onNav
   let html = `<div class="workshop-sop-panel dual-sop-parallel">
     <div class="workshop-sop-panel-head"><i class="fa-solid fa-table-columns"></i> Dual-SOP · Parallel</div>`;
   for (let i = 0; i < pairCount; i += 1) {
-    const orientIdx = findPairIdx('dual-pair-orient', i);
     const collectIdx = findPairIdx('dual-pair-collect', i);
-    const active = currentIndex === orientIdx || currentIndex === collectIdx;
+    const active = currentIndex === collectIdx;
     const trackTitle = (window.INTERNAL_SOP_TRACKS?.[i]?.title || window.SOP_TOOL_TRACKS?.[i]?.title || `Track ${i + 1}`)
       .replace(/^Track \d+: /, '');
     html += `<div class="workshop-sop-phase${active ? ' is-current' : ''}">
@@ -2239,14 +2259,9 @@ function renderDualSopParallelPanelHtml(currentIndex, { clickable = false, onNav
         <span class="workshop-sop-panel-badge">Track ${i + 1}</span>
         <span class="workshop-sop-panel-title">${esc(trackTitle)}</span>
       </div>`;
-    if (orientIdx >= 0) {
-      html += `<button type="button" class="workshop-sop-step${currentIndex === orientIdx ? ' active' : ''}" data-slide-index="${orientIdx}">
-        <i class="fa-solid fa-map"></i> Überblick
-      </button>`;
-    }
     if (collectIdx >= 0) {
       html += `<button type="button" class="workshop-sop-step${currentIndex === collectIdx ? ' active' : ''}" data-slide-index="${collectIdx}">
-        <i class="fa-solid fa-lightbulb"></i> Brainstorm
+        <i class="fa-solid fa-lightbulb"></i> Use Cases sammeln
       </button>`;
     }
     html += '</div>';
@@ -4071,10 +4086,10 @@ function renderEditorCanvas() {
       const meta = getSlideShellMeta(slide);
       canvas.innerHTML = `${wrapSlide(renderWsSlideShell({
         ...meta,
-        title: c.title || c.sopCardName,
-        chips: [{ icon: 'fa-table-columns', label: 'Parallel' }],
+        title: getWsPresentTitle(slide),
+        chips: getWsPresentChips(slide),
         main: renderBrainstormSplitViz(slide),
-      }), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-eye"></i> Split-View · SOP-Boards aus den verknüpften Brainstorm-Folien</div>`;
+      }), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-eye"></i> Split-View · SOP-Boards + Live-Eingaben</div>`;
     } else {
       canvas.innerHTML = `${wrapSlide(renderWorkshopCardCollectHtml(c, true), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Freitext sammeln${hasCollectChain(slide) ? ' · Ranking & Ergebnis folgen automatisch' : ''}</div>`;
     }
