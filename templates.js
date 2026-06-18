@@ -25,9 +25,73 @@ window.LP_SOP_KIND = Object.freeze({
   DUAL_PAIR_ORIENT: 'dual-pair-orient',
   DUAL_PAIR_COLLECT: 'dual-pair-collect',
   GROUP_VOTE: 'group-vote',
+  GROUP_TRANSITION: 'group-transition',
   PARTICIPANTS: 'participants',
 });
 const SK = window.LP_SOP_KIND;
+
+// Verbindliche Gruppen-Identität (Icon + Label) — konsistent in Present, Split-View, Chips.
+window.LP_SOP_GROUP_META = Object.freeze({
+  internal: {
+    key: 'internal',
+    label: 'Internal SOP',
+    shortLabel: 'Internal',
+    icon: 'fa-building',
+  },
+  consulting: {
+    key: 'consulting',
+    label: 'Consulting SOP',
+    shortLabel: 'Consulting',
+    icon: 'fa-handshake',
+  },
+});
+
+function sopGroupFields(group) {
+  const meta = window.LP_SOP_GROUP_META[group];
+  if (!meta) return {};
+  return { sopGroup: group, sopGroupLabel: meta.label, sopGroupIcon: meta.icon };
+}
+
+function dualBothGroupsFields() {
+  const g = window.LP_SOP_GROUP_META;
+  return {
+    sopDualBoth: true,
+    sopGroupChips: [
+      { sopGroup: 'internal', sopGroupLabel: g.internal.label, sopGroupIcon: g.internal.icon },
+      { sopGroup: 'consulting', sopGroupLabel: g.consulting.label, sopGroupIcon: g.consulting.icon },
+    ],
+  };
+}
+
+function dualSequentialProgress(group, trackIndex, trackTotal, intTrackCount) {
+  const sopIndex = group === 'internal' ? 1 : 2;
+  const globalTrackIndex = group === 'internal' ? trackIndex : intTrackCount + trackIndex;
+  const globalTrackTotal = intTrackCount + (window.SOP_TOOL_TRACKS?.length || 0);
+  return {
+    sopDualProgress: {
+      mode: 'sequential',
+      sopIndex,
+      sopTotal: 2,
+      trackIndex: trackIndex + 1,
+      trackTotal,
+      globalTrackIndex: globalTrackIndex + 1,
+      globalTrackTotal,
+      label: `SOP ${sopIndex}/2, Track ${trackIndex + 1} von ${trackTotal}`,
+      globalLabel: `Track ${globalTrackIndex + 1} von ${globalTrackTotal}`,
+    },
+  };
+}
+
+function dualParallelProgress(pairIndex, pairTotal) {
+  return {
+    sopDualProgress: {
+      mode: 'parallel',
+      pairIndex: pairIndex + 1,
+      pairTotal,
+      label: `Track ${pairIndex + 1} von ${pairTotal}`,
+    },
+  };
+}
 
 // ─── DUAL-SOP TEAMS (zentral anpassen) ────────────────────────────────────────
 // Wer welchem SOP zugeordnet ist. Wird in beiden Dual-Vorlagen verwendet, statt
@@ -971,14 +1035,16 @@ function buildMarketingSopWorkshopSlides() {
 function dualCombinedVote() {
   const n = (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
   return tplSlide('mc_multi', {
-    title: 'Gesamt-Priorisierung · beide SOPs',
-    subtitle: `Wählt die Top ${n} KI Use Cases aus Internal + Consulting`,
+    title: 'Gesamt-Priorisierung über beide SOPs',
+    subtitle: `Wählt die Top ${n} KI Use Cases aus Internal und Consulting`,
     prompt: `Welche ${n} Use Cases haben über beide SOPs hinweg den größten Hebel für ROOTS?\nHinweis: Eigene Beiträge können nicht gewählt werden.`,
     isQuestionSlide: true,
     options: [],
     maxSelections: n,
     sopKind: SK.GROUP_VOTE,
     sopFairVote: true,
+    ...dualBothGroupsFields(),
+    sopDualProgress: { mode: 'finale', label: 'Finale Priorisierung' },
   }, { showResultsLive: true, sopAllTracksVote: true, sopFairVote: true, sopVoteMax: n, workshopMode: 'decide' });
 }
 
@@ -990,42 +1056,70 @@ function dualParticipantsSlide(subtitle) {
     body: dualTeamsBody(),
     sopKind: SK.PARTICIPANTS,
     isHeroSlide: false,
+    ...dualBothGroupsFields(),
+  }, { workshopMode: 'orient' });
+}
+
+function dualGroupTransitionSlide(intTrackCount) {
+  return tplSlide('section', {
+    title: 'Wechsel zu Consulting SOP',
+    subtitle: 'Internal abgeschlossen — jetzt die Consulting-SOP durchgehen',
+    body: `${intTrackCount} Internal-Tracks sind durch. Als Nächstes sammelt ihr Use Cases entlang der Consulting-SOP.`,
+    sopKind: SK.GROUP_TRANSITION,
+    ...sopGroupFields('consulting'),
+    sopDualProgress: { mode: 'sequential', sopIndex: 2, sopTotal: 2, label: 'SOP 2/2' },
+    sopDualSequential: true,
   }, { workshopMode: 'orient' });
 }
 
 // ─── DUAL SOP · SEQUENZIELL (Internal, dann Consulting — kein Split-View) ─────
 function buildDualSopSequentialWorkshopSlides() {
   const slides = [];
+  const intTrackCount = INTERNAL_SOP_TRACKS.length;
+  const conTrackCount = SOP_TOOL_TRACKS.length;
 
-  function tagSeqSlide(slide, group) {
-    slide.content.sopGroup = group;
-    slide.content.sopGroupLabel = group === 'internal' ? 'Internal SOP' : 'Consulting SOP';
+  function tagDualSharedSlide(slide) {
+    Object.assign(slide.content, dualBothGroupsFields());
+    slide.content.sopDualSequential = true;
     return slide;
   }
 
-  slides.push(...sopWorkshopIntro({
-    title: 'SOP · KI Use-Case Workshop',
-    subtitle: 'Internal + Consulting · nacheinander',
-    exampleKey: 'consulting',
-  }));
+  function tagSeqSlide(slide, group, trackIndex, trackTotal) {
+    Object.assign(slide.content, sopGroupFields(group));
+    Object.assign(slide.content, dualSequentialProgress(group, trackIndex, trackTotal, intTrackCount));
+    slide.content.sopDualSequential = true;
+    return slide;
+  }
 
-  slides.push(dualParticipantsSlide('Zwei Teams · zwei SOPs · wir starten mit dem internen SOP'));
+  const introSlides = sopWorkshopIntro({
+    title: 'SOP · KI Use-Case Workshop',
+    subtitle: 'Internal und Consulting nacheinander',
+    exampleKey: 'consulting',
+  });
+  introSlides.forEach((s) => tagDualSharedSlide(s));
+  slides.push(...introSlides);
+
+  slides.push(tagDualSharedSlide(
+    dualParticipantsSlide('Zwei Teams und zwei SOPs. Wir starten mit dem Internal SOP.'),
+  ));
 
   INTERNAL_SOP_TRACKS.forEach((t, i) => {
-    slides.push(tagSeqSlide(sopTrackIntro(t, i), 'internal'));
-    slides.push(tagSeqSlide(sopTrackBrainstorm(t), 'internal'));
+    slides.push(tagSeqSlide(sopTrackIntro(t, i), 'internal', i, intTrackCount));
+    slides.push(tagSeqSlide(sopTrackBrainstorm(t), 'internal', i, intTrackCount));
   });
+
+  slides.push(dualGroupTransitionSlide(intTrackCount));
 
   SOP_TOOL_TRACKS.forEach((t, i) => {
-    slides.push(tagSeqSlide(sopTrackIntro(t, i), 'consulting'));
-    slides.push(tagSeqSlide(sopTrackBrainstorm(t), 'consulting'));
+    slides.push(tagSeqSlide(sopTrackIntro(t, i), 'consulting', i, conTrackCount));
+    slides.push(tagSeqSlide(sopTrackBrainstorm(t), 'consulting', i, conTrackCount));
   });
 
-  slides.push(dualCombinedVote());
-  slides.push(sopPitchSession());
-  slides.push(sopIceMatrix());
-  slides.push(sopWorkshopNextSteps());
-  slides.push(...sopWorkshopClose());
+  slides.push(tagDualSharedSlide(dualCombinedVote()));
+  slides.push(tagDualSharedSlide(sopPitchSession()));
+  slides.push(tagDualSharedSlide(sopIceMatrix()));
+  slides.push(tagDualSharedSlide(sopWorkshopNextSteps()));
+  sopWorkshopClose().forEach((s) => slides.push(tagDualSharedSlide(s)));
 
   return slides;
 }
@@ -1034,6 +1128,7 @@ function buildDualSopSequentialWorkshopSlides() {
 function buildDualSopParallelWorkshopSlides() {
   const slides = [];
   const pairCount = Math.max(INTERNAL_SOP_TRACKS.length, SOP_TOOL_TRACKS.length);
+  const G = window.LP_SOP_GROUP_META;
   const trackName = (t) => t?.title?.replace(/^Track \d+: /, '') || '';
 
   // Welche SOPs sind in diesem Paar vertreten? Bei ungleicher Track-Zahl
@@ -1044,40 +1139,69 @@ function buildDualSopParallelWorkshopSlides() {
     const sides = [];
     if (internal) sides.push('internal');
     if (consulting) sides.push('consulting');
-    const labelParts = [];
-    if (internal) labelParts.push(`Internal: ${trackName(internal)}`);
-    if (consulting) labelParts.push(`Consulting: ${trackName(consulting)}`);
-    return { internal, consulting, sides, label: labelParts.join('  ·  '), singleSide: sides.length === 1 ? sides[0] : null };
+    const internalTrackName = internal ? trackName(internal) : null;
+    const consultingTrackName = consulting ? trackName(consulting) : null;
+    let subtitle = 'Überblick der parallelen Tracks';
+    if (internal && consulting) {
+      subtitle = `${G.internal.shortLabel}: ${internalTrackName} und ${G.consulting.shortLabel}: ${consultingTrackName}`;
+    } else if (internal) {
+      subtitle = `${G.internal.shortLabel}: ${internalTrackName}`;
+    } else if (consulting) {
+      subtitle = `${G.consulting.shortLabel}: ${consultingTrackName}`;
+    }
+    return {
+      internal,
+      consulting,
+      sides,
+      singleSide: sides.length === 1 ? sides[0] : null,
+      internalTrackName,
+      consultingTrackName,
+      subtitle,
+    };
+  }
+
+  function tagDualSharedSlide(slide) {
+    Object.assign(slide.content, dualBothGroupsFields());
+    slide.content.sopDualParallel = true;
+    return slide;
   }
 
   function tagDualSlide(slide, group, pairIndex) {
-    slide.content.sopGroup = group;
-    slide.content.sopGroupLabel = group === 'internal' ? 'Internal SOP' : 'Consulting SOP';
+    Object.assign(slide.content, sopGroupFields(group));
+    Object.assign(slide.content, dualParallelProgress(pairIndex, pairCount));
     slide.content.sopDualPairIndex = pairIndex;
     slide.content.sopDualParallel = true;
     return slide;
   }
 
-  slides.push(...sopWorkshopIntro({
+  const introSlides = sopWorkshopIntro({
     title: 'SOP · KI Use-Case Workshop',
-    subtitle: 'Internal + Consulting · zwei Teams parallel',
-    body: 'QR scannen · Name + Avatar wählen · Host weist euch euer SOP-Team zu · los geht\'s!',
+    subtitle: 'Internal und Consulting parallel',
+    body: 'QR scannen, Name und Avatar wählen. Der Host weist euch euer SOP-Team zu — los geht\'s!',
     exampleKey: 'consulting',
     openerExtra: { sopDualParallel: true },
-  }));
+  });
+  introSlides.forEach((s) => tagDualSharedSlide(s));
+  slides.push(...introSlides);
 
-  slides.push(dualParticipantsSlide('Zwei SOPs · parallel · Host weist Teilnehmer den Teams zu'));
+  slides.push(tagDualSharedSlide(
+    dualParticipantsSlide('Zwei SOPs parallel. Der Host weist Teilnehmer den Teams zu.'),
+  ));
 
   function dualPairOrientSlide(pairIndex) {
     const info = pairInfo(pairIndex);
     const n = pairIndex + 1;
     return tplSlide('content', {
       title: `Track ${n} von ${pairCount}`,
-      subtitle: info.label || 'Überblick · parallel',
+      subtitle: info.subtitle,
       sopKind: SK.DUAL_PAIR_ORIENT,
       sopDualPairIndex: pairIndex,
       sopDualParallel: true,
       sopDualSingleSide: info.singleSide,
+      internalTrackName: info.internalTrackName,
+      consultingTrackName: info.consultingTrackName,
+      ...dualBothGroupsFields(),
+      ...dualParallelProgress(pairIndex, pairCount),
     }, { workshopMode: 'orient' });
   }
 
@@ -1087,13 +1211,17 @@ function buildDualSopParallelWorkshopSlides() {
     const n = pairIndex + 1;
     return tplSlide('brainstorm', {
       title: `Track ${n} · Use Cases`,
-      subtitle: info.label || 'Brainstorm · parallel',
+      subtitle: info.subtitle,
       prompt: `KI Use Cases sammeln · max. ${ws.brainstormMaxResponses} pro Person\nFormat: Use Case · Feature · Abhängigkeiten`,
       isQuestionSlide: true,
       sopKind: SK.DUAL_PAIR_COLLECT,
       sopDualPairIndex: pairIndex,
       sopDualParallel: true,
       sopDualSingleSide: info.singleSide,
+      internalTrackName: info.internalTrackName,
+      consultingTrackName: info.consultingTrackName,
+      ...dualBothGroupsFields(),
+      ...dualParallelProgress(pairIndex, pairCount),
     }, brainstormSettings());
   }
 
@@ -1110,11 +1238,11 @@ function buildDualSopParallelWorkshopSlides() {
     if (SOP_TOOL_TRACKS[i]) slides.push(hiddenBrainstormSlide(SOP_TOOL_TRACKS[i], 'consulting', i));
   }
 
-  slides.push(dualCombinedVote());
-  slides.push(sopPitchSession());
-  slides.push(sopIceMatrix());
-  slides.push(sopWorkshopNextSteps());
-  slides.push(...sopWorkshopClose());
+  slides.push(tagDualSharedSlide(dualCombinedVote()));
+  slides.push(tagDualSharedSlide(sopPitchSession()));
+  slides.push(tagDualSharedSlide(sopIceMatrix()));
+  slides.push(tagDualSharedSlide(sopWorkshopNextSteps()));
+  sopWorkshopClose().forEach((s) => slides.push(tagDualSharedSlide(s)));
 
   return slides;
 }

@@ -1551,17 +1551,118 @@ function phaseChipsFromSubtitle(subtitle) {
     .map((label) => ({ icon: 'fa-bookmark', label }));
 }
 
+function getSopGroupMeta(group) {
+  const fromTemplates = window.LP_SOP_GROUP_META?.[group];
+  if (fromTemplates) return fromTemplates;
+  if (group === 'internal') return { icon: 'fa-building', label: 'Internal SOP', shortLabel: 'Internal' };
+  if (group === 'consulting') return { icon: 'fa-handshake', label: 'Consulting SOP', shortLabel: 'Consulting' };
+  return { icon: 'fa-circle', label: 'Team', shortLabel: 'Team' };
+}
+
+function renderSopEmptyState({ icon = 'fa-circle', title = '', hint = '' } = {}) {
+  const titleHtml = title ? `<p class="sop-empty-state-title">${esc(title)}</p>` : '';
+  const hintHtml = hint ? `<p class="sop-empty-state-text">${esc(hint)}</p>` : '';
+  return `<div class="sop-empty-state ws-empty ws-sop-empty">
+    <i class="fa-solid ${icon}"></i>
+    ${titleHtml}
+    ${hintHtml}
+  </div>`;
+}
+
+function getDualSopProgress(slide) {
+  if (!slide || !isDualSopWorkshop()) return null;
+  const c = slide.content || {};
+  if (typeof c.sopDualProgress === 'string') return { label: c.sopDualProgress, kind: 'meta' };
+  if (c.sopDualProgress?.label) return c.sopDualProgress;
+  const pairIdx = getDualSopPairIndex(slide);
+  const isParallel = !!c.sopDualParallel || (State.slides || []).some((s) => s.content?.sopDualParallel);
+  if (isParallel && pairIdx != null && pairIdx >= 0) {
+    const total = Math.max((window.INTERNAL_SOP_TRACKS || []).length, (window.SOP_TOOL_TRACKS || []).length);
+    if (total > 0) {
+      return { kind: 'parallel', n: pairIdx + 1, total, label: `Track ${pairIdx + 1} von ${total}` };
+    }
+  }
+  if (c.sopGroup === 'internal') return { kind: 'sequential', n: 1, total: 2, label: 'SOP 1/2' };
+  if (c.sopGroup === 'consulting') return { kind: 'sequential', n: 2, total: 2, label: 'SOP 2/2' };
+  return null;
+}
+
+function getDualPairTrackNames(pairIdx) {
+  const idx = pairIdx ?? 0;
+  const intTrack = window.INTERNAL_SOP_TRACKS?.[idx];
+  const conTrack = window.SOP_TOOL_TRACKS?.[idx];
+  return {
+    internal: intTrack ? workshopDisplayTitle({ title: intTrack.title }) : '',
+    consulting: conTrack ? workshopDisplayTitle({ title: conTrack.title }) : '',
+  };
+}
+
+function renderDualSopIdleColumn(activeGroup) {
+  const idleSide = activeGroup === 'internal' ? 'consulting' : 'internal';
+  const meta = getSopGroupMeta(idleSide);
+  const title = idleSide === 'consulting'
+    ? 'Consulting-Team ist fertig — unterstützt jetzt Internal'
+    : 'Internal-Team ist fertig — unterstützt jetzt Consulting';
+  return renderSopEmptyState({ icon: meta.icon, title, hint: 'Beide Teams bleiben am selben Track-Paar.' });
+}
+
+function renderDualSopSplitView(slide, columnRenderer) {
+  const pairIdx = getDualSopPairIndex(slide) ?? 0;
+  const singleSide = slide?.content?.sopDualSingleSide || null;
+  const trackNames = getDualPairTrackNames(pairIdx);
+  const renderBody = (group) => {
+    const tracks = group === 'internal' ? window.INTERNAL_SOP_TRACKS : window.SOP_TOOL_TRACKS;
+    if (!tracks?.[pairIdx]) {
+      if (singleSide && singleSide !== group) return renderDualSopIdleColumn(singleSide);
+      return renderSopEmptyState({
+        icon: getSopGroupMeta(group).icon,
+        title: 'Kein Track in diesem SOP.',
+        hint: 'Für dieses Paar ist hier keine Folie hinterlegt.',
+      });
+    }
+    return columnRenderer(group, pairIdx);
+  };
+  const singleSideClass = singleSide ? ` sop-split-single-side sop-split-single-side--${singleSide}` : '';
+  if (singleSide === 'internal') {
+    return `<div class="sop-split-grid sop-split-active sop-split-slides sop-split-full${singleSideClass}">
+      ${renderSopSplitColumn('internal', renderBody('internal'), { trackName: trackNames.internal })}
+    </div>`;
+  }
+  if (singleSide === 'consulting') {
+    return `<div class="sop-split-grid sop-split-active sop-split-slides sop-split-full${singleSideClass}">
+      ${renderSopSplitColumn('consulting', renderBody('consulting'), { trackName: trackNames.consulting })}
+    </div>`;
+  }
+  const col = (group) => {
+    const idle = !((group === 'internal' ? window.INTERNAL_SOP_TRACKS : window.SOP_TOOL_TRACKS)?.[pairIdx]);
+    return renderSopSplitColumn(group, renderBody(group), { trackName: trackNames[group], idle });
+  };
+  return `<div class="sop-split-grid sop-split-active sop-split-slides sop-split-full${singleSideClass}">
+    ${col('internal')}
+    ${col('consulting')}
+  </div>`;
+}
+
 function renderBrainstormSlideColumn(slide) {
-  if (!slide) return '<div class="present-wait-msg">Kein entsprechender Track in diesem SOP.</div>';
+  if (!slide) {
+    return renderSopEmptyState({
+      icon: 'fa-lightbulb',
+      title: 'Kein entsprechender Track in diesem SOP.',
+      hint: 'Brainstorm-Folie für dieses Paar fehlt.',
+    });
+  }
   const visible = getVisibleResponses(slide.id);
   return `${renderWorkshopCardCollectHtml(enrichSopContent(slide.content || {}), false, { shellMode: true, splitCol: true })}
     <div class="viz-wrap viz-wrap-present">${renderBrainstormPresentViz(slide, visible)}</div>`;
 }
 
 // Split-View (nur Beamer): links Internal-SOP, rechts Consulting-SOP — immer aktiv bis zur Gesamt-Priorisierung.
-function renderSopSplitColumn(group, label, icon, bodyHtml) {
-  return `<div class="sop-split-col">
-      <div class="sop-split-col-head sop-split-col-head--${group}"><i class="fa-solid ${icon}"></i> ${label}</div>
+function renderSopSplitColumn(group, bodyHtml, { trackName = '', idle = false } = {}) {
+  const meta = getSopGroupMeta(group);
+  const short = meta.shortLabel || meta.label.replace(/\s+SOP$/, '');
+  const headerLabel = trackName ? `${short} · ${trackName}` : meta.label;
+  return `<div class="sop-split-col${idle ? ' sop-split-col--idle' : ''}">
+      <div class="sop-split-col-head sop-split-col-head--${group}"><i class="fa-solid ${meta.icon}"></i> ${esc(headerLabel)}</div>
       <div class="sop-split-col-body">${bodyHtml}</div>
     </div>`;
 }
@@ -1606,7 +1707,12 @@ function trackToSopBoardContent(track, pairIdx) {
 function renderDualPairOrientColumn(group, pairIdx) {
   const tracks = group === 'internal' ? window.INTERNAL_SOP_TRACKS : window.SOP_TOOL_TRACKS;
   const track = tracks?.[pairIdx];
-  if (!track) return '<div class="ws-empty"><i class="fa-regular fa-circle"></i></div>';
+  if (!track) {
+    return renderSopEmptyState({
+      icon: getSopGroupMeta(group).icon,
+      title: 'Kein Track in diesem SOP.',
+    });
+  }
   const theme = sopTrackTheme(track.class);
   const boardContent = trackToSopBoardContent(track, pairIdx);
   return `<div class="ws-orient-col ws-orient-col--split-present" style="--sop-accent:${theme.accent}">
@@ -1615,35 +1721,27 @@ function renderDualPairOrientColumn(group, pairIdx) {
 }
 
 function renderDualPairOrientSplitView(slide) {
-  const pairIdx = getDualSopPairIndex(slide);
-  return `<div class="sop-split-grid sop-split-active sop-split-slides sop-split-full">
-    ${renderSopSplitColumn('internal', 'Internal', 'fa-building', renderDualPairOrientColumn('internal', pairIdx))}
-    ${renderSopSplitColumn('consulting', 'Consulting', 'fa-handshake', renderDualPairOrientColumn('consulting', pairIdx))}
-  </div>`;
+  return renderDualSopSplitView(slide, (group, pairIdx) => renderDualPairOrientColumn(group, pairIdx));
 }
 
 function renderSopSectionSplitView(currentSlide) {
   if (currentSlide?.content?.sopKind === 'dual-pair-orient') return renderDualPairOrientSplitView(currentSlide);
-  const pairIdx = getDualSopPairIndex(currentSlide);
-  const intSlide = trackIntroSlidesOfGroup('internal')[pairIdx];
-  const conSlide = trackIntroSlidesOfGroup('consulting')[pairIdx];
-  const colBody = (s) => s
-    ? renderSopSectionHtml(enrichSopContent(s.content), false, { shellMode: true, splitCol: true })
-    : '<div class="present-wait-msg">Kein Track in diesem SOP.</div>';
-  return `<div class="sop-split-grid sop-split-active sop-split-slides sop-split-full">
-    ${renderSopSplitColumn('internal', 'Internal SOP', 'fa-building', colBody(intSlide))}
-    ${renderSopSplitColumn('consulting', 'Consulting SOP', 'fa-handshake', colBody(conSlide))}
-  </div>`;
+  return renderDualSopSplitView(currentSlide, (group, pairIdx) => {
+    const s = trackIntroSlidesOfGroup(group)[pairIdx];
+    return s
+      ? renderSopSectionHtml(enrichSopContent(s.content), false, { shellMode: true, splitCol: true })
+      : renderSopEmptyState({
+        icon: getSopGroupMeta(group).icon,
+        title: 'Kein Track in diesem SOP.',
+        hint: 'Intro-Folie für dieses Paar fehlt.',
+      });
+  });
 }
 
 function renderBrainstormSplitViz(currentSlide) {
-  const pairIdx = getDualSopPairIndex(currentSlide);
-  const intSlide = brainstormSlidesOfGroup('internal')[pairIdx];
-  const conSlide = brainstormSlidesOfGroup('consulting')[pairIdx];
-  return `<div class="sop-split-grid sop-split-active sop-split-slides sop-split-full">
-    ${renderSopSplitColumn('internal', 'Internal SOP', 'fa-building', renderBrainstormSlideColumn(intSlide))}
-    ${renderSopSplitColumn('consulting', 'Consulting SOP', 'fa-handshake', renderBrainstormSlideColumn(conSlide))}
-  </div>`;
+  return renderDualSopSplitView(currentSlide, (group, pairIdx) => (
+    renderBrainstormSlideColumn(brainstormSlidesOfGroup(group)[pairIdx])
+  ));
 }
 
 // Finale Priorisierung (Moderator/Beamer): moderne Tabelle — alle Use Cases mit
@@ -1908,6 +2006,16 @@ function renderFinalePillHtml() {
   return `<span class="ws-pill ws-pill--finale"><i class="fa-solid fa-flag-checkered"></i> Finale</span>`;
 }
 
+function getWorkshopModePill(workshopMode) {
+  const pills = {
+    orient: { pillIcon: 'fa-compass', pillLabel: 'Orientierung', pillTone: 'orient' },
+    collect: { pillIcon: 'fa-lightbulb', pillLabel: 'Sammeln', pillTone: 'collect' },
+    decide: { pillIcon: 'fa-ranking-star', pillLabel: 'Priorisierung', pillTone: 'decide' },
+    present: { pillIcon: 'fa-person-chalkboard', pillLabel: 'Präsentieren', pillTone: 'brand' },
+  };
+  return pills[workshopMode] || null;
+}
+
 function getSlideShellMeta(slide) {
   const c = slide?.content || {};
   if (isFinaleSlide(slide)) {
@@ -1916,6 +2024,11 @@ function getSlideShellMeta(slide) {
     if (slide.settings?.sopAllTracksMatrix || slide.slide_type === 'priority_matrix') return { pillIcon: 'fa-table-cells-large', pillLabel: 'Matrix', pillTone: 'finale' };
     return { pillIcon: 'fa-flag-checkered', pillLabel: 'Finale', pillTone: 'finale' };
   }
+  const modePill = getWorkshopModePill(slide?.settings?.workshopMode);
+  const workshopSlide = c.sopGroup || c.sopDualParallel || c.sopKind?.startsWith('dual-pair')
+    || isBrainstormCollectSlide(slide) || (slide?.slide_type === 'section' && c.sopTrackClass);
+  if (modePill && workshopSlide) return modePill;
+  if (c.sopKind === 'group-transition') return { pillIcon: 'fa-arrows-turn-right', pillLabel: 'Wechsel', pillTone: 'orient' };
   if (c.sopKind === 'dual-pair-orient') return { pillIcon: 'fa-map', pillLabel: 'Orientierung', pillTone: 'orient' };
   if (c.sopKind === 'dual-pair-collect') return { pillIcon: 'fa-lightbulb', pillLabel: 'Sammeln', pillTone: 'collect' };
   if (isBrainstormCollectSlide(slide)) return { pillIcon: 'fa-lightbulb', pillLabel: 'Brainstorm', pillTone: 'collect' };
@@ -1931,14 +2044,29 @@ function getSlideShellMeta(slide) {
     return { pillIcon: 'fa-heart', pillLabel: 'Abschluss', pillTone: 'muted' };
   }
   if (slide?.slide_type === 'open' && slide?.settings?.anonymous) return { pillIcon: 'fa-comment', pillLabel: 'Feedback', pillTone: 'muted' };
+  if (modePill) return modePill;
   return { pillIcon: 'fa-circle-info', pillLabel: 'Info', pillTone: 'muted' };
 }
 
 function getWsPresentChips(slide) {
   const c = slide?.content || {};
   const chips = [];
-  if (c.sopGroupLabel) {
-    chips.push({ icon: c.sopGroup === 'internal' ? 'fa-building' : 'fa-handshake', label: c.sopGroupLabel });
+  if (c.sopDualBoth && Array.isArray(c.sopGroupChips)) {
+    c.sopGroupChips.forEach((g) => {
+      if (g?.sopGroupLabel) {
+        chips.push({ icon: g.sopGroupIcon || getSopGroupMeta(g.sopGroup).icon, label: g.sopGroupLabel });
+      }
+    });
+  } else {
+    const group = c.sopGroup;
+    const groupLabel = c.sopGroupLabel || (group ? getSopGroupMeta(group).label : '');
+    if (group && groupLabel) {
+      chips.push({ icon: c.sopGroupIcon || getSopGroupMeta(group).icon, label: groupLabel });
+    }
+  }
+  const progress = getDualSopProgress(slide);
+  if (progress?.label) {
+    chips.push({ icon: progress.mode === 'sequential' ? 'fa-arrows-left-right' : 'fa-layer-group', label: progress.label });
   }
   if (slide?.slide_type === 'section' && c.sopTrackClass) {
     chips.push(...phaseChipsFromSubtitle(c.subtitle));
@@ -2746,6 +2874,39 @@ function renderPresentParticipants() {
   if (!bar) return;
   if (!State.participants.length) {
     bar.innerHTML = '<span class="present-participants-empty">Warte auf Teilnehmer…</span>';
+    return;
+  }
+  if (isDualSopParallelWorkshop()) {
+    const buckets = { internal: [], consulting: [], unassigned: [] };
+    State.participants.forEach((p) => {
+      const g = getParticipantSopGroup(p.id);
+      if (g === 'internal' || g === 'consulting') buckets[g].push(p);
+      else buckets.unassigned.push(p);
+    });
+    const teamSection = (group, list) => {
+      if (!list.length) return '';
+      const meta = getSopGroupMeta(group);
+      return `<div class="present-participants-team present-participants-team--${group}">
+        <div class="present-participants-team-head">
+          <i class="fa-solid ${meta.icon}"></i> ${esc(meta.label)}
+          <span class="sop-split-col-count">${list.length}</span>
+        </div>
+        <div class="present-participants-list">${list.map(participantChipHtml).join('')}</div>
+      </div>`;
+    };
+    bar.innerHTML = `
+      <div class="present-participants-label"><i class="fa-solid fa-users"></i> ${State.participants.length} Teilnehmer</div>
+      <div class="present-participants-teams">
+        ${teamSection('internal', buckets.internal)}
+        ${teamSection('consulting', buckets.consulting)}
+        ${buckets.unassigned.length ? `<div class="present-participants-team present-participants-team--unassigned">
+          <div class="present-participants-team-head">
+            <i class="fa-solid fa-user-clock"></i> Noch nicht zugewiesen
+            <span class="sop-split-col-count">${buckets.unassigned.length}</span>
+          </div>
+          <div class="present-participants-list">${buckets.unassigned.map(participantChipHtml).join('')}</div>
+        </div>` : ''}
+      </div>`;
     return;
   }
   bar.innerHTML = `
@@ -5509,6 +5670,13 @@ function renderPresentNow() {
     return;
   }
 
+  if (slide.slide_type === 'section' && c.sopKind === 'group-transition') {
+    mountPresentWsSlide(stage, slide, slideIdx, {
+      main: `<div class="ws-sop-main ws-sop-main--transition"><p class="ws-hero-body">${esc(c.body || '').replace(/\n/g, '<br>')}</p></div>`,
+    });
+    return;
+  }
+
   if (slide.slide_type === 'section' && c.sopTrackClass) {
     const splitOn = shouldUseSopSplit(slide);
     const enriched = enrichSopContent(c);
@@ -6167,6 +6335,10 @@ async function renderParticipantQuestion() {
   const isWorkshop = isSopWorkshopPresentation() || hasBrainstormChain(slide) || isBrainstormVoteSlide(slide) || isBrainstormResultsSlide(slide);
   const isCollect = isBrainstormCollectSlide(slide);
   const isDecide = shouldUseVoteWorkshopUi(slide);
+  const assignedGroup = isDualSopParallelWorkshop() ? getParticipantSopGroup(State.participant?.id) : null;
+  const teamBadge = assignedGroup && isCollect
+    ? `<div class="participant-team-badge ws-pill ws-pill--orient"><i class="fa-solid ${getSopGroupMeta(assignedGroup).icon}"></i> Dein Team: ${esc(getSopGroupMeta(assignedGroup).label)}</div>`
+    : '';
   const cardClass = [
     'participant-card',
     c.isQuestionSlide || isWorkshop ? 'participant-pslide-q' : '',
@@ -6180,6 +6352,7 @@ async function renderParticipantQuestion() {
         ${participantAvatarHtml(State.participant, 'md')}
         <div><div class="participant-meta">Code ${esc(State.session.code)}${slide.settings?.anonymous ? ' · Anonym' : ''}</div><div class="participant-you">${esc(State.participant?.display_name || '')}</div></div>
       </div>` : ''}
+      ${teamBadge}
       ${isCollect ? renderWorkshopCardCollectHtml(c) : ''}
       ${isDecide ? `<h1 class="pslide-q-title">${esc(c.title || 'Priorisierung')}</h1><p class="pslide-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>` : ''}
       ${!isCollect && !isDecide ? `<h1 class="pslide-q-title">${esc(c.title || c.prompt || 'Frage')}</h1>` : ''}
@@ -6924,6 +7097,10 @@ function exposeLpAppGlobals() {
     selectDashRange,
     bindDashboardSelection,
     closeModal,
+    getSopGroupMeta,
+    renderSopEmptyState,
+    getDualSopProgress,
+    getDualPairTrackLabel,
   };
   window.LPApp = api;
   window.toast = toast;

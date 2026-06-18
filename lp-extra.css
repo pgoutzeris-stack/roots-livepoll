@@ -113,6 +113,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
     transition-duration:.001s!important;scroll-behavior:auto!important
   }
   .lp-reaction{animation:none;display:none}
+  .ws-live-in,.ws-row--new,.lp-sop-workshop.present-mode .viz-bubble--new{animation:none!important}
 }
 
 /* ═══════ TIMER SETTINGS UI (Editor Props) ═══════ */
@@ -1357,39 +1358,72 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-sop-workshop .present-stage.sop-split-stage{align-items:stretch;text-align:left}
 .lp-sop-workshop .present-stage.sop-split-stage .pslide-slide{width:100%;max-width:none}
 .lp-sop-workshop .present-stage.sop-split-stage .viz-wrap{width:100%;max-width:none}
-.sop-split-col{min-width:0;border:1px solid var(--line);border-radius:14px;background:var(--bg);overflow:hidden;box-shadow:var(--shadow-dash);display:flex;flex-direction:column;height:100%}
-.sop-split-col-head{display:flex;align-items:center;gap:.5rem;font-weight:800;font-size:.8rem;letter-spacing:.05em;text-transform:uppercase;padding:.6rem .85rem;color:#fff;flex-shrink:0}
-.sop-split-col-head--internal{background:#206efb}
-.sop-split-col-head--consulting{background:#0f6b57}
-.sop-split-col-count{margin-left:auto;background:rgba(255,255,255,.25);border-radius:999px;padding:.1rem .55rem;font-size:.78rem;font-weight:700}
+.sop-split-col{min-width:0;border:none;border-radius:16px;background:var(--bg);overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column;height:100%}
+.sop-split-col-head{display:flex;align-items:center;gap:.5rem;font-weight:800;font-size:.8rem;letter-spacing:.05em;text-transform:uppercase;padding:.6rem .85rem;color:var(--ink);background:var(--surface);border-bottom:1px solid var(--line);flex-shrink:0}
+.sop-split-col-head i{color:var(--brand);font-size:.85rem}
+.sop-split-col-head--internal,
+.sop-split-col-head--consulting{background:var(--surface);color:var(--ink)}
+.sop-split-col-count{margin-left:auto;background:var(--brand-light);color:var(--brand);border-radius:999px;padding:.1rem .55rem;font-size:.78rem;font-weight:700}
+.sop-split-grid.sop-split-single-side{grid-template-columns:1fr;max-width:min(760px,94vw);margin:0 auto;width:100%}
 .sop-split-col .ws-table{margin:0;border:none;border-radius:0}
 .sop-split-col .ws-row{font-size:.9rem}
+.sop-split-single-side .sop-split-col{width:100%;max-width:100%}
+.sop-split-col--idle{background:var(--surface);box-shadow:none;border:1.5px dashed var(--line);opacity:.92}
+.sop-split-col--idle .sop-split-col-head{color:var(--muted);background:transparent;border-bottom-color:rgba(148,163,184,.35)}
+.sop-split-col--idle .sop-split-col-head i{color:var(--muted);opacity:.75}
+.sop-split-col--idle .sop-split-col-body{display:flex;align-items:center;justify-content:center;min-height:140px;padding:1.25rem}
+.sop-split-col--idle .sop-empty-state,
+.sop-split-col--idle .present-wait-msg,
+.sop-split-col--idle .ws-empty{width:100%;opacity:1;padding:0;min-height:0}
 .sop-split-col .sop-all-track-group{margin:.6rem .7rem}
 .sop-split-active .ws-board-head{margin-bottom:1rem}
 .sop-split-col-body{padding:.85rem;flex:1;min-width:0}
 .sop-split-col-body .present-wait-msg{padding:1rem .5rem}
 /* Split-View: zwei vollständige Slides nebeneinander — volle Breite */
 .sop-split-slides .sop-split-col-body{padding:1rem;overflow-x:auto}
-.sop-split-slides .pslide-q-title{font-size:1.25rem;line-height:1.25}
-.sop-split-slides .sop-pslide-title{font-size:1.35rem;line-height:1.2}
+.sop-split-slides .pslide-q-title,
+.sop-split-slides .sop-pslide-title{font-size:1.2rem;line-height:1.25}
+.sop-split-slides .workshop-collect-shell--split .workshop-collect-question,
+.sop-split-slides .workshop-collect-shell--split .workshop-format-hint,
+.sop-split-slides .workshop-collect-shell--split .workshop-collect-note,
+.sop-split-slides .ws-orient-col--split-present .sop-board-preview,
+.sop-split-slides .workshop-collect-shell--split .sop-board-preview{font-size:.92rem}
+.sop-split-slides .ws-orient-col--split-present .sop-board-card,
+.sop-split-slides .workshop-collect-shell--split .sop-board-card{font-size:.92rem;padding:.48rem .58rem}
+.sop-split-slides .ws-orient-col--split-present .sop-board-phase-label,
+.sop-split-slides .workshop-collect-shell--split .sop-board-phase-label{font-size:.72rem}
 .sop-split-slides .pslide-question-block{padding:0}
 .sop-split-slides .workshop-collect-board{margin-top:.6rem}
 .sop-split-slides .sop-pslide-section{padding:.5rem 0;text-align:left}
 .sop-split-slides .viz-wrap-present{margin-top:.75rem}
 
 /* Host: SOP-Zuweisung pro Teilnehmer (Dual-Workshop) */
-.lp-dual-sop-parallel .present-participants-bar{display:block!important;max-width:min(560px,92vw)}
+.lp-dual-sop-parallel .present-participants-bar{display:block!important;max-width:min(560px,92vw);padding:.85rem .95rem}
+.lp-dual-sop-parallel .present-participants-list--grouped{max-height:min(240px,34vh)}
+.lp-dual-sop-parallel .present-participant-chip--dual{align-items:center;gap:.35rem;padding:.35rem .5rem .35rem .35rem}
+.lp-dual-sop-parallel .present-participant-name{max-width:8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.78rem}
 .present-participant-chip--dual{align-items:center;gap:.35rem;padding:.35rem .5rem .35rem .35rem}
 .present-participant-name{max-width:8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.78rem}
 .sop-assign-btns{display:inline-flex;gap:2px;margin-left:.15rem}
-.sop-assign-btn{border:1px solid var(--line);background:var(--surface);color:var(--muted);font-family:inherit;font-size:.62rem;font-weight:800;padding:.2rem .45rem;border-radius:6px;cursor:pointer;line-height:1.2;transition:background .12s,color .12s,border-color .12s}
-.sop-assign-btn--internal.is-active{background:#206efb;border-color:#206efb;color:#fff}
-.sop-assign-btn--consulting.is-active{background:#0f6b57;border-color:#0f6b57;color:#fff}
+.sop-assign-btn{border:1px solid var(--line);background:var(--surface);color:var(--muted);font-family:inherit;font-size:.62rem;font-weight:800;padding:.2rem .55rem;border-radius:var(--radius-pill);cursor:pointer;line-height:1.2;transition:background .12s,color .12s,border-color .12s,box-shadow .12s}
+.sop-assign-btn--internal.is-active,
+.sop-assign-btn--consulting.is-active{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 0 0 2px rgba(32,110,251,.1)}
 .sop-assign-btn:hover:not(.is-active){border-color:var(--brand);color:var(--ink)}
+.sop-assign-btn:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(32,110,251,.1)}
 .participant-sop-unassigned .pslide-q-prompt{max-width:36rem;margin:0 auto}
 
 /* ═══════ WS-SLIDE · einheitliches Workshop-Design (bold, pills, icons) ═══════ */
 @keyframes ws-title-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ws-live-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.ws-live-in,
+.ws-row--new{animation:ws-live-in 450ms cubic-bezier(.22,1,.36,1) both}
+.lp-sop-workshop.present-mode .viz-bubble--new{animation:ws-live-in 450ms cubic-bezier(.22,1,.36,1) both,bubbleFloat 5.5s ease-in-out infinite;animation-delay:0s,calc(var(--bubble-delay,0s) + .45s)}
+.sop-empty-state,
+.ws-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2.5rem 1.25rem;color:var(--muted);gap:.4rem;min-height:100px}
+.sop-empty-state-title,
+.sop-empty-state .sop-empty-state-title{font-size:1rem;font-weight:700;color:var(--ink);margin:0;line-height:1.35}
+.sop-empty-state-text{font-size:.88rem;color:var(--muted);margin:0;max-width:360px;line-height:1.45}
+.sop-empty-state i{font-size:1.35rem;color:var(--brand);opacity:.55;margin-bottom:.15rem}
 @keyframes ws-pill-in{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
 .lp-sop-workshop.present-mode .present-stage .pslide-slide{width:100%;max-width:min(1240px,96vw);text-align:left}
 .ws-slide{width:100%;display:flex;flex-direction:column;gap:.85rem;animation:ws-title-in .45s cubic-bezier(.22,1,.36,1)}
@@ -1400,7 +1434,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .ws-pill{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .75rem;border-radius:999px;font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;animation:ws-pill-in .4s ease backwards}
 .ws-pill i{font-size:.72rem}
 .ws-pill--brand,.ws-pill--finale{background:var(--brand);color:#fff;box-shadow:0 2px 10px rgba(32,110,251,.28)}
-.ws-pill--collect{background:#0f6b57;color:#fff}
+.ws-pill--collect{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
 .ws-pill--orient{background:#206efb;color:#fff}
 .ws-pill--decide{background:var(--ink);color:#fff}
 .ws-pill--muted{background:var(--surface);color:var(--muted);border:1px solid var(--line)}
@@ -1413,15 +1447,9 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .ws-orient-num{font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--sop-accent,var(--brand))}
 .ws-orient-title{font-size:1.15rem;font-weight:800;line-height:1.2;margin:0;color:var(--ink)}
 .ws-orient-intro{font-size:.82rem;line-height:1.45;color:var(--muted);margin:0}
-.sop-split-slides .ws-orient-col--split-present .sop-board-preview{margin-top:0;font-size:.84rem;width:100%}
-.sop-split-slides .ws-orient-col--split-present .sop-board-card{font-size:.78rem;padding:.42rem .52rem}
-.sop-split-slides .ws-orient-col--split-present .sop-board-phase-label{font-size:.72rem}
-.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .ws-orient-col--split-present .sop-board-preview{font-size:.88rem}
-.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .ws-orient-col--split-present .sop-board-card{font-size:.82rem;padding:.5rem .58rem}
-.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .ws-orient-col--split-present .sop-board-phase{min-width:min(220px,44vw)}
+.sop-split-slides .ws-orient-col--split-present .sop-board-preview{margin-top:0;width:100%}
 .workshop-collect-shell--split .workshop-collect-question{font-size:.95rem;font-weight:700;margin:0 0 .35rem;line-height:1.3}
 .workshop-collect-shell--split .workshop-collect-board{margin-top:.35rem}
-.workshop-collect-shell--split .sop-board-preview{font-size:.84rem}
 .sop-pslide-section--shell{padding:0}
 .sop-pslide-body--shell{font-size:.88rem;line-height:1.5;color:var(--muted);margin:0 0 .75rem}
 .workshop-collect-shell--compact{padding:0}
@@ -1431,9 +1459,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .sop-split-slides .sop-board-preview.sop-board-preview--no-header .sop-board-phases-row,
 .sop-pslide-section--shell .sop-board-preview .sop-board-phases-row,
 .workshop-collect-shell--compact .sop-board-phases-row{padding-top:.65rem}
-.ws-empty{color:var(--muted);opacity:.45;text-align:center;padding:1.5rem 0}
 .lp-sop-workshop .ws-body .viz-wrap{width:100%;max-width:none;margin-top:.35rem}
-.lp-sop-workshop.sop-split-stage .ws-title{font-size:clamp(1.5rem,3vw,2rem)}
 
 /* WS-Shell: einheitliche Inhalts-Blöcke (kein altes sop-pslide-Layout im Present) */
 .ws-body .ws-sop-main{width:100%;display:flex;flex-direction:column;gap:.85rem}
@@ -1516,11 +1542,11 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   width:100%;
 }
 .lp-sop-workshop.present-mode .ws-slide{
-  background:linear-gradient(180deg,var(--surface) 0%,var(--bg) 100%);
-  border:1px solid var(--line);
+  background:var(--bg);
+  border:none;
   border-radius:20px;
   padding:clamp(1rem,2.2vw,1.55rem) clamp(1rem,2.4vw,1.75rem);
-  box-shadow:0 14px 44px rgba(15,23,42,.07);
+  box-shadow:var(--shadow);
   gap:clamp(.75rem,1.6vw,1rem);
   animation:none!important;
   opacity:1!important;
@@ -1538,13 +1564,13 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   margin-bottom:.1rem;
 }
 .lp-sop-workshop.present-mode .ws-title{
-  font-size:clamp(1.55rem,2.8vw,2.25rem);
-  font-weight:900;
+  font-size:clamp(2rem,4vw,3.25rem);
+  font-weight:700;
   letter-spacing:-.025em;
   line-height:1.1;
 }
 .lp-sop-workshop.present-mode .ws-lead{
-  font-size:.92rem;
+  font-size:clamp(1.25rem,2vw,1.45rem);
   font-weight:600;
   color:var(--muted);
   max-width:none;
@@ -1617,17 +1643,47 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-sop-workshop.present-mode .sop-board-card{
   font-size:.8rem;
   padding:.48rem .58rem;
-  border-radius:10px;
+  border-radius:16px;
+  border:none;
+  box-shadow:var(--shadow);
 }
+.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .sop-board-card,
+.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .ws-orient-col--split-present .sop-board-card,
+.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .workshop-collect-shell--split .sop-board-card{
+  font-size:1rem;
+  padding:.52rem .62rem;
+  border-radius:16px;
+  border:none;
+  box-shadow:var(--shadow);
+}
+.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .ws-orient-col--split-present .sop-board-phase{min-width:min(220px,44vw)}
 /* Split-View */
 .lp-sop-workshop.present-mode.sop-split-stage .present-stage{padding-top:clamp(.65rem,1.5vw,1rem)}
 .lp-sop-workshop.present-mode .sop-split-grid{gap:clamp(.65rem,1.4vw,.85rem)}
 .lp-sop-workshop.present-mode .sop-split-col{
+  border:none;
   border-radius:16px;
-  box-shadow:0 8px 28px rgba(15,23,42,.06);
+  box-shadow:var(--shadow);
 }
 .lp-sop-workshop.present-mode .sop-split-col-body{padding:clamp(.75rem,1.5vw,1rem)}
-.lp-sop-workshop.present-mode.sop-split-stage .ws-title{font-size:clamp(1.35rem,2.2vw,1.75rem)}
+.lp-sop-workshop.present-mode.sop-split-stage .ws-title,
+.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .pslide-q-title,
+.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .sop-pslide-title{
+  font-size:clamp(1.35rem,2.4vw,1.85rem);
+  font-weight:700;
+  line-height:1.15;
+}
+.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .workshop-collect-shell--split .workshop-collect-question,
+.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .workshop-collect-shell--split .workshop-format-hint,
+.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .workshop-collect-shell--split .workshop-collect-note,
+.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .ws-orient-col--split-present .sop-board-preview,
+.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .workshop-collect-shell--split .sop-board-preview{
+  font-size:.95rem;
+}
+.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .ws-orient-col--split-present .sop-board-phase-label,
+.lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .workshop-collect-shell--split .sop-board-phase-label{
+  font-size:.72rem;
+}
 .lp-sop-workshop.present-mode.sop-split-stage .ws-slide{padding:clamp(.85rem,1.8vw,1.25rem)}
 /* Inhalts-Module innerhalb ws-body */
 .lp-sop-workshop.present-mode .ws-body .ws-hero-body{
@@ -1803,8 +1859,8 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 @media (prefers-color-scheme:dark){
   .lp-sop-workshop.present-mode .ws-slide{
-    background:linear-gradient(180deg,var(--surface) 0%,rgba(15,23,42,.35) 100%);
-    box-shadow:0 14px 44px rgba(0,0,0,.25);
+    background:var(--bg);
+    box-shadow:var(--shadow);
   }
   .lp-sop-workshop.present-mode .ws-body .workshop-instructions-card,
   .lp-sop-workshop.present-mode .ws-body .ws-hero-body{background:rgba(255,255,255,.03)}

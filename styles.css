@@ -309,8 +309,10 @@ html.lp-join-route #screen-participant{display:flex!important}
 .participant-card h1{font-size:1.35rem;margin-bottom:.35rem}
 .participant-card p{color:var(--muted);font-size:.92rem;margin-bottom:1rem}
 .participant-code-input{font-size:2rem;text-align:center;letter-spacing:.25em;font-weight:800;padding:1rem;border:2px solid var(--line);border-radius:12px;width:100%;margin-bottom:1rem}
-.participant-option{display:block;width:100%;text-align:left;padding:1rem 1.1rem;border:2px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:.65rem;cursor:pointer;font-size:1rem;font-weight:600;transition:all .15s}
+.participant-option{display:block;width:100%;text-align:left;padding:.85rem 1.25rem;border:1.5px solid var(--line);border-radius:var(--radius-pill);background:var(--bg);margin-bottom:.65rem;cursor:pointer;font-size:1rem;font-weight:600;transition:border-color .15s,background .15s,color .15s,box-shadow .15s}
 .participant-option:hover,.participant-option.selected{border-color:var(--brand);background:var(--brand-light);color:var(--brand)}
+.participant-option:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(32,110,251,.1)}
+.participant-pslide-q .participant-option{border-radius:var(--radius-pill)}
 .participant-submit{width:100%;margin-top:.5rem}
 .viz-bars{display:flex;flex-direction:column;gap:.65rem}
 .viz-bar-row{display:grid;grid-template-columns:120px 1fr 48px;gap:.75rem;align-items:center;font-size:.92rem}
@@ -416,9 +418,18 @@ html.lp-join-route #screen-participant{display:flex!important}
 .p-avatar-xs{width:24px;height:24px;font-size:.75rem}
 .p-avatar-sm{width:32px;height:32px;font-size:.95rem}
 .p-avatar-md{width:48px;height:48px;font-size:1.35rem}
-.present-participants-bar{position:fixed;left:1rem;bottom:5rem;max-width:min(420px,42vw);background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:.75rem .85rem;z-index:205;color:var(--ink);box-shadow:var(--shadow-lg)}
+.present-participants-bar{position:fixed;left:1rem;bottom:5rem;max-width:min(420px,42vw);background:var(--bg);border:none;border-radius:16px;padding:.75rem .85rem;z-index:205;color:var(--ink);box-shadow:var(--shadow)}
 .present-participants-label{font-size:.72rem;color:var(--muted);margin-bottom:.5rem;display:flex;align-items:center;gap:.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
 .present-participants-list{display:flex;flex-wrap:wrap;gap:.4rem;max-height:120px;overflow-y:auto}
+.present-participants-list--grouped{display:flex;flex-direction:column;flex-wrap:nowrap;gap:.6rem;max-height:min(220px,32vh)}
+.present-participants-team{display:flex;flex-direction:column;gap:.35rem;min-width:0}
+.present-participants-team-label{display:flex;align-items:center;gap:.35rem;font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.present-participants-team-label i{color:var(--brand);font-size:.68rem}
+.present-participants-team-chips{display:flex;flex-wrap:wrap;gap:.35rem}
+.present-participants-team--internal .present-participants-team-label i,
+.present-participant-chip--assigned-internal{border-color:rgba(32,110,251,.22);background:var(--brand-light)}
+.present-participants-team--consulting .present-participant-chip--assigned-consulting{border-color:rgba(32,110,251,.22);background:var(--brand-light)}
+.present-participants-team--unassigned .present-participant-chip{border-style:dashed;opacity:.9}
 .present-participants-empty{font-size:.78rem;color:var(--muted)}
 .present-participant-chip{display:inline-flex;align-items:center;gap:.35rem;padding:.25rem .55rem .25rem .25rem;background:var(--surface);border:1px solid var(--line);border-radius:999px;font-size:.75rem;font-weight:600;white-space:nowrap;color:var(--ink)}
 .present-activity-feed{position:fixed;right:1rem;bottom:5rem;display:flex;flex-direction:column;gap:.35rem;z-index:206;pointer-events:none;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s}
@@ -473,7 +484,8 @@ html.lp-join-route #screen-participant{display:flex!important}
 .participant-card-pslide{max-width:640px;background:transparent;border:none;box-shadow:none;padding:0}
 .participant-card-pslide .participant-submit-lg{padding:1rem 1.25rem;font-size:1.05rem;border-radius:14px;margin-top:1rem}
 .participant-wait-block{text-align:center;width:100%}
-.participant-pslide-q .participant-option{font-size:1rem;padding:1rem 1.15rem;border-radius:14px;transition:transform .12s,box-shadow .12s;border-width:2px}
+.participant-pslide-q .participant-option{font-size:1rem;padding:1rem 1.25rem;border-radius:var(--radius-pill);transition:transform .12s,box-shadow .12s,border-color .15s,background .15s;border-width:1.5px}
+.participant-pslide-q .participant-option:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(32,110,251,.1)}
 .participant-pslide-q .participant-option:active{transform:scale(.98)}
 .participant-pslide-q .participant-textarea{min-height:120px;font-size:1.05rem;border-radius:14px;border-width:2px;padding:1rem}
 .viz-wrap-present{width:min(920px,94vw)!important;margin-top:1.25rem!important}
@@ -499,7 +511,7 @@ html.lp-join-route #screen-participant{display:flex!important}
 .sop-board-phase.active{background:linear-gradient(180deg,var(--sop-soft,#eff6ff),rgba(255,255,255,.72));border:1px solid color-mix(in srgb,var(--sop-accent,#206efb) 28%,var(--line));border-radius:14px;padding:.55rem;box-shadow:0 10px 26px rgba(15,23,42,.06)}
 .sop-board-phase-label{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--sop-accent,#206efb);margin-bottom:.5rem;padding-bottom:.35rem;border-bottom:2px solid var(--sop-accent,#206efb)}
 .sop-board-cards{display:flex;flex-direction:column;gap:.45rem}
-.sop-board-card{display:flex;align-items:flex-start;gap:.45rem;padding:.55rem .65rem;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:.78rem;font-weight:600;line-height:1.35;color:var(--ink)}
+.sop-board-card{display:flex;align-items:flex-start;gap:.45rem;padding:.55rem .65rem;border:1px solid var(--line);border-radius:16px;background:var(--surface);font-size:.78rem;font-weight:600;line-height:1.35;color:var(--ink);box-shadow:0 1px 3px rgba(15,23,42,.04)}
 .sop-board-card i{color:var(--sop-accent,#206efb);margin-top:.1rem;flex-shrink:0}
 .sop-board-card.active{border-color:var(--sop-accent,#206efb);background:rgba(32,110,251,.08);box-shadow:var(--shadow-focus)}
 .track-pre .sop-board-phase-label,.track-pre .sop-board-card i{color:#206efb}
