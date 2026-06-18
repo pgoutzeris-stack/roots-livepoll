@@ -638,6 +638,164 @@ function buildSopKiWorkshopSlides(mode = 'pro-phase') {
 
 window.SOP_TOOL_TRACKS = SOP_TOOL_TRACKS;
 
+// ─── INTERNAL SOP TRACKS ───────────────────────────────────────────
+// Interne SOP (Betrieb von ROOTS selbst) — gleiche Struktur wie SOP_TOOL_TRACKS,
+// Klassen mit Präfix track-int-. Karten sind reine {name}-Einträge.
+const INTERNAL_SOP_TRACKS = [
+  {
+    title: 'Track 1: People',
+    class: 'track-int-people',
+    intro: 'Den gesamten Mitarbeiter-Lebenszyklus von der Einstellung bis zur Kapazitätsplanung managen. 3 Phasen.',
+    phases: [
+      {
+        name: 'Hiring',
+        intro: 'Von der Definition des Stellenprofils bis zum unterschriebenen Vertrag.',
+        cards: [
+          { name: 'Stellenprofil & Anforderungen definieren' },
+          { name: 'Ausschreibung & Sourcing' },
+          { name: 'Bewerbungsprozess: Screening, Interviews, Case' },
+          { name: 'Vertrag' },
+        ],
+      },
+      {
+        name: 'Onboarding',
+        intro: 'Neue Mitarbeitende strukturiert ausstatten, einarbeiten und ins Team integrieren.',
+        cards: [
+          { name: 'Equipment, IT-Zugänge, Tools' },
+          { name: 'Erster Tag & Teamvorstellung' },
+          { name: 'Einarbeitungsplan (30/60/90 Tage)' },
+          { name: 'Mentor-Zuweisung' },
+        ],
+      },
+      {
+        name: 'Kapazitäts- & Urlaubsplanung',
+        intro: 'Auslastung, Urlaube und Teamkalender laufend planen und im Blick behalten.',
+        cards: [
+          { name: 'Auslastung pro MA' },
+          { name: 'Urlaubsanfragen & -genehmigung' },
+          { name: 'Teamkalender pflegen' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Track 2: Steuerung',
+    class: 'track-int-steuerung',
+    intro: 'Ziele, Meetings und Finanzen als Steuerungsinstrumente des Unternehmens führen. 3 Phasen.',
+    phases: [
+      {
+        name: 'OKR-Planung',
+        intro: 'Ziele im Review reflektieren und in der Planung neu ausrichten.',
+        cards: [
+          { name: 'Review-Meeting' },
+          { name: 'Planungs-Meeting' },
+        ],
+      },
+      {
+        name: 'Meeting',
+        intro: 'Meetings effizient vorbereiten, dokumentieren und in Actions überführen.',
+        cards: [
+          { name: 'Meeting Etiquette' },
+          { name: 'Meeting Minutes' },
+          { name: 'Actions & Next Steps' },
+        ],
+      },
+      {
+        name: 'Finance & Controlling',
+        intro: 'Finanzen und Controlling laufend überwachen und steuern.',
+        cards: [
+          { name: 'Finance & Controlling' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Track 3: Wissen',
+    class: 'track-int-wissen',
+    intro: 'Internes Wissen sichern und in internen Projekten nutzbar machen. 2 Phasen.',
+    phases: [
+      {
+        name: 'Internes Wissensmanagement',
+        intro: 'Wissen strukturiert ablegen, aktuell halten und bei Personalwechsel sichern.',
+        cards: [
+          { name: 'Ablagestruktur in SharePoint einhalten' },
+          { name: 'Frameworks, Methoden, SOPs aktuell halten' },
+          { name: 'Wissenstransfer bei Personalwechsel' },
+        ],
+      },
+      {
+        name: 'Interne Projekte',
+        intro: 'Interne Projekte von der Zielklärung bis zum fertigen Deliverable umsetzen.',
+        cards: [
+          { name: 'Anlass, Zielgruppe & Ziel klären' },
+          { name: 'Inhaltsstruktur & Storyline (Pyramid Principle)' },
+          { name: 'Erstellung & Design nach ROOTS Master & CD' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Track 4: Marketing & New Business',
+    class: 'track-int-marketing',
+    intro: 'Neue Geschäftschancen erschließen und ROOTS über Content sichtbar machen. 2 Phasen.',
+    phases: [
+      {
+        name: 'New Business',
+        intro: 'Leads identifizieren, kontaktieren und bis zur Übergabe in die Consulting SOP führen.',
+        cards: [
+          { name: 'Lead-Identifikation & Qualifizierung' },
+          { name: 'Outreach & Erstkontakt' },
+          { name: 'Pipeline-Management & Statusverfolgung' },
+          { name: 'Übergabe in Consulting SOP bei Go' },
+        ],
+      },
+      {
+        name: 'Content',
+        intro: 'Mit Thought-Leadership und Always-On-Inhalten kontinuierlich Reichweite aufbauen.',
+        cards: [
+          { name: 'Thought-Leadership' },
+          { name: 'Always-On' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Track 5: Daten-Infrastruktur & (AI) Tools',
+    class: 'track-int-daten',
+    intro: 'Datenablage, Tool-Landschaft und AI-Regeln als Fundament des Betriebs pflegen. 3 Phasen.',
+    phases: [
+      {
+        name: 'SharePoint',
+        intro: 'Ordnerstruktur, Zugriffsrechte und Datenpflege in SharePoint sauber halten.',
+        cards: [
+          { name: 'Ordnerstruktur-Governance' },
+          { name: 'Zugriffsrechte & Berechtigungen' },
+          { name: 'Pflege, Archivierung & Bereinigung' },
+        ],
+      },
+      {
+        name: '(AI) Tools',
+        intro: 'Tool-Landschaft, Lizenzen und Use Cases übersichtlich verwalten und evaluieren.',
+        cards: [
+          { name: 'Tool-Übersicht pflegen' },
+          { name: 'Lizenz- & Zugangsmanagement' },
+          { name: 'Use-Case-Entwicklung' },
+          { name: 'Tool-Evaluation' },
+        ],
+      },
+      {
+        name: 'AI Rules',
+        intro: 'Verbindliche AI-Regeln laufend pflegen und aktuell halten.',
+        cards: [
+          { name: 'AI Rules pflegen & aktualisieren' },
+        ],
+      },
+    ],
+  },
+];
+
+window.INTERNAL_SOP_TRACKS = INTERNAL_SOP_TRACKS;
+
 // ─── LOCALSTORAGE: SOP-Struktur beim ersten Laden speichern ──────────────────
 (function () {
   const LS_KEY = 'lp_sop_tracks_v2';
@@ -801,6 +959,77 @@ function buildMarketingSopWorkshopSlides() {
   return slides;
 }
 
+// ─── DUAL SOP · KI WORKSHOP (Internal + Consulting parallel) ──────────
+// Beide SOPs parallel sammeln · getrennt priorisieren (Speaker-Switch) · gemeinsame ICE-Matrix.
+function buildDualSopWorkshopSlides() {
+  const slides = [];
+
+  // Inline-Helfer: getrennte Priorisierungs-Abstimmung pro SOP-Gruppe.
+  function groupVote(group, label) {
+    const n = (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
+    return tplSlide('mc_multi', {
+      title: `Priorisierung · ${label} SOP`,
+      subtitle: `Wählt die Top ${n} Use Cases der ${label}-SOP`,
+      prompt: `Welche ${n} Use Cases haben den größten Hebel?`,
+      isQuestionSlide: true,
+      options: [],
+      maxSelections: n,
+      sopGroup: group,
+      sopGroupLabel: label,
+      sopKind: 'group-vote',
+    }, { showResultsLive: true, sopAllTracksVote: true, sopGroup: group, sopVoteMax: n, workshopMode: 'decide' });
+  }
+
+  // 1. Opener
+  slides.push(tplSlide('content', {
+    title: 'SOP · KI Use-Case Workshop',
+    subtitle: 'Internal + Consulting · parallel',
+    body: 'QR scannen · Name + Avatar wählen · los geht\'s!',
+    isHeroSlide: true,
+  }));
+
+  // 2. Teilnehmer-Intro (zwei Teams)
+  slides.push(tplSlide('content', {
+    title: 'Wer ist dabei?',
+    subtitle: 'Zwei Teams · zwei SOPs · parallel',
+    body: 'INTERNAL SOP\nRichard Erbler · Jannick Müller · Pano Goutzeris\n\nCONSULTING SOP\nManuel Stankovic · Rod Mitecki',
+    sopKind: 'participants',
+    isHeroSlide: false,
+  }, { workshopMode: 'orient' }));
+
+  // 3. Zielbild + 4. Instruktionen
+  slides.push(sopWorkshopGoal());
+  slides.push(sopWorkshopInstructions());
+
+  // 5. CONSULTING: Track-Intro + Track-Brainstorm (Gruppe consulting)
+  SOP_TOOL_TRACKS.forEach((t, i) => {
+    slides.push(sopTrackIntro(t, i));
+    const s = sopTrackBrainstorm(t);
+    s.content.sopGroup = 'consulting';
+    slides.push(s);
+  });
+
+  // 6. INTERNAL: Track-Intro + Track-Brainstorm (Gruppe internal)
+  INTERNAL_SOP_TRACKS.forEach((t, i) => {
+    slides.push(sopTrackIntro(t, i));
+    const s = sopTrackBrainstorm(t);
+    s.content.sopGroup = 'internal';
+    slides.push(s);
+  });
+
+  // 7. + 8. Getrennte Priorisierung (Speaker-Switch zwischen den beiden Votes)
+  slides.push(groupVote('consulting', 'Consulting'));
+  slides.push(groupVote('internal', 'Internal'));
+
+  // 9.–12. Pitch · gemeinsame ICE-Matrix · Next Steps · Abschluss
+  slides.push(sopPitchSession());
+  slides.push(sopIceMatrix());
+  slides.push(sopWorkshopNextSteps());
+  slides.push(...sopWorkshopClose());
+
+  return slides;
+}
+
 window.LP_TEMPLATES = [
   {
     key: 'roots-sop-ki-workshop-phase',
@@ -831,6 +1060,16 @@ window.LP_TEMPLATES = [
     group: '6–20',
     tips: 'Pro Karte 5 Min. · max. 2 Use Cases · Auswertung nach Teilbereich.',
     slides: buildMarketingSopWorkshopSlides(),
+  },
+  {
+    key: 'roots-sop-dual-internal-consulting',
+    category: 'ROOTS · SOP & KI',
+    name: 'Internal + Consulting · Pro Track',
+    desc: 'Beide SOPs parallel sammeln · getrennt priorisieren (Speaker-Switch) · gemeinsame ICE-Matrix.',
+    duration: '90–120 Min.',
+    group: '5–25',
+    tips: 'Zwei Teams parallel. Speaker wechselt zwischen den beiden Abstimmungen. Eine kombinierte Matrix.',
+    slides: buildDualSopWorkshopSlides(),
   },
 ];
 

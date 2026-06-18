@@ -1144,3 +1144,196 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .plt-err{background:rgba(220,38,38,.1);border-radius:4px}
 .plt-err .plt-ico,.plt-err .plt-msg{color:#f87171}
 .plt-empty{color:#64748b;padding:.4rem 0}
+
+/* ═══════ SOP switch + participants ═══════════════════════════════
+   Zwei neue, von app.js gerenderte Komponenten:
+   1) .sop-switch-bar  — segmentierte Pille (Consulting / Internal) auf den
+      beiden Priorisierungs-Folien im Beamer. Self-contained, kein
+      bestimmter Parent nötig; gut auf Beamer UND mobil tappbar.
+   2) .sop-pslide-participants — Teilnehmer-Intro-Folie: Body enthält zwei
+      Teams, getrennt durch eine Leerzeile → als zwei klare Team-Blöcke. */
+
+/* ── 1) Speaker SOP-Switch-Bar (segmented pill) ── */
+.sop-switch-bar{
+  display:inline-flex;align-items:center;gap:.25rem;
+  margin:0 auto 1.1rem;padding:.28rem;
+  background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--radius-pill);box-shadow:var(--shadow-dash);
+  max-width:100%;flex-wrap:wrap;justify-content:center;
+}
+/* Wenn als Block in die Stage gesetzt: zentriert oben halten */
+.present-stage > .sop-switch-bar,
+.present-stage .sop-switch-bar{margin-top:.25rem}
+.sop-switch-btn{
+  appearance:none;border:none;cursor:pointer;font-family:inherit;
+  display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
+  min-height:40px;padding:.5rem 1.15rem;border-radius:var(--radius-pill);
+  background:transparent;color:var(--muted);
+  font-size:.9rem;font-weight:700;line-height:1;white-space:nowrap;
+  transition:background .15s,color .15s,box-shadow .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.sop-switch-btn:hover{color:var(--ink)}
+.sop-switch-btn.is-active{
+  background:var(--brand);color:#fff;
+  box-shadow:0 2px 8px rgba(32,110,251,.28);
+}
+.sop-switch-btn.is-active:hover{color:#fff}
+.sop-switch-btn:focus-visible{outline:3px solid rgba(32,110,251,.45);outline-offset:2px}
+
+/* ── 2) Participant-Intro-Folie: zwei Team-Blöcke ── */
+/* Body kommt als pre-line Text mit Teams durch eine Leerzeile getrennt.
+   Wir geben dem Container ein zweispaltiges Card-Layout (Desktop) bzw.
+   gestapelt (Mobile). Greift auf .sop-pslide-section auf (siehe oben),
+   überschreibt nur den Body. */
+.sop-pslide-participants .sop-pslide-body,
+.sop-pslide-participants .sop-pslide-sub{
+  text-align:left;max-width:none;
+}
+/* Der Body ist i.d.R. ein einzelner pre-line-Textknoten → als saubere
+   Karte darstellen. Teilt app.js ihn in .sop-team-block-Elemente, greift
+   das 2-Spalten-Layout unten (min-width:769px). */
+.sop-pslide-participants .sop-pslide-body{
+  white-space:pre-line;margin:1.25rem auto 0;line-height:1.7;
+  font-size:1rem;color:var(--ink);
+  background:var(--surface);border:1px solid var(--line);
+  border-radius:16px;padding:1.1rem 1.25rem;box-shadow:var(--shadow-dash);
+}
+/* Falls app.js den Body in zwei .sop-team-block-Elemente aufteilt,
+   bekommen diese ein sauberes 2-Spalten-Card-Layout. */
+.sop-pslide-participants .sop-team-block{
+  background:var(--bg);border:1px solid var(--line);
+  border-left:3px solid var(--brand);border-radius:0 14px 14px 0;
+  padding:1rem 1.15rem;line-height:1.65;color:var(--ink);
+}
+.sop-pslide-participants .sop-team-block h3,
+.sop-pslide-participants .sop-team-title{
+  font-size:.78rem;font-weight:800;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--brand);margin:0 0 .5rem;
+}
+@media (min-width:769px){
+  .sop-pslide-participants .sop-pslide-body:has(.sop-team-block),
+  .sop-pslide-participants .sop-team-grid{
+    display:grid;grid-template-columns:1fr 1fr;gap:1rem;
+    background:transparent;border:none;padding:0;box-shadow:none;
+  }
+}
+
+/* ═══════ Mobile hardening ════════════════════════════════════════
+   Höchste Priorität: das ganze Tool — besonders die Teilnehmer-Ansicht
+   (QR auf dem Handy) — sauber mobil. Diese Datei wird NACH styles.css
+   geladen, gewinnt also bei gleicher Spezifität. Breakpoint einheitlich
+   768px für Teilnehmer/Mobile (deckt die 760–900px-Lücke konsistent ab),
+   ohne Desktop-Regeln zu verändern. */
+
+/* — Kein horizontaler Overflow auf dem Handy — */
+@media (max-width:768px){
+  html,body{max-width:100%;overflow-x:clip}
+  .screen,.present-shell,.participant-root,.participant-workshop-layout,
+  .participant-main-wrap,.present-stage,.present-main,.present-stage-wrap{
+    max-width:100%;
+  }
+  .present-stage{overflow-x:clip}
+  /* Lange Wörter / URLs brechen statt zu überlaufen */
+  .pslide-q-title,.pslide-q-prompt,.present-slide-title,.present-slide-body,
+  .participant-card h1,.participant-card p,.sop-pslide-title,.sop-pslide-body,
+  .viz-word,.viz-bubble-text,.lp-qna-text{
+    overflow-wrap:anywhere;word-break:break-word;
+  }
+  .present-stage{padding-left:1rem;padding-right:1rem}
+}
+
+/* — Sticky Submit-Action-Bar auf der Teilnehmer-Ansicht —
+   Der eigentliche Scroll-Container ist #participant-root (.participant-root,
+   overflow-y:auto). Damit der blaue Submit-Button IMMER erreichbar bleibt,
+   heften wir ihn unten an und geben dem Inhalt darüber Platz. */
+@media (max-width:768px){
+  /* Scroll-Container darf den Sheet-Effekt zeigen statt zu zentrieren */
+  #participant-root.participant-root,.participant-root{
+    align-items:stretch;justify-content:flex-start;
+    padding:1rem .85rem 0;
+  }
+  .pslide-participant-slide{width:100%;max-width:100%}
+  /* Platz schaffen, damit nichts hinter der fixen Bar verschwindet */
+  .participant-card{
+    padding-bottom:calc(72px + env(safe-area-inset-bottom))!important;
+  }
+  /* Primärer Submit-Button als sticky Bottom-Action-Bar */
+  .participant-submit,
+  .participant-submit-lg,
+  #participant-root [id^="submit-"]{
+    position:sticky;bottom:0;z-index:60;width:100%;
+    margin:.75rem 0 0;
+    /* Backdrop-Leiste hinter dem Button, respektiert iOS Safe-Area */
+    padding-bottom:env(safe-area-inset-bottom);
+    box-shadow:0 -8px 18px -8px rgba(15,23,42,.28),0 6px 16px rgba(32,110,251,.28);
+  }
+  /* Hintergrund-Streifen, damit Inhalt nicht „durchscheint" */
+  .participant-submit::before,
+  .participant-submit-lg::before,
+  #participant-root [id^="submit-"]::before{
+    content:'';position:absolute;left:-.85rem;right:-.85rem;
+    bottom:calc(-1 * (env(safe-area-inset-bottom) + .75rem));
+    top:-.75rem;z-index:-1;
+    background:linear-gradient(180deg,transparent,var(--bg) 40%);
+    pointer-events:none;
+  }
+  /* Sicherstellen: Buttons sind echte Tap-Ziele */
+  .participant-submit,.participant-submit-lg{min-height:48px;font-size:1rem}
+}
+
+/* — Tap-Ziele: interaktive Buttons ≥44px auf dem Handy — */
+@media (max-width:768px){
+  .present-btn{min-width:44px;min-height:44px}
+  .avatar-color-btn{width:40px;height:40px}
+  .avatar-emoji-btn{min-height:44px}
+  .participant-option,.track-vote-option,.lp-mxm-btn{min-height:44px}
+  .lp-mxm-btn{height:48px}
+  .qa-up,.lp-upvote-btn{min-height:40px}
+}
+
+/* — SOP/Workshop-Teilnehmer-Layouts: sauber 1-spaltig, scroll- & klickbar — */
+@media (max-width:768px){
+  .lp-sop-workshop.participant-mode .participant-workshop-layout,
+  .lp-sop-workshop.participant-mode .participant-main-wrap{
+    flex-direction:column;width:100%;
+  }
+  .workshop-slide-sop{display:none!important}
+  .lp-sop-workshop .present-stage{padding:1.25rem 1rem 6rem}
+  /* Vote-Listen + Matrix-Mobile-Liste einspaltig */
+  .track-vote-grouped,.track-vote-results,.track-vote-present,
+  .phase-vote-present,.card-vote-participation-grid{
+    grid-template-columns:1fr!important;
+  }
+  .track-vote-result-row{
+    grid-template-columns:1fr;gap:.35rem;
+  }
+  .lp-mxm-choices{grid-template-columns:repeat(4,1fr)}
+  /* Next-Steps / Tabellen / Matrix bleiben scrollbar */
+  .next-steps-list{grid-template-columns:1fr}
+  .ws-table,.lp-matrix-cell-items,.lp-mx-mobile{-webkit-overflow-scrolling:touch}
+  /* Nichts fängt Klicks ab: fixe Panels auf dem Handy ausblenden,
+     wenn sie Inhalt überdecken würden */
+  .present-participants-bar{max-width:calc(100vw - 1rem)}
+}
+
+/* — SOP-switch-bar auf dem Handy: volle Breite, große Segmente — */
+@media (max-width:768px){
+  .sop-switch-bar{width:100%;max-width:420px}
+  .sop-switch-btn{flex:1;min-width:0;padding:.6rem .75rem;min-height:44px}
+}
+
+/* — Sticky Matrix-Action-Bar (mobil) einheitlich mit Safe-Area — */
+@media (max-width:768px){
+  .lp-mx-actions{
+    position:sticky;bottom:0;z-index:5;
+    padding-bottom:calc(.6rem + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg,transparent,var(--bg) 35%);
+  }
+}
+
+/* — Dark-Mode: Submit-Backdrop nutzt die dunkle Fläche — */
+@media (prefers-color-scheme:dark){
+  .sop-pslide-participants .sop-pslide-body{background:var(--surface)}
+  .sop-pslide-participants .sop-team-block{background:rgba(255,255,255,.03)}
+}

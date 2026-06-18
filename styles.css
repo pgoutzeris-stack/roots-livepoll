@@ -25,7 +25,7 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;font-family:'Circular Std',system-ui,sans-serif;color:var(--ink);background:var(--app-bg);-webkit-font-smoothing:antialiased;overflow:hidden}
 button,input,select,textarea{font-family:inherit;color:inherit}
-.screen{display:none;height:100vh;width:100vw}
+.screen{display:none;height:100vh;height:100dvh;width:100vw;max-width:100%}
 .screen.active{display:flex;flex-direction:column}
 #screen-present.active{display:block}
 #screen-participant.active{display:flex}
@@ -246,7 +246,7 @@ html.lp-join-route #screen-participant{display:flex!important}
 @media(min-width:901px){
   .props-close-mobile{display:none!important}
 }
-.present-shell{display:flex;flex-direction:column;height:100vh;background:var(--app-bg)}
+.present-shell{display:flex;flex-direction:column;height:100vh;height:100dvh;background:var(--app-bg)}
 .present-header{flex-shrink:0;position:relative;z-index:120}
 .present-live-badge{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .75rem;border-radius:999px;background:var(--brand-light);color:var(--brand);font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
 .present-live-badge i{font-size:.45rem;animation:presentPulse 1.4s ease-in-out infinite}
@@ -287,7 +287,7 @@ html.lp-join-route #screen-participant{display:flex!important}
 .present-code-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:.35rem}
 .present-code-text{font-size:2.5rem;font-weight:800;letter-spacing:.2em;margin-bottom:.5rem;color:var(--brand)}
 .present-code-url{font-size:.72rem;color:var(--muted);margin-top:.5rem;word-break:break-all;line-height:1.45}
-.participant-root{min-height:100vh;background:var(--app-bg);display:flex;align-items:center;justify-content:center;padding:1rem}
+.participant-root{min-height:100vh;min-height:100dvh;background:var(--app-bg);display:flex;align-items:center;justify-content:center;padding:1rem}
 .participant-card{width:100%;max-width:480px;background:var(--bg);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:1.5rem;border:1px solid var(--line)}
 .participant-card h1{font-size:1.35rem;margin-bottom:.35rem}
 .participant-card p{color:var(--muted);font-size:.92rem;margin-bottom:1rem}
@@ -583,7 +583,7 @@ html.lp-join-route #screen-participant{display:flex!important}
 .participant-sent-icon{width:56px;height:56px;border-radius:50%;background:var(--brand-light);color:var(--brand);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:1.35rem}
 .present-body{display:flex;flex:1;min-height:0;overflow:hidden}
 .lp-sop-workshop:not(.lp-sop-panels) .present-participants-bar,.lp-sop-workshop:not(.lp-sop-panels) .present-activity-feed{display:none!important}
-.participant-workshop-layout{display:flex;min-height:100vh;width:100%;flex:1}
+.participant-workshop-layout{display:flex;min-height:100vh;min-height:100dvh;width:100%;flex:1}
 .sop-nav-track-collapsed small{display:block;font-size:.62rem;font-weight:500;opacity:.8;margin-top:.1rem}
 .dash-nav-item--card{font-size:.78rem;padding:.45rem .65rem .45rem .55rem;gap:.45rem}
 .dash-nav-item--card.done{opacity:.65}

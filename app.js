@@ -298,7 +298,7 @@ function aggregateAllTracksUseCases() {
     // track-collect den Track-Namen wiederholt (führte zu doppeltem Track im UI).
     const phaseName = c.sopPhaseName || '';
     if (!byTrackKey.has(trackKey)) {
-      byTrackKey.set(trackKey, { trackKey, trackLabel, phases: [] });
+      byTrackKey.set(trackKey, { trackKey, trackLabel, sopGroup: c.sopGroup || null, phases: [] });
       trackOrder.push(trackKey);
     }
     const items = (State.responses || [])
@@ -404,15 +404,16 @@ function aggregateTopTrackVotedUseCases() {
 // Top Use Cases aus der FINALEN Cross-Track-Abstimmung (sopAllTracksVote).
 // Diese wandern automatisch in die Impact/Effort-Matrix.
 function aggregateTopFinalVotedUseCases(limit = 12) {
-  const voteSlide = (State.slides || []).find((s) => s.settings?.sopAllTracksVote);
-  if (!voteSlide) return [];
+  const voteSlides = (State.slides || []).filter((s) => s.settings?.sopAllTracksVote);
+  if (!voteSlides.length) return [];
+  const voteIds = new Set(voteSlides.map((s) => s.id));
   const { allItems } = aggregateAllTracksUseCases();
   const itemByVoteId = {};
   allItems.forEach((item) => { itemByVoteId[`resp-${item.id}`] = item; });
   const totals = {};
   const votes = {};
   (State.responses || [])
-    .filter((r) => r.slide_id === voteSlide.id && !r.is_hidden)
+    .filter((r) => voteIds.has(r.slide_id) && !r.is_hidden)
     .forEach((r) => {
       (r.response?.values || []).forEach((id) => {
         votes[id] = (votes[id] || 0) + 1;
@@ -1188,8 +1189,9 @@ function getTrackVoteOptionsGrouped(slide) {
   }
   if (scope?.kind === 'all-tracks') {
     const { byTrack } = aggregateAllTracksUseCases();
+    const grp = slide.content?.sopGroup || null; // Gruppen-Vote (internal/consulting) nur die eigene Gruppe
     const groups = [];
-    byTrack.forEach((trk) => {
+    (grp ? byTrack.filter((t) => t.sopGroup === grp) : byTrack).forEach((trk) => {
       trk.phases.forEach((p) => {
         if (p.items.length) {
           groups.push({
@@ -3054,11 +3056,31 @@ function bindPitchTimers(stage) {
   });
 }
 
+// Speaker-Quick-Switch zwischen den beiden Abstimmungs-Slides (internal/consulting).
+function injectSopSwitchBar(slide) {
+  if (!slide?.settings?.sopAllTracksVote || !slide.content?.sopGroup) return;
+  const voteSlides = (State.slides || [])
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => s.settings?.sopAllTracksVote && s.content?.sopGroup);
+  if (voteSlides.length < 2) return;
+  const stage = $('#present-stage');
+  if (!stage || stage.querySelector('.sop-switch-bar')) return;
+  const cur = State.session?.current_slide_index || 0;
+  const btns = voteSlides.map(({ s, i }) =>
+    `<button type="button" class="sop-switch-btn${i === cur ? ' is-active' : ''}" data-sop-switch-idx="${i}">${esc(s.content.sopGroupLabel || s.content.sopGroup)}</button>`
+  ).join('');
+  stage.insertAdjacentHTML('afterbegin', `<div class="sop-switch-bar" role="tablist" aria-label="Abstimmung wechseln"><span class="sop-switch-label">Abstimmung:</span>${btns}</div>`);
+  stage.querySelectorAll('.sop-switch-bar .sop-switch-btn').forEach((b) => {
+    b.onclick = () => { const idx = Number(b.dataset.sopSwitchIdx); if (Number.isFinite(idx)) goToSlide(idx); };
+  });
+}
+
 function finalizePresentUi(slide) {
   updatePresentToolbarUi(slide);
   bindResultsDisplayToggle($('#present-stage'));
   maybeLaunchResultsConfetti(slide);
   bindPitchTimers($('#present-stage'));
+  injectSopSwitchBar(slide);
 }
 
 async function deleteSlide(id) {
@@ -5346,13 +5368,10 @@ function getMatrixItems(slide, { fresh = false } = {}) {
   //    Anzahl N: folgt der finalen Abstimmung (sopVoteMax), sonst der Matrix-eigenen
   //    Einstellung (sopMatrixCount), sonst Vorlagen-Default — einstellbar pro Slide/Vorlage.
   if (slide?.settings?.sopAllTracksMatrix) {
-    const voteSlide = (State.slides || []).find((s) => s.settings?.sopAllTracksVote);
-    const count = Number(
-      voteSlide?.settings?.sopVoteMax
-      || slide.settings?.sopMatrixCount
-      || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount
-      || 5
-    );
+    const voteSlidesAll = (State.slides || []).filter((s) => s.settings?.sopAllTracksVote);
+    const count = voteSlidesAll.length
+      ? voteSlidesAll.reduce((n, s) => n + Number(s.settings?.sopVoteMax || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5), 0)
+      : Number(slide.settings?.sopMatrixCount || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
 
     // 1a. Bevorzugt: Gewinner der FINALEN Cross-Track-Abstimmung (Pro-Track-Flow).
     const finalTop = aggregateTopFinalVotedUseCases(count);
