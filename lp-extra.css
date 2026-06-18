@@ -2214,3 +2214,328 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .lp-sop-workshop.present-mode .ws-body .workshop-instructions-card,
   .lp-sop-workshop.present-mode .ws-body .ws-hero-body{background:transparent}
 }
+
+/* ═══════ Hero-Opener · zentriert + KI-Hintergrund ═══════ */
+.lp-sop-workshop.present-mode .present-stage.ws-hero-present-stage{
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+  padding:clamp(1rem,3vw,2rem);
+  overflow:hidden;
+}
+.lp-sop-workshop.present-mode .present-stage.ws-hero-present-stage .pslide-slide{
+  max-width:min(920px,96vw);
+  margin:0 auto;
+}
+.lp-sop-workshop.present-mode .present-stage.ws-hero-present-stage .pslide-slide-content--ws{
+  align-items:center;
+  justify-content:center;
+}
+.ws-hero-stage{
+  position:relative;
+  width:100%;
+  min-height:min(72vh,760px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:clamp(1.5rem,4vw,3rem) clamp(1rem,3vw,2rem);
+  border-radius:20px;
+  overflow:hidden;
+  isolation:isolate;
+}
+.ws-hero-ai-canvas{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  pointer-events:none;
+  z-index:0;
+}
+.ws-hero-ai-grid{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  z-index:0;
+  opacity:.35;
+  background-image:
+    linear-gradient(rgba(32,110,251,.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(32,110,251,.06) 1px, transparent 1px);
+  background-size:42px 42px;
+  mask-image:radial-gradient(ellipse 80% 70% at 50% 45%, #000 20%, transparent 100%);
+}
+.ws-hero-glow{
+  position:absolute;
+  border-radius:50%;
+  filter:blur(60px);
+  pointer-events:none;
+  z-index:0;
+  animation:ws-hero-glow-drift 12s ease-in-out infinite alternate;
+}
+.ws-hero-glow--a{
+  width:min(420px,55vw);
+  height:min(420px,55vw);
+  top:-8%;
+  left:12%;
+  background:rgba(32,110,251,.22);
+}
+.ws-hero-glow--b{
+  width:min(360px,48vw);
+  height:min(360px,48vw);
+  bottom:-10%;
+  right:8%;
+  background:rgba(99,102,241,.18);
+  animation-delay:-4s;
+}
+@keyframes ws-hero-glow-drift{
+  from{transform:translate(0,0) scale(1)}
+  to{transform:translate(18px,-14px) scale(1.06)}
+}
+.ws-hero-content{
+  position:relative;
+  z-index:1;
+  max-width:720px;
+  text-align:center;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:.85rem;
+}
+.ws-hero-icon-ring{
+  width:72px;
+  height:72px;
+  border-radius:22px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:1.65rem;
+  color:#fff;
+  background:linear-gradient(135deg,#206efb,#6366f1);
+  box-shadow:0 16px 40px rgba(32,110,251,.35);
+  animation:ws-hero-icon-float 4.5s ease-in-out infinite;
+}
+@keyframes ws-hero-icon-float{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-6px)}
+}
+.ws-hero-title{
+  font-size:clamp(2.2rem,5.5vw,3.6rem);
+  font-weight:800;
+  line-height:1.08;
+  letter-spacing:-.03em;
+  color:var(--ink);
+  margin:0;
+}
+.ws-hero-title--shimmer{
+  background:linear-gradient(105deg,var(--ink) 0%,var(--ink) 42%,#206efb 50%,var(--ink) 58%,var(--ink) 100%);
+  background-size:220% 100%;
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  animation:ws-hero-shimmer 6s ease-in-out infinite;
+}
+@keyframes ws-hero-shimmer{
+  0%,100%{background-position:100% 50%}
+  50%{background-position:0% 50%}
+}
+.ws-hero-kicker{
+  font-size:clamp(1rem,2.2vw,1.2rem);
+  font-weight:700;
+  color:var(--brand);
+  margin:0;
+}
+.ws-hero-lead{
+  font-size:clamp(1rem,2vw,1.15rem);
+  line-height:1.65;
+  color:var(--muted);
+  max-width:540px;
+  margin:0;
+}
+
+/* Pitch · Timer sichtbar + Mobile-Autor */
+.ws-timer .ws-time{
+  display:inline-block;
+  min-width:4.75ch;
+}
+.ws-table--pitch .ws-row--head .ws-c-author{display:none}
+@media (max-width:760px){
+  .ws-table--pitch .ws-row{
+    grid-template-columns:1.75rem minmax(0,1fr);
+    grid-template-areas:
+      "rank uc"
+      "rank author"
+      "timer timer";
+    align-items:start;
+  }
+  .ws-table--pitch .ws-row--head{display:none}
+  .ws-table--pitch .ws-c-rank{grid-area:rank}
+  .ws-table--pitch .ws-c-uc{grid-area:uc}
+  .ws-table--pitch .ws-c-author{
+    grid-area:author;
+    display:flex!important;
+    font-size:.82rem;
+    padding-left:.15rem;
+  }
+  .ws-table--pitch .ws-c-action{
+    grid-area:timer;
+    justify-content:flex-start;
+    padding-top:.35rem;
+    border-top:1px dashed var(--line);
+    margin-top:.15rem;
+    width:100%;
+  }
+  .ws-table--pitch .ws-time{font-size:1.25rem;min-width:5ch}
+}
+
+/* Teilnehmer · Pitch-Liste mit Autor */
+.participant-pitch-block{text-align:left}
+.participant-pitch-hint{
+  font-size:.88rem;
+  color:var(--muted);
+  margin:0 0 .85rem;
+  line-height:1.45;
+}
+.participant-pitch-hint i{color:var(--brand);margin-right:.35rem}
+.participant-pitch-list{display:flex;flex-direction:column;gap:.65rem}
+.participant-pitch-card{
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:.75rem .85rem;
+  background:var(--surface);
+}
+.participant-pitch-card-head{
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  margin-bottom:.4rem;
+}
+.participant-pitch-num{
+  width:1.5rem;
+  height:1.5rem;
+  border-radius:999px;
+  background:var(--brand);
+  color:#fff;
+  font-size:.72rem;
+  font-weight:800;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.participant-pitch-track{
+  font-size:.68rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  color:var(--brand);
+}
+.participant-pitch-text{
+  margin:0 0 .55rem;
+  font-size:.92rem;
+  line-height:1.45;
+  color:var(--ink);
+  font-weight:600;
+}
+.participant-pitch-author{
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  font-size:.8rem;
+  color:var(--muted);
+}
+.participant-pitch-author strong{color:var(--ink)}
+.participant-pitch-avatar-fallback{
+  width:28px;height:28px;border-radius:999px;background:var(--line);
+  display:flex;align-items:center;justify-content:center;color:var(--muted);
+}
+.participant-wait-block .ws-hero-stage{
+  min-height:auto;
+  padding:1.25rem .5rem 1rem;
+  border-radius:16px;
+}
+.participant-wait-block .ws-hero-title{font-size:clamp(1.65rem,6vw,2.2rem)}
+.participant-wait-block .ws-hero-lead{font-size:.95rem}
+
+/* Teilnehmer · keine leeren SOP-Spacer-Kästen */
+.lp-sop-workshop.participant-mode .sop-board-card--spacer{display:none!important}
+.lp-sop-workshop.participant-mode .sop-board-cards{
+  display:flex;
+  flex-direction:column;
+  gap:.45rem;
+  grid-template-rows:none!important;
+}
+.lp-sop-workshop.participant-mode .sop-board-phase{min-height:0}
+
+/* SOP-Zuweisung · Celebration-Popup (Mobile) */
+.sop-assign-celebration{
+  position:fixed;
+  inset:0;
+  z-index:10050;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  padding:1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  background:rgba(15,23,42,.42);
+  opacity:0;
+  transition:opacity .28s ease;
+  pointer-events:none;
+}
+.sop-assign-celebration.is-visible{
+  opacity:1;
+  pointer-events:auto;
+}
+.sop-assign-celebration-card{
+  width:min(420px,100%);
+  border-radius:20px 20px 16px 16px;
+  background:var(--bg);
+  border:1px solid var(--line);
+  box-shadow:0 24px 60px rgba(15,23,42,.22);
+  padding:1.15rem 1.15rem 1rem;
+  text-align:center;
+  transform:translateY(24px);
+  transition:transform .32s cubic-bezier(.22,1,.36,1);
+}
+.sop-assign-celebration.is-visible .sop-assign-celebration-card{transform:translateY(0)}
+.sop-assign-celebration-icon{
+  width:56px;height:56px;border-radius:16px;margin:0 auto .65rem;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.35rem;color:#fff;
+  background:linear-gradient(135deg,#206efb,#6366f1);
+}
+.sop-assign-celebration--consulting .sop-assign-celebration-icon{
+  background:linear-gradient(135deg,#7c3aed,#6366f1);
+}
+.sop-assign-celebration-kicker{
+  margin:0 0 .25rem;
+  font-size:.68rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:var(--brand);
+}
+.sop-assign-celebration-title{
+  margin:0 0 .45rem;
+  font-size:1.35rem;
+  font-weight:800;
+  line-height:1.15;
+  color:var(--ink);
+}
+.sop-assign-celebration-text{
+  margin:0 0 .85rem;
+  font-size:.88rem;
+  line-height:1.5;
+  color:var(--muted);
+}
+.sop-assign-celebration-close{
+  width:100%;
+  border:none;
+  border-radius:12px;
+  padding:.72rem 1rem;
+  font:inherit;
+  font-weight:800;
+  color:#fff;
+  background:var(--brand);
+  cursor:pointer;
+}
+@media (min-width:761px){
+  .sop-assign-celebration{align-items:center;padding:1.5rem}
+  .sop-assign-celebration-card{border-radius:20px}
+}

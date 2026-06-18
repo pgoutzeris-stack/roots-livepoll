@@ -63,6 +63,9 @@ const State = {
   bubbleSeenIds: {},
   participantResponsesKey: null,
   participantResponsesAt: 0,
+  pitchTimers: {},
+  sopAssignSeen: null,
+  heroAiRaf: 0,
 };
 
 localStorage.setItem('lp_device_id', State.deviceId);
@@ -1840,7 +1843,7 @@ function renderDualPairCollectColumn(group, pairIdx) {
   const boardContent = trackToSopBoardContent(track, pairIdx);
   const brainstormSlide = brainstormSlidesOfGroup(group)[pairIdx];
   let html = `<div class="ws-split-sop-board ws-orient-col ws-orient-col--split-present" style="--sop-accent:${theme.accent}">
-    ${renderSopBoardPreview(boardContent, false, { hideTrackHeader: true })}
+    ${renderSopBoardPreview(boardContent, false, { hideTrackHeader: true, alignCards: true })}
   </div>`;
   if (brainstormSlide) {
     const visible = getVisibleResponses(brainstormSlide.id);
@@ -1861,7 +1864,7 @@ function renderDualPairOrientColumn(group, pairIdx) {
   const theme = sopTrackTheme(track.class);
   const boardContent = trackToSopBoardContent(track, pairIdx);
   return `<div class="ws-orient-col ws-orient-col--split-present" style="--sop-accent:${theme.accent}">
-    ${renderSopBoardPreview(boardContent, false, { hideTrackHeader: true })}
+    ${renderSopBoardPreview(boardContent, false, { hideTrackHeader: true, alignCards: true })}
   </div>`;
 }
 
@@ -2040,7 +2043,7 @@ function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false,
     ? (hasBody ? `<div class="canvas-editable pslide-q-sub" contenteditable="true" data-field="body">${esc(content.body)}</div>` : '')
     : (hasBody ? `<p class="pslide-q-sub">${esc(content.body).replace(/\n/g, '<br>')}</p>` : '');
   const boardEl = !editable && content.sopBoard?.length
-    ? `<div class="workshop-collect-board">${renderSopBoardPreview(content, false, { hideTrackHeader: shellMode })}</div>`
+    ? `<div class="workshop-collect-board">${renderSopBoardPreview(content, false, { hideTrackHeader: shellMode, alignCards: !!(shellMode || splitCol) })}</div>`
     : '';
   const { question, formatHint, note } = parseCollectPrompt(content.prompt);
   const questionEl = question
@@ -2615,7 +2618,7 @@ function syncSopWorkshopShell(mode, slideIndex) {
   else participantPanel?.classList.add('hidden');
 }
 
-function renderSopBoardPreview(c, editable = false, { hideTrackHeader = false } = {}) {
+function renderSopBoardPreview(c, editable = false, { hideTrackHeader = false, alignCards = false } = {}) {
   const content = enrichSopContent(c);
   if (content.sopKind === 'track' && !content.sopBoard?.length) return '';
   const board = content.sopBoard || [];
@@ -2634,9 +2637,9 @@ function renderSopBoardPreview(c, editable = false, { hideTrackHeader = false } 
         <div class="sop-board-card ${card === content.sopCardName || (content.sopKind === 'card' && card === content.title) ? 'active' : ''}">
           <i class="fa-solid fa-file-lines"></i><span>${esc(card)}</span>
         </div>`).join('');
-    const spacers = Array(Math.max(0, maxCards - (phase.cards || []).length)).fill(0).map(() => (
+    const spacers = alignCards ? Array(Math.max(0, maxCards - (phase.cards || []).length)).fill(0).map(() => (
       '<div class="sop-board-card sop-board-card--spacer" aria-hidden="true"><span>&nbsp;</span></div>'
-    )).join('');
+    )).join('') : '';
     return `
     <div class="sop-board-phase ${phase.name === content.sopPhaseName || board.length === 1 ? 'active' : ''}">
       <div class="sop-board-phase-label">${ed('phase', phase.name, 'sop-board-phase-name')}</div>
@@ -2670,7 +2673,7 @@ function renderSopSectionHtml(c, editable = false, { shellMode = false, splitCol
     <div class="sop-pslide-section sop-pslide-section--shell ${isTrack ? 'sop-pslide-track' : 'sop-pslide-phase'} ${esc(content.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
       ${colTitle}
       ${bodyEl}
-      ${renderSopBoardPreview(content, editable, { hideTrackHeader: shellMode })}
+      ${renderSopBoardPreview(content, editable, { hideTrackHeader: shellMode, alignCards: splitCol })}
     </div>`;
   }
   const titleEl = editable
@@ -2991,10 +2994,28 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
 }
 
 function renderHeroSlideHtml(c, editable = false, opts = {}) {
-  const { shellMode = false } = opts;
+  const { shellMode = false, presentFx = false } = opts;
   const bodyEl = editable
     ? `<div class="canvas-editable pslide-hero-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
     : `<div class="ws-hero-body">${esc(c.body || '').replace(/\n/g, '<br>')}</div>`;
+  if (shellMode && !editable && presentFx) {
+    const subEl = c.subtitle
+      ? `<p class="ws-hero-kicker">${esc(c.subtitle)}</p>`
+      : '';
+    return `
+      <div class="ws-hero-stage">
+        <canvas class="ws-hero-ai-canvas" aria-hidden="true"></canvas>
+        <div class="ws-hero-ai-grid" aria-hidden="true"></div>
+        <div class="ws-hero-glow ws-hero-glow--a" aria-hidden="true"></div>
+        <div class="ws-hero-glow ws-hero-glow--b" aria-hidden="true"></div>
+        <div class="ws-hero-content">
+          <div class="ws-hero-icon-ring"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+          <h1 class="ws-hero-title ws-hero-title--shimmer">${esc(c.title || '')}</h1>
+          ${subEl}
+          ${bodyEl.replace('ws-hero-body', 'ws-hero-body ws-hero-lead')}
+        </div>
+      </div>`;
+  }
   if (shellMode && !editable) return bodyEl;
   const titleEl = editable
     ? `<div class="canvas-editable pslide-hero-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
@@ -3005,6 +3026,87 @@ function renderHeroSlideHtml(c, editable = false, opts = {}) {
       ${titleEl}
       ${bodyEl}
     </div>`;
+}
+
+function stopHeroAiFx() {
+  if (State.heroAiRaf) {
+    cancelAnimationFrame(State.heroAiRaf);
+    State.heroAiRaf = 0;
+  }
+}
+
+function initHeroAiFx(stage) {
+  stopHeroAiFx();
+  const wrap = stage?.querySelector('.ws-hero-stage');
+  const canvas = wrap?.querySelector('.ws-hero-ai-canvas');
+  if (!wrap || !canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const particles = [];
+  const links = [];
+  const resize = () => {
+    const rect = wrap.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${rect.height}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!particles.length) {
+      const count = Math.min(48, Math.max(22, Math.floor(rect.width / 28)));
+      for (let i = 0; i < count; i += 1) {
+        particles.push({
+          x: Math.random() * rect.width,
+          y: Math.random() * rect.height,
+          vx: (Math.random() - 0.5) * 0.35,
+          vy: (Math.random() - 0.5) * 0.35,
+          r: 1.2 + Math.random() * 2.2,
+          a: 0.18 + Math.random() * 0.45,
+        });
+      }
+    }
+  };
+  resize();
+  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null;
+  ro?.observe(wrap);
+  const tick = () => {
+    const w = wrap.clientWidth;
+    const h = wrap.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+    particles.forEach((p) => {
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < 0 || p.x > w) p.vx *= -1;
+      if (p.y < 0 || p.y > h) p.vy *= -1;
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(32,110,251,${p.a})`;
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    for (let i = 0; i < particles.length; i += 1) {
+      for (let j = i + 1; j < particles.length; j += 1) {
+        const a = particles[i];
+        const b = particles[j];
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 110) {
+          ctx.strokeStyle = `rgba(32,110,251,${(1 - dist / 110) * 0.14})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        }
+      }
+    }
+    State.heroAiRaf = requestAnimationFrame(tick);
+  };
+  State.heroAiRaf = requestAnimationFrame(tick);
+  wrap._heroAiCleanup = () => {
+    stopHeroAiFx();
+    ro?.disconnect();
+  };
 }
 
 function renderPresentParticipants() {
@@ -4062,15 +4164,15 @@ function renderAllTracksUseCasesWithAuthors(timerSec = 120) {
         n += 1;
         const author = (State.participants || []).find((x) => x.id === item.participant_id);
         const authorName = author?.display_name || item.authorName || '–';
-        html += `<div class="ws-row">
+        html += `<div class="ws-row" data-pitch-row="${esc(item.id)}">
           <span class="ws-c-rank">${n}</span>
           <span class="ws-c-uc">
             <span class="ws-uc-text">${esc(item.text)}</span>
             <span class="ws-uc-meta"><span class="ws-uc-track">${esc(trk.trackLabel)}</span>${p.phase && p.phase !== trk.trackLabel ? `<span class="ws-uc-phase">${esc(p.phase)}</span>` : ''}</span>
           </span>
           <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
-          <span class="ws-c-action ws-timer" data-total="${timerSec}">
-            <span class="ws-time">${pitchFmt(timerSec)}</span>
+          <span class="ws-c-action ws-timer" data-pitch-key="${esc(item.id)}" data-total="${timerSec}">
+            <span class="ws-time" aria-live="polite">${pitchFmt(getPitchTimerRemaining(item.id, timerSec))}</span>
             <button type="button" class="ws-timer-btn" data-pitch-toggle aria-label="Pitch-Timer starten / stoppen"><i class="fa-solid fa-play"></i></button>
           </span>
         </div>`;
@@ -4081,40 +4183,116 @@ function renderAllTracksUseCasesWithAuthors(timerSec = 120) {
   return html;
 }
 
-// Bindet pro Use Case einen eigenen Start/Stop-Countdown (kein globaler Timer).
+function getPitchTimerRemaining(key, total) {
+  const st = State.pitchTimers?.[key];
+  if (!st) return total;
+  return Math.max(0, st.remaining ?? total);
+}
+
+function syncPitchTimerIntervals() {
+  Object.values(State.pitchTimers || {}).forEach((st) => {
+    if (st.interval) {
+      clearInterval(st.interval);
+      st.interval = null;
+    }
+  });
+}
+
+// Bindet pro Use Case einen eigenen Start/Stop-Countdown (überlebt Present-Re-Renders).
 function bindPitchTimers(stage) {
-  const timers = stage?.querySelectorAll('.ws-timer[data-total]');
-  if (!timers || !timers.length) return;
+  if (!State.pitchTimers) State.pitchTimers = {};
+  const timers = stage?.querySelectorAll('.ws-timer[data-pitch-key]');
+  if (!timers?.length) return;
+  syncPitchTimerIntervals();
   timers.forEach((timerEl) => {
+    const key = timerEl.dataset.pitchKey;
     const total = parseInt(timerEl.dataset.total, 10) || 120;
     const timeEl = timerEl.querySelector('.ws-time');
     const btn = timerEl.querySelector('[data-pitch-toggle]');
-    if (!btn || !timeEl) return;
-    let remaining = total;
-    let interval = null;
+    if (!key || !timeEl || !btn) return;
+    let st = State.pitchTimers[key];
+    if (!st || st.total !== total) {
+      st = { remaining: total, running: false, total, interval: null };
+      State.pitchTimers[key] = st;
+    }
     const setIcon = (name) => { btn.innerHTML = `<i class="fa-solid ${name}"></i>`; };
-    const halt = () => {
-      clearInterval(interval); interval = null;
-      timerEl.classList.remove('is-running');
-      setIcon(remaining <= 0 ? 'fa-rotate-left' : 'fa-play');
+    const paint = () => {
+      timeEl.textContent = pitchFmt(Math.max(0, st.remaining));
+      timerEl.classList.toggle('is-running', !!st.running);
+      timerEl.classList.toggle('is-done', st.remaining <= 0 && !st.running);
+      setIcon(st.running ? 'fa-stop' : (st.remaining <= 0 ? 'fa-rotate-left' : 'fa-play'));
     };
-    btn.addEventListener('click', () => {
-      if (interval) { halt(); return; }            // läuft → stoppen
-      if (remaining <= 0) { remaining = total; timerEl.classList.remove('is-done'); } // abgelaufen → reset & neu
-      timerEl.classList.add('is-running');
-      setIcon('fa-stop');
-      interval = setInterval(() => {
-        remaining -= 1;
-        timeEl.textContent = pitchFmt(remaining);
-        if (remaining <= 0) {
-          clearInterval(interval); interval = null;
-          timerEl.classList.remove('is-running');
+    const halt = () => {
+      if (st.interval) { clearInterval(st.interval); st.interval = null; }
+      st.running = false;
+      paint();
+    };
+    const start = () => {
+      if (st.remaining <= 0) {
+        st.remaining = total;
+        timerEl.classList.remove('is-done');
+      }
+      st.running = true;
+      paint();
+      st.interval = setInterval(() => {
+        st.remaining -= 1;
+        timeEl.textContent = pitchFmt(Math.max(0, st.remaining));
+        if (st.remaining <= 0) {
+          halt();
           timerEl.classList.add('is-done');
           setIcon('fa-rotate-left');
         }
       }, 1000);
+    };
+    btn.onclick = () => {
+      if (st.running) halt();
+      else start();
+    };
+    if (st.running && !st.interval) {
+      st.interval = setInterval(() => {
+        st.remaining -= 1;
+        timeEl.textContent = pitchFmt(Math.max(0, st.remaining));
+        if (st.remaining <= 0) {
+          halt();
+          timerEl.classList.add('is-done');
+          setIcon('fa-rotate-left');
+        }
+      }, 1000);
+    }
+  });
+}
+
+function renderParticipantPitchHtml() {
+  const { byTrack } = aggregateAllTracksUseCases();
+  if (!byTrack.length) {
+    return `<div class="participant-pitch-empty"><p>Noch keine Use Cases gesammelt.</p></div>`;
+  }
+  let n = 0;
+  let cards = '';
+  byTrack.forEach((trk) => {
+    trk.phases.forEach((p) => {
+      p.items.forEach((item) => {
+        n += 1;
+        const author = (State.participants || []).find((x) => x.id === item.participant_id);
+        const authorName = author?.display_name || item.authorName || 'Unbekannt';
+        cards += `<article class="participant-pitch-card">
+          <div class="participant-pitch-card-head">
+            <span class="participant-pitch-num">${n}</span>
+            <span class="participant-pitch-track">${esc(trk.trackLabel)}</span>
+          </div>
+          <p class="participant-pitch-text">${esc(item.text)}</p>
+          <div class="participant-pitch-author">
+            ${author ? participantAvatarHtml(author, 'sm') : '<span class="participant-pitch-avatar-fallback"><i class="fa-solid fa-user"></i></span>'}
+            <span>Eingebracht von <strong>${esc(authorName)}</strong></span>
+          </div>
+        </article>`;
+      });
     });
   });
+  return `<div class="participant-pitch-list">
+    <p class="participant-pitch-hint"><i class="fa-solid fa-person-chalkboard"></i> Pitch Session — wer pitcht welchen Use Case?</p>
+    ${cards}
+  </div>`;
 }
 
 // Split-View: beide SOPs nebeneinander auf Track-Intro + Brainstorm bis zur Gesamt-Priorisierung.
@@ -4150,6 +4328,8 @@ function finalizePresentUi(slide) {
   maybeLaunchResultsConfetti(slide);
   bindPitchTimers($('#present-stage'));
   bindPresentParticipantAssign();
+  if (slide?.content?.isHeroSlide) initHeroAiFx($('#present-stage'));
+  else stopHeroAiFx();
 }
 
 async function deleteSlide(id) {
@@ -5475,12 +5655,49 @@ window.LP_resetDebug = function () {
 
 function applySessionPatch(patch) {
   if (!State.session) return;
+  const prevAssign = State.participant?.id
+    ? State.session.settings?.dualSopAssignments?.[State.participant.id]
+    : null;
   // Presenter→Teilnehmer: aufgelöste Matrix-Items übernehmen
   if (patch && patch.matrixItems && typeof patch.matrixItems === 'object') {
     State.matrixItemsBySlide = { ...(State.matrixItemsBySlide || {}), ...patch.matrixItems };
   }
   const { matrixItems, ...rest } = patch || {};
   State.session = { ...State.session, ...rest };
+  const newAssign = State.participant?.id
+    ? State.session.settings?.dualSopAssignments?.[State.participant.id]
+    : null;
+  if (State.participant && newAssign && newAssign !== prevAssign && newAssign !== State.sopAssignSeen) {
+    State.sopAssignSeen = newAssign;
+    showSopAssignCelebration(newAssign);
+  }
+}
+
+function showSopAssignCelebration(group) {
+  const meta = getSopGroupMeta(group);
+  if (!meta) return;
+  document.querySelector('.sop-assign-celebration')?.remove();
+  const el = document.createElement('div');
+  el.className = `sop-assign-celebration sop-assign-celebration--${group}`;
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-live', 'polite');
+  el.innerHTML = `
+    <div class="sop-assign-celebration-card">
+      <div class="sop-assign-celebration-icon"><i class="fa-solid ${meta.icon}"></i></div>
+      <p class="sop-assign-celebration-kicker">Du bist dabei!</p>
+      <h2 class="sop-assign-celebration-title">${esc(meta.label)}</h2>
+      <p class="sop-assign-celebration-text">Der Host hat dich diesem SOP zugewiesen. Ab jetzt siehst du nur deine Tracks — bis Pitch, Priorisierung und Matrix gemeinsam laufen.</p>
+      <button type="button" class="sop-assign-celebration-close">Los geht's</button>
+    </div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('is-visible'));
+  launchResultsConfetti(2600);
+  const close = () => {
+    el.classList.remove('is-visible');
+    setTimeout(() => el.remove(), 350);
+  };
+  el.querySelector('.sop-assign-celebration-close')?.addEventListener('click', close);
+  setTimeout(close, 5200);
 }
 
 // Presenter: aufgelöste Matrix-Items an Teilnehmer broadcasten (nur bei Änderung)
@@ -5722,7 +5939,8 @@ function renderPresentNow() {
     }
   }
   const stage = $('#present-stage');
-  if (!slide) { stage.innerHTML = '<h1>Keine Folien</h1>'; stage.classList.remove('sop-split-stage'); return; }
+  if (!slide) { stage.innerHTML = '<h1>Keine Folien</h1>'; stage.classList.remove('sop-split-stage', 'ws-hero-present-stage'); stopHeroAiFx(); return; }
+  stage.classList.toggle('ws-hero-present-stage', !!(slide.content?.isHeroSlide && isSopWorkshopPresentation()));
   const c = slide.content || {};
   // DEBUG-Simulator: bei jedem Slide-Wechsel die Antworten für diesen Slide
   // zeitversetzt drippen (nur einmal pro Slide via triggeredSlides-Set)
@@ -5860,9 +6078,15 @@ function renderPresentNow() {
   }
 
   if (isSopWorkshopPresentation() && slide.slide_type === 'content' && c.isHeroSlide && !isCardResultsSlide(slide)) {
-    mountPresentWsSlide(stage, slide, slideIdx, {
-      main: renderHeroSlideHtml(c, false, { shellMode: true }),
-    });
+    stage.classList.remove('sop-split-stage');
+    stage.dataset.splitOn = '';
+    stage.innerHTML = wrapSlide(renderHeroSlideHtml(c, false, { shellMode: true, presentFx: true }), slideIdx);
+    updatePresentHeader();
+    updatePresentStats();
+    renderPresentParticipants();
+    void renderQrCode();
+    syncSopWorkshopShell('present', slideIdx);
+    finalizePresentUi(slide);
     return;
   }
 
@@ -6270,6 +6494,7 @@ async function joinSession(code, name, emoji, color) {
   if (pErr) { toast(pErr.message, 'error'); return; }
   State.session = session;
   State.participant = part;
+  State.sopAssignSeen = getParticipantSopGroup(part.id);
   State.responses = [];
   loadAnsweredSlides(session.id);
   const { data: slides } = await sb.from('lp_slides').select('*').eq('presentation_id', session.presentation_id).order('sort_order');
@@ -6375,6 +6600,15 @@ async function renderParticipantQuestion() {
     finishParticipant();
     return;
   }
+  if (hostSlide?.content?.sopKind === 'pitch-session' || hostSlide?.settings?.sopPitchSession) {
+    root.innerHTML = wrapParticipantSlide(`
+      <div class="participant-wait-block participant-pitch-block">
+        ${renderParticipantPitchHtml()}
+        <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf die Pitch Session auf dem Beamer achten…</p>
+      </div>`, slideIndex);
+    finishParticipant();
+    return;
+  }
   if (hostSlide?.content?.sopKind === 'dual-pair-orient') {
     root.innerHTML = wrapParticipantSlide(`
       <div class="participant-wait-block ws-slide ws-slide--orient">
@@ -6396,7 +6630,9 @@ async function renderParticipantQuestion() {
       return;
     }
     if (slide.slide_type === 'content' && (slide.content?.isHeroSlide || slide.content?.sopKind || slide.content?.sopTrackResults || isSopCardResultsSlide(slide))) {
-      const html = slide.content.isHeroSlide ? renderHeroSlideHtml(slide.content) : (isSopCardResultsSlide(slide) ? '' : renderSopContentHtml(slide.content));
+      const html = slide.content.isHeroSlide
+        ? renderHeroSlideHtml(slide.content, false, { shellMode: true, presentFx: true })
+        : (isSopCardResultsSlide(slide) ? '' : renderSopContentHtml(slide.content));
       if (html || isSopCardResultsSlide(slide)) {
         root.innerHTML = wrapParticipantSlide(`
           <div class="participant-wait-block">${html || `<h1 class="pslide-q-title">${esc(slide.content?.title || 'Ergebnis')}</h1><p class="pslide-q-prompt">${esc(slide.content?.body || '')}</p>`}
