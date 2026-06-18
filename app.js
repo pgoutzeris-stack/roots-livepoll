@@ -3112,22 +3112,40 @@ function bindPitchTimers(stage) {
   });
 }
 
-// Speaker-Quick-Switch zwischen den beiden Abstimmungs-Slides (internal/consulting).
-function injectSopSwitchBar(slide) {
-  if (!slide?.settings?.sopAllTracksVote || !slide.content?.sopGroup) return;
-  const voteSlides = (State.slides || [])
+// Internal/Consulting-Switch — auf ALLEN SOP-Slides ab dem ersten SOP-Slide.
+// Dient zugleich als Badge (aktives Segment = aktueller SOP) und als Quick-Switch,
+// um beide Gruppen parallel zu brainstormen.
+function injectSopSwitchBar() {
+  const groupSlides = (State.slides || [])
     .map((s, i) => ({ s, i }))
-    .filter(({ s }) => s.settings?.sopAllTracksVote && s.content?.sopGroup);
-  if (voteSlides.length < 2) return;
+    .filter(({ s }) => s.content?.sopGroup === 'internal' || s.content?.sopGroup === 'consulting');
+  if (!groupSlides.length) return;
+  const groups = ['internal', 'consulting'];
+  const present = new Set(groupSlides.map(({ s }) => s.content.sopGroup));
+  if (!groups.every((g) => present.has(g))) return; // nur im Dual-SOP-Workshop
+  const cur = State.session?.current_slide_index || 0;
+  const firstSopIdx = Math.min(...groupSlides.map(({ i }) => i));
+  if (cur < firstSopIdx) return; // Switch erst ab dem ersten SOP-Slide
   const stage = $('#present-stage');
   if (!stage || stage.querySelector('.sop-switch-bar')) return;
-  const cur = State.session?.current_slide_index || 0;
-  const btns = voteSlides.map(({ s, i }) =>
-    `<button type="button" class="sop-switch-btn${i === cur ? ' is-active' : ''}" data-sop-switch-idx="${i}">${esc(s.content.sopGroupLabel || s.content.sopGroup)}</button>`
-  ).join('');
-  stage.insertAdjacentHTML('afterbegin', `<div class="sop-switch-bar" role="tablist" aria-label="Abstimmung wechseln"><span class="sop-switch-label">Abstimmung:</span>${btns}</div>`);
+  const labelFor = { internal: 'Internal SOP', consulting: 'Consulting SOP' };
+  const iconFor = { internal: 'fa-building', consulting: 'fa-handshake' };
+  // Sprungziel: erstes Brainstorm der Gruppe (sonst erster Slide der Gruppe).
+  const jumpIdx = (g) => {
+    const brain = groupSlides.find(({ s }) => s.content.sopGroup === g && s.slide_type === 'brainstorm');
+    if (brain) return brain.i;
+    const any = groupSlides.find(({ s }) => s.content.sopGroup === g);
+    return any ? any.i : -1;
+  };
+  const curGroup = State.slides[cur]?.content?.sopGroup || null;
+  const btns = groups.map((g) => {
+    const target = jumpIdx(g);
+    const active = curGroup === g;
+    return `<button type="button" class="sop-switch-btn${active ? ' is-active' : ''}" data-sop-switch-idx="${target}" aria-pressed="${active}"><i class="fa-solid ${iconFor[g]}"></i> ${esc(labelFor[g])}</button>`;
+  }).join('');
+  stage.insertAdjacentHTML('afterbegin', `<div class="sop-switch-bar" role="tablist" aria-label="SOP wechseln"><span class="sop-switch-label">SOP:</span>${btns}</div>`);
   stage.querySelectorAll('.sop-switch-bar .sop-switch-btn').forEach((b) => {
-    b.onclick = () => { const idx = Number(b.dataset.sopSwitchIdx); if (Number.isFinite(idx)) goToSlide(idx); };
+    b.onclick = () => { const idx = Number(b.dataset.sopSwitchIdx); if (Number.isFinite(idx) && idx >= 0) goToSlide(idx); };
   });
 }
 
@@ -3136,7 +3154,7 @@ function finalizePresentUi(slide) {
   bindResultsDisplayToggle($('#present-stage'));
   maybeLaunchResultsConfetti(slide);
   bindPitchTimers($('#present-stage'));
-  injectSopSwitchBar(slide);
+  injectSopSwitchBar();
 }
 
 async function deleteSlide(id) {

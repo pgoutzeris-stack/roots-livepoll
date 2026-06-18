@@ -964,20 +964,18 @@ function buildMarketingSopWorkshopSlides() {
 function buildDualSopWorkshopSlides() {
   const slides = [];
 
-  // Inline-Helfer: getrennte Priorisierungs-Abstimmung pro SOP-Gruppe.
-  function groupVote(group, label) {
+  // EINE gemeinsame Priorisierung über BEIDE SOPs (kein sopGroup → alle Tracks beider SOPs).
+  function combinedVote() {
     const n = (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
     return tplSlide('mc_multi', {
-      title: `Priorisierung · ${label} SOP`,
-      subtitle: `Wählt die Top ${n} Use Cases der ${label}-SOP`,
-      prompt: `Welche ${n} Use Cases haben den größten Hebel?`,
+      title: 'Gesamt-Priorisierung · beide SOPs',
+      subtitle: `Wählt die Top ${n} KI Use Cases aus Internal + Consulting`,
+      prompt: `Welche ${n} Use Cases haben über beide SOPs hinweg den größten Hebel für ROOTS?`,
       isQuestionSlide: true,
       options: [],
       maxSelections: n,
-      sopGroup: group,
-      sopGroupLabel: label,
       sopKind: 'group-vote',
-    }, { showResultsLive: true, sopAllTracksVote: true, sopGroup: group, sopVoteMax: n, workshopMode: 'decide' });
+    }, { showResultsLive: true, sopAllTracksVote: true, sopVoteMax: n, workshopMode: 'decide' });
   }
 
   // 1. Opener (Join)
@@ -1002,18 +1000,27 @@ function buildDualSopWorkshopSlides() {
   }, { workshopMode: 'orient' }));
 
   // 5. INTERNAL zuerst: Track-Intro + Track-Brainstorm (Gruppe internal)
+  //    sopGroup auf ALLEN Slides der Gruppe → Switch/Badge funktioniert durchgehend.
   INTERNAL_SOP_TRACKS.forEach((t, i) => {
-    slides.push(sopTrackIntro(t, i));
+    const intro = sopTrackIntro(t, i);
+    intro.content.sopGroup = 'internal';
+    intro.content.sopGroupLabel = 'Internal SOP';
+    slides.push(intro);
     const s = sopTrackBrainstorm(t);
     s.content.sopGroup = 'internal';
+    s.content.sopGroupLabel = 'Internal SOP';
     slides.push(s);
   });
 
   // 6. CONSULTING danach: Track-Intro + Track-Brainstorm (Gruppe consulting)
   SOP_TOOL_TRACKS.forEach((t, i) => {
-    slides.push(sopTrackIntro(t, i));
+    const intro = sopTrackIntro(t, i);
+    intro.content.sopGroup = 'consulting';
+    intro.content.sopGroupLabel = 'Consulting SOP';
+    slides.push(intro);
     const s = sopTrackBrainstorm(t);
     s.content.sopGroup = 'consulting';
+    s.content.sopGroupLabel = 'Consulting SOP';
     slides.push(s);
   });
 
@@ -1027,9 +1034,8 @@ function buildDualSopWorkshopSlides() {
     isHeroSlide: false,
   }, { workshopMode: 'orient' }));
 
-  // 8. + 9. Getrennte Priorisierung (Speaker-Switch) — Internal zuerst
-  slides.push(groupVote('internal', 'Internal'));
-  slides.push(groupVote('consulting', 'Consulting'));
+  // 8. EINE gemeinsame Priorisierung über beide SOPs (statt zwei getrennter Votes)
+  slides.push(combinedVote());
 
   // 10.–13. Pitch · gemeinsame ICE-Matrix · Next Steps · Abschluss
   slides.push(sopPitchSession());
@@ -1075,10 +1081,10 @@ window.LP_TEMPLATES = [
     key: 'roots-sop-dual-internal-consulting',
     category: 'ROOTS · SOP & KI',
     name: 'Internal + Consulting · Pro Track',
-    desc: 'Beide SOPs parallel sammeln · getrennt priorisieren (Speaker-Switch) · gemeinsame ICE-Matrix.',
+    desc: 'Erst interner SOP, dann Consulting · per Switch beide Gruppen parallel brainstormen · EINE gemeinsame Priorisierung beider SOPs · gemeinsame ICE-Matrix.',
     duration: '90–120 Min.',
     group: '5–25',
-    tips: 'Zwei Teams parallel. Speaker wechselt zwischen den beiden Abstimmungen. Eine kombinierte Matrix.',
+    tips: 'Internal zuerst. Über den Internal/Consulting-Switch oben kann der Speaker jederzeit zwischen den beiden SOPs wechseln (parallel brainstormen). Priorisiert wird einmal gemeinsam über beide SOPs.',
     slides: buildDualSopWorkshopSlides(),
   },
 ];
