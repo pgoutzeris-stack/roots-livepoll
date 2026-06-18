@@ -572,7 +572,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 
 /* Kompaktes sopBoard innerhalb Brainstorm-Collect-Slides */
 .workshop-collect-board{margin:.65rem 0 .55rem;opacity:.9}
-.workshop-collect-board .sop-board-preview{margin-top:0;box-shadow:none;border:1px solid var(--line);border-radius:12px}
+.workshop-collect-board .sop-board-preview{margin-top:0;box-shadow:none;border:none;border-radius:0;background:transparent}
 .workshop-collect-board .sop-board-track-header{display:none}
 .workshop-collect-board .sop-board-phases-row{padding:.6rem;gap:.5rem}
 .workshop-collect-board .sop-board-phase{min-width:160px}
@@ -1816,7 +1816,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-sop-workshop.present-mode .present-stage h1{margin-bottom:0}
 .lp-sop-workshop.present-mode .pslide-slide{
   width:100%;
-  max-width:var(--lp-stage-max-w);
+  max-width:min(1240px,96vw);
   margin:0 auto;
   padding:0;
   min-height:0;
@@ -1825,7 +1825,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 .lp-dual-sop-workshop.present-mode.dual-sop-wide-stage .pslide-slide,
 .lp-sop-workshop.present-mode.sop-single-sop-stage .pslide-slide{
-  max-width:var(--lp-stage-max-w);
+  max-width:min(1240px,96vw);
 }
 .lp-sop-workshop.present-mode .pslide-slide-content,
 .lp-sop-workshop.present-mode .pslide-slide-content--ws{
@@ -1928,12 +1928,37 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   margin-left:0!important;
   margin-right:0!important;
 }
-/* SOP-Board — Original-Kacheln, gleich groß & aligned im Present-Modus */
-.lp-sop-workshop.present-mode .sop-board-preview{
+/* SOP-Board — Present: flat (keine zweite Karte; sop-split-col reicht) */
+.lp-sop-workshop.present-mode .sop-board-preview,
+.lp-sop-workshop.present-mode .workshop-collect-board .sop-board-preview,
+.lp-sop-workshop.present-mode .sop-board-autoscroll .sop-board-preview{
   margin-top:0;
-  border-radius:14px;
+  border:none;
+  border-radius:0;
   box-shadow:none;
-  background:var(--bg);
+  background:transparent;
+  overflow:visible;
+}
+.lp-sop-workshop.present-mode .sop-board-phase,
+.lp-sop-workshop.present-mode .sop-board-phase.active{
+  background:transparent;
+  border:none;
+  border-radius:0;
+  padding:0;
+  box-shadow:none;
+}
+.lp-sop-workshop.present-mode .workshop-collect-board{
+  margin:.35rem 0 0;
+  opacity:1;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+}
+.lp-sop-workshop.present-mode .sop-board-preview--no-header .sop-board-phases-row,
+.lp-sop-workshop.present-mode .workshop-collect-board .sop-board-phases-row,
+.lp-sop-workshop.present-mode .sop-pslide-section--shell .sop-board-phases-row{
+  padding-left:0;
+  padding-right:0;
 }
 .lp-sop-workshop.present-mode .sop-board-phases-row{
   display:grid;
@@ -2009,7 +2034,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   padding:clamp(.4rem,.9vw,.65rem) clamp(.4rem,1.1vw,.85rem) 4.75rem;
 }
 .lp-sop-workshop.present-mode.sop-split-stage .pslide-slide{
-  max-width:var(--lp-stage-max-w);
+  max-width:min(1240px,96vw);
 }
 .lp-sop-workshop.present-mode.sop-split-stage .ws-slide{
   min-height:min(calc(100vh - 6rem),920px);
@@ -2180,7 +2205,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   flex:1;
   align-items:stretch;
   min-height:min(48vh,540px);
-  padding:clamp(.75rem,1.4vw,1rem);
+  padding:clamp(.65rem,1.2vw,.85rem) 0 0;
   gap:clamp(.8rem,1.5vw,1.05rem);
 }
 .lp-sop-workshop.present-mode.sop-split-stage .ws-split-collect-viz{
@@ -2349,7 +2374,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-dual-sop-workshop.present-mode.dual-sop-wide-stage .pslide-slide,
 .lp-dual-sop-workshop.present-mode.sop-split-stage .pslide-slide,
 .lp-dual-sop-workshop.present-mode.sop-single-sop-stage .pslide-slide{
-  max-width:var(--lp-stage-max-w);
+  max-width:min(1240px,96vw);
 }
 .lp-dual-sop-workshop.present-mode .sop-split-grid{
   max-width:none;
@@ -2373,8 +2398,10 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-dual-sop-workshop.present-mode.sop-single-sop-stage .ws-body-inner,
 .lp-dual-sop-workshop.present-mode.sop-single-sop-stage .viz-wrap,
 .lp-dual-sop-workshop.present-mode.sop-single-sop-stage .ws-lead{
-  max-width:none;
+  max-width:100%;
   width:100%;
+  min-width:0;
+  box-sizing:border-box;
 }
 .lp-dual-sop-workshop.present-mode.sop-single-sop-stage .ws-slide,
 .lp-dual-sop-workshop.present-mode.sop-split-stage .ws-slide{
@@ -3052,13 +3079,19 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   width:24px;
   background:var(--brand);
 }
+/* Present: Sammel-Folien — gleiche Breite wie Orient/WS-Shell (kein Breakout) */
+.lp-sop-workshop.present-mode .workshop-collect-shell,
 .lp-sop-workshop.present-mode .workshop-collect-board,
-.lp-sop-workshop.present-mode .workshop-collect-board .sop-board-autoscroll,
-.lp-sop-workshop.present-mode .workshop-collect-board .sop-board-preview,
-.lp-sop-workshop.present-mode .ws-split-sop-board .sop-board-autoscroll,
-.lp-sop-workshop.present-mode .ws-orient-col--split-present .sop-board-autoscroll{
+.lp-sop-workshop.present-mode .sop-board-autoscroll,
+.lp-sop-workshop.present-mode .ws-collect-prompt-bar{
   width:100%;
-  max-width:none;
+  max-width:100%;
+  min-width:0;
+  box-sizing:border-box;
+}
+.lp-sop-workshop.present-mode .ws-body:has(.workshop-collect-shell),
+.lp-sop-workshop.present-mode .ws-body:has(.sop-split-slides){
+  overflow-x:clip;
 }
 .lp-sop-workshop.present-mode .ws-split-sop-board .sop-board-autoscroll,
 .lp-sop-workshop.present-mode.sop-split-stage .ws-orient-col--split-present .sop-board-autoscroll,
