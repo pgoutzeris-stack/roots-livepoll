@@ -1484,35 +1484,264 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-sop-workshop .present-stage .viz-wrap-present{margin-top:.5rem}
 .lp-sop-workshop .present-stage .finale-vote{margin-top:.25rem}
 
-/* ═══════ Matrix-Frame v2 · Achsen + bold Quadranten ═══════ */
-.lp-mx-frame{width:100%;max-width:1100px;margin:0 auto}
-.lp-mx-frame-layout{display:grid;grid-template-columns:2.4rem 1fr;gap:.55rem .65rem;align-items:stretch}
-.lp-mx-axis-col{display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:.35rem 0;min-height:100%}
-.lp-mx-axis-row{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding-top:.45rem;margin-top:.15rem;border-top:2px solid var(--line)}
-.lp-mx-axis-name{font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:var(--ink);text-align:center;line-height:1.2}
-.lp-mx-axis-tag{display:inline-flex;align-items:center;gap:.25rem;font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);white-space:nowrap}
-.lp-mx-axis-tag--high{color:var(--brand)}
-.lp-mx-axis-tag i{font-size:.55rem}
-.lp-mx-quad-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8px;min-height:min(42vh,380px)}
-.lp-mx-quad,.lp-matrix-result-cell.lp-mx-quad{border:2px solid var(--line);border-radius:16px;padding:.75rem;display:flex;flex-direction:column;gap:.45rem;min-height:130px;background:var(--bg);transition:box-shadow .2s,transform .2s}
-.lp-mx-quad-head,.lp-matrix-result-cell .lp-mx-quad-head{display:flex;align-items:center;gap:.45rem;font-weight:800;font-size:.88rem;color:var(--ink)}
-.lp-mx-quad-ico,.lp-matrix-result-cell .lp-mx-quad-ico{width:30px;height:30px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-size:.82rem;color:#fff;flex-shrink:0}
+/* ═══════ Matrix-Frame v3 · Achsen mit Linien + Chart-Grid ═══════ */
+.lp-mx-frame{width:100%;max-width:min(1200px,100%);margin:0 auto}
+.lp-mx-chart{
+  display:grid;
+  grid-template-columns:minmax(3rem,auto) 1fr;
+  gap:clamp(.85rem,2vw,1.35rem);
+  align-items:stretch;
+  width:100%;
+}
+.lp-mx-axis--y{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:space-between;
+  padding:.15rem 0 3.35rem;
+  min-height:100%;
+}
+.lp-mx-axis-track{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+  min-height:0;
+  width:100%;
+}
+.lp-mx-axis-line--y{
+  position:absolute;
+  top:0;
+  bottom:0;
+  left:50%;
+  width:3px;
+  transform:translateX(-50%);
+  background:linear-gradient(180deg,var(--brand) 0%,var(--line) 52%,rgba(148,163,184,.55) 100%);
+  border-radius:999px;
+}
+.lp-mx-axis-label--y{
+  writing-mode:vertical-rl;
+  transform:rotate(180deg);
+  font-size:.78rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.14em;
+  color:var(--ink);
+  background:var(--bg);
+  padding:.4rem .2rem;
+  z-index:1;
+}
+.lp-mx-axis-tip{
+  display:inline-flex;
+  align-items:center;
+  gap:.3rem;
+  font-size:.72rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  color:var(--muted);
+  white-space:nowrap;
+}
+.lp-mx-axis-tip--high{color:var(--brand)}
+.lp-mx-axis-tip i{font-size:.62rem}
+.lp-mx-chart-body{
+  display:flex;
+  flex-direction:column;
+  gap:clamp(.75rem,1.6vw,1.1rem);
+  min-width:0;
+}
+.lp-mx-axis--x{
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  align-items:center;
+  gap:clamp(.65rem,1.8vw,1.15rem);
+  padding:0 .35rem;
+}
+.lp-mx-axis-track--x{
+  position:relative;
+  height:2.75rem;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.lp-mx-axis-line--x{
+  position:absolute;
+  left:0;
+  right:0;
+  top:50%;
+  height:3px;
+  transform:translateY(-50%);
+  background:linear-gradient(90deg,rgba(148,163,184,.55) 0%,var(--line) 48%,var(--brand) 100%);
+  border-radius:999px;
+}
+.lp-mx-axis-label--x{
+  font-size:.78rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.14em;
+  color:var(--ink);
+  background:var(--bg);
+  padding:0 .55rem;
+  z-index:1;
+}
+.lp-mx-quad-grid--chart{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  grid-template-rows:1fr 1fr;
+  min-height:min(58vh,560px);
+  gap:0;
+  border:2px solid var(--line);
+  border-radius:18px;
+  overflow:hidden;
+  background:
+    linear-gradient(var(--line) 0 0) calc(50% - .5px) 0 / 1px 100% no-repeat,
+    linear-gradient(var(--line) 0 0) 0 calc(50% - .5px) / 100% 1px no-repeat;
+}
+.lp-mx-quad-grid--chart .lp-mx-quad{
+  border:none;
+  border-radius:0;
+  box-shadow:none;
+  min-height:100%;
+  padding:clamp(1rem,2.2vw,1.45rem);
+  background:transparent;
+}
+.lp-mx-quad--goal .lp-mx-quad-body{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+  gap:.65rem;
+  min-height:0;
+}
+.lp-mx-quad-hint{
+  font-size:.88rem;
+  line-height:1.45;
+  color:var(--muted);
+  font-weight:500;
+}
+.lp-mx-qw-hero{
+  margin-top:auto;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:.75rem;
+  text-align:center;
+  padding-top:.35rem;
+}
+.lp-mx-qw-orbit{
+  position:relative;
+  width:5rem;
+  height:5rem;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.lp-mx-qw-orbit-ring{
+  position:absolute;
+  inset:0;
+  border:2px dashed rgba(16,185,129,.42);
+  border-radius:50%;
+  animation:lp-mx-orbit-spin 14s linear infinite;
+}
+.lp-mx-qw-orbit-glow{
+  position:absolute;
+  inset:18%;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(16,185,129,.22),transparent 70%);
+  animation:lp-mx-orbit-pulse 2.6s ease-in-out infinite;
+}
+.lp-mx-qw-orbit-icon{
+  position:relative;
+  z-index:1;
+  font-size:1.85rem;
+  color:#10b981;
+  filter:drop-shadow(0 6px 14px rgba(16,185,129,.35));
+  animation:lp-mx-rocket-float 2.8s ease-in-out infinite;
+}
+.lp-mx-qw-tagline{
+  margin:0;
+  font-size:.78rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:#10b981;
+}
+@keyframes lp-mx-orbit-spin{to{transform:rotate(360deg)}}
+@keyframes lp-mx-orbit-pulse{0%,100%{opacity:.55;transform:scale(.92)}50%{opacity:1;transform:scale(1.05)}}
+@keyframes lp-mx-rocket-float{0%,100%{transform:translateY(0) rotate(-10deg)}50%{transform:translateY(-10px) rotate(-4deg)}}
+.lp-mx-quad,.lp-matrix-result-cell.lp-mx-quad{
+  display:flex;
+  flex-direction:column;
+  gap:.55rem;
+  min-height:130px;
+  transition:background .2s,box-shadow .2s;
+}
+.lp-mx-quad-head,.lp-matrix-result-cell .lp-mx-quad-head{
+  display:flex;
+  align-items:center;
+  gap:.55rem;
+  font-weight:800;
+  font-size:clamp(.95rem,1.6vw,1.05rem);
+  color:var(--ink);
+}
+.lp-mx-quad-ico,.lp-matrix-result-cell .lp-mx-quad-ico{
+  width:34px;
+  height:34px;
+  border-radius:11px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:.88rem;
+  color:#fff;
+  flex-shrink:0;
+}
 .lp-q-qw .lp-mx-quad-ico,.lp-q-qw .lp-matrix-cell-ico{background:#10b981}
 .lp-q-sb .lp-mx-quad-ico,.lp-q-sb .lp-matrix-cell-ico{background:var(--brand)}
 .lp-q-ts .lp-mx-quad-ico,.lp-q-ts .lp-matrix-cell-ico{background:#64748b}
 .lp-q-dr .lp-mx-quad-ico,.lp-q-dr .lp-matrix-cell-ico{background:#dc2626}
-.lp-q-qw.lp-mx-quad,.lp-q-qw.lp-matrix-result-cell{border-color:rgba(16,185,129,.45);background:linear-gradient(165deg,rgba(16,185,129,.09),transparent 70%)}
-.lp-q-sb.lp-mx-quad,.lp-q-sb.lp-matrix-result-cell{border-color:rgba(32,110,251,.42);background:linear-gradient(165deg,rgba(32,110,251,.09),transparent 70%)}
-.lp-q-ts.lp-mx-quad,.lp-q-ts.lp-matrix-result-cell{border-color:rgba(100,116,139,.42);background:linear-gradient(165deg,rgba(100,116,139,.11),transparent 70%)}
-.lp-q-dr.lp-mx-quad,.lp-q-dr.lp-matrix-result-cell{border-color:rgba(220,38,38,.38);background:linear-gradient(165deg,rgba(220,38,38,.08),transparent 70%)}
-.lp-mx-quad-body,.lp-mx-quad .lp-mx-cell-items{flex:1;min-height:48px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;max-height:28vh}
-.lp-mx-frame-foot{display:flex;flex-wrap:wrap;justify-content:center;gap:.45rem;margin-top:.65rem;padding:.55rem;background:var(--surface);border-radius:12px}
+.lp-mx-quad-grid--chart .lp-q-qw{background:linear-gradient(145deg,rgba(16,185,129,.14),rgba(16,185,129,.04))}
+.lp-mx-quad-grid--chart .lp-q-sb{background:linear-gradient(145deg,rgba(32,110,251,.12),rgba(32,110,251,.03))}
+.lp-mx-quad-grid--chart .lp-q-ts{background:linear-gradient(145deg,rgba(100,116,139,.11),rgba(100,116,139,.03))}
+.lp-mx-quad-grid--chart .lp-q-dr{background:linear-gradient(145deg,rgba(220,38,38,.09),rgba(220,38,38,.02))}
+.lp-mx-quad-grid--chart .lp-mx-cell{
+  border:none;
+  border-radius:0;
+  background:transparent;
+}
+.lp-mx-quad-grid--chart .lp-mx-cell.lp-mx-drop-active{
+  box-shadow:inset 0 0 0 3px rgba(32,110,251,.28);
+  background:rgba(32,110,251,.06);
+}
+.lp-mx-quad-body,.lp-mx-quad .lp-mx-cell-items{
+  flex:1;
+  min-height:48px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  overflow-y:auto;
+  max-height:28vh;
+}
+.lp-mx-frame-foot{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:.45rem;
+  margin-top:.85rem;
+  padding:.55rem 0;
+}
 .lp-mx-instructions.ws-pill{margin-bottom:.25rem;font-size:.72rem;padding:.45rem .85rem}
 @media(max-width:760px){
-  .lp-mx-quad-grid{min-height:280px;gap:5px}
-  .lp-mx-quad,.lp-matrix-result-cell.lp-mx-quad{padding:.55rem;min-height:100px}
+  .lp-mx-chart{grid-template-columns:2.5rem 1fr;gap:.65rem}
+  .lp-mx-quad-grid--chart{min-height:min(52vh,420px)}
+  .lp-mx-quad-grid--chart .lp-mx-quad{padding:.75rem .85rem}
+  .lp-mx-axis-label--y,.lp-mx-axis-label--x{font-size:.66rem}
+  .lp-mx-axis-tip{font-size:.62rem}
+  .lp-mx-qw-orbit{width:4rem;height:4rem}
+  .lp-mx-qw-orbit-icon{font-size:1.45rem}
   .ws-title{font-size:1.55rem}
-  .lp-mx-axis-name{font-size:.62rem}
 }
 
 /* ═══════ WS-PRESENT v3 · State-of-the-art Workshop Slides ═══════ */
@@ -1548,11 +1777,11 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   flex-direction:column;
 }
 .lp-sop-workshop.present-mode .ws-slide{
-  background:var(--bg);
+  background:transparent;
   border:none;
-  border-radius:20px;
-  padding:clamp(1rem,2.2vw,1.55rem) clamp(1rem,2.4vw,1.75rem);
-  box-shadow:var(--shadow);
+  border-radius:0;
+  padding:clamp(.85rem,2vw,1.35rem) clamp(.85rem,2.4vw,1.75rem);
+  box-shadow:none;
   gap:clamp(.75rem,1.6vw,1rem);
   animation:none!important;
   opacity:1!important;
@@ -1635,36 +1864,32 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   margin-left:0!important;
   margin-right:0!important;
 }
-/* SOP-Board */
+/* SOP-Board — flat im Present-Modus */
 .lp-sop-workshop.present-mode .sop-board-preview{
   margin-top:0;
-  border-radius:14px;
+  border-radius:0;
   box-shadow:none;
-  background:var(--bg);
+  background:transparent;
 }
 .lp-sop-workshop.present-mode .sop-board-phases-row{
-  padding:.75rem;
-  gap:.65rem;
+  padding:.75rem 0;
+  gap:.85rem;
   scrollbar-width:thin;
 }
 .lp-sop-workshop.present-mode .sop-board-phase{
   min-width:min(200px,42vw);
 }
-.lp-sop-workshop.present-mode .sop-board-card{
-  font-size:.8rem;
-  padding:.48rem .58rem;
-  border-radius:16px;
-  border:none;
-  box-shadow:var(--shadow);
-}
+.lp-sop-workshop.present-mode .sop-board-card,
 .lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .sop-board-card,
 .lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .ws-orient-col--split-present .sop-board-card,
 .lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .workshop-collect-shell--split .sop-board-card{
-  font-size:1rem;
-  padding:.52rem .62rem;
-  border-radius:16px;
+  font-size:.82rem;
+  padding:.42rem 0;
+  border-radius:0;
   border:none;
-  box-shadow:var(--shadow);
+  border-bottom:1px solid rgba(148,163,184,.22);
+  box-shadow:none;
+  background:transparent;
 }
 .lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .ws-orient-col--split-present .sop-board-phase,
 .lp-sop-workshop.present-mode.sop-split-stage .ws-split-sop-board .sop-board-phase{min-width:min(240px,46vw)}
@@ -1690,8 +1915,13 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-sop-workshop.present-mode .sop-split-grid{gap:clamp(.65rem,1.4vw,.85rem)}
 .lp-sop-workshop.present-mode .sop-split-col{
   border:none;
-  border-radius:16px;
-  box-shadow:var(--shadow);
+  border-radius:0;
+  box-shadow:none;
+  background:transparent;
+}
+.lp-sop-workshop.present-mode .sop-split-col-head{
+  background:transparent;
+  border-bottom:1px solid var(--line);
 }
 .lp-sop-workshop.present-mode .sop-split-col-body{padding:clamp(.75rem,1.5vw,1rem)}
 .lp-sop-workshop.present-mode.sop-split-stage .ws-title,
@@ -1712,57 +1942,62 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-sop-workshop.present-mode.sop-split-stage .sop-split-slides .workshop-collect-shell--split .sop-board-phase-label{
   font-size:.72rem;
 }
-/* Inhalts-Module innerhalb ws-body */
+/* Inhalts-Module innerhalb ws-body — flat, ohne Karten-Boxen */
+.lp-sop-workshop.present-mode .ws-body .ws-goal-copy{
+  font-size:clamp(1rem,1.85vw,1.18rem);
+  line-height:1.65;
+  color:var(--muted);
+  max-width:52rem;
+  margin:0 0 clamp(1.25rem,2.5vw,1.75rem);
+  text-align:left;
+}
+.lp-sop-workshop.present-mode .ws-body .ws-goal-copy p{margin:0 0 .85rem}
+.lp-sop-workshop.present-mode .ws-body .ws-goal-copy p:last-child{margin-bottom:0}
 .lp-sop-workshop.present-mode .ws-body .ws-hero-body{
   font-size:.98rem;
   line-height:1.65;
   color:var(--ink);
-  padding:1rem 1.15rem;
-  background:var(--bg);
-  border:1px solid var(--line);
-  border-radius:14px;
-  border-left:4px solid var(--brand);
+  padding:0;
+  background:transparent;
+  border:none;
+  border-radius:0;
 }
 .lp-sop-workshop.present-mode .ws-body .workshop-instructions-card{
   max-width:none;
   margin:0;
-  padding:1rem 1.1rem;
-  background:var(--bg);
-  border:1px solid var(--line);
-  border-radius:14px;
+  padding:0;
+  background:transparent;
+  border:none;
+  border-radius:0;
 }
 .lp-sop-workshop.present-mode .ws-body .goal-matrix{
-  max-width:min(1100px,100%);
-  margin:0 auto;
+  max-width:min(1200px,100%);
+  margin:0;
 }
 .lp-sop-workshop.present-mode .ws-sop-main--goal{
-  align-items:center;
+  align-items:stretch;
   width:100%;
+  gap:clamp(1rem,2vw,1.5rem);
 }
-.lp-sop-workshop.present-mode .ws-sop-main--goal .ws-hero-body--goal{
-  width:100%;
+.lp-sop-workshop.present-mode .ws-sop-main--goal .ws-goal-copy{
   max-width:52rem;
-  text-align:left;
 }
-.lp-sop-workshop.present-mode .ws-matrix-stage{
+.lp-sop-workshop.present-mode .ws-matrix-stage,
+.lp-sop-workshop.present-mode .ws-matrix-stage--goal{
   width:100%;
   display:flex;
-  justify-content:center;
+  justify-content:flex-start;
   align-items:stretch;
 }
 .lp-sop-workshop.present-mode .ws-matrix-stage .lp-mx-frame,
 .lp-sop-workshop.present-mode .ws-sop-main--goal .lp-mx-frame{
-  max-width:min(1100px,96vw);
-  margin:0 auto;
+  max-width:min(1200px,100%);
+  margin:0;
   width:100%;
 }
-.lp-sop-workshop.present-mode .ws-matrix-stage .lp-mx-quad-grid,
-.lp-sop-workshop.present-mode .ws-sop-main--goal .lp-mx-quad-grid{
-  min-height:min(50vh,460px);
-}
-.lp-sop-workshop.present-mode .ws-matrix-stage .lp-mx-frame-layout,
-.lp-sop-workshop.present-mode .ws-sop-main--goal .lp-mx-frame-layout{
-  grid-template-columns:3rem 1fr;
+.lp-sop-workshop.present-mode .ws-matrix-stage .lp-mx-quad-grid--chart,
+.lp-sop-workshop.present-mode .ws-sop-main--goal .lp-mx-quad-grid--chart{
+  min-height:min(62vh,620px);
 }
 .lp-sop-workshop.present-mode .ws-sop-main--instructions{
   max-width:52rem;
@@ -1871,7 +2106,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   max-width:none;
   margin:0;
 }
-.lp-sop-workshop.present-mode .ws-body .lp-mx-quad-grid{min-height:min(50vh,460px)}
+.lp-sop-workshop.present-mode .ws-body .lp-mx-quad-grid--chart{min-height:min(58vh,540px)}
 .lp-sop-workshop.present-mode .ws-body .lp-mx-frame:not(.ws-matrix-stage .lp-mx-frame){
   max-width:min(1100px,96vw);
   margin:0 auto;
@@ -1910,9 +2145,9 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 @media (prefers-color-scheme:dark){
   .lp-sop-workshop.present-mode .ws-slide{
-    background:var(--bg);
-    box-shadow:var(--shadow);
+    background:transparent;
+    box-shadow:none;
   }
   .lp-sop-workshop.present-mode .ws-body .workshop-instructions-card,
-  .lp-sop-workshop.present-mode .ws-body .ws-hero-body{background:rgba(255,255,255,.03)}
+  .lp-sop-workshop.present-mode .ws-body .ws-hero-body{background:transparent}
 }

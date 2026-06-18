@@ -13,18 +13,24 @@
 
   function renderMatrixFrame({ yLabel, xLabel, gridHtml, footerHtml = '' }) {
     return `<div class="lp-mx-frame">
-      <div class="lp-mx-frame-layout">
-        <div class="lp-mx-axis-col">
-          <span class="lp-mx-axis-tag lp-mx-axis-tag--high"><i class="fa-solid fa-chevron-up"></i> hoch</span>
-          <span class="lp-mx-axis-name">${esc(yLabel || 'Impact')}</span>
-          <span class="lp-mx-axis-tag lp-mx-axis-tag--low"><i class="fa-solid fa-chevron-down"></i> niedrig</span>
-        </div>
-        <div class="lp-mx-frame-main">
-          <div class="lp-mx-quad-grid">${gridHtml}</div>
-          <div class="lp-mx-axis-row">
-            <span class="lp-mx-axis-tag lp-mx-axis-tag--low"><i class="fa-solid fa-chevron-left"></i> niedrig</span>
-            <span class="lp-mx-axis-name">${esc(xLabel || 'Aufwand')}</span>
-            <span class="lp-mx-axis-tag lp-mx-axis-tag--high">hoch <i class="fa-solid fa-chevron-right"></i></span>
+      <div class="lp-mx-chart">
+        <aside class="lp-mx-axis lp-mx-axis--y" aria-hidden="true">
+          <span class="lp-mx-axis-tip lp-mx-axis-tip--high"><i class="fa-solid fa-arrow-up"></i> hoch</span>
+          <div class="lp-mx-axis-track">
+            <div class="lp-mx-axis-line lp-mx-axis-line--y"></div>
+            <span class="lp-mx-axis-label lp-mx-axis-label--y">${esc(yLabel || 'Impact')}</span>
+          </div>
+          <span class="lp-mx-axis-tip lp-mx-axis-tip--low"><i class="fa-solid fa-arrow-down"></i> niedrig</span>
+        </aside>
+        <div class="lp-mx-chart-body">
+          <div class="lp-mx-quad-grid lp-mx-quad-grid--chart">${gridHtml}</div>
+          <div class="lp-mx-axis lp-mx-axis--x" aria-hidden="true">
+            <span class="lp-mx-axis-tip lp-mx-axis-tip--low"><i class="fa-solid fa-arrow-left"></i> niedrig</span>
+            <div class="lp-mx-axis-track lp-mx-axis-track--x">
+              <div class="lp-mx-axis-line lp-mx-axis-line--x"></div>
+              <span class="lp-mx-axis-label lp-mx-axis-label--x">${esc(xLabel || 'Aufwand')}</span>
+            </div>
+            <span class="lp-mx-axis-tip lp-mx-axis-tip--high">hoch <i class="fa-solid fa-arrow-right"></i></span>
           </div>
         </div>
       </div>
