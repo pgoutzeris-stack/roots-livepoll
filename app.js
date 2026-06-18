@@ -2451,7 +2451,7 @@ function getWsPresentChips(slide) {
     }
     chips.push(
       { icon: 'fa-clock', label: `${Math.round((slide.settings?.timeLimitSec || window.LP_WORKSHOP_SETTINGS?.brainstormTimeLimitSec || 300) / 60)} Min.` },
-      { icon: 'fa-hashtag', label: `max. ${window.LP_WORKSHOP_SETTINGS?.brainstormMaxResponses || 2} UC` },
+      { icon: 'fa-hashtag', label: `max. ${getCollectResponseLimit(slide)} UC` },
     );
   }
   if (c.sopKind === 'dual-pair-orient') {
@@ -3246,6 +3246,7 @@ function renderClosingSlideHtml(c, editable = false, opts = {}) {
         <canvas class="ws-closing-ai-canvas" aria-hidden="true"></canvas>
         <div class="ws-closing-sparkles" aria-hidden="true">
           <span></span><span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span><span></span>
         </div>
         <div class="ws-closing-glow ws-closing-glow--a" aria-hidden="true"></div>
         <div class="ws-closing-glow ws-closing-glow--b" aria-hidden="true"></div>
@@ -3296,16 +3297,16 @@ function initClosingAiFx(stage) {
     canvas.style.height = `${rect.height}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (!particles.length) {
-      const count = Math.min(36, Math.max(16, Math.floor(rect.width / 32)));
+      const count = Math.min(72, Math.max(32, Math.floor(rect.width / 18)));
       for (let i = 0; i < count; i += 1) {
         particles.push({
           x: Math.random() * rect.width,
           y: Math.random() * rect.height,
-          vx: (Math.random() - 0.5) * 0.28,
-          vy: 0.15 + Math.random() * 0.45,
-          r: 1.5 + Math.random() * 2.5,
+          vx: (Math.random() - 0.5) * 0.48,
+          vy: 0.28 + Math.random() * 0.72,
+          r: 2 + Math.random() * 3.8,
           color: colors[Math.floor(Math.random() * colors.length)],
-          a: 0.2 + Math.random() * 0.5,
+          a: 0.32 + Math.random() * 0.58,
         });
       }
     }
@@ -3406,15 +3407,15 @@ function initHeroAiFx(stage) {
     canvas.style.height = `${rect.height}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (!particles.length) {
-      const count = Math.min(48, Math.max(22, Math.floor(rect.width / 28)));
+      const count = Math.min(88, Math.max(42, Math.floor(rect.width / 16)));
       for (let i = 0; i < count; i += 1) {
         particles.push({
           x: Math.random() * rect.width,
           y: Math.random() * rect.height,
-          vx: (Math.random() - 0.5) * 0.35,
-          vy: (Math.random() - 0.5) * 0.35,
-          r: 1.2 + Math.random() * 2.2,
-          a: 0.18 + Math.random() * 0.45,
+          vx: (Math.random() - 0.5) * 0.62,
+          vy: (Math.random() - 0.5) * 0.62,
+          r: 1.6 + Math.random() * 3.4,
+          a: 0.28 + Math.random() * 0.55,
         });
       }
     }
@@ -3443,9 +3444,9 @@ function initHeroAiFx(stage) {
         const dx = a.x - b.x;
         const dy = a.y - b.y;
         const dist = Math.hypot(dx, dy);
-        if (dist < 110) {
-          ctx.strokeStyle = `rgba(32,110,251,${(1 - dist / 110) * 0.14})`;
-          ctx.lineWidth = 1;
+        if (dist < 140) {
+          ctx.strokeStyle = `rgba(32,110,251,${(1 - dist / 140) * 0.26})`;
+          ctx.lineWidth = 1.2;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           ctx.lineTo(b.x, b.y);
@@ -3971,6 +3972,7 @@ async function openEditor(id) {
   const { data: slides } = await sb.from('lp_slides').select('*').eq('presentation_id', id).order('sort_order');
   State.presentation = pres;
   State.slides = normalizeSlides(slides);
+  await stripWorkshopFeedbackSlides();
   State.resultsDisplayMode = getPresentationSettings().resultsDisplayMode || 'percent';
   State.selectedSlideId = State.slides[0]?.id || null;
   $('#editor-title').value = pres.title;
@@ -5106,7 +5108,7 @@ function renderEditorProps() {
     collectLimitsHtml = `
     <div class="props-section">Eingabe-Limits</div>
     <div class="props-row-2">
-      <div><div class="props-label">Max. Antworten / Person</div><input id="prop-max-responses" type="number" min="0" value="${Number(c.maxResponsesPerUser || 0)}" placeholder="0 = ∞" /></div>
+      <div><div class="props-label">Max. Antworten / Person</div><input id="prop-max-responses" type="number" min="0" value="${Number(c.maxResponsesPerUser || s.responseLimit || 0)}" placeholder="0 = ∞" /></div>
       <div><div class="props-label">Zeichenlimit</div><input id="prop-char-limit" type="number" min="0" value="${Number(c.charLimit || 0)}" placeholder="0 = aus" /></div>
     </div>
     <p class="props-hint"><i class="fa-solid fa-circle-info"></i> 0 = keine Begrenzung.</p>`;
@@ -5198,7 +5200,12 @@ function renderEditorProps() {
     }
     // ── Sammel-Limits (Brainstorm/Offen/Wortwolke) ──
     if (['brainstorm', 'open', 'wordcloud'].includes(slideObj.slide_type)) {
-      if ($('#prop-max-responses')) slideObj.content.maxResponsesPerUser = Number($('#prop-max-responses').value || 0);
+      const maxResponses = Number($('#prop-max-responses')?.value || 0);
+      slideObj.content.maxResponsesPerUser = maxResponses;
+      if (maxResponses > 0) {
+        slideObj.settings.responseLimit = maxResponses;
+        slideObj.settings.multipleResponses = maxResponses > 1;
+      }
       if ($('#prop-char-limit')) slideObj.content.charLimit = Number($('#prop-char-limit').value || 0);
     }
     // ── mc_multi/mc_single: Optionen aus Brainstorming importieren ──
@@ -5649,10 +5656,15 @@ const LP_DebugSim = {
         useCases = GENERIC_USE_CASES.slice(offset).concat(GENERIC_USE_CASES.slice(0, offset)).slice(0, 6);
       }
       const queue = [];
+      const perParticipantCount = new Map();
+      const responseLimit = getCollectResponseLimit(slide);
       useCases.forEach((text, i) => {
         const pIdx = i % defs.length;
         const fakeP = `debug-p-${pIdx}-${sessionId}`;
         const pDef = defs[pIdx] || {};
+        const sent = perParticipantCount.get(fakeP) || 0;
+        if (responseLimit > 0 && sent >= responseLimit) return;
+        perParticipantCount.set(fakeP, sent + 1);
         // Sicherstellen, dass der (simulierte) Autor in State.participants existiert —
         // sonst hätten Use Cases von noch nicht "beigetretenen" Teilnehmern keinen Autor.
         if (!State.participants.find((x) => x.id === fakeP)) {
@@ -6813,6 +6825,12 @@ function normalizeSlideRecord(slide) {
       }
     }
   }
+  const st = next.settings;
+  if (st && typeof st === 'object' && ['brainstorm', 'open', 'wordcloud'].includes(next.slide_type)) {
+    const fromContent = Number(next.content?.maxResponsesPerUser);
+    if ((!st.responseLimit || st.responseLimit <= 0) && fromContent > 0) st.responseLimit = fromContent;
+    if (st.responseLimit > 0 && st.multipleResponses == null) st.multipleResponses = st.responseLimit > 1;
+  }
   return next;
 }
 
@@ -6973,7 +6991,70 @@ async function loadQaResponses(slideId) {
   return (data || []).filter((r) => r.response?.text);
 }
 
+function getCollectResponseLimit(slide) {
+  if (!slide) return 1;
+  const st = slide.settings || {};
+  const c = slide.content || {};
+  const fromSettings = Number(st.responseLimit);
+  if (Number.isFinite(fromSettings) && fromSettings > 0) return Math.floor(fromSettings);
+  const fromContent = Number(c.maxResponsesPerUser);
+  if (Number.isFinite(fromContent) && fromContent > 0) return Math.floor(fromContent);
+  const wsDefault = Number(window.LP_WORKSHOP_SETTINGS?.brainstormMaxResponses);
+  return Number.isFinite(wsDefault) && wsDefault > 0 ? Math.floor(wsDefault) : 1;
+}
+
+function collectLimitLabel(limit) {
+  const n = Number(limit) || 1;
+  return n === 1 ? '1 Use Case' : `${n} Use Cases`;
+}
+
+function patchCollectPromptLimit(prompt, limit) {
+  const text = String(prompt || '');
+  const label = collectLimitLabel(limit);
+  if (/max\.\s*\d+/i.test(text)) {
+    return text.replace(/Max\.\s*\d+\s*(Use Cases?|UC)?(\s*pro (Person|Teilnehmer))?/gi, `Max. ${label} pro Person`);
+  }
+  if (!text.trim()) return `Max. ${label} pro Person.`;
+  const lines = text.split('\n');
+  lines.splice(1, 0, `Max. ${label} pro Person.`);
+  return lines.join('\n');
+}
+
+function countParticipantTextResponses(slideId, participantId) {
+  if (!slideId || !participantId) return 0;
+  return (State.responses || []).filter((r) => (
+    r.slide_id === slideId
+    && r.participant_id === participantId
+    && !r.is_hidden
+    && String(r.response?.text || '').trim()
+  )).length;
+}
+
+function isWorkshopFeedbackSlide(slide) {
+  if (!slide || slide.slide_type !== 'open' || !slide.settings?.anonymous) return false;
+  return /dein feedback/i.test(String(slide.content?.title || ''));
+}
+
+async function stripWorkshopFeedbackSlides() {
+  if (!State.presentation?.id || !isSopWorkshopPresentation()) return;
+  const toRemove = State.slides.filter(isWorkshopFeedbackSlide);
+  if (!toRemove.length) return;
+  for (const slide of toRemove) {
+    await sb.from('lp_slides').delete().eq('id', slide.id);
+  }
+  State.slides = State.slides.filter((s) => !isWorkshopFeedbackSlide(s));
+  State.slides.forEach((s, idx) => { s.sort_order = idx; });
+  await persistSlideOrder();
+}
+
 function hasAnsweredSlide(slide) {
+  const limit = getCollectResponseLimit(slide);
+  const isCollect = isBrainstormCollectSlide(slide)
+    || (COLLECT_CHAIN_TYPES.has(slide.slide_type) && limit > 0);
+  if (isCollect && limit > 0) {
+    const count = countParticipantTextResponses(slide.id, State.participant?.id);
+    return count >= limit;
+  }
   if (slide.settings?.multipleResponses) return false;
   return State.answeredSlides.has(slide.id);
 }
@@ -6984,6 +7065,9 @@ async function renderParticipantQuestion() {
   const slide = resolveParticipantSlide(hostSlide) || hostSlide;
   const isMatrixSlide = slide?.slide_type === 'priority_matrix' || slide?.settings?.sopAllTracksMatrix;
   if (isSopVoteSlide(slide) || isMatrixSlide) await ensureParticipantResponses(true);
+  if (isBrainstormCollectSlide(slide) || (COLLECT_CHAIN_TYPES.has(slide?.slide_type) && getCollectResponseLimit(slide) > 0)) {
+    await ensureParticipantResponses(true);
+  }
   const root = $('#participant-root');
   const finishParticipant = () => syncSopWorkshopShell('participant', slideIndex);
   if (!hostSlide?.settings?.sopTrackVote) State.participantVoteExpert = false;
@@ -7043,7 +7127,6 @@ async function renderParticipantQuestion() {
     root.innerHTML = wrapParticipantSlide(`
       <div class="participant-wait-block participant-closing-block">
         ${renderClosingSlideHtml(hostSlide.content || {}, false, { shellMode: true, presentFx: true })}
-        <p class="participant-sop-wait"><i class="fa-solid fa-comment"></i> Gleich folgt noch kurzes Feedback…</p>
       </div>`, slideIndex);
     maybeLaunchClosingCelebration(hostSlide);
     finishParticipant();
@@ -7101,6 +7184,12 @@ async function renderParticipantQuestion() {
   const c = slide.content || {};
   const type = slide.slide_type;
   const timeLimit = slide.settings?.timeLimitSec || 0;
+  const isCollectSlide = isBrainstormCollectSlide(slide);
+  const collectLimit = isCollectSlide ? getCollectResponseLimit(slide) : 0;
+  const collectSubmitted = isCollectSlide ? countParticipantTextResponses(slide.id, State.participant?.id) : 0;
+  const collectDisplayContent = isCollectSlide
+    ? { ...c, prompt: patchCollectPromptLimit(c.prompt, collectLimit) }
+    : c;
   let input = '';
 
   if (type === 'mc_single' || type === 'quiz' || type === 'yesno') {
@@ -7115,13 +7204,17 @@ async function renderParticipantQuestion() {
       input = `<div id="multi-wrap">${(c.options || []).map((o) => `<label class="props-check"><input type="checkbox" value="${esc(o.id)}"> ${esc(o.text)}</label>`).join('')}</div><button type="button" class="btn-primary participant-submit" id="submit-multi">Senden</button>`;
     }
   } else if (type === 'wordcloud' || type === 'open' || type === 'brainstorm') {
-    const isCollect = isBrainstormCollectSlide(slide);
+    const isCollect = isCollectSlide;
     const lim = Number(c.charLimit || 0);
     const maxAttr = lim > 0 ? ` maxlength="${lim}"` : '';
     const counter = lim > 0 ? `<div class="p-char-counter"><span id="p-char-n">0</span>/${lim}</div>` : '';
+    const collectCounter = isCollect && collectLimit > 0
+      ? `<div class="p-collect-counter" id="p-collect-counter">${collectSubmitted} / ${collectLimit} Use Cases</div>`
+      : '';
     if (isCollect) {
-      input = `<label class="join-label" for="p-text">Dein KI Use Case</label>
-        <textarea id="p-text" rows="4" class="participant-textarea participant-textarea-lg"${maxAttr} placeholder="${esc((c.prompt || '').split('\n')[0] || 'Use Case beschreiben…')}"></textarea>
+      input = `${collectCounter}
+        <label class="join-label" for="p-text">Dein KI Use Case${collectLimit > 1 ? ` (${collectSubmitted + 1} von ${collectLimit})` : ''}</label>
+        <textarea id="p-text" rows="4" class="participant-textarea participant-textarea-lg"${maxAttr} placeholder="${esc((collectDisplayContent.prompt || '').split('\n')[0] || 'Use Case beschreiben…')}"></textarea>
         ${counter}
         <button type="button" class="btn-primary participant-submit participant-submit-lg" id="submit-text">Use Case senden</button>`;
     } else {
@@ -7161,7 +7254,7 @@ async function renderParticipantQuestion() {
   }
 
   const isWorkshop = isSopWorkshopPresentation() || hasBrainstormChain(slide) || isBrainstormVoteSlide(slide) || isBrainstormResultsSlide(slide);
-  const isCollect = isBrainstormCollectSlide(slide);
+  const isCollect = isCollectSlide;
   const isDecide = shouldUseVoteWorkshopUi(slide);
   const assignedGroup = isDualSopWorkshop() ? getParticipantSopGroup(State.participant?.id) : null;
   const teamBadge = assignedGroup && isCollect
@@ -7181,7 +7274,7 @@ async function renderParticipantQuestion() {
         <div><div class="participant-meta">Code ${esc(State.session.code)}${slide.settings?.anonymous ? ' · Anonym' : ''}</div><div class="participant-you">${esc(State.participant?.display_name || '')}</div></div>
       </div>` : ''}
       ${teamBadge}
-      ${isCollect ? renderWorkshopCardCollectHtml(c) : ''}
+      ${isCollect ? renderWorkshopCardCollectHtml(collectDisplayContent) : ''}
       ${isDecide ? `<h1 class="pslide-q-title">${esc(c.title || 'Priorisierung')}</h1><p class="pslide-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>` : ''}
       ${!isCollect && !isDecide ? `<h1 class="pslide-q-title">${esc(c.title || c.prompt || 'Frage')}</h1>` : ''}
       ${!isCollect && !isDecide && c.prompt && c.title ? `<p class="pslide-q-prompt">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : ''}
@@ -7650,6 +7743,13 @@ function bindParticipantHandlers(slide) {
     if (!text && (slide.settings?.required || isCollect)) { toast(isCollect ? 'Bitte Idee eingeben' : 'Antwort erforderlich', 'warn'); return; }
     const lim = Number(slide.content?.charLimit || 0);
     if (lim > 0 && text.length > lim) { toast(`Maximal ${lim} Zeichen erlaubt`, 'warn'); return; }
+    if (isCollect) {
+      const maxUc = getCollectResponseLimit(slide);
+      if (maxUc > 0 && countParticipantTextResponses(slide.id, State.participant?.id) >= maxUc) {
+        toast(`Maximal ${maxUc} Use Case${maxUc === 1 ? '' : 's'} pro Runde`, 'warn');
+        return;
+      }
+    }
     submitResponse({ text, upvotes: 0 });
   });
   $('#submit-num')?.addEventListener('click', () => {
@@ -7706,6 +7806,16 @@ async function submitResponse(response) {
   }
   if (response.text) response.text = filterProfanity(response.text, slide.settings?.profanityFilter !== false);
 
+  const isCollectText = Boolean(response?.text) && isBrainstormCollectSlide(slide);
+  const collectLimit = isCollectText ? getCollectResponseLimit(slide) : 0;
+  if (isCollectText && collectLimit > 0) {
+    const existing = countParticipantTextResponses(slide.id, State.participant?.id);
+    if (existing >= collectLimit) {
+      toast(`Maximal ${collectLimit} Use Case${collectLimit === 1 ? '' : 's'} pro Runde`, 'warn');
+      return;
+    }
+  }
+
   // Quiz: Korrektheit + Punkte in die Antwort schreiben — das Leaderboard liest response.correct/score.
   if (slide.slide_type === 'quiz' && response && typeof response === 'object') {
     const correctId = (slide.content.options || []).find((o) => o.correct)?.id;
@@ -7744,6 +7854,13 @@ async function submitResponse(response) {
   }
 
   State._submitting = false;
+  const submittedCount = isCollectText ? countParticipantTextResponses(slide.id, State.participant?.id) : 0;
+  const canSubmitMore = isCollectText && collectLimit > 1 && submittedCount < collectLimit;
+  if (canSubmitMore) {
+    toast(`Use Case ${submittedCount}/${collectLimit} gespeichert — du kannst noch ${collectLimit - submittedCount} eingeben`, 'success');
+    void renderParticipantQuestion();
+    return;
+  }
   markAnswered(slide.id);
   const modMsg = slide.settings?.moderation ? 'Antwort zur Freigabe gesendet.' : 'Antwort gesendet.';
   $('#participant-root').innerHTML = `<div class="participant-card"><h1>Danke!</h1><p>${modMsg} Warte auf die nächste Frage…</p></div>`;

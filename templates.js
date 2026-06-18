@@ -634,7 +634,7 @@ function sopWorkshopNextSteps() {
 
 // ─── ABSCHLUSS-FOLIEN ──────────────────────────────────────────────────────────
 
-// Abschluss: eine Danke-Folie, danach anonymes Feedback. Bewusst ohne NPS.
+// Abschluss: Danke-Folie (ohne Feedback-Runde).
 function sopWorkshopClose() {
   return [
     tplSlide('content', {
@@ -643,11 +643,6 @@ function sopWorkshopClose() {
       isHeroSlide: true,
       sopKind: SK.WORKSHOP_CLOSE,
     }),
-    tplSlide('open', {
-      title: 'Dein Feedback',
-      prompt: 'Was nimmst du mit — und was sollten wir beim nächsten Workshop besser machen?',
-      subtitle: 'Anonym · ⏱ 2 Min',
-    }, { anonymous: true }),
   ];
 }
 
