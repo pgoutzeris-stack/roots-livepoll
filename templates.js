@@ -1024,17 +1024,7 @@ function buildDualSopWorkshopSlides() {
     slides.push(s);
   });
 
-  // 7. Gemeinsamer Überblick: Use Cases BEIDER SOPs aggregiert (Brücke in die Priorisierung)
-  slides.push(tplSlide('content', {
-    title: 'Beide SOPs im Überblick',
-    subtitle: 'Alle gesammelten KI Use Cases · Internal + Consulting',
-    body: 'Hier laufen die Use Cases aus beiden SOPs zusammen. Aus dieser Gesamtsicht priorisieren wir als Nächstes — erst Internal, dann Consulting — und ordnen die Favoriten gemeinsam in die Impact/Effort-Matrix ein.',
-    sopKind: SK.ALL_TRACKS_SUMMARY,
-    sopAllTracksResults: true,
-    isHeroSlide: false,
-  }, { workshopMode: 'orient' }));
-
-  // 8. EINE gemeinsame Priorisierung über beide SOPs (statt zwei getrennter Votes)
+  // 7. EINE konsolidierte Priorisierung über beide SOPs (kein Überblick, kein Split)
   slides.push(combinedVote());
 
   // 10.–13. Pitch · gemeinsame ICE-Matrix · Next Steps · Abschluss
@@ -1081,10 +1071,10 @@ window.LP_TEMPLATES = [
     key: 'roots-sop-dual-internal-consulting',
     category: 'ROOTS · SOP & KI',
     name: 'Internal + Consulting · Pro Track',
-    desc: 'Erst interner SOP, dann Consulting · per Switch beide Gruppen parallel brainstormen · EINE gemeinsame Priorisierung beider SOPs · gemeinsame ICE-Matrix.',
+    desc: 'Erst interner SOP, dann Consulting · Split-View auf den Brainstorm-Slides (beide Gruppen nebeneinander) · EINE konsolidierte Priorisierung + gemeinsame ICE-Matrix.',
     duration: '90–120 Min.',
     group: '5–25',
-    tips: 'Internal zuerst. Über den Internal/Consulting-Switch oben kann der Speaker jederzeit zwischen den beiden SOPs wechseln (parallel brainstormen). Priorisiert wird einmal gemeinsam über beide SOPs.',
+    tips: 'Internal zuerst. Auf den Brainstorm-Slides blendet der Split-View-Button (nur Beamer) beide SOPs nebeneinander ein (links Internal, rechts Consulting) — ideal für zwei parallele Gruppen. Priorisierung und Matrix laufen konsolidiert über beide SOPs, ohne Split.',
     slides: buildDualSopWorkshopSlides(),
   },
 ];

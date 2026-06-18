@@ -359,22 +359,6 @@ function renderAllTracksResultsHtml() {
       ${phasesHtml}
     </div>`;
   };
-  // Split-View: Internal-Tracks links, Consulting-Tracks rechts
-  const groupsPresent = new Set(byTrack.map((t) => t.sopGroup).filter(Boolean));
-  if (State.sopSplitView && groupsPresent.has('internal') && groupsPresent.has('consulting')) {
-    const colFor = (group, label, icon) => {
-      const inner = byTrack.filter((t) => t.sopGroup === group).map(trackHtml).join('')
-        || '<div class="present-wait-msg">Noch keine Use Cases.</div>';
-      return `<div class="sop-split-col">
-        <div class="sop-split-col-head sop-split-col-head--${group}"><i class="fa-solid ${icon}"></i> ${label}</div>
-        ${inner}
-      </div>`;
-    };
-    return `<div class="sop-all-tracks-results sop-split-active"><div class="sop-split-grid">
-      ${colFor('internal', 'Internal SOP', 'fa-building')}
-      ${colFor('consulting', 'Consulting SOP', 'fa-handshake')}
-    </div></div>`;
-  }
   return `<div class="sop-all-tracks-results">${byTrack.map(trackHtml).join('')}
   <div class="sop-all-track-total">${allItems.length} Use Cases gesammelt · über alle Tracks</div>
 </div>`;
@@ -1432,6 +1416,36 @@ function renderBrainstormPresentViz(slide, visible) {
   return window.LPViz.renderBrainstormBubbles(items, { mode: 'present', maxItems: 100, newIds });
 }
 
+// Gesammelte Use Cases einer SOP-Gruppe (über alle Brainstorm-Slides der Gruppe).
+function brainstormGroupItems(group) {
+  const slideIds = new Set((State.slides || [])
+    .filter((s) => s.slide_type === 'brainstorm' && s.content?.sopGroup === group)
+    .map((s) => s.id));
+  return (State.responses || [])
+    .filter((r) => slideIds.has(r.slide_id) && !r.is_hidden)
+    .map((r) => ({ id: r.id, text: String(r.response?.text || '').trim() }))
+    .filter((item) => item.text);
+}
+
+// Split-View (nur Beamer): links Internal-SOP-Use-Cases, rechts Consulting.
+function renderBrainstormSplitViz() {
+  const col = (group, label, icon) => {
+    const items = brainstormGroupItems(group);
+    const newIds = markNewBubbleIds('split-' + group, items);
+    const body = items.length
+      ? window.LPViz.renderBrainstormBubbles(items, { mode: 'present', maxItems: 60, newIds })
+      : '<div class="present-wait-msg">Noch keine Use Cases.</div>';
+    return `<div class="sop-split-col">
+      <div class="sop-split-col-head sop-split-col-head--${group}"><i class="fa-solid ${icon}"></i> ${label} <span class="sop-split-col-count">${items.length}</span></div>
+      <div class="sop-split-col-body">${body}</div>
+    </div>`;
+  };
+  return `<div class="sop-split-grid sop-split-active">
+    ${col('internal', 'Internal SOP', 'fa-building')}
+    ${col('consulting', 'Consulting SOP', 'fa-handshake')}
+  </div>`;
+}
+
 // Finale Priorisierung (Moderator/Beamer): moderne Tabelle — alle Use Cases mit
 // Autor + Live-Stimmen, immer sichtbar (auch vor der ersten Stimme).
 function renderFinalVotePresentHtml(slide, visible) {
@@ -1483,23 +1497,7 @@ function renderFinalVotePresentHtml(slide, visible) {
     h += `</div>`;
     return h;
   };
-  // Split-View: zwei Spalten (links Internal, rechts Consulting)
-  if (State.sopSplitView && supportsSopSplit(slide)) {
-    const internal = decorate(allItems.filter((it) => it.sopGroup === 'internal'));
-    const consulting = decorate(allItems.filter((it) => it.sopGroup === 'consulting'));
-    return `<div class="ws-board finale-vote sop-split-active">${head}
-      <div class="sop-split-grid">
-        <div class="sop-split-col">
-          <div class="sop-split-col-head sop-split-col-head--internal"><i class="fa-solid fa-building"></i> Internal SOP <span class="sop-split-col-count">${internal.length}</span></div>
-          ${tableFor(internal)}
-        </div>
-        <div class="sop-split-col">
-          <div class="sop-split-col-head sop-split-col-head--consulting"><i class="fa-solid fa-handshake"></i> Consulting SOP <span class="sop-split-col-count">${consulting.length}</span></div>
-          ${tableFor(consulting)}
-        </div>
-      </div>
-    </div>`;
-  }
+  // Konsolidierte Priorisierung — EINE Liste über beide SOPs, kein Split.
   return `<div class="ws-board finale-vote">${head}${tableFor(decorate(allItems))}</div>`;
 }
 
@@ -3153,9 +3151,11 @@ function bindPitchTimers(stage) {
 // nebeneinander (links Internal, rechts Consulting) — per Icon-Toggle in der Top-Bar.
 // Nur sinnvoll, wenn beide Gruppen (internal + consulting) im Workshop existieren.
 function supportsSopSplit(slide) {
+  // Split-View NUR auf den SOP-Brainstorm-Slides (Präsentationsansicht) — nicht
+  // auf Priorisierung/Matrix. Setzt voraus, dass beide Gruppen existieren.
   const c = slide?.content || {};
-  const st = slide?.settings || {};
-  if (!(st.sopAllTracksVote || c.sopAllTracksResults)) return false;
+  if (slide?.slide_type !== 'brainstorm') return false;
+  if (c.sopGroup !== 'internal' && c.sopGroup !== 'consulting') return false;
   const groups = new Set((State.slides || []).map((s) => s.content?.sopGroup).filter(Boolean));
   return groups.has('internal') && groups.has('consulting');
 }
@@ -4874,9 +4874,10 @@ function renderPresent() {
   const workshopMode = getWorkshopMode(slide);
 
   if (isBrainstormCollectSlide(slide)) {
+    const collectViz = (State.sopSplitView && supportsSopSplit(slide)) ? renderBrainstormSplitViz() : viz;
     stage.innerHTML = wrapSlide(`
       ${renderWorkshopCardCollectHtml(c)}
-      <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`, slideIdx);
+      <div class="viz-wrap viz-wrap-present">${collectViz}</div>${modPanel}`, slideIdx);
     stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
     stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
     updatePresentHeader();

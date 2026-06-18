@@ -1363,3 +1363,5 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .sop-split-col .ws-row{font-size:.9rem}
 .sop-split-col .sop-all-track-group{margin:.6rem .7rem}
 .sop-split-active .ws-board-head{margin-bottom:1rem}
+.sop-split-col-body{padding:.85rem}
+.sop-split-col-body .present-wait-msg{padding:1rem .5rem}
