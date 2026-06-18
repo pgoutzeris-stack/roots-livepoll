@@ -216,10 +216,6 @@ function participantAvatarHtml(p, size = 'md') {
   return `<span class="p-avatar p-avatar-${size}" style="background:${esc(color)}" title="${esc(name)}" aria-label="${esc(name)}">${emoji}</span>`;
 }
 
-function participantChipHtml(p) {
-  return `<div class="present-participant-chip">${participantAvatarHtml(p, 'sm')}<span>${esc(p.display_name || 'Gast')}</span></div>`;
-}
-
 function sopTrackTheme(trackClass) {
   const themes = {
     'track-pre': { accent: '#206efb', badgeBg: '#dbe7ff', badgeColor: '#165fd9', soft: '#eff6ff' },
@@ -1421,6 +1417,78 @@ function brainstormSlidesOfGroup(group) {
   return (State.slides || []).filter((s) => s.slide_type === 'brainstorm' && s.content?.sopGroup === group);
 }
 
+function trackIntroSlidesOfGroup(group) {
+  return (State.slides || []).filter((s) => s.slide_type === 'section' && s.content?.sopGroup === group && s.content?.sopKind === 'track');
+}
+
+function isDualSopWorkshop() {
+  const groups = new Set((State.slides || []).map((s) => s.content?.sopGroup).filter(Boolean));
+  return groups.has('internal') && groups.has('consulting');
+}
+
+function getDualSopPairIndex(slide) {
+  if (!slide) return null;
+  if (slide.content?.sopDualPairIndex != null) return slide.content.sopDualPairIndex;
+  const group = slide.content?.sopGroup;
+  if (!group) return null;
+  if (slide.slide_type === 'brainstorm') {
+    return brainstormSlidesOfGroup(group).findIndex((s) => s.id === slide.id);
+  }
+  if (slide.slide_type === 'section' && slide.content?.sopKind === 'track') {
+    return trackIntroSlidesOfGroup(group).findIndex((s) => s.id === slide.id);
+  }
+  return null;
+}
+
+function getParticipantSopGroup(participantId) {
+  if (!participantId || !State.session?.settings) return null;
+  return State.session.settings.dualSopAssignments?.[participantId] || null;
+}
+
+function findDualSopSlideByPair(group, pairIndex, slideType) {
+  if (pairIndex == null || pairIndex < 0) return null;
+  return (State.slides || []).find((s) => s.slide_type === slideType
+    && s.content?.sopGroup === group
+    && getDualSopPairIndex(s) === pairIndex) || null;
+}
+
+function resolveParticipantSlide(slide) {
+  if (!slide || !isDualSopWorkshop() || !State.participant) return slide;
+  if (isFinaleSlide(slide) || slide.settings?.sopAllTracksVote || slide.settings?.sopAllTracksMatrix || slide.settings?.sopPitchSession) return slide;
+  const group = getParticipantSopGroup(State.participant.id);
+  if (!group || slide.content?.sopGroup === group) return slide;
+  const pairIdx = getDualSopPairIndex(slide);
+  if (pairIdx == null) return slide;
+  return findDualSopSlideByPair(group, pairIdx, slide.slide_type) || slide;
+}
+
+async function assignParticipantSopGroup(participantId, group) {
+  if (!State.session?.id) return;
+  const prev = State.session.settings?.dualSopAssignments || {};
+  const dualSopAssignments = { ...prev, [participantId]: group };
+  const settings = { ...(State.session.settings || {}), dualSopAssignments };
+  const { error } = await sb.from('lp_sessions').update({ settings }).eq('id', State.session.id);
+  if (error) { toast('SOP-Zuweisung fehlgeschlagen', 'error'); return; }
+  State.session.settings = settings;
+  renderPresentParticipants();
+  toast(group === 'internal' ? '→ Internal SOP' : '→ Consulting SOP', 'success');
+}
+
+function participantChipHtml(p) {
+  if (!isDualSopWorkshop() || !State.session) return `<div class="present-participant-chip">${participantAvatarHtml(p, 'sm')}<span>${esc(p.display_name || 'Gast')}</span></div>`;
+  const assigned = getParticipantSopGroup(p.id);
+  const activeInternal = assigned === 'internal' ? ' is-active' : '';
+  const activeConsulting = assigned === 'consulting' ? ' is-active' : '';
+  return `<div class="present-participant-chip present-participant-chip--dual" data-participant-id="${esc(p.id)}">
+    ${participantAvatarHtml(p, 'sm')}
+    <span class="present-participant-name">${esc(p.display_name || 'Gast')}</span>
+    <span class="sop-assign-btns" role="group" aria-label="SOP-Zuweisung">
+      <button type="button" class="sop-assign-btn sop-assign-btn--internal${activeInternal}" data-sop-assign="internal" data-participant-id="${esc(p.id)}" title="Internal SOP">Int</button>
+      <button type="button" class="sop-assign-btn sop-assign-btn--consulting${activeConsulting}" data-sop-assign="consulting" data-participant-id="${esc(p.id)}" title="Consulting SOP">Con</button>
+    </span>
+  </div>`;
+}
+
 // Eine vollständige Brainstorm-Slide als Spalte (Frage + Board + Live-Bubbles DIESER Slide).
 function renderBrainstormSlideColumn(slide) {
   if (!slide) return '<div class="present-wait-msg">Kein entsprechender Track in diesem SOP.</div>';
@@ -1429,20 +1497,32 @@ function renderBrainstormSlideColumn(slide) {
     <div class="viz-wrap viz-wrap-present">${renderBrainstormPresentViz(slide, visible)}</div>`;
 }
 
-// Split-View (nur Beamer): links die Internal-SOP-Slide, rechts die Consulting-SOP-Slide.
-// Gepaart über den Index innerhalb der jeweiligen Gruppe (parallele Tracks).
-function renderBrainstormSplitViz(currentSlide) {
-  const internals = brainstormSlidesOfGroup('internal');
-  const consultings = brainstormSlidesOfGroup('consulting');
-  const list = currentSlide?.content?.sopGroup === 'consulting' ? consultings : internals;
-  const groupIdx = Math.max(0, list.findIndex((s) => s.id === currentSlide?.id));
-  const col = (group, label, icon, slide) => `<div class="sop-split-col">
+// Split-View (nur Beamer): links Internal-SOP, rechts Consulting-SOP — immer aktiv bis zur Gesamt-Priorisierung.
+function renderSopSplitColumn(group, label, icon, bodyHtml) {
+  return `<div class="sop-split-col">
       <div class="sop-split-col-head sop-split-col-head--${group}"><i class="fa-solid ${icon}"></i> ${label}</div>
-      <div class="sop-split-col-body">${renderBrainstormSlideColumn(slide)}</div>
+      <div class="sop-split-col-body">${bodyHtml}</div>
     </div>`;
-  return `<div class="sop-split-grid sop-split-active sop-split-slides">
-    ${col('internal', 'Internal SOP', 'fa-building', internals[groupIdx] || null)}
-    ${col('consulting', 'Consulting SOP', 'fa-handshake', consultings[groupIdx] || null)}
+}
+
+function renderSopSectionSplitView(currentSlide) {
+  const pairIdx = getDualSopPairIndex(currentSlide);
+  const intSlide = trackIntroSlidesOfGroup('internal')[pairIdx];
+  const conSlide = trackIntroSlidesOfGroup('consulting')[pairIdx];
+  const colBody = (slide) => slide ? renderSopSectionHtml(slide.content) : '<div class="present-wait-msg">Kein Track in diesem SOP.</div>';
+  return `<div class="sop-split-grid sop-split-active sop-split-slides sop-split-full">
+    ${renderSopSplitColumn('internal', 'Internal SOP', 'fa-building', colBody(intSlide))}
+    ${renderSopSplitColumn('consulting', 'Consulting SOP', 'fa-handshake', colBody(conSlide))}
+  </div>`;
+}
+
+function renderBrainstormSplitViz(currentSlide) {
+  const pairIdx = getDualSopPairIndex(currentSlide);
+  const intSlide = brainstormSlidesOfGroup('internal')[pairIdx];
+  const conSlide = brainstormSlidesOfGroup('consulting')[pairIdx];
+  return `<div class="sop-split-grid sop-split-active sop-split-slides sop-split-full">
+    ${renderSopSplitColumn('internal', 'Internal SOP', 'fa-building', renderBrainstormSlideColumn(intSlide))}
+    ${renderSopSplitColumn('consulting', 'Consulting SOP', 'fa-handshake', renderBrainstormSlideColumn(conSlide))}
   </div>`;
 }
 
@@ -1876,6 +1956,7 @@ function renderSopWorkshopNavHtml(currentIndex, options = {}) {
 function syncSopWorkshopShell(mode, slideIndex) {
   const isSop = isSopWorkshopPresentation();
   document.body.classList.toggle('lp-sop-workshop', isSop);
+  document.body.classList.toggle('lp-dual-sop', isDualSopWorkshop());
   document.body.classList.toggle('lp-sop-focus', isSop && State.sopFocusMode);
   document.body.classList.toggle('lp-sop-panels', isSop && State.showPresentPanels);
   document.body.classList.toggle('editor-mode', mode === 'editor');
@@ -2079,7 +2160,7 @@ function renderSopContentHtml(c, editable = false) {
           <div class="goal-q goal-q--dr"><i class="fa-solid fa-ban"></i><strong>Drop</strong><span>wenig Wirkung · wenig Aufwand</span></div>
           <div class="goal-q goal-q--ts"><i class="fa-solid fa-screwdriver-wrench"></i><strong>Time Sink</strong><span>wenig Wirkung · viel Aufwand</span></div>
         </div>
-        <div class="goal-matrix-xaxis">Aufwand <i class="fa-solid fa-arrow-right"></i></div>
+        <div class="goal-matrix-xaxis"><span class="goal-axis-low">niedrig</span><span>Aufwand</span><span class="goal-axis-high">hoch <i class="fa-solid fa-arrow-right"></i></span></div>
       </div>`;
     return `
       <div class="sop-pslide-section sop-pslide-goal">
@@ -3147,32 +3228,29 @@ function bindPitchTimers(stage) {
   });
 }
 
-// Split-View: zeigt auf den SOP-Abstimmungs-/Übersichts-Slides beide SOPs
-// nebeneinander (links Internal, rechts Consulting) — per Icon-Toggle in der Top-Bar.
-// Nur sinnvoll, wenn beide Gruppen (internal + consulting) im Workshop existieren.
+// Split-View: beide SOPs nebeneinander auf Track-Intro + Brainstorm bis zur Gesamt-Priorisierung.
 function supportsSopSplit(slide) {
-  // Split-View NUR auf den SOP-Brainstorm-Slides (Präsentationsansicht) — nicht
-  // auf Priorisierung/Matrix. Setzt voraus, dass beide Gruppen existieren.
+  if (!isDualSopWorkshop() || isFinaleSlide(slide)) return false;
+  if (slide?.settings?.sopAllTracksVote) return false;
   const c = slide?.content || {};
-  if (slide?.slide_type !== 'brainstorm') return false;
-  if (c.sopGroup !== 'internal' && c.sopGroup !== 'consulting') return false;
-  const groups = new Set((State.slides || []).map((s) => s.content?.sopGroup).filter(Boolean));
-  return groups.has('internal') && groups.has('consulting');
+  if (slide?.slide_type === 'brainstorm' && (c.sopGroup === 'internal' || c.sopGroup === 'consulting')) return true;
+  if (slide?.slide_type === 'section' && c.sopKind === 'track' && c.sopGroup) return true;
+  return false;
 }
 
-function injectSopSplitToggle(slide) {
-  if (!supportsSopSplit(slide)) return;
-  const stage = $('#present-stage');
-  if (!stage || stage.querySelector('.sop-split-bar')) return;
-  const on = !!State.sopSplitView;
-  stage.insertAdjacentHTML('afterbegin', `<div class="sop-split-bar">
-    <button type="button" class="sop-split-toggle${on ? ' is-active' : ''}" id="sop-split-toggle" aria-pressed="${on}" title="Split-View: beide SOPs nebeneinander zeigen">
-      <i class="fa-solid fa-table-columns"></i><span>${on ? 'Split-View an' : 'Split-View'}</span>
-    </button>
-  </div>`);
-  stage.querySelector('#sop-split-toggle')?.addEventListener('click', () => {
-    State.sopSplitView = !State.sopSplitView;
-    renderPresent();
+function shouldUseSopSplit(slide) {
+  return supportsSopSplit(slide);
+}
+
+function bindPresentParticipantAssign() {
+  const bar = $('#present-participants');
+  if (!bar || bar.dataset.assignBound) return;
+  bar.dataset.assignBound = '1';
+  bar.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-sop-assign]');
+    if (!btn) return;
+    e.preventDefault();
+    void assignParticipantSopGroup(btn.dataset.participantId, btn.dataset.sopAssign);
   });
 }
 
@@ -3181,7 +3259,7 @@ function finalizePresentUi(slide) {
   bindResultsDisplayToggle($('#present-stage'));
   maybeLaunchResultsConfetti(slide);
   bindPitchTimers($('#present-stage'));
-  injectSopSplitToggle(slide);
+  bindPresentParticipantAssign();
 }
 
 async function deleteSlide(id) {
@@ -4717,6 +4795,7 @@ function renderPresent() {
   const slide = currentSessionSlide();
   const stage = $('#present-stage');
   if (!slide) { stage.innerHTML = '<h1>Keine Folien</h1>'; return; }
+  stage.classList.remove('sop-split-stage');
   const c = slide.content || {};
   // DEBUG-Simulator: bei jedem Slide-Wechsel die Antworten für diesen Slide
   // zeitversetzt drippen (nur einmal pro Slide via triggeredSlides-Set)
@@ -4789,7 +4868,9 @@ function renderPresent() {
   const slideMuted = c.subtextColor || 'var(--muted)';
 
   if (slide.slide_type === 'section' && c.sopTrackClass) {
-    stage.innerHTML = wrapSlide(`${renderSopSectionHtml(c)}`, State.session.current_slide_index || 0);
+    const inner = shouldUseSopSplit(slide) ? renderSopSectionSplitView(slide) : renderSopSectionHtml(c);
+    stage.innerHTML = wrapSlide(inner, State.session.current_slide_index || 0);
+    stage.classList.toggle('sop-split-stage', shouldUseSopSplit(slide));
     updatePresentHeader();
     updatePresentStats();
     renderPresentParticipants();
@@ -4874,12 +4955,13 @@ function renderPresent() {
   const workshopMode = getWorkshopMode(slide);
 
   if (isBrainstormCollectSlide(slide)) {
-    const splitOn = State.sopSplitView && supportsSopSplit(slide);
+    const splitOn = shouldUseSopSplit(slide);
     const inner = splitOn
       ? renderBrainstormSplitViz(slide)
       : `${renderWorkshopCardCollectHtml(c)}
       <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`;
     stage.innerHTML = wrapSlide(inner, slideIdx);
+    stage.classList.toggle('sop-split-stage', splitOn);
     stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
     stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
     updatePresentHeader();
@@ -5293,15 +5375,26 @@ function hasAnsweredSlide(slide) {
 
 async function renderParticipantQuestion() {
   const slideIndex = State.session.current_slide_index || 0;
-  const slide = State.slides[slideIndex];
+  const hostSlide = State.slides[slideIndex];
+  const slide = resolveParticipantSlide(hostSlide) || hostSlide;
   const isMatrixSlide = slide?.slide_type === 'priority_matrix' || slide?.settings?.sopAllTracksMatrix;
   if (isSopVoteSlide(slide) || isMatrixSlide) await ensureParticipantResponses(true);
   const root = $('#participant-root');
   const finishParticipant = () => syncSopWorkshopShell('participant', slideIndex);
-  if (!slide?.settings?.sopTrackVote) State.participantVoteExpert = false;
-  if (!slide) { root.innerHTML = '<div class="participant-card"><p>Warte auf Folie…</p></div>'; finishParticipant(); return; }
+  if (!hostSlide?.settings?.sopTrackVote) State.participantVoteExpert = false;
+  if (!hostSlide) { root.innerHTML = '<div class="participant-card"><p>Warte auf Folie…</p></div>'; finishParticipant(); return; }
   if (!State.session.question_open) {
-    root.innerHTML = `<div class="participant-card"><h1>${esc(slide.content?.title || 'Warte…')}</h1><p>Die Frage ist geschlossen. Bitte warte auf die nächste Folie.</p></div>`;
+    root.innerHTML = `<div class="participant-card"><h1>${esc(hostSlide.content?.title || 'Warte…')}</h1><p>Die Frage ist geschlossen. Bitte warte auf die nächste Folie.</p></div>`;
+    finishParticipant();
+    return;
+  }
+  if (isDualSopWorkshop() && isBrainstormCollectSlide(hostSlide) && !getParticipantSopGroup(State.participant?.id)) {
+    root.innerHTML = wrapParticipantSlide(`
+      <div class="participant-wait-block participant-sop-unassigned">
+        <h1 class="pslide-q-title">SOP-Zuweisung ausstehend</h1>
+        <p class="pslide-q-prompt">Du bist verbunden — der Host weist dich gleich einem SOP-Team zu (Internal oder Consulting). Dann kannst du Use Cases einreichen.</p>
+        <p class="participant-sop-wait"><i class="fa-solid fa-hourglass-half"></i> Bitte kurz warten…</p>
+      </div>`, slideIndex);
     finishParticipant();
     return;
   }
@@ -5547,10 +5640,10 @@ function renderParticipantMatrixHtml(slide) {
   const c = slide.content || {};
   const items = getMatrixItems(slide);
   const quadrants = c.quadrants || {
-    qw: { label: 'Quick Win', icon: '🚀', desc: 'hoher Impact · niedriger Aufwand' },
-    sb: { label: 'Strategic Bet', icon: '⭐', desc: 'hoher Impact · hoher Aufwand' },
-    ts: { label: 'Time Sink', icon: '🔧', desc: 'niedriger Impact · hoher Aufwand' },
-    dr: { label: 'Drop', icon: '❌', desc: 'niedriger Impact · niedriger Aufwand' },
+    qw: { label: 'Quick Win', icon: 'fa-rocket', desc: 'hoher Impact · niedriger Aufwand' },
+    sb: { label: 'Strategic Bet', icon: 'fa-star', desc: 'hoher Impact · hoher Aufwand' },
+    ts: { label: 'Time Sink', icon: 'fa-screwdriver-wrench', desc: 'niedriger Impact · hoher Aufwand' },
+    dr: { label: 'Drop', icon: 'fa-ban', desc: 'niedriger Impact · niedriger Aufwand' },
   };
   if (!items.length) {
     return '<div class="participant-wait-block"><p class="participant-sop-wait"><i class="fa-solid fa-clock"></i> Noch keine Use Cases gesammelt. Bitte warte auf den Vortragenden.</p></div>';
@@ -5577,13 +5670,13 @@ function renderParticipantMatrixHtml(slide) {
       <div class="lp-mx-y-high">↑ hoch</div>
       <div class="lp-mx-y-low">↓ niedrig</div>
       <div class="lp-mx-grid">
-        <div class="lp-mx-cell lp-q-sb" data-drop="sb">
-          ${cellHead('sb')}
-          <div class="lp-mx-cell-items">${inQuadrant('sb').map(itemCard).join('')}</div>
-        </div>
         <div class="lp-mx-cell lp-q-qw" data-drop="qw">
           ${cellHead('qw')}
           <div class="lp-mx-cell-items">${inQuadrant('qw').map(itemCard).join('')}</div>
+        </div>
+        <div class="lp-mx-cell lp-q-sb" data-drop="sb">
+          ${cellHead('sb')}
+          <div class="lp-mx-cell-items">${inQuadrant('sb').map(itemCard).join('')}</div>
         </div>
         <div class="lp-mx-cell lp-q-dr" data-drop="dr">
           ${cellHead('dr')}
@@ -5594,7 +5687,7 @@ function renderParticipantMatrixHtml(slide) {
           <div class="lp-mx-cell-items">${inQuadrant('ts').map(itemCard).join('')}</div>
         </div>
       </div>
-      <div class="lp-mx-x-label">${esc(c.xAxisLabel || 'Aufwand')}: hoch ← → niedrig</div>
+      <div class="lp-mx-x-label"><span class="lp-mx-axis-low">niedrig</span> ${esc(c.xAxisLabel || 'Aufwand')} <span class="lp-mx-axis-high">hoch</span></div>
     </div>
     <div class="lp-mx-pool" data-drop="pool">
       <div class="lp-mx-pool-head"><strong><i class="fa-solid fa-layer-group"></i> Use Cases</strong> <span class="lp-mx-pool-count" id="lp-mx-pool-count">${inPool.length} / ${items.length}</span></div>
@@ -5950,7 +6043,8 @@ async function renderQaList(slide) {
 }
 
 async function submitResponse(response) {
-  const slide = State.slides[State.session.current_slide_index || 0];
+  const hostSlide = State.slides[State.session.current_slide_index || 0];
+  const slide = resolveParticipantSlide(hostSlide) || hostSlide;
   if (!slide || !State.session.question_open) return;
   if (State._submitting) return; // Doppel-Tap / langsames Netz: kein Zweit-Insert
 

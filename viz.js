@@ -266,12 +266,12 @@
         <div class="lp-matrix-result-axes">
           <div class="lp-matrix-result-y-label"><i class="fa-solid fa-arrow-up"></i> ${esc(slide.content.yAxisLabel || 'Impact')}</div>
           <div class="lp-matrix-result-grid">
-            ${cell('sb')}
             ${cell('qw')}
+            ${cell('sb')}
             ${cell('dr')}
             ${cell('ts')}
           </div>
-          <div class="lp-matrix-result-x-label">${esc(slide.content.xAxisLabel || 'Aufwand')} <span class="lp-matrix-axis-dir">hoch ← → niedrig</span></div>
+          <div class="lp-matrix-result-x-label"><span class="lp-matrix-axis-low">niedrig</span> ${esc(slide.content.xAxisLabel || 'Aufwand')} <span class="lp-matrix-axis-high">hoch</span></div>
         </div>
         <div class="lp-matrix-result-total"><i class="fa-solid fa-users"></i> ${agg.total} Teilnehmer · <i class="fa-solid fa-layer-group"></i> ${Object.keys(itemPlacements).length} Use Cases priorisiert</div>
       </div>`;

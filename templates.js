@@ -960,7 +960,7 @@ function buildMarketingSopWorkshopSlides() {
 }
 
 // ─── DUAL SOP · KI WORKSHOP (Internal + Consulting parallel) ──────────
-// Beide SOPs parallel sammeln · getrennt priorisieren (Speaker-Switch) · gemeinsame ICE-Matrix.
+// Beide SOPs parallel sammeln · Host weist Teilnehmer zu · gemeinsame Priorisierung + ICE-Matrix.
 function buildDualSopWorkshopSlides() {
   const slides = [];
 
@@ -978,11 +978,18 @@ function buildDualSopWorkshopSlides() {
     }, { showResultsLive: true, sopAllTracksVote: true, sopVoteMax: n, workshopMode: 'decide' });
   }
 
+  function tagDualSlide(slide, group, pairIndex) {
+    slide.content.sopGroup = group;
+    slide.content.sopGroupLabel = group === 'internal' ? 'Internal SOP' : 'Consulting SOP';
+    slide.content.sopDualPairIndex = pairIndex;
+    return slide;
+  }
+
   // 1. Opener (Join)
   slides.push(tplSlide('content', {
     title: 'SOP · KI Use-Case Workshop',
     subtitle: 'Internal + Consulting · zwei Teams parallel',
-    body: 'QR scannen · Name + Avatar wählen · los geht\'s!',
+    body: 'QR scannen · Name + Avatar wählen · Host weist euch euer SOP-Team zu · los geht\'s!',
     isHeroSlide: true,
   }));
 
@@ -990,41 +997,33 @@ function buildDualSopWorkshopSlides() {
   slides.push(sopWorkshopGoal());
   slides.push(sopWorkshopInstructions());
 
-  // 4. Teilnehmer-Intro (zwei Teams) — direkt vor dem Start, gebrandet, Internal zuerst
+  // 4. Teilnehmer-Intro (zwei Teams) — vor dem parallelen Start
   slides.push(tplSlide('content', {
     title: 'Wer ist dabei?',
-    subtitle: 'Zwei Teams · zwei SOPs · wir starten mit dem internen SOP',
+    subtitle: 'Zwei SOPs · parallel · Host weist Teilnehmer den Teams zu',
     body: 'Internal SOP\nRichard Erbler · Jannick Müller · Pano Goutzeris\n\nConsulting SOP\nManuel Stankovic · Rod Mitecki',
     sopKind: 'participants',
     isHeroSlide: false,
   }, { workshopMode: 'orient' }));
 
-  // 5. INTERNAL zuerst: Track-Intro + Track-Brainstorm (Gruppe internal)
-  //    sopGroup auf ALLEN Slides der Gruppe → Switch/Badge funktioniert durchgehend.
-  INTERNAL_SOP_TRACKS.forEach((t, i) => {
-    const intro = sopTrackIntro(t, i);
-    intro.content.sopGroup = 'internal';
-    intro.content.sopGroupLabel = 'Internal SOP';
-    slides.push(intro);
-    const s = sopTrackBrainstorm(t);
-    s.content.sopGroup = 'internal';
-    s.content.sopGroupLabel = 'Internal SOP';
-    slides.push(s);
-  });
+  // 5. Track-Paare parallel: je Runde Internal + Consulting nebeneinander (Split-View am Beamer)
+  const pairCount = Math.max(INTERNAL_SOP_TRACKS.length, SOP_TOOL_TRACKS.length);
+  for (let i = 0; i < pairCount; i += 1) {
+    if (INTERNAL_SOP_TRACKS[i]) {
+      slides.push(tagDualSlide(sopTrackIntro(INTERNAL_SOP_TRACKS[i], i), 'internal', i));
+    }
+    if (SOP_TOOL_TRACKS[i]) {
+      slides.push(tagDualSlide(sopTrackIntro(SOP_TOOL_TRACKS[i], i), 'consulting', i));
+    }
+    if (INTERNAL_SOP_TRACKS[i]) {
+      slides.push(tagDualSlide(sopTrackBrainstorm(INTERNAL_SOP_TRACKS[i]), 'internal', i));
+    }
+    if (SOP_TOOL_TRACKS[i]) {
+      slides.push(tagDualSlide(sopTrackBrainstorm(SOP_TOOL_TRACKS[i]), 'consulting', i));
+    }
+  }
 
-  // 6. CONSULTING danach: Track-Intro + Track-Brainstorm (Gruppe consulting)
-  SOP_TOOL_TRACKS.forEach((t, i) => {
-    const intro = sopTrackIntro(t, i);
-    intro.content.sopGroup = 'consulting';
-    intro.content.sopGroupLabel = 'Consulting SOP';
-    slides.push(intro);
-    const s = sopTrackBrainstorm(t);
-    s.content.sopGroup = 'consulting';
-    s.content.sopGroupLabel = 'Consulting SOP';
-    slides.push(s);
-  });
-
-  // 7. EINE konsolidierte Priorisierung über beide SOPs (kein Überblick, kein Split)
+  // 6. EINE konsolidierte Priorisierung über beide SOPs (kein Split)
   slides.push(combinedVote());
 
   // 10.–13. Pitch · gemeinsame ICE-Matrix · Next Steps · Abschluss
@@ -1071,10 +1070,10 @@ window.LP_TEMPLATES = [
     key: 'roots-sop-dual-internal-consulting',
     category: 'ROOTS · SOP & KI',
     name: 'Internal + Consulting · Pro Track',
-    desc: 'Erst interner SOP, dann Consulting · Split-View auf den Brainstorm-Slides (beide Gruppen nebeneinander) · EINE konsolidierte Priorisierung + gemeinsame ICE-Matrix.',
+    desc: 'Beide SOPs parallel · Split-View auf Track-Intro + Brainstorm (volle Breite) · Host weist Teilnehmer zu · EINE konsolidierte Priorisierung + gemeinsame ICE-Matrix.',
     duration: '90–120 Min.',
     group: '5–25',
-    tips: 'Internal zuerst. Auf den Brainstorm-Slides blendet der Split-View-Button (nur Beamer) beide SOPs nebeneinander ein (links Internal, rechts Consulting) — ideal für zwei parallele Gruppen. Priorisierung und Matrix laufen konsolidiert über beide SOPs, ohne Split.',
+    tips: 'QR-Join → Host weist jedem Teilnehmer Internal oder Consulting zu. Am Beamer laufen beide SOPs im Split-View parallel (Track-Intro + Brainstorm). Priorisierung, Pitch und Matrix zeigen alle Use Cases konsolidiert — ohne Split.',
     slides: buildDualSopWorkshopSlides(),
   },
 ];

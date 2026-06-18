@@ -205,7 +205,9 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-mx-y-label{grid-column:1;grid-row:2;writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;align-self:center}
 .lp-mx-y-high{grid-column:1;grid-row:1;text-align:center;font-size:.65rem;font-weight:700;color:var(--success)}
 .lp-mx-y-low{grid-column:1;grid-row:3;text-align:center;font-size:.65rem;font-weight:700;color:var(--muted)}
-.lp-mx-x-label{grid-column:2;grid-row:4;text-align:center;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding-top:.25rem}
+.lp-mx-x-label{grid-column:2;grid-row:4;display:flex;align-items:center;justify-content:space-between;gap:.5rem;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding-top:.25rem}
+.lp-mx-axis-low,.lp-mx-axis-high{font-size:.68rem;font-weight:700;text-transform:none;letter-spacing:0;color:var(--muted)}
+.lp-matrix-axis-low,.lp-matrix-axis-high{font-size:.68rem;font-weight:700;text-transform:none;letter-spacing:0;color:var(--muted)}
 .lp-mx-grid{grid-column:2;grid-row:1/4;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6px;min-height:280px}
 .lp-mx-cell{background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:.6rem;display:flex;flex-direction:column;gap:.35rem;min-height:130px;transition:border-color .15s,box-shadow .15s,background .15s;position:relative}
 .lp-mx-cell.lp-mx-drop-active{border-color:var(--brand);box-shadow:0 0 0 3px rgba(32,110,251,.22) inset;transform:scale(1.005)}
@@ -279,7 +281,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-matrix-result{display:flex;flex-direction:column;gap:1rem;max-width:1100px;margin:0 auto;padding:.5rem}
 .lp-matrix-result-axes{display:grid;grid-template-columns:24px 1fr;grid-template-rows:auto 1fr auto;gap:.4rem}
 .lp-matrix-result-y-label{grid-column:1;grid-row:1/3;writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;align-self:center}
-.lp-matrix-result-x-label{grid-column:2;grid-row:3;text-align:center;font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding-top:.25rem}
+.lp-matrix-result-x-label{grid-column:2;grid-row:3;display:flex;align-items:center;justify-content:space-between;gap:.5rem;font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding-top:.25rem}
 .lp-matrix-result-grid{grid-column:2;grid-row:1/3;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8px;min-height:340px}
 .lp-matrix-result-y-label i,.lp-matrix-result-x-label i{font-size:.7rem}
 .lp-matrix-axis-dir{font-weight:600;opacity:.7;text-transform:none;letter-spacing:0;margin-left:.35rem}
@@ -1039,9 +1041,11 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   grid-column:2;grid-row:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:.6rem;
 }
 .goal-matrix-xaxis{
-  grid-column:2;grid-row:2;display:flex;align-items:center;justify-content:center;gap:.4rem;
+  grid-column:2;grid-row:2;display:flex;align-items:center;justify-content:space-between;gap:.4rem;
   font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
 }
+.goal-axis-low,.goal-axis-high{font-size:.68rem;font-weight:700;text-transform:none;letter-spacing:0}
+.goal-axis-high{display:inline-flex;align-items:center;gap:.25rem}
 .goal-q{
   border:1.5px solid var(--line);border-radius:12px;padding:.7rem .8rem;
   display:flex;flex-direction:column;gap:.15rem;background:var(--surface);min-height:90px;
@@ -1346,16 +1350,15 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 
 /* ═══════ SOP Split-View (Internal | Consulting nebeneinander) ═══════ */
-.sop-split-bar{display:flex;justify-content:center;margin:0 auto 1rem}
-.sop-split-toggle{display:inline-flex;align-items:center;gap:.5rem;border:1px solid var(--line);background:var(--bg);color:var(--muted);font-family:inherit;font-weight:700;font-size:.9rem;padding:.5rem 1.05rem;border-radius:var(--radius-pill);cursor:pointer;box-shadow:var(--shadow-dash);transition:background .15s,color .15s,border-color .15s;-webkit-tap-highlight-color:transparent}
-.sop-split-toggle:hover{color:var(--ink);border-color:var(--brand)}
-.sop-split-toggle.is-active{background:var(--brand);color:#fff;border-color:var(--brand);box-shadow:0 2px 8px rgba(32,110,251,.28)}
-.sop-split-toggle i{font-size:1rem}
-.sop-split-toggle:focus-visible{outline:3px solid rgba(32,110,251,.45);outline-offset:2px}
-.sop-split-grid{display:grid;grid-template-columns:1fr;gap:1rem;align-items:start}
-@media (min-width:880px){ .sop-split-grid{grid-template-columns:1fr 1fr} }
-.sop-split-col{min-width:0;border:1px solid var(--line);border-radius:14px;background:var(--bg);overflow:hidden;box-shadow:var(--shadow-dash)}
-.sop-split-col-head{display:flex;align-items:center;gap:.5rem;font-weight:800;font-size:.8rem;letter-spacing:.05em;text-transform:uppercase;padding:.6rem .85rem;color:#fff}
+.sop-split-bar{display:none}
+.sop-split-grid{display:grid;grid-template-columns:1fr;gap:1rem;align-items:stretch;width:100%}
+@media (min-width:760px){ .sop-split-grid{grid-template-columns:1fr 1fr} }
+.sop-split-full{width:100%;max-width:none;margin:0}
+.lp-sop-workshop .present-stage.sop-split-stage{align-items:stretch;text-align:left}
+.lp-sop-workshop .present-stage.sop-split-stage .pslide-slide{width:100%;max-width:none}
+.lp-sop-workshop .present-stage.sop-split-stage .viz-wrap{width:100%;max-width:none}
+.sop-split-col{min-width:0;border:1px solid var(--line);border-radius:14px;background:var(--bg);overflow:hidden;box-shadow:var(--shadow-dash);display:flex;flex-direction:column;height:100%}
+.sop-split-col-head{display:flex;align-items:center;gap:.5rem;font-weight:800;font-size:.8rem;letter-spacing:.05em;text-transform:uppercase;padding:.6rem .85rem;color:#fff;flex-shrink:0}
 .sop-split-col-head--internal{background:#206efb}
 .sop-split-col-head--consulting{background:#0f6b57}
 .sop-split-col-count{margin-left:auto;background:rgba(255,255,255,.25);border-radius:999px;padding:.1rem .55rem;font-size:.78rem;font-weight:700}
@@ -1363,10 +1366,24 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .sop-split-col .ws-row{font-size:.9rem}
 .sop-split-col .sop-all-track-group{margin:.6rem .7rem}
 .sop-split-active .ws-board-head{margin-bottom:1rem}
-.sop-split-col-body{padding:.85rem}
+.sop-split-col-body{padding:.85rem;flex:1;min-width:0}
 .sop-split-col-body .present-wait-msg{padding:1rem .5rem}
-/* Split-View zeigt zwei vollständige Slides nebeneinander */
+/* Split-View: zwei vollständige Slides nebeneinander — volle Breite */
 .sop-split-slides .sop-split-col-body{padding:1rem;overflow-x:auto}
-.sop-split-slides .pslide-q-title{font-size:1.4rem;line-height:1.2}
+.sop-split-slides .pslide-q-title{font-size:1.25rem;line-height:1.25}
+.sop-split-slides .sop-pslide-title{font-size:1.35rem;line-height:1.2}
 .sop-split-slides .pslide-question-block{padding:0}
 .sop-split-slides .workshop-collect-board{margin-top:.6rem}
+.sop-split-slides .sop-pslide-section{padding:.5rem 0;text-align:left}
+.sop-split-slides .viz-wrap-present{margin-top:.75rem}
+
+/* Host: SOP-Zuweisung pro Teilnehmer (Dual-Workshop) */
+.lp-dual-sop .present-participants-bar{display:block!important;max-width:min(560px,92vw)}
+.present-participant-chip--dual{align-items:center;gap:.35rem;padding:.35rem .5rem .35rem .35rem}
+.present-participant-name{max-width:8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.78rem}
+.sop-assign-btns{display:inline-flex;gap:2px;margin-left:.15rem}
+.sop-assign-btn{border:1px solid var(--line);background:var(--surface);color:var(--muted);font-family:inherit;font-size:.62rem;font-weight:800;padding:.2rem .45rem;border-radius:6px;cursor:pointer;line-height:1.2;transition:background .12s,color .12s,border-color .12s}
+.sop-assign-btn--internal.is-active{background:#206efb;border-color:#206efb;color:#fff}
+.sop-assign-btn--consulting.is-active{background:#0f6b57;border-color:#0f6b57;color:#fff}
+.sop-assign-btn:hover:not(.is-active){border-color:var(--brand);color:var(--ink)}
+.participant-sop-unassigned .pslide-q-prompt{max-width:36rem;margin:0 auto}
