@@ -1364,7 +1364,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .sop-split-col-head--internal,
 .sop-split-col-head--consulting{background:var(--surface);color:var(--ink)}
 .sop-split-col-count{margin-left:auto;background:var(--brand-light);color:var(--brand);border-radius:999px;padding:.1rem .55rem;font-size:.78rem;font-weight:700}
-.sop-split-grid.sop-split-single-side{grid-template-columns:1fr;max-width:min(760px,94vw);margin:0 auto;width:100%}
+.sop-split-grid.sop-split-single-side{grid-template-columns:1fr;width:100%}
 .sop-split-col .ws-table{margin:0;border:none;border-radius:0}
 .sop-split-col .ws-row{font-size:.9rem}
 .sop-split-single-side .sop-split-col{width:100%;max-width:100%}
@@ -1781,6 +1781,12 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   display:flex;
   flex-direction:column;
 }
+.lp-dual-sop-workshop.present-mode.dual-sop-wide-stage .pslide-slide{
+  max-width:min(1920px,99.5vw);
+}
+.lp-sop-workshop.present-mode.sop-single-sop-stage .pslide-slide{
+  max-width:min(1920px,99.5vw);
+}
 .lp-sop-workshop.present-mode .pslide-slide-content,
 .lp-sop-workshop.present-mode .pslide-slide-content--ws{
   align-items:stretch;
@@ -1962,7 +1968,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   padding:clamp(.4rem,.9vw,.65rem) clamp(.4rem,1.1vw,.85rem) 4.75rem;
 }
 .lp-sop-workshop.present-mode.sop-split-stage .pslide-slide{
-  max-width:min(1680px,99vw);
+  max-width:min(1920px,99.5vw);
 }
 .lp-sop-workshop.present-mode.sop-split-stage .ws-slide{
   min-height:min(calc(100vh - 6rem),920px);
@@ -2213,6 +2219,73 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   }
   .lp-sop-workshop.present-mode .ws-body .workshop-instructions-card,
   .lp-sop-workshop.present-mode .ws-body .ws-hero-body{background:transparent}
+}
+
+/* ═══════ Dual-SOP · volle Breite (Split + einzelne SOP-Folien) ═══════ */
+.lp-dual-sop-workshop .workshop-slide-sop{
+  width:252px;
+  padding:.8rem .65rem;
+}
+.lp-dual-sop-workshop.present-mode.dual-sop-wide-stage .present-stage,
+.lp-dual-sop-workshop.present-mode.sop-split-stage .present-stage,
+.lp-dual-sop-workshop.present-mode.sop-single-sop-stage .present-stage{
+  padding-left:clamp(.45rem,1vw,.85rem);
+  padding-right:clamp(.45rem,1vw,.85rem);
+}
+.lp-dual-sop-workshop.present-mode.dual-sop-wide-stage .pslide-slide,
+.lp-dual-sop-workshop.present-mode.sop-split-stage .pslide-slide,
+.lp-dual-sop-workshop.present-mode.sop-single-sop-stage .pslide-slide{
+  max-width:min(1920px,99.5vw);
+}
+.lp-dual-sop-workshop.present-mode .sop-split-grid{
+  max-width:none;
+  width:100%;
+  margin:0;
+}
+.lp-dual-sop-workshop.present-mode .sop-split-grid.sop-split-single-side{
+  max-width:none;
+  width:100%;
+  margin:0;
+}
+.lp-dual-sop-workshop.present-mode.sop-split-stage .sop-split-grid.sop-split-single-side .sop-split-col{
+  max-width:none;
+  width:100%;
+}
+.lp-dual-sop-workshop.present-mode.sop-single-sop-stage .workshop-collect-shell,
+.lp-dual-sop-workshop.present-mode.sop-single-sop-stage .workshop-collect-board,
+.lp-dual-sop-workshop.present-mode.sop-single-sop-stage .sop-board-preview,
+.lp-dual-sop-workshop.present-mode.sop-single-sop-stage .sop-pslide-section--shell,
+.lp-dual-sop-workshop.present-mode.sop-single-sop-stage .ws-body,
+.lp-dual-sop-workshop.present-mode.sop-single-sop-stage .ws-body-inner,
+.lp-dual-sop-workshop.present-mode.sop-single-sop-stage .viz-wrap,
+.lp-dual-sop-workshop.present-mode.sop-single-sop-stage .ws-lead{
+  max-width:none;
+  width:100%;
+}
+.lp-dual-sop-workshop.present-mode.sop-single-sop-stage .ws-slide,
+.lp-dual-sop-workshop.present-mode.sop-split-stage .ws-slide{
+  min-height:min(calc(100vh - 6rem),920px);
+}
+.lp-dual-sop-workshop.present-mode.sop-single-sop-stage .sop-board-phases-row,
+.lp-dual-sop-workshop.present-mode.sop-split-stage .sop-board-phases-row,
+.lp-dual-sop-workshop.present-mode.sop-split-stage .ws-split-sop-board .sop-board-phases-row{
+  grid-auto-columns:minmax(min(300px,34vw),1fr);
+}
+.lp-dual-sop-workshop.present-mode.sop-single-sop-stage .sop-board-card,
+.lp-dual-sop-workshop.present-mode.sop-split-stage .sop-board-card{
+  min-height:3.65rem;
+}
+.lp-dual-sop-workshop.participant-mode .workshop-collect-shell,
+.lp-dual-sop-workshop.participant-mode .sop-board-preview,
+.lp-dual-sop-workshop.participant-mode .pslide-participant-content{
+  max-width:none;
+  width:100%;
+}
+@media (max-width:760px){
+  .lp-dual-sop-workshop.present-mode.sop-single-sop-stage .sop-board-phases-row,
+  .lp-dual-sop-workshop.present-mode.sop-split-stage .sop-board-phases-row{
+    grid-auto-columns:minmax(min(240px,88vw),1fr);
+  }
 }
 
 /* ═══════ Abschluss-Folie · zentriert + Celebration ═══════ */

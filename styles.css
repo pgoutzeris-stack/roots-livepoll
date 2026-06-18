@@ -610,6 +610,11 @@ html.lp-join-route #screen-participant{display:flex!important}
 .workshop-mode-collect{background:#ecfdf5;color:#206efb}
 .workshop-mode-decide{background:#f5f3ff;color:#206efb}
 .workshop-collect-shell{text-align:left;max-width:min(860px,96vw);margin:0 auto}
+.lp-dual-sop-workshop.present-mode .workshop-collect-shell,
+.lp-dual-sop-workshop.participant-mode .workshop-collect-shell{
+  max-width:none;
+  width:100%;
+}
 .workshop-card-title{font-size:clamp(1.35rem,3vw,2rem);font-weight:800;line-height:1.2;margin:.25rem 0}
 .workshop-card-sub{font-size:.88rem;color:var(--muted);margin-bottom:.5rem}
 .workshop-card-body{font-size:.95rem;color:var(--muted);line-height:1.55;margin-bottom:1rem}

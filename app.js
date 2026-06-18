@@ -2284,8 +2284,7 @@ function mountPresentWsSlide(stage, slide, slideIdx, { main = '', splitOn = fals
     lead: lead ?? getWsPresentLead(slide),
     main,
   }), slideIdx);
-  stage.classList.toggle('sop-split-stage', splitOn);
-  stage.dataset.splitOn = splitOn ? '1' : '';
+  applyPresentStageLayout(stage, slide, { splitOn });
   updatePresentHeader();
   updatePresentStats();
   renderPresentParticipants();
@@ -4458,6 +4457,36 @@ function shouldUseSopSplit(slide) {
   return supportsSopSplit(slide);
 }
 
+function shouldUseDualSopWideStage(slide) {
+  if (!isDualSopWorkshop() || !slide) return false;
+  if (isFinaleSlide(slide)) return false;
+  const c = slide.content || {};
+  if (shouldUseSopSplit(slide)) return true;
+  if (c.sopKind === 'dual-pair-collect' || c.sopKind === 'dual-pair-orient') return true;
+  if (c.sopGroup && (slide.slide_type === 'brainstorm' || (slide.slide_type === 'section' && c.sopTrackClass))) {
+    return true;
+  }
+  return false;
+}
+
+function applyPresentStageLayout(stage, slide, { splitOn = false } = {}) {
+  if (!stage) return;
+  const wide = shouldUseDualSopWideStage(slide);
+  const singleSop = wide && !splitOn && !!slide?.content?.sopGroup;
+  const body = document.body;
+  body.classList.toggle('sop-split-stage', splitOn);
+  body.classList.toggle('sop-single-sop-stage', singleSop);
+  body.classList.toggle('dual-sop-wide-stage', wide);
+  stage.dataset.splitOn = splitOn ? '1' : '';
+}
+
+function clearPresentStageLayout(stage) {
+  if (!stage) return;
+  document.body.classList.remove('sop-split-stage', 'sop-single-sop-stage', 'dual-sop-wide-stage');
+  stage.classList.remove('ws-hero-present-stage', 'ws-closing-present-stage');
+  stage.dataset.splitOn = '';
+}
+
 function bindPresentParticipantAssign() {
   if (document.body.dataset.sopAssignBound) return;
   document.body.dataset.sopAssignBound = '1';
@@ -6091,9 +6120,10 @@ function renderPresentNow() {
     }
   }
   const stage = $('#present-stage');
-  if (!slide) { stage.innerHTML = '<h1>Keine Folien</h1>'; stage.classList.remove('sop-split-stage', 'ws-hero-present-stage', 'ws-closing-present-stage'); stopHeroAiFx(); stopClosingAiFx(); return; }
+  if (!slide) { stage.innerHTML = '<h1>Keine Folien</h1>'; clearPresentStageLayout(stage); stopHeroAiFx(); stopClosingAiFx(); return; }
   stage.classList.toggle('ws-hero-present-stage', !!(isWorkshopOpeningSlide(slide) && isSopWorkshopPresentation()));
   stage.classList.toggle('ws-closing-present-stage', !!(isWorkshopClosingSlide(slide) && (isSopWorkshopPresentation() || slide.settings?.presentationClosing)));
+  applyPresentStageLayout(stage, slide, { splitOn: shouldUseSopSplit(slide) });
   const c = slide.content || {};
   // DEBUG-Simulator: bei jedem Slide-Wechsel die Antworten für diesen Slide
   // zeitversetzt drippen (nur einmal pro Slide via triggeredSlides-Set)
@@ -6191,8 +6221,7 @@ function renderPresentNow() {
   }
 
   if (slide.slide_type === 'section' && useCenteredLayout(slide)) {
-    stage.classList.remove('sop-split-stage');
-    stage.dataset.splitOn = '';
+    applyPresentStageLayout(stage, slide, { splitOn: false });
     stage.innerHTML = wrapSlide(renderCenteredSlideHtml(c, false, { icon: 'fa-heading' }), State.session.current_slide_index || 0);
     updatePresentHeader();
     updatePresentStats();
@@ -6220,8 +6249,7 @@ function renderPresentNow() {
       html = `${useCenteredLayout(slide) ? renderCenteredSlideHtml(c, false, { icon: 'fa-trophy' }) : `<h1 class="pslide-q-title">${esc(c.title || 'Ergebnis')}</h1><p class="pslide-q-prompt">${esc(c.body || '').replace(/\n/g, '<br>')}</p>`}
         <div class="viz-wrap viz-wrap-present">${srcDisplay ? window.LPViz.renderViz(srcDisplay, srcAgg, 'present', { displayMode: getResultsDisplayMode() }) : ''}</div>`;
     }
-    stage.classList.remove('sop-split-stage');
-    stage.dataset.splitOn = '';
+    applyPresentStageLayout(stage, slide, { splitOn: false });
     stage.classList.toggle('ws-closing-present-stage', !!slide.settings?.presentationClosing);
     stage.innerHTML = wrapSlide(html, State.session.current_slide_index || 0);
     updatePresentHeader();
@@ -6234,8 +6262,7 @@ function renderPresentNow() {
   }
 
   if (isSopWorkshopPresentation() && slide.slide_type === 'content' && isWorkshopClosingSlide(slide)) {
-    stage.classList.remove('sop-split-stage');
-    stage.dataset.splitOn = '';
+    applyPresentStageLayout(stage, slide, { splitOn: false });
     stage.innerHTML = wrapSlide(renderClosingSlideHtml(c, false, { shellMode: true, presentFx: true }), slideIdx);
     updatePresentHeader();
     updatePresentStats();
@@ -6247,8 +6274,7 @@ function renderPresentNow() {
   }
 
   if (isSopWorkshopPresentation() && slide.slide_type === 'content' && isWorkshopOpeningSlide(slide) && !isCardResultsSlide(slide)) {
-    stage.classList.remove('sop-split-stage');
-    stage.dataset.splitOn = '';
+    applyPresentStageLayout(stage, slide, { splitOn: false });
     stage.innerHTML = wrapSlide(renderHeroSlideHtml(c, false, { shellMode: true, presentFx: true }), slideIdx);
     updatePresentHeader();
     updatePresentStats();
@@ -6288,8 +6314,7 @@ function renderPresentNow() {
       html = c.isHeroSlide ? renderHeroSlideHtml(c) : renderSopContentHtml(c);
     }
     if (html) {
-      stage.classList.remove('sop-split-stage');
-      stage.dataset.splitOn = '';
+      applyPresentStageLayout(stage, slide, { splitOn: false });
       stage.innerHTML = wrapSlide(html, State.session.current_slide_index || 0);
       updatePresentHeader();
       updatePresentStats();
@@ -6302,8 +6327,7 @@ function renderPresentNow() {
   }
 
   if (slide.slide_type === 'content' && useCenteredLayout(slide) && !interactive) {
-    stage.classList.remove('sop-split-stage');
-    stage.dataset.splitOn = '';
+    applyPresentStageLayout(stage, slide, { splitOn: false });
     stage.innerHTML = wrapSlide(`${renderCenteredSlideHtml(c, false, { icon: 'fa-align-center' })}
       ${c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="" style="max-width:min(720px,90vw);border-radius:16px;margin-top:1rem">` : ''}
       ${viz ? `<div class="viz-wrap viz-wrap-present">${viz}</div>` : ''}`, State.session.current_slide_index || 0);
@@ -6355,8 +6379,7 @@ function renderPresentNow() {
     stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
     return;
   } else {
-    stage.classList.remove('sop-split-stage');
-    stage.dataset.splitOn = '';
+    applyPresentStageLayout(stage, slide, { splitOn: false });
     stage.innerHTML = wrapSlide(`
       ${!isSopWorkshopPresentation() && workshopMode ? renderWorkshopModeBadge(workshopMode) : ''}
       ${!isSopWorkshopPresentation() ? sopBadge : ''}
