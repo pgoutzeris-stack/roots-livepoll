@@ -1365,3 +1365,8 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .sop-split-active .ws-board-head{margin-bottom:1rem}
 .sop-split-col-body{padding:.85rem}
 .sop-split-col-body .present-wait-msg{padding:1rem .5rem}
+/* Split-View zeigt zwei vollständige Slides nebeneinander */
+.sop-split-slides .sop-split-col-body{padding:1rem;overflow-x:auto}
+.sop-split-slides .pslide-q-title{font-size:1.4rem;line-height:1.2}
+.sop-split-slides .pslide-question-block{padding:0}
+.sop-split-slides .workshop-collect-board{margin-top:.6rem}

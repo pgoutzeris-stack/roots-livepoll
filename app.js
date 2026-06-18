@@ -1416,33 +1416,33 @@ function renderBrainstormPresentViz(slide, visible) {
   return window.LPViz.renderBrainstormBubbles(items, { mode: 'present', maxItems: 100, newIds });
 }
 
-// Gesammelte Use Cases einer SOP-Gruppe (über alle Brainstorm-Slides der Gruppe).
-function brainstormGroupItems(group) {
-  const slideIds = new Set((State.slides || [])
-    .filter((s) => s.slide_type === 'brainstorm' && s.content?.sopGroup === group)
-    .map((s) => s.id));
-  return (State.responses || [])
-    .filter((r) => slideIds.has(r.slide_id) && !r.is_hidden)
-    .map((r) => ({ id: r.id, text: String(r.response?.text || '').trim() }))
-    .filter((item) => item.text);
+// Brainstorm-Slides einer SOP-Gruppe, in Deck-Reihenfolge.
+function brainstormSlidesOfGroup(group) {
+  return (State.slides || []).filter((s) => s.slide_type === 'brainstorm' && s.content?.sopGroup === group);
 }
 
-// Split-View (nur Beamer): links Internal-SOP-Use-Cases, rechts Consulting.
-function renderBrainstormSplitViz() {
-  const col = (group, label, icon) => {
-    const items = brainstormGroupItems(group);
-    const newIds = markNewBubbleIds('split-' + group, items);
-    const body = items.length
-      ? window.LPViz.renderBrainstormBubbles(items, { mode: 'present', maxItems: 60, newIds })
-      : '<div class="present-wait-msg">Noch keine Use Cases.</div>';
-    return `<div class="sop-split-col">
-      <div class="sop-split-col-head sop-split-col-head--${group}"><i class="fa-solid ${icon}"></i> ${label} <span class="sop-split-col-count">${items.length}</span></div>
-      <div class="sop-split-col-body">${body}</div>
+// Eine vollständige Brainstorm-Slide als Spalte (Frage + Board + Live-Bubbles DIESER Slide).
+function renderBrainstormSlideColumn(slide) {
+  if (!slide) return '<div class="present-wait-msg">Kein entsprechender Track in diesem SOP.</div>';
+  const visible = getVisibleResponses(slide.id);
+  return `${renderWorkshopCardCollectHtml(slide.content || {})}
+    <div class="viz-wrap viz-wrap-present">${renderBrainstormPresentViz(slide, visible)}</div>`;
+}
+
+// Split-View (nur Beamer): links die Internal-SOP-Slide, rechts die Consulting-SOP-Slide.
+// Gepaart über den Index innerhalb der jeweiligen Gruppe (parallele Tracks).
+function renderBrainstormSplitViz(currentSlide) {
+  const internals = brainstormSlidesOfGroup('internal');
+  const consultings = brainstormSlidesOfGroup('consulting');
+  const list = currentSlide?.content?.sopGroup === 'consulting' ? consultings : internals;
+  const groupIdx = Math.max(0, list.findIndex((s) => s.id === currentSlide?.id));
+  const col = (group, label, icon, slide) => `<div class="sop-split-col">
+      <div class="sop-split-col-head sop-split-col-head--${group}"><i class="fa-solid ${icon}"></i> ${label}</div>
+      <div class="sop-split-col-body">${renderBrainstormSlideColumn(slide)}</div>
     </div>`;
-  };
-  return `<div class="sop-split-grid sop-split-active">
-    ${col('internal', 'Internal SOP', 'fa-building')}
-    ${col('consulting', 'Consulting SOP', 'fa-handshake')}
+  return `<div class="sop-split-grid sop-split-active sop-split-slides">
+    ${col('internal', 'Internal SOP', 'fa-building', internals[groupIdx] || null)}
+    ${col('consulting', 'Consulting SOP', 'fa-handshake', consultings[groupIdx] || null)}
   </div>`;
 }
 
@@ -4874,10 +4874,12 @@ function renderPresent() {
   const workshopMode = getWorkshopMode(slide);
 
   if (isBrainstormCollectSlide(slide)) {
-    const collectViz = (State.sopSplitView && supportsSopSplit(slide)) ? renderBrainstormSplitViz() : viz;
-    stage.innerHTML = wrapSlide(`
-      ${renderWorkshopCardCollectHtml(c)}
-      <div class="viz-wrap viz-wrap-present">${collectViz}</div>${modPanel}`, slideIdx);
+    const splitOn = State.sopSplitView && supportsSopSplit(slide);
+    const inner = splitOn
+      ? renderBrainstormSplitViz(slide)
+      : `${renderWorkshopCardCollectHtml(c)}
+      <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`;
+    stage.innerHTML = wrapSlide(inner, slideIdx);
     stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
     stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
     updatePresentHeader();
