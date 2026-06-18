@@ -1472,6 +1472,117 @@ function getParticipantSopGroup(participantId) {
   return State.session.settings.dualSopAssignments?.[participantId] || null;
 }
 
+function isParticipantSharedSlide(slide) {
+  if (!slide) return true;
+  const c = slide.content || {};
+  if (isFinaleSlide(slide)) return true;
+  if (c.sopDualBoth) return true;
+  if (c.sopKind === 'participants' || c.sopKind === 'group-transition') return true;
+  if (c.sopKind === 'workshop-goal' || c.sopKind === 'instructions') return true;
+  if (c.isHeroSlide) return true;
+  if (!c.sopGroup && c.sopKind !== 'dual-pair-collect') return true;
+  return false;
+}
+
+function participantNeedsSopAssignment(slide) {
+  if (!isDualSopWorkshop() || !State.participant || isParticipantSharedSlide(slide)) return false;
+  return !getParticipantSopGroup(State.participant.id);
+}
+
+function participantOnWrongSopGroup(slide) {
+  if (!isDualSopWorkshop() || !State.participant || isParticipantSharedSlide(slide)) return false;
+  const assigned = getParticipantSopGroup(State.participant.id);
+  if (!assigned) return false;
+  const slideGroup = slide.content?.sopGroup;
+  if (!slideGroup) return false;
+  return slideGroup !== assigned;
+}
+
+function renderParticipantSopWaitHtml({ title = 'SOP-Zuweisung', lead = '' } = {}) {
+  return `<div class="participant-wait-block participant-sop-unassigned ws-slide ws-slide--orient">
+    <header class="ws-slide-head"><span class="ws-pill ws-pill--orient"><i class="fa-solid fa-hourglass-half"></i> Warte</span></header>
+    <h1 class="ws-title">${esc(title)}</h1>
+    <p class="ws-lead">${esc(lead || 'Bitte auf den Host achten…')}</p>
+  </div>`;
+}
+
+function getDualSopAssignBuckets() {
+  const buckets = { internal: [], consulting: [], unassigned: [] };
+  (State.participants || []).forEach((p) => {
+    const g = getParticipantSopGroup(p.id);
+    if (g === 'internal' || g === 'consulting') buckets[g].push(p);
+    else buckets.unassigned.push(p);
+  });
+  return buckets;
+}
+
+function participantAssignButtonsHtml(p, { large = false } = {}) {
+  const assigned = getParticipantSopGroup(p.id);
+  const activeInternal = assigned === 'internal' ? ' is-active' : '';
+  const activeConsulting = assigned === 'consulting' ? ' is-active' : '';
+  const intMeta = getSopGroupMeta('internal');
+  const conMeta = getSopGroupMeta('consulting');
+  if (large) {
+    return `<span class="sop-assign-btns sop-assign-btns--large" role="group" aria-label="SOP-Zuweisung für ${esc(p.display_name || 'Gast')}">
+      <button type="button" class="sop-assign-btn sop-assign-btn--internal${activeInternal}" data-sop-assign="internal" data-participant-id="${esc(p.id)}">
+        <i class="fa-solid ${intMeta.icon}"></i> ${esc(intMeta.shortLabel || 'Internal')}
+      </button>
+      <button type="button" class="sop-assign-btn sop-assign-btn--consulting${activeConsulting}" data-sop-assign="consulting" data-participant-id="${esc(p.id)}">
+        <i class="fa-solid ${conMeta.icon}"></i> ${esc(conMeta.shortLabel || 'Consulting')}
+      </button>
+    </span>`;
+  }
+  return `<span class="sop-assign-btns" role="group" aria-label="SOP-Zuweisung">
+    <button type="button" class="sop-assign-btn sop-assign-btn--internal${activeInternal}" data-sop-assign="internal" data-participant-id="${esc(p.id)}" title="${esc(intMeta.label)}">Int</button>
+    <button type="button" class="sop-assign-btn sop-assign-btn--consulting${activeConsulting}" data-sop-assign="consulting" data-participant-id="${esc(p.id)}" title="${esc(conMeta.label)}">Con</button>
+  </span>`;
+}
+
+function renderSopAssignBoardHtml({ large = false } = {}) {
+  if (!isDualSopWorkshop()) return '';
+  const buckets = getDualSopAssignBuckets();
+  const total = State.participants?.length || 0;
+  if (!total) {
+    return `<div class="sop-assign-board${large ? ' sop-assign-board--stage' : ''}">
+      <p class="sop-assign-empty"><i class="fa-solid fa-qrcode"></i> Warte auf Teilnehmer per QR-Code…</p>
+    </div>`;
+  }
+  const rowHtml = (p) => `<div class="sop-assign-row${large ? ' sop-assign-row--large' : ''}" data-participant-id="${esc(p.id)}">
+    ${participantAvatarHtml(p, large ? 'md' : 'sm')}
+    <span class="sop-assign-name">${esc(p.display_name || 'Gast')}</span>
+    ${participantAssignButtonsHtml(p, { large })}
+  </div>`;
+  const column = (group, list) => {
+    if (!list.length) return '';
+    const meta = getSopGroupMeta(group);
+    return `<div class="sop-assign-col sop-assign-col--${group}">
+      <div class="sop-assign-col-head">
+        <i class="fa-solid ${meta.icon}"></i> ${esc(meta.label)}
+        <span class="sop-split-col-count">${list.length}</span>
+      </div>
+      <div class="sop-assign-col-list">${list.map(rowHtml).join('')}</div>
+    </div>`;
+  };
+  const unassignedCol = buckets.unassigned.length ? `<div class="sop-assign-col sop-assign-col--unassigned">
+    <div class="sop-assign-col-head">
+      <i class="fa-solid fa-user-clock"></i> Noch nicht zugewiesen
+      <span class="sop-split-col-count">${buckets.unassigned.length}</span>
+    </div>
+    <div class="sop-assign-col-list">${buckets.unassigned.map(rowHtml).join('')}</div>
+  </div>` : '';
+  const hint = large
+    ? `<p class="sop-assign-hint"><i class="fa-solid fa-hand-pointer"></i> ${total} Teilnehmer beigetreten — weise jeden Internal oder Consulting zu. In der Mobilansicht sehen Teilnehmer nur ihr SOP, bis Pitch, Priorisierung und Matrix.</p>`
+    : '';
+  return `<div class="sop-assign-board${large ? ' sop-assign-board--stage' : ''}" data-sop-assign-board>
+    ${hint}
+    <div class="sop-assign-columns">
+      ${column('internal', buckets.internal)}
+      ${column('consulting', buckets.consulting)}
+      ${unassignedCol}
+    </div>
+  </div>`;
+}
+
 function findDualSopSlideByPair(group, pairIndex, slideType) {
   if (pairIndex == null || pairIndex < 0) return null;
   return (State.slides || []).find((s) => s.slide_type === slideType
@@ -1480,19 +1591,26 @@ function findDualSopSlideByPair(group, pairIndex, slideType) {
 }
 
 function resolveParticipantSlide(slide) {
-  if (!slide || !isDualSopParallelWorkshop() || !State.participant) return slide;
-  if (isFinaleSlide(slide) || slide.settings?.sopAllTracksVote || slide.settings?.sopAllTracksMatrix || slide.settings?.sopPitchSession) return slide;
-  if (slide.content?.sopKind === 'dual-pair-collect') {
+  if (!slide || !isDualSopWorkshop() || !State.participant) return slide;
+  if (isParticipantSharedSlide(slide)) return slide;
+  if (participantOnWrongSopGroup(slide) || participantNeedsSopAssignment(slide)) return slide;
+
+  if (slide.content?.sopKind === 'dual-pair-collect' && isDualSopParallelWorkshop()) {
     const group = getParticipantSopGroup(State.participant.id);
     if (!group) return slide;
     const pairIdx = getDualSopPairIndex(slide);
     return findDualSopSlideByPair(group, pairIdx, 'brainstorm') || slide;
   }
+
   const group = getParticipantSopGroup(State.participant.id);
-  if (!group || slide.content?.sopGroup === group) return slide;
+  if (!group) return slide;
+  if (slide.content?.sopGroup === group) return slide;
+
   const pairIdx = getDualSopPairIndex(slide);
-  if (pairIdx == null) return slide;
-  return findDualSopSlideByPair(group, pairIdx, slide.slide_type) || slide;
+  if (pairIdx != null && pairIdx >= 0) {
+    return findDualSopSlideByPair(group, pairIdx, slide.slide_type) || slide;
+  }
+  return slide;
 }
 
 async function assignParticipantSopGroup(participantId, group) {
@@ -1504,21 +1622,18 @@ async function assignParticipantSopGroup(participantId, group) {
   if (error) { toast('SOP-Zuweisung fehlgeschlagen', 'error'); return; }
   State.session.settings = settings;
   renderPresentParticipants();
+  if (currentSessionSlide()?.content?.sopKind === 'participants') renderPresent();
   toast(group === 'internal' ? '→ Internal SOP' : '→ Consulting SOP', 'success');
 }
 
 function participantChipHtml(p) {
-  if (!isDualSopParallelWorkshop() || !State.session) return `<div class="present-participant-chip">${participantAvatarHtml(p, 'sm')}<span>${esc(p.display_name || 'Gast')}</span></div>`;
-  const assigned = getParticipantSopGroup(p.id);
-  const activeInternal = assigned === 'internal' ? ' is-active' : '';
-  const activeConsulting = assigned === 'consulting' ? ' is-active' : '';
+  if (!isDualSopWorkshop() || !State.session) {
+    return `<div class="present-participant-chip">${participantAvatarHtml(p, 'sm')}<span>${esc(p.display_name || 'Gast')}</span></div>`;
+  }
   return `<div class="present-participant-chip present-participant-chip--dual" data-participant-id="${esc(p.id)}">
     ${participantAvatarHtml(p, 'sm')}
     <span class="present-participant-name">${esc(p.display_name || 'Gast')}</span>
-    <span class="sop-assign-btns" role="group" aria-label="SOP-Zuweisung">
-      <button type="button" class="sop-assign-btn sop-assign-btn--internal${activeInternal}" data-sop-assign="internal" data-participant-id="${esc(p.id)}" title="Internal SOP">Int</button>
-      <button type="button" class="sop-assign-btn sop-assign-btn--consulting${activeConsulting}" data-sop-assign="consulting" data-participant-id="${esc(p.id)}" title="Consulting SOP">Con</button>
-    </span>
+    ${participantAssignButtonsHtml(p)}
   </div>`;
 }
 
@@ -2066,7 +2181,7 @@ function getSlideShellMeta(slide) {
   if (c.isHeroSlide) return { pillIcon: 'fa-signal', pillLabel: 'Start', pillTone: 'brand' };
   if (c.sopKind === 'workshop-goal') return { pillIcon: 'fa-bullseye', pillLabel: 'Ziel', pillTone: 'brand' };
   if (c.sopKind === 'instructions') return { pillIcon: 'fa-pen-ruler', pillLabel: 'Format', pillTone: 'brand' };
-  if (c.sopKind === 'participants') return { pillIcon: 'fa-users', pillLabel: 'Teams', pillTone: 'orient' };
+  if (c.sopKind === 'participants') return { pillIcon: 'fa-user-group', pillLabel: 'Zuweisung', pillTone: 'orient' };
   if (c.sopKind === 'next-steps' || slide?.settings?.sopNextSteps) return { pillIcon: 'fa-list-check', pillLabel: 'Actions', pillTone: 'finale' };
   if (c.sopKind === 'group-vote' || c.sopKind === 'final-vote') return { pillIcon: 'fa-ranking-star', pillLabel: 'Priorisierung', pillTone: 'finale' };
   if (slide?.settings?.presentationClosing || (c.isHeroSlide && /danke/i.test(String(c.title || '')))) {
@@ -2427,6 +2542,7 @@ function syncSopWorkshopShell(mode, slideIndex) {
   const isSop = isSopWorkshopPresentation();
   document.body.classList.toggle('lp-sop-workshop', isSop);
   document.body.classList.toggle('lp-dual-sop-parallel', isDualSopParallelWorkshop());
+  document.body.classList.toggle('lp-dual-sop-workshop', isDualSopWorkshop());
   document.body.classList.toggle('lp-sop-focus', isSop && State.sopFocusMode);
   document.body.classList.toggle('lp-sop-panels', isSop && State.showPresentPanels);
   document.body.classList.toggle('editor-mode', mode === 'editor');
@@ -2820,7 +2936,7 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
         ${renderSopBoardPreview(c, editable)}
       </div>`;
   }
-  // Teilnehmer-/Teams-Folie — gebrandet wie die anderen Intro-Folien (Badge + Team-Karten)
+  // SOP-Zuweisung — live aus QR-Teilnehmern (Present) / Platzhalter (Editor)
   if (c.sopKind === 'participants') {
     const titleEl = editable
       ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
@@ -2828,37 +2944,17 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
     const subEl = editable
       ? `<div class="canvas-editable sop-pslide-sub" contenteditable="true" data-field="subtitle">${esc(c.subtitle || '')}</div>`
       : (c.subtitle ? `<p class="sop-pslide-sub">${esc(c.subtitle)}</p>` : '');
-    // Teams aus dem Body parsen: Blöcke (Leerzeile getrennt) → 1. Zeile = Label, Rest = Mitglieder (· oder ,)
-    const blocks = String(c.body || '').split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
-    const teamThemes = [sopTrackTheme('track-people'), sopTrackTheme('track-pre'), sopTrackTheme('track-knowledge')];
-    const teams = blocks.map((block) => {
-      const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
-      return {
-        label: lines[0] || '',
-        members: lines.slice(1).join(' · ').split(/·|,/).map((m) => m.trim()).filter(Boolean),
-      };
-    });
-    const teamsHtml = teams.length
-      ? `<div class="sop-team-grid">${teams.map((t, i) => {
-          const th = teamThemes[i % teamThemes.length];
-          const members = t.members.length
-            ? `<div class="sop-team-members">${t.members.map((m) => `<span class="sop-team-member"><span class="sop-team-ava" style="background:${th.soft};color:${th.badgeColor}">${esc((m.trim()[0] || '?').toUpperCase())}</span>${esc(m)}</span>`).join('')}</div>`
-            : '<div class="sop-team-members"><span class="sop-team-member sop-team-member--empty">Noch offen</span></div>';
-          return `<div class="sop-team-block" style="border-left-color:${th.badgeColor}">
-            <div class="sop-team-title" style="color:${th.badgeColor}"><i class="fa-solid fa-people-group"></i> ${esc(t.label)}</div>
-            ${members}
-          </div>`;
-        }).join('')}</div>`
-      : (c.body ? `<p class="sop-pslide-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+    const assignBoard = renderSopAssignBoardHtml({ large: true });
+    const editorHint = `<p class="sop-assign-editor-hint"><i class="fa-solid fa-qrcode"></i> Im Live-Modus erscheinen hier alle per QR-Code beigetretenen Teilnehmer — der Host weist sie Internal oder Consulting zu.</p>`;
     if (shellMode && !editable) {
-      return `<div class="ws-sop-main ws-sop-main--participants">${teamsHtml}</div>`;
+      return `<div class="ws-sop-main ws-sop-main--participants">${assignBoard}</div>`;
     }
     return `
       <div class="sop-pslide-section sop-pslide-participants">
-        <div class="sop-pslide-badge" style="background:var(--brand);color:#fff"><i class="fa-solid fa-users"></i> Teilnehmer</div>
+        <div class="sop-pslide-badge" style="background:var(--brand);color:#fff"><i class="fa-solid fa-user-group"></i> Zuweisung</div>
         ${titleEl}
         ${subEl}
-        ${teamsHtml}
+        ${editable ? editorHint : assignBoard || editorHint}
       </div>`;
   }
   // Generischer SOP-Content-Fallback (sonst wuerde eine unbekannte sopKind-Folie leer rendern).
@@ -2909,13 +3005,8 @@ function renderPresentParticipants() {
     bar.innerHTML = '<span class="present-participants-empty">Warte auf Teilnehmer…</span>';
     return;
   }
-  if (isDualSopParallelWorkshop()) {
-    const buckets = { internal: [], consulting: [], unassigned: [] };
-    State.participants.forEach((p) => {
-      const g = getParticipantSopGroup(p.id);
-      if (g === 'internal' || g === 'consulting') buckets[g].push(p);
-      else buckets.unassigned.push(p);
-    });
+  if (isDualSopWorkshop()) {
+    const buckets = getDualSopAssignBuckets();
     const teamSection = (group, list) => {
       if (!list.length) return '';
       const meta = getSopGroupMeta(group);
@@ -4034,10 +4125,9 @@ function shouldUseSopSplit(slide) {
 }
 
 function bindPresentParticipantAssign() {
-  const bar = $('#present-participants');
-  if (!bar || bar.dataset.assignBound) return;
-  bar.dataset.assignBound = '1';
-  bar.addEventListener('click', (e) => {
+  if (document.body.dataset.sopAssignBound) return;
+  document.body.dataset.sopAssignBound = '1';
+  document.body.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-sop-assign]');
     if (!btn) return;
     e.preventDefault();
@@ -6248,13 +6338,31 @@ async function renderParticipantQuestion() {
     finishParticipant();
     return;
   }
-  if (isDualSopParallelWorkshop() && isBrainstormCollectSlide(hostSlide) && !getParticipantSopGroup(State.participant?.id)) {
-    root.innerHTML = wrapParticipantSlide(`
-      <div class="participant-wait-block participant-sop-unassigned ws-slide ws-slide--orient">
-        <header class="ws-slide-head"><span class="ws-pill ws-pill--orient"><i class="fa-solid fa-hourglass-half"></i> Warte</span></header>
-        <h1 class="ws-title">SOP-Zuweisung</h1>
-        <p class="ws-lead">Der Host weist dich gleich Internal oder Consulting zu.</p>
-      </div>`, slideIndex);
+  if (hostSlide?.content?.sopKind === 'participants') {
+    root.innerHTML = wrapParticipantSlide(renderParticipantSopWaitHtml({
+      title: 'SOP-Zuweisung läuft',
+      lead: 'Der Host ordnet dich gleich Internal oder Consulting zu. Danach siehst du nur dein SOP — bis Pitch, Priorisierung und Matrix.',
+    }), slideIndex);
+    finishParticipant();
+    return;
+  }
+  if (participantNeedsSopAssignment(hostSlide)) {
+    root.innerHTML = wrapParticipantSlide(renderParticipantSopWaitHtml({
+      title: 'SOP-Zuweisung',
+      lead: 'Der Host weist dich gleich Internal oder Consulting zu.',
+    }), slideIndex);
+    finishParticipant();
+    return;
+  }
+  if (participantOnWrongSopGroup(hostSlide)) {
+    const assigned = getParticipantSopGroup(State.participant?.id);
+    const meta = assigned ? getSopGroupMeta(assigned) : null;
+    root.innerHTML = wrapParticipantSlide(renderParticipantSopWaitHtml({
+      title: meta ? `Dein SOP: ${meta.label}` : 'Andere SOP-Runde',
+      lead: meta
+        ? `Du bist ${meta.label} zugewiesen. Bitte warte, bis eure Runde auf dem Beamer aktiv ist.`
+        : 'Bitte auf den Host achten…',
+    }), slideIndex);
     finishParticipant();
     return;
   }
@@ -6368,7 +6476,7 @@ async function renderParticipantQuestion() {
   const isWorkshop = isSopWorkshopPresentation() || hasBrainstormChain(slide) || isBrainstormVoteSlide(slide) || isBrainstormResultsSlide(slide);
   const isCollect = isBrainstormCollectSlide(slide);
   const isDecide = shouldUseVoteWorkshopUi(slide);
-  const assignedGroup = isDualSopParallelWorkshop() ? getParticipantSopGroup(State.participant?.id) : null;
+  const assignedGroup = isDualSopWorkshop() ? getParticipantSopGroup(State.participant?.id) : null;
   const teamBadge = assignedGroup && isCollect
     ? `<div class="participant-team-badge ws-pill ws-pill--orient"><i class="fa-solid ${getSopGroupMeta(assignedGroup).icon}"></i> Dein Team: ${esc(getSopGroupMeta(assignedGroup).label)}</div>`
     : '';

@@ -1405,11 +1405,29 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .present-participant-chip--dual{align-items:center;gap:.35rem;padding:.35rem .5rem .35rem .35rem}
 .present-participant-name{max-width:8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.78rem}
 .sop-assign-btns{display:inline-flex;gap:2px;margin-left:.15rem}
+.sop-assign-btns--large{display:flex;gap:.45rem;margin-left:0;flex-shrink:0}
 .sop-assign-btn{border:1px solid var(--line);background:var(--surface);color:var(--muted);font-family:inherit;font-size:.62rem;font-weight:800;padding:.2rem .55rem;border-radius:var(--radius-pill);cursor:pointer;line-height:1.2;transition:background .12s,color .12s,border-color .12s,box-shadow .12s}
+.sop-assign-btns--large .sop-assign-btn{font-size:.72rem;padding:.42rem .75rem;display:inline-flex;align-items:center;gap:.35rem;border-radius:999px}
 .sop-assign-btn--internal.is-active,
 .sop-assign-btn--consulting.is-active{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 0 0 2px rgba(32,110,251,.1)}
 .sop-assign-btn:hover:not(.is-active){border-color:var(--brand);color:var(--ink)}
 .sop-assign-btn:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(32,110,251,.1)}
+.sop-assign-board{width:100%;margin-top:.25rem}
+.sop-assign-board--stage{margin-top:.35rem}
+.sop-assign-hint{font-size:.88rem;line-height:1.5;color:var(--muted);margin:0 0 1rem;padding:.75rem 1rem;background:var(--brand-light);border-radius:12px}
+.sop-assign-hint i{color:var(--brand);margin-right:.35rem}
+.sop-assign-empty,.sop-assign-editor-hint{font-size:.92rem;line-height:1.55;color:var(--muted);padding:1rem 1.1rem;background:var(--surface);border:1.5px dashed var(--line);border-radius:14px;margin:0}
+.sop-assign-empty i,.sop-assign-editor-hint i{color:var(--brand);margin-right:.35rem}
+.sop-assign-columns{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:clamp(.75rem,1.5vw,1rem);align-items:start}
+.sop-assign-col{border:1px solid var(--line);border-radius:16px;background:var(--bg);overflow:hidden;box-shadow:var(--shadow);min-height:120px}
+.sop-assign-col-head{display:flex;align-items:center;gap:.5rem;font-weight:800;font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;padding:.65rem .85rem;background:var(--surface);border-bottom:1px solid var(--line)}
+.sop-assign-col-head i{color:var(--brand)}
+.sop-assign-col--unassigned .sop-assign-col-head{color:var(--muted)}
+.sop-assign-col-list{display:flex;flex-direction:column;gap:.45rem;padding:.65rem .75rem .75rem;max-height:min(52vh,420px);overflow-y:auto}
+.sop-assign-row{display:flex;align-items:center;gap:.55rem;padding:.45rem .55rem;border-radius:12px;background:var(--surface);border:1px solid var(--line)}
+.sop-assign-row--large{padding:.55rem .65rem;gap:.65rem}
+.sop-assign-name{flex:1;min-width:0;font-size:.88rem;font-weight:700;color:var(--ink);line-height:1.25}
+.sop-assign-row--large .sop-assign-name{font-size:.95rem}
 .participant-sop-unassigned .pslide-q-prompt{max-width:36rem;margin:0 auto}
 
 /* ═══════ WS-SLIDE · einheitliches Workshop-Design (bold, pills, icons) ═══════ */

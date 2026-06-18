@@ -93,16 +93,14 @@ function dualParallelProgress(pairIndex, pairTotal) {
   };
 }
 
-// ─── DUAL-SOP TEAMS (zentral anpassen) ────────────────────────────────────────
-// Wer welchem SOP zugeordnet ist. Wird in beiden Dual-Vorlagen verwendet, statt
-// die Namen fest in den Folientext zu schreiben.
+// Dual-SOP: Zuweisung erfolgt live per QR-Teilnehmer (siehe assignParticipantSopGroup).
+// LP_DUAL_SOP_TEAMS bleibt nur als optionale Editor-Referenz, nicht mehr in Folien hardcodiert.
 window.LP_DUAL_SOP_TEAMS = {
-  internal: ['Richard Erbler', 'Jannick Müller', 'Pano Goutzeris'],
-  consulting: ['Manuel Stankovic', 'Rod Mitecki'],
+  internal: [],
+  consulting: [],
 };
 function dualTeamsBody() {
-  const t = window.LP_DUAL_SOP_TEAMS;
-  return `Internal SOP\n${t.internal.join(' · ')}\n\nConsulting SOP\n${t.consulting.join(' · ')}`;
+  return '';
 }
 
 // Single source of truth for the Impact/Effort matrix quadrants (used by sopIceMatrix + LP_DEFAULT_CONTENT).
@@ -1049,12 +1047,12 @@ function dualCombinedVote() {
   }, { showResultsLive: true, sopAllTracksVote: true, sopFairVote: true, sopVoteMax: n, workshopMode: 'decide' });
 }
 
-// Teilnehmer-/Team-Folie. Namen kommen aus LP_DUAL_SOP_TEAMS (zentral konfigurierbar).
+// Teilnehmer-Zuweisungsfolie — live im Present-Modus aus QR-Teilnehmern befüllt.
 function dualParticipantsSlide(subtitle) {
   return tplSlide('content', {
-    title: 'Wer ist dabei?',
-    subtitle,
-    body: dualTeamsBody(),
+    title: 'SOP-Zuweisung',
+    subtitle: subtitle || 'Teilnehmer per QR-Code Internal oder Consulting zuweisen',
+    body: '',
     sopKind: SK.PARTICIPANTS,
     isHeroSlide: false,
     ...dualBothGroupsFields(),
@@ -1101,7 +1099,7 @@ function buildDualSopSequentialWorkshopSlides() {
   slides.push(...introSlides);
 
   slides.push(tagDualSharedSlide(
-    dualParticipantsSlide('Zwei Teams und zwei SOPs. Wir starten mit dem Internal SOP.'),
+    dualParticipantsSlide('Alle per QR beigetretenen Teilnehmer einem SOP zuweisen — danach startet Internal.'),
   ));
 
   INTERNAL_SOP_TRACKS.forEach((t, i) => {
@@ -1184,7 +1182,7 @@ function buildDualSopParallelWorkshopSlides() {
   slides.push(...introSlides);
 
   slides.push(tagDualSharedSlide(
-    dualParticipantsSlide('Zwei SOPs parallel. Der Host weist Teilnehmer den Teams zu.'),
+    dualParticipantsSlide('Alle per QR beigetretenen Teilnehmer einem SOP zuweisen — danach paralleles Sammeln.'),
   ));
 
   function dualPairCollectAnchor(pairIndex) {
