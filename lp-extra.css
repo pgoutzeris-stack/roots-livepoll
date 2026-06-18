@@ -1429,6 +1429,29 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-sop-workshop .ws-body .viz-wrap{width:100%;max-width:none;margin-top:.35rem}
 .lp-sop-workshop.sop-split-stage .ws-title{font-size:clamp(1.5rem,3vw,2rem)}
 
+/* WS-Shell: einheitliche Inhalts-Blöcke (kein altes sop-pslide-Layout im Present) */
+.ws-body .ws-sop-main{width:100%;display:flex;flex-direction:column;gap:.85rem}
+.ws-body .ws-sop-main .sop-pslide-body{color:var(--muted);font-size:.92rem;line-height:1.55;margin:0;max-width:52rem}
+.ws-body .ws-hero-body{font-size:.95rem;line-height:1.55;color:var(--muted)}
+.ws-body .goal-matrix{margin-top:.15rem}
+.ws-body .workshop-instructions-card{margin-top:0}
+.ws-body .sop-team-grid{margin-top:0;gap:.85rem}
+.ws-body .sop-team-block{border-radius:14px;border:1px solid var(--line);background:var(--surface)}
+.ws-body .pitch-use-cases{margin-top:0}
+.ws-body .pitch-hint{font-size:.88rem;color:var(--muted);margin:0}
+.ws-body .next-steps-list{margin-top:0}
+.ws-body .ws-feedback-wait{margin-top:.25rem}
+.lp-sop-workshop .present-stage .pslide-hero{text-align:left;padding:0;max-width:none}
+.lp-sop-workshop .present-stage .sop-pslide-section{padding:0;max-width:none;margin:0}
+.lp-sop-workshop .present-stage .sop-pslide-section .sop-pslide-title{display:none}
+.lp-sop-workshop .present-stage .sop-pslide-section .sop-pslide-badge{display:none}
+.lp-sop-workshop .present-stage .sop-pslide-sub{font-size:.95rem;font-weight:600;color:var(--muted);margin:0 0 .5rem}
+.lp-sop-workshop .present-stage .workshop-collect-shell--compact .workshop-collect-question{font-size:1.05rem;font-weight:700;color:var(--ink)}
+.lp-sop-workshop .present-stage .workshop-format-hint{font-size:.82rem}
+.lp-sop-workshop .present-stage .workshop-collect-note{font-size:.82rem;color:var(--muted)}
+.lp-sop-workshop .present-stage .viz-wrap-present{margin-top:.5rem}
+.lp-sop-workshop .present-stage .finale-vote{margin-top:.25rem}
+
 /* ═══════ Matrix-Frame v2 · Achsen + bold Quadranten ═══════ */
 .lp-mx-frame{width:100%;max-width:1100px;margin:0 auto}
 .lp-mx-frame-layout{display:grid;grid-template-columns:2.4rem 1fr;gap:.55rem .65rem;align-items:stretch}

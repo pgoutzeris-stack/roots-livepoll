@@ -1904,7 +1904,84 @@ function getSlideShellMeta(slide) {
   if (c.sopKind === 'workshop-goal') return { pillIcon: 'fa-bullseye', pillLabel: 'Ziel', pillTone: 'brand' };
   if (c.sopKind === 'instructions') return { pillIcon: 'fa-pen-ruler', pillLabel: 'Format', pillTone: 'brand' };
   if (c.sopKind === 'participants') return { pillIcon: 'fa-users', pillLabel: 'Teams', pillTone: 'orient' };
+  if (c.sopKind === 'next-steps' || slide?.settings?.sopNextSteps) return { pillIcon: 'fa-list-check', pillLabel: 'Actions', pillTone: 'finale' };
+  if (c.sopKind === 'group-vote' || c.sopKind === 'final-vote') return { pillIcon: 'fa-ranking-star', pillLabel: 'Priorisierung', pillTone: 'finale' };
+  if (slide?.settings?.presentationClosing || (c.isHeroSlide && /danke/i.test(String(c.title || '')))) {
+    return { pillIcon: 'fa-heart', pillLabel: 'Abschluss', pillTone: 'muted' };
+  }
+  if (slide?.slide_type === 'open' && slide?.settings?.anonymous) return { pillIcon: 'fa-comment', pillLabel: 'Feedback', pillTone: 'muted' };
   return { pillIcon: 'fa-circle-info', pillLabel: 'Info', pillTone: 'muted' };
+}
+
+function getWsPresentChips(slide) {
+  const c = slide?.content || {};
+  const chips = [];
+  if (c.sopGroupLabel) {
+    chips.push({ icon: c.sopGroup === 'internal' ? 'fa-building' : 'fa-handshake', label: c.sopGroupLabel });
+  }
+  if (slide?.slide_type === 'section' && c.sopTrackClass) {
+    chips.push(...phaseChipsFromSubtitle(c.subtitle));
+  }
+  if (isBrainstormCollectSlide(slide)) {
+    chips.push(
+      { icon: 'fa-clock', label: `${Math.round((slide.settings?.timeLimitSec || window.LP_WORKSHOP_SETTINGS?.brainstormTimeLimitSec || 300) / 60)} Min.` },
+      { icon: 'fa-hashtag', label: `max. ${window.LP_WORKSHOP_SETTINGS?.brainstormMaxResponses || 2} UC` },
+    );
+  }
+  if (c.sopKind === 'dual-pair-orient') {
+    chips.push({ icon: 'fa-table-columns', label: 'Parallel' }, { icon: 'fa-map', label: `Track ${(getDualSopPairIndex(slide) || 0) + 1}` });
+  }
+  if (c.sopKind === 'instructions' && c.subtitle) {
+    chips.push({ icon: 'fa-stopwatch', label: c.subtitle });
+  }
+  if (isFinaleSlide(slide) && !chips.length) {
+    chips.push({ icon: 'fa-flag-checkered', label: 'Finale' });
+  }
+  if (c.subtitle && c.isHeroSlide && !c.sopKind) {
+    chips.push({ icon: 'fa-tag', label: c.subtitle });
+  }
+  if (slide?.slide_type === 'open' && slide?.settings?.anonymous && c.subtitle) {
+    chips.push({ icon: 'fa-user-secret', label: c.subtitle });
+  }
+  return chips.filter(Boolean);
+}
+
+function getWsPresentTitle(slide) {
+  const c = slide?.content || {};
+  if (slide?.slide_type === 'section' && c.sopTrackClass) return workshopDisplayTitle(enrichSopContent(c));
+  if (c.sopKind === 'dual-pair-orient') return `Track ${(getDualSopPairIndex(slide) || 0) + 1}`;
+  if (isBrainstormCollectSlide(slide)) return workshopDisplayTitle(enrichSopContent(c)) || c.sopCardName || c.title;
+  return c.title || c.prompt || 'Folie';
+}
+
+function getWsPresentLead(slide) {
+  const c = slide?.content || {};
+  if (c.sopKind === 'instructions') return '';
+  if (c.sopKind === 'workshop-goal') return c.subtitle || '';
+  if (c.sopKind === 'pitch-session') return c.subtitle || '';
+  if (c.sopKind === 'next-steps') return c.subtitle || '';
+  if (shouldUseVoteWorkshopUi(slide) && c.prompt) return String(c.prompt).split('\n')[0];
+  if (slide?.slide_type === 'priority_matrix' && c.subtitle) return c.subtitle;
+  if (c.sopKind === 'participants') return c.subtitle || '';
+  return '';
+}
+
+function mountPresentWsSlide(stage, slide, slideIdx, { main = '', splitOn = false } = {}) {
+  const meta = getSlideShellMeta(slide);
+  stage.innerHTML = wrapSlide(renderWsSlideShell({
+    ...meta,
+    title: getWsPresentTitle(slide),
+    chips: getWsPresentChips(slide),
+    lead: getWsPresentLead(slide),
+    main,
+  }), slideIdx);
+  stage.classList.toggle('sop-split-stage', splitOn);
+  updatePresentHeader();
+  updatePresentStats();
+  renderPresentParticipants();
+  void renderQrCode();
+  syncSopWorkshopShell('present', slideIdx);
+  finalizePresentUi(slide);
 }
 
 function renderWsSlideShell({ pillIcon, pillLabel, pillTone = 'brand', title, chips = [], lead = '', main = '' }) {
@@ -2338,7 +2415,8 @@ function renderSopTrackResultsHtml(trackKey) {
     </div>`).join('')}<div class="sop-track-result-total">${allItems.length} Use Cases gesammelt</div></div>`;
 }
 
-function renderSopContentHtml(c, editable = false) {
+function renderSopContentHtml(c, editable = false, opts = {}) {
+  const { shellMode = false } = opts;
   if (c.sopKind === 'card') return renderSopCardHtml(c, editable);
   if (c.sopAllTracksResults) {
     const titleEl = editable
@@ -2396,6 +2474,9 @@ function renderSopContentHtml(c, editable = false) {
         </div>
         <div class="goal-matrix-xaxis"><span class="goal-axis-low">niedrig</span><span>Aufwand</span><span class="goal-axis-high">hoch <i class="fa-solid fa-arrow-right"></i></span></div>
       </div>`;
+    if (shellMode && !editable) {
+      return `<div class="ws-sop-main ws-sop-main--goal">${bodyEl}${goalMatrix}</div>`;
+    }
     return `
       <div class="sop-pslide-section sop-pslide-goal">
         <div class="sop-pslide-badge" style="background:var(--brand);color:#fff"><i class="fa-solid fa-bullseye"></i> Ziel</div>
@@ -2461,6 +2542,9 @@ function renderSopContentHtml(c, editable = false) {
       }
       flushAvoid();
     }
+    if (shellMode && !editable) {
+      return `<div class="ws-sop-main ws-sop-main--instructions"><div class="workshop-instructions-card">${instrHtml}</div></div>`;
+    }
     return `
       <div class="sop-pslide-section sop-pslide-instructions" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
         <div class="sop-pslide-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">Workshop · So geht\'s</div>
@@ -2492,6 +2576,9 @@ function renderSopContentHtml(c, editable = false) {
             </div>
           </div>`).join('')}</div>`
       : '<div class="present-wait-msg">Die priorisierten Use Cases erscheinen hier, sobald die Impact/Effort-Matrix gefüllt ist.</div>';
+    if (shellMode && !editable) {
+      return `<div class="ws-sop-main ws-sop-main--nextsteps">${bodyEl}${cards}</div>`;
+    }
     return `
       <div class="sop-pslide-section sop-pslide-nextsteps">
         ${renderFinalePillHtml()}
@@ -2519,6 +2606,9 @@ function renderSopContentHtml(c, editable = false) {
     const useCasesHtml = State.session
       ? renderAllTracksUseCasesWithAuthors(timerSec)
       : '<div class="present-wait-msg">Use Cases mit Autornamen erscheinen in der Live-Session.</div>';
+    if (shellMode && !editable) {
+      return `<div class="ws-sop-main ws-sop-main--pitch">${configEl}<div class="pitch-use-cases">${useCasesHtml}</div></div>`;
+    }
     return `
       <div class="sop-pslide-section sop-pitch-session">
         ${renderFinalePillHtml()}
@@ -2582,6 +2672,9 @@ function renderSopContentHtml(c, editable = false) {
           </div>`;
         }).join('')}</div>`
       : (c.body ? `<p class="sop-pslide-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+    if (shellMode && !editable) {
+      return `<div class="ws-sop-main ws-sop-main--participants">${teamsHtml}</div>`;
+    }
     return `
       <div class="sop-pslide-section sop-pslide-participants">
         <div class="sop-pslide-badge" style="background:var(--brand);color:#fff"><i class="fa-solid fa-users"></i> Teilnehmer</div>
@@ -2602,6 +2695,9 @@ function renderSopContentHtml(c, editable = false) {
       ? `<div class="canvas-editable sop-pslide-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
       : (c.body ? `<p class="sop-pslide-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
     if (!c.title && !c.subtitle && !c.body && !editable) return '';
+    if (shellMode && !editable) {
+      return `<div class="ws-sop-main">${bodyEl}</div>`;
+    }
     return `
       <div class="sop-pslide-section sop-pslide-${esc(c.sopKind || 'content')}">
         ${titleEl}
@@ -2611,13 +2707,15 @@ function renderSopContentHtml(c, editable = false) {
   }
 }
 
-function renderHeroSlideHtml(c, editable = false) {
+function renderHeroSlideHtml(c, editable = false, opts = {}) {
+  const { shellMode = false } = opts;
+  const bodyEl = editable
+    ? `<div class="canvas-editable pslide-hero-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+    : `<div class="ws-hero-body">${esc(c.body || '').replace(/\n/g, '<br>')}</div>`;
+  if (shellMode && !editable) return bodyEl;
   const titleEl = editable
     ? `<div class="canvas-editable pslide-hero-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
     : `<h1 class="pslide-hero-title">${esc(c.title)}</h1>`;
-  const bodyEl = editable
-    ? `<div class="canvas-editable pslide-hero-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
-    : `<p class="pslide-hero-body">${esc(c.body || '').replace(/\n/g, '<br>')}</p>`;
   return `
     <div class="pslide-hero">
       <div class="pslide-hero-icon"><i class="fa-solid fa-signal"></i></div>
@@ -5132,43 +5230,20 @@ function renderPresent() {
   const slideMuted = c.subtextColor || 'var(--muted)';
 
   if (slide.slide_type === 'content' && c.sopKind === 'dual-pair-orient') {
-    const meta = getSlideShellMeta(slide);
-    const pairIdx = getDualSopPairIndex(slide) || 0;
-    const chips = [{ icon: 'fa-table-columns', label: 'Parallel' }, { icon: 'fa-map', label: `Track ${pairIdx + 1}` }];
-    stage.innerHTML = wrapSlide(renderWsSlideShell({
-      ...meta, title: `Track ${pairIdx + 1}`, chips, main: renderDualPairOrientSplitView(slide),
-    }), slideIdx);
-    stage.classList.add('sop-split-stage');
-    updatePresentHeader();
-    updatePresentStats();
-    renderPresentParticipants();
-    void renderQrCode();
-    syncSopWorkshopShell('present', slideIdx);
-    finalizePresentUi(slide);
+    mountPresentWsSlide(stage, slide, slideIdx, {
+      main: renderDualPairOrientSplitView(slide),
+      splitOn: true,
+    });
     return;
   }
 
   if (slide.slide_type === 'section' && c.sopTrackClass) {
     const splitOn = shouldUseSopSplit(slide);
-    const meta = getSlideShellMeta(slide);
     const enriched = enrichSopContent(c);
-    const main = splitOn ? renderSopSectionSplitView(slide) : renderSopSectionHtml(enriched, false, { shellMode: true });
-    stage.innerHTML = wrapSlide(renderWsSlideShell({
-      ...meta,
-      title: workshopDisplayTitle(enriched),
-      chips: [
-        c.sopGroupLabel ? { icon: c.sopGroup === 'internal' ? 'fa-building' : 'fa-handshake', label: c.sopGroupLabel } : null,
-        ...phaseChipsFromSubtitle(c.subtitle),
-      ].filter(Boolean),
-      main,
-    }), slideIdx);
-    stage.classList.toggle('sop-split-stage', splitOn);
-    updatePresentHeader();
-    updatePresentStats();
-    renderPresentParticipants();
-    void renderQrCode();
-    syncSopWorkshopShell('present', State.session.current_slide_index || 0);
-    finalizePresentUi(slide);
+    mountPresentWsSlide(stage, slide, slideIdx, {
+      main: splitOn ? renderSopSectionSplitView(slide) : renderSopSectionHtml(enriched, false, { shellMode: true }),
+      splitOn,
+    });
     return;
   }
 
@@ -5205,6 +5280,32 @@ function renderPresent() {
     void renderQrCode();
     syncSopWorkshopShell('present', State.session.current_slide_index || 0);
     finalizePresentUi(slide);
+    return;
+  }
+
+  if (isSopWorkshopPresentation() && slide.slide_type === 'content' && c.isHeroSlide && !isCardResultsSlide(slide)) {
+    mountPresentWsSlide(stage, slide, slideIdx, {
+      main: renderHeroSlideHtml(c, false, { shellMode: true }),
+    });
+    return;
+  }
+
+  if (isSopWorkshopPresentation() && slide.slide_type === 'content' && c.sopKind && c.sopKind !== 'dual-pair-orient') {
+    const main = renderSopContentHtml(c, false, { shellMode: true });
+    if (main) {
+      mountPresentWsSlide(stage, slide, slideIdx, { main: `${main}${modPanel}` });
+      stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
+      stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
+      return;
+    }
+  }
+
+  if (isSopWorkshopPresentation() && slide.slide_type === 'open' && slide.settings?.anonymous) {
+    mountPresentWsSlide(stage, slide, slideIdx, {
+      main: `<div class="present-wait-msg ws-feedback-wait">${State.session.question_open ? 'Teilnehmer geben anonym Feedback…' : 'Feedback-Runde beendet'}</div>${modPanel}`,
+    });
+    stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
+    stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
     return;
   }
 
@@ -5247,65 +5348,35 @@ function renderPresent() {
 
   if (isBrainstormCollectSlide(slide)) {
     const splitOn = shouldUseSopSplit(slide);
-    const meta = getSlideShellMeta(slide);
     const enriched = enrichSopContent(c);
-    const chips = [
-      c.sopGroupLabel ? { icon: c.sopGroup === 'internal' ? 'fa-building' : 'fa-handshake', label: c.sopGroupLabel } : null,
-      { icon: 'fa-clock', label: `${Math.round((slide.settings?.timeLimitSec || window.LP_WORKSHOP_SETTINGS?.brainstormTimeLimitSec || 300) / 60)} Min.` },
-      { icon: 'fa-hashtag', label: `max. ${window.LP_WORKSHOP_SETTINGS?.brainstormMaxResponses || 2} UC` },
-    ].filter(Boolean);
     const collectInner = splitOn
       ? renderBrainstormSplitViz(slide)
       : `${renderWorkshopCardCollectHtml(enriched, false, { shellMode: true })}<div class="viz-wrap viz-wrap-present">${viz}</div>`;
-    stage.innerHTML = wrapSlide(renderWsSlideShell({
-      ...meta,
-      title: workshopDisplayTitle(enriched) || c.sopCardName,
-      chips,
+    mountPresentWsSlide(stage, slide, slideIdx, {
       main: `${collectInner}${modPanel}`,
-    }), slideIdx);
-    stage.classList.toggle('sop-split-stage', splitOn);
+      splitOn,
+    });
     stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
     stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
-    updatePresentHeader();
-    updatePresentStats();
-    renderPresentParticipants();
-    void renderQrCode();
-    syncSopWorkshopShell('present', slideIdx);
-    finalizePresentUi(slide);
     return;
   }
 
   if (shouldUseVoteWorkshopUi(slide)) {
-    const meta = getSlideShellMeta(slide);
-    const chips = isFinaleSlide(slide) ? [{ icon: 'fa-flag-checkered', label: 'Finale' }] : [];
-    const voteMain = `<div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`;
-    stage.innerHTML = wrapSlide(renderWsSlideShell({
-      ...meta,
-      title: c.title || 'Priorisierung',
-      chips,
-      lead: c.prompt ? String(c.prompt).split('\n')[0] : '',
-      main: voteMain,
-    }), slideIdx);
+    mountPresentWsSlide(stage, slide, slideIdx, {
+      main: `<div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`,
+    });
     stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
     stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
-    updatePresentHeader();
-    updatePresentStats();
-    renderPresentParticipants();
-    void renderQrCode();
-    syncSopWorkshopShell('present', slideIdx);
-    finalizePresentUi(slide);
     return;
   }
 
   if (isFinaleSlide(slide)) {
-    const meta = getSlideShellMeta(slide);
-    stage.innerHTML = wrapSlide(renderWsSlideShell({
-      ...meta,
-      title: c.title || 'Folie',
-      chips: [{ icon: 'fa-flag-checkered', label: 'Finale' }],
-      lead: c.prompt ? String(c.prompt).split('\n')[0] : '',
+    mountPresentWsSlide(stage, slide, slideIdx, {
       main: `<div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`,
-    }), slideIdx);
+    });
+    stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
+    stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
+    return;
   } else {
     stage.innerHTML = wrapSlide(`
       ${!isSopWorkshopPresentation() && workshopMode ? renderWorkshopModeBadge(workshopMode) : ''}
