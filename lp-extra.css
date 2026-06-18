@@ -2964,6 +2964,58 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .workshop-collect-shell--participant .workshop-collect-board{
   margin:.35rem 0 0;
 }
+
+/* Mobile Teilnehmer: Phasen + Unterpunkte untereinander */
+.sop-phase-stack{
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  gap:.65rem;
+}
+.sop-phase-stack-phase{
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:#fff;
+  overflow:hidden;
+}
+.sop-phase-stack-phase.is-active{
+  border-color:rgba(32,110,251,.35);
+  box-shadow:0 0 0 1px rgba(32,110,251,.1);
+}
+.sop-phase-stack-title{
+  margin:0;
+  padding:.65rem .85rem;
+  font-size:.82rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  color:var(--sop-accent,var(--brand));
+  background:var(--sop-soft,rgba(32,110,251,.06));
+  border-bottom:1px solid var(--line);
+}
+.sop-phase-stack-list{
+  list-style:none;
+  margin:0;
+  padding:.45rem .65rem .55rem;
+  display:flex;
+  flex-direction:column;
+  gap:.35rem;
+}
+.sop-phase-stack-item{
+  padding:.5rem .65rem;
+  border-radius:10px;
+  font-size:.88rem;
+  line-height:1.35;
+  color:var(--ink);
+  background:var(--surface,#f8fafc);
+  border:1px solid transparent;
+}
+.sop-phase-stack-item.is-active{
+  background:var(--brand-light);
+  border-color:rgba(32,110,251,.2);
+  font-weight:600;
+}
+
 .sop-phase-carousel{
   width:100%;
 }

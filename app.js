@@ -2290,6 +2290,34 @@ function renderSopPhaseCarouselHtml(c) {
     </div>`;
 }
 
+function sopBoardCardName(card) {
+  return typeof card === 'string' ? card : (card?.name || '');
+}
+
+/** Mobile Teilnehmer: alle Phasen + Unterpunkte untereinander (kein Carousel). */
+function renderSopPhaseStackHtml(c) {
+  const content = enrichSopContentForCollect(c);
+  const board = content.sopBoard || [];
+  if (!board.length) return '';
+  const theme = sopTrackTheme(content.sopTrackClass);
+  const phases = board.map((phase) => {
+    const items = (phase.cards || [])
+      .map((card) => sopBoardCardName(card))
+      .filter(Boolean)
+      .map((name) => {
+        const active = name === content.sopCardName || (content.sopKind === 'card' && name === content.title);
+        return `<li class="sop-phase-stack-item${active ? ' is-active' : ''}">${esc(name)}</li>`;
+      }).join('');
+    const phaseActive = phase.name === content.sopPhaseName;
+    return `
+      <section class="sop-phase-stack-phase${phaseActive ? ' is-active' : ''}">
+        <h3 class="sop-phase-stack-title">${esc(phase.name)}</h3>
+        ${items ? `<ul class="sop-phase-stack-list">${items}</ul>` : ''}
+      </section>`;
+  }).join('');
+  return `<div class="sop-phase-stack" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">${phases}</div>`;
+}
+
 function initSopPhaseCarousels(root = document) {
   const scope = root?.querySelectorAll ? root : document;
   scope.querySelectorAll('.sop-phase-carousel').forEach((wrap) => {
@@ -2333,11 +2361,16 @@ function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false,
     ? (hasBody ? `<div class="canvas-editable pslide-q-sub" contenteditable="true" data-field="body">${esc(content.body)}</div>` : '')
     : (hasBody ? `<p class="pslide-q-sub">${esc(content.body).replace(/\n/g, '<br>')}</p>` : '');
   const displayContent = (!editable && !splitCol) ? enrichSopContentForCollect(content) : enrichSopContent(content);
-  const useCarousel = !editable && !splitCol && displayContent.sopBoard?.length;
+  let boardInner = '';
+  if (participantMode && displayContent.sopBoard?.length) {
+    boardInner = renderSopPhaseStackHtml(displayContent);
+  } else if (!editable && !splitCol && displayContent.sopBoard?.length) {
+    boardInner = renderSopPhaseCarouselHtml(displayContent);
+  } else if (displayContent.sopBoard?.length) {
+    boardInner = renderSopBoardPreview(displayContent, false, { hideTrackHeader: shellMode, alignCards: !!(shellMode || splitCol) });
+  }
   const boardEl = !editable && displayContent.sopBoard?.length && !hideBoard
-    ? `<div class="workshop-collect-board">${useCarousel
-      ? renderSopPhaseCarouselHtml(displayContent)
-      : renderSopBoardPreview(displayContent, false, { hideTrackHeader: shellMode, alignCards: !!(shellMode || splitCol) })}</div>`
+    ? `<div class="workshop-collect-board">${boardInner}</div>`
     : '';
   const { question, note } = parseCollectPrompt(content.prompt);
   const questionEl = question
@@ -7375,7 +7408,6 @@ async function renderParticipantQuestion() {
 
   if (timeLimit) startQuestionTimer(timeLimit);
   bindParticipantHandlers(slide);
-  initSopPhaseCarousels(root);
   finishParticipant();
 }
 
