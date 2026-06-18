@@ -11,6 +11,27 @@
     return Math.abs(h);
   }
 
+  function renderMatrixFrame({ yLabel, xLabel, gridHtml, footerHtml = '' }) {
+    return `<div class="lp-mx-frame">
+      <div class="lp-mx-frame-layout">
+        <div class="lp-mx-axis-col">
+          <span class="lp-mx-axis-tag lp-mx-axis-tag--high"><i class="fa-solid fa-chevron-up"></i> hoch</span>
+          <span class="lp-mx-axis-name">${esc(yLabel || 'Impact')}</span>
+          <span class="lp-mx-axis-tag lp-mx-axis-tag--low"><i class="fa-solid fa-chevron-down"></i> niedrig</span>
+        </div>
+        <div class="lp-mx-frame-main">
+          <div class="lp-mx-quad-grid">${gridHtml}</div>
+          <div class="lp-mx-axis-row">
+            <span class="lp-mx-axis-tag lp-mx-axis-tag--low"><i class="fa-solid fa-chevron-left"></i> niedrig</span>
+            <span class="lp-mx-axis-name">${esc(xLabel || 'Aufwand')}</span>
+            <span class="lp-mx-axis-tag lp-mx-axis-tag--high">hoch <i class="fa-solid fa-chevron-right"></i></span>
+          </div>
+        </div>
+      </div>
+      ${footerHtml ? `<div class="lp-mx-frame-foot">${footerHtml}</div>` : ''}
+    </div>`;
+  }
+
   function normalizeBubbleItems(items) {
     return (items || []).map((item, i) => {
       if (typeof item === 'string') return { id: `t-${i}-${item.slice(0, 24)}`, text: item };
@@ -226,8 +247,6 @@
     }
 
     if (agg.type === 'priority_matrix') {
-      // Aggregierte Matrix: jedes Item landet im Quadranten mit den meisten Votes.
-      // ROOTS-Design, Font-Awesome-Icons, feste Quadranten-Farben (kein Gelb).
       const itemPlacements = agg.itemPlacements || {};
       const itemMeta = agg.itemMeta || {};
       const quadrants = slide.content.quadrants || {};
@@ -242,7 +261,6 @@
       Object.entries(itemPlacements).forEach(([id, counts]) => {
         const max = Math.max(counts.qw, counts.sb, counts.ts, counts.dr);
         if (max === 0) return;
-        // Bei Gleichstand: deterministische Priorität qw > sb > ts > dr (kein Split-Block).
         const order = ['qw', 'sb', 'ts', 'dr'];
         const winner = order.find((q) => counts[q] === max);
         const text = itemMeta[id]?.text || id;
@@ -257,24 +275,19 @@
               <span class="lp-matrix-result-pct">${pct}%</span>
             </div>`;
           }).join('')
-        : '<div class="lp-matrix-result-empty"><i class="fa-regular fa-circle-dot"></i> noch leer</div>';
-      const cell = (q) => `<div class="lp-matrix-result-cell lp-q-${q}">
-          <div class="lp-matrix-cell-title"><span class="lp-matrix-cell-ico"><i class="fa-solid ${QICON[q]}"></i></span>${esc(QLABEL[q])}<span class="lp-matrix-cell-count">${byQuadrant[q].length}</span></div>
-          <div class="lp-matrix-cell-items">${renderItems(q)}</div>
+        : '<div class="lp-matrix-result-empty"><i class="fa-regular fa-circle-dot"></i> leer</div>';
+      const quad = (q) => `<div class="lp-mx-quad lp-q-${q} lp-matrix-result-cell">
+          <div class="lp-mx-quad-head"><span class="lp-mx-quad-ico"><i class="fa-solid ${QICON[q]}"></i></span><strong>${esc(QLABEL[q])}</strong><span class="lp-matrix-cell-count">${byQuadrant[q].length}</span></div>
+          <div class="lp-mx-quad-body lp-matrix-cell-items">${renderItems(q)}</div>
         </div>`;
-      return `<div class="lp-matrix-result">
-        <div class="lp-matrix-result-axes">
-          <div class="lp-matrix-result-y-label"><i class="fa-solid fa-arrow-up"></i> ${esc(slide.content.yAxisLabel || 'Impact')}</div>
-          <div class="lp-matrix-result-grid">
-            ${cell('qw')}
-            ${cell('sb')}
-            ${cell('dr')}
-            ${cell('ts')}
-          </div>
-          <div class="lp-matrix-result-x-label"><span class="lp-matrix-axis-low">niedrig</span> ${esc(slide.content.xAxisLabel || 'Aufwand')} <span class="lp-matrix-axis-high">hoch</span></div>
-        </div>
-        <div class="lp-matrix-result-total"><i class="fa-solid fa-users"></i> ${agg.total} Teilnehmer · <i class="fa-solid fa-layer-group"></i> ${Object.keys(itemPlacements).length} Use Cases priorisiert</div>
-      </div>`;
+      const gridHtml = `${quad('qw')}${quad('sb')}${quad('dr')}${quad('ts')}`;
+      const foot = `<span class="ws-chip"><i class="fa-solid fa-users"></i> ${agg.total} TN</span><span class="ws-chip"><i class="fa-solid fa-layer-group"></i> ${Object.keys(itemPlacements).length} UC</span>`;
+      return renderMatrixFrame({
+        yLabel: slide.content.yAxisLabel || 'Impact',
+        xLabel: slide.content.xAxisLabel || 'Aufwand',
+        gridHtml,
+        footerHtml: foot,
+      });
     }
 
     if (agg.type === 'pin_image' && slide.content.imageUrl) {
@@ -289,5 +302,5 @@
     return `<div style="color:var(--muted)">${agg.total || 0} Antworten</div>`;
   }
 
-  window.LPViz = { aggregateResponses, renderViz, renderBrainstormBubbles, esc };
+  window.LPViz = { aggregateResponses, renderViz, renderBrainstormBubbles, renderMatrixFrame, esc };
 })();

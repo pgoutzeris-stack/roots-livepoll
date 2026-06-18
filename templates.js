@@ -22,6 +22,8 @@ window.LP_SOP_KIND = Object.freeze({
   PITCH_SESSION: 'pitch-session',
   FINAL_VOTE: 'final-vote',
   CARD_WORKSHOP: 'card-workshop',
+  DUAL_PAIR_ORIENT: 'dual-pair-orient',
+  DUAL_PAIR_COLLECT: 'dual-pair-collect',
 });
 const SK = window.LP_SOP_KIND;
 
@@ -1063,20 +1065,43 @@ function buildDualSopParallelWorkshopSlides() {
     isHeroSlide: false,
   }, { workshopMode: 'orient' }));
 
+  function dualPairOrientSlide(pairIndex) {
+    const n = pairIndex + 1;
+    return tplSlide('content', {
+      title: `Track ${n}`,
+      subtitle: 'Überblick · parallel',
+      sopKind: SK.DUAL_PAIR_ORIENT,
+      sopDualPairIndex: pairIndex,
+      sopDualParallel: true,
+    }, { workshopMode: 'orient' });
+  }
+
+  function dualPairCollectAnchor(pairIndex) {
+    const ws = window.LP_WORKSHOP_SETTINGS;
+    const n = pairIndex + 1;
+    return tplSlide('brainstorm', {
+      title: `Track ${n} · Use Cases`,
+      subtitle: 'Brainstorm · parallel',
+      prompt: `KI Use Cases sammeln · max. ${ws.brainstormMaxResponses} pro Person\nFormat: Use Case · Feature · Abhängigkeiten`,
+      isQuestionSlide: true,
+      sopKind: SK.DUAL_PAIR_COLLECT,
+      sopDualPairIndex: pairIndex,
+      sopDualParallel: true,
+    }, brainstormSettings());
+  }
+
+  function hiddenBrainstormSlide(track, group, pairIndex) {
+    const s = tagDualSlide(sopTrackBrainstorm(track), group, pairIndex);
+    s.settings = { ...s.settings, sopDualHiddenNav: true };
+    return s;
+  }
+
   const pairCount = Math.max(INTERNAL_SOP_TRACKS.length, SOP_TOOL_TRACKS.length);
   for (let i = 0; i < pairCount; i += 1) {
-    if (INTERNAL_SOP_TRACKS[i]) {
-      slides.push(tagDualSlide(sopTrackIntro(INTERNAL_SOP_TRACKS[i], i), 'internal', i));
-    }
-    if (SOP_TOOL_TRACKS[i]) {
-      slides.push(tagDualSlide(sopTrackIntro(SOP_TOOL_TRACKS[i], i), 'consulting', i));
-    }
-    if (INTERNAL_SOP_TRACKS[i]) {
-      slides.push(tagDualSlide(sopTrackBrainstorm(INTERNAL_SOP_TRACKS[i]), 'internal', i));
-    }
-    if (SOP_TOOL_TRACKS[i]) {
-      slides.push(tagDualSlide(sopTrackBrainstorm(SOP_TOOL_TRACKS[i]), 'consulting', i));
-    }
+    slides.push(dualPairOrientSlide(i));
+    slides.push(dualPairCollectAnchor(i));
+    if (INTERNAL_SOP_TRACKS[i]) slides.push(hiddenBrainstormSlide(INTERNAL_SOP_TRACKS[i], 'internal', i));
+    if (SOP_TOOL_TRACKS[i]) slides.push(hiddenBrainstormSlide(SOP_TOOL_TRACKS[i], 'consulting', i));
   }
 
   slides.push(combinedVote());
@@ -1133,10 +1158,10 @@ window.LP_TEMPLATES = [
     key: 'roots-sop-dual-internal-consulting-parallel',
     category: 'ROOTS · SOP & KI',
     name: 'Internal + Consulting · parallel',
-    desc: 'Beide SOPs gleichzeitig · Split-View auf Track-Intro + Brainstorm · Host weist Teilnehmer zu · EINE konsolidierte Priorisierung + gemeinsame ICE-Matrix.',
+    desc: 'Beide SOPs gleichzeitig · 2 Folien pro Track (Überblick + Sammeln) · Split-View · Host-Zuweisung · konsolidierte Priorisierung + Matrix.',
     duration: '90–120 Min.',
     group: '5–25',
-    tips: 'QR-Join → Host weist jedem Teilnehmer Internal oder Consulting zu. Am Beamer laufen beide SOPs im Split-View parallel. Priorisierung, Pitch und Matrix zeigen alle Use Cases konsolidiert — ohne Split.',
+    tips: 'Pro Track nur 2 Host-Folien (Überblick → Sammeln) — kein Doppel-Klick. QR-Join → Host weist Internal/Consulting zu. Split-View am Beamer. Priorisierung, Pitch, Matrix konsolidiert.',
     slides: buildDualSopParallelWorkshopSlides(),
   },
 ];

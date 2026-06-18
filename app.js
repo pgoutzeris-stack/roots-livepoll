@@ -1467,6 +1467,12 @@ function findDualSopSlideByPair(group, pairIndex, slideType) {
 function resolveParticipantSlide(slide) {
   if (!slide || !isDualSopParallelWorkshop() || !State.participant) return slide;
   if (isFinaleSlide(slide) || slide.settings?.sopAllTracksVote || slide.settings?.sopAllTracksMatrix || slide.settings?.sopPitchSession) return slide;
+  if (slide.content?.sopKind === 'dual-pair-collect') {
+    const group = getParticipantSopGroup(State.participant.id);
+    if (!group) return slide;
+    const pairIdx = getDualSopPairIndex(slide);
+    return findDualSopSlideByPair(group, pairIdx, 'brainstorm') || slide;
+  }
   const group = getParticipantSopGroup(State.participant.id);
   if (!group || slide.content?.sopGroup === group) return slide;
   const pairIdx = getDualSopPairIndex(slide);
@@ -1517,11 +1523,34 @@ function renderSopSplitColumn(group, label, icon, bodyHtml) {
     </div>`;
 }
 
+function renderDualPairOrientColumn(group, pairIdx) {
+  const tracks = group === 'internal' ? window.INTERNAL_SOP_TRACKS : window.SOP_TOOL_TRACKS;
+  const track = tracks?.[pairIdx];
+  if (!track) return '<div class="ws-empty"><i class="fa-regular fa-circle"></i></div>';
+  const theme = sopTrackTheme(track.class);
+  const phases = (track.phases || []).map((p) =>
+    `<span class="ws-chip ws-chip--sm"><i class="fa-solid fa-bookmark"></i>${esc(p.name)}</span>`).join('');
+  return `<div class="ws-orient-col" style="--sop-accent:${theme.accent}">
+    <span class="ws-orient-num">Track ${pairIdx + 1}</span>
+    <h2 class="ws-orient-title">${esc(track.title.replace(/^Track \d+: /, ''))}</h2>
+    <div class="ws-chips ws-chips--wrap">${phases}</div>
+  </div>`;
+}
+
+function renderDualPairOrientSplitView(slide) {
+  const pairIdx = getDualSopPairIndex(slide);
+  return `<div class="sop-split-grid sop-split-active sop-split-slides sop-split-full">
+    ${renderSopSplitColumn('internal', 'Internal', 'fa-building', renderDualPairOrientColumn('internal', pairIdx))}
+    ${renderSopSplitColumn('consulting', 'Consulting', 'fa-handshake', renderDualPairOrientColumn('consulting', pairIdx))}
+  </div>`;
+}
+
 function renderSopSectionSplitView(currentSlide) {
+  if (currentSlide?.content?.sopKind === 'dual-pair-orient') return renderDualPairOrientSplitView(currentSlide);
   const pairIdx = getDualSopPairIndex(currentSlide);
   const intSlide = trackIntroSlidesOfGroup('internal')[pairIdx];
   const conSlide = trackIntroSlidesOfGroup('consulting')[pairIdx];
-  const colBody = (slide) => slide ? renderSopSectionHtml(slide.content) : '<div class="present-wait-msg">Kein Track in diesem SOP.</div>';
+  const colBody = (s) => s ? renderSopSectionHtml(s.content) : '<div class="present-wait-msg">Kein Track in diesem SOP.</div>';
   return `<div class="sop-split-grid sop-split-active sop-split-slides sop-split-full">
     ${renderSopSplitColumn('internal', 'Internal SOP', 'fa-building', colBody(intSlide))}
     ${renderSopSplitColumn('consulting', 'Consulting SOP', 'fa-handshake', colBody(conSlide))}
@@ -1794,9 +1823,77 @@ function isFinaleSlide(s) {
 }
 
 // Konsistente Finale-Pill (Badge) für Pitch Session, Finale Priorisierung und Matrix.
-// Bewusst NICHT identisch mit der jeweiligen Folien-Überschrift.
 function renderFinalePillHtml() {
-  return `<div class="sop-pslide-badge sop-finale-badge" style="background:var(--brand);color:#fff"><i class="fa-solid fa-flag-checkered"></i> Finale</div>`;
+  return `<span class="ws-pill ws-pill--finale"><i class="fa-solid fa-flag-checkered"></i> Finale</span>`;
+}
+
+function getSlideShellMeta(slide) {
+  const c = slide?.content || {};
+  if (isFinaleSlide(slide)) {
+    if (slide.settings?.sopPitchSession || c.sopKind === 'pitch-session') return { pillIcon: 'fa-person-chalkboard', pillLabel: 'Pitch', pillTone: 'finale' };
+    if (slide.settings?.sopAllTracksVote || c.sopKind === 'final-vote') return { pillIcon: 'fa-ranking-star', pillLabel: 'Priorisierung', pillTone: 'finale' };
+    if (slide.settings?.sopAllTracksMatrix || slide.slide_type === 'priority_matrix') return { pillIcon: 'fa-table-cells-large', pillLabel: 'Matrix', pillTone: 'finale' };
+    return { pillIcon: 'fa-flag-checkered', pillLabel: 'Finale', pillTone: 'finale' };
+  }
+  if (c.sopKind === 'dual-pair-orient') return { pillIcon: 'fa-map', pillLabel: 'Track', pillTone: 'orient' };
+  if (c.sopKind === 'dual-pair-collect') return { pillIcon: 'fa-lightbulb', pillLabel: 'Sammeln', pillTone: 'collect' };
+  if (isBrainstormCollectSlide(slide)) return { pillIcon: 'fa-lightbulb', pillLabel: 'Brainstorm', pillTone: 'collect' };
+  if (shouldUseVoteWorkshopUi(slide)) return { pillIcon: 'fa-ranking-star', pillLabel: 'Vote', pillTone: 'decide' };
+  if (slide?.slide_type === 'section' && c.sopTrackClass) return { pillIcon: 'fa-map', pillLabel: (c.sopTrackLabel || 'SOP').replace(/^Track \d+: /, ''), pillTone: 'orient' };
+  if (c.isHeroSlide) return { pillIcon: 'fa-signal', pillLabel: 'Start', pillTone: 'brand' };
+  if (c.sopKind === 'workshop-goal') return { pillIcon: 'fa-bullseye', pillLabel: 'Ziel', pillTone: 'brand' };
+  if (c.sopKind === 'instructions') return { pillIcon: 'fa-pen-ruler', pillLabel: 'Format', pillTone: 'brand' };
+  if (c.sopKind === 'participants') return { pillIcon: 'fa-users', pillLabel: 'Teams', pillTone: 'orient' };
+  return { pillIcon: 'fa-circle-info', pillLabel: 'Info', pillTone: 'muted' };
+}
+
+function renderWsSlideShell({ pillIcon, pillLabel, pillTone = 'brand', title, chips = [], lead = '', main = '' }) {
+  const chipHtml = chips.filter(Boolean).map((ch) => (
+    typeof ch === 'string'
+      ? `<span class="ws-chip">${esc(ch)}</span>`
+      : `<span class="ws-chip"><i class="fa-solid ${ch.icon || 'fa-circle'}"></i> ${esc(ch.label)}</span>`
+  )).join('');
+  const leadHtml = lead
+    ? `<p class="ws-lead">${typeof lead === 'string' && lead.includes('<') ? lead : esc(String(lead)).replace(/\n/g, '<br>')}</p>`
+    : '';
+  return `<section class="ws-slide ws-slide--${esc(pillTone)}">
+    <header class="ws-slide-head">
+      <span class="ws-pill ws-pill--${esc(pillTone)}"><i class="fa-solid ${pillIcon}"></i> ${esc(pillLabel)}</span>
+      ${chipHtml ? `<div class="ws-chips">${chipHtml}</div>` : ''}
+    </header>
+    ${title ? `<h1 class="ws-title">${esc(title)}</h1>` : ''}
+    ${leadHtml}
+    ${main ? `<div class="ws-body">${main}</div>` : ''}
+  </section>`;
+}
+
+function isNavHiddenSlide(slide) {
+  return !!slide?.settings?.sopDualHiddenNav;
+}
+
+function visibleNavSlides() {
+  return (State.slides || []).filter((s) => !isNavHiddenSlide(s));
+}
+
+function advanceSlideIndex(from, delta) {
+  let i = from;
+  for (let step = 0; step < (State.slides?.length || 0) + 1; step += 1) {
+    i += delta;
+    if (i < 0 || i >= (State.slides?.length || 0)) return clamp(from, 0, Math.max(0, (State.slides?.length || 1) - 1));
+    if (!isNavHiddenSlide(State.slides[i])) return i;
+  }
+  return clamp(from, 0, Math.max(0, (State.slides?.length || 1) - 1));
+}
+
+function visibleSlideCounter(idx) {
+  const vis = visibleNavSlides();
+  const slide = State.slides[idx];
+  if (!slide || isNavHiddenSlide(slide)) {
+    const n = vis.findIndex((s) => (State.slides || []).indexOf(s) > idx);
+    return { n: Math.max(1, n + 1), total: vis.length || 1 };
+  }
+  const n = vis.findIndex((s) => s.id === slide.id) + 1;
+  return { n: n > 0 ? n : idx + 1, total: vis.length || 1 };
 }
 
 function renderSopFinalePanelHtml(currentIndex, { clickable = false, onNavigate } = {}) {
@@ -3243,7 +3340,9 @@ function bindPitchTimers(stage) {
 // Split-View: beide SOPs nebeneinander auf Track-Intro + Brainstorm bis zur Gesamt-Priorisierung.
 function supportsSopSplit(slide) {
   if (!isDualSopParallelWorkshop() || isFinaleSlide(slide)) return false;
-  if (slide?.settings?.sopAllTracksVote) return false;
+  if (slide?.settings?.sopAllTracksVote || slide?.settings?.sopDualHiddenNav) return false;
+  const k = slide?.content?.sopKind;
+  if (k === 'dual-pair-orient' || k === 'dual-pair-collect') return true;
   const c = slide?.content || {};
   if (slide?.slide_type === 'brainstorm' && (c.sopGroup === 'internal' || c.sopGroup === 'consulting')) return true;
   if (slide?.slide_type === 'section' && c.sopKind === 'track' && c.sopGroup) return true;
@@ -4880,9 +4979,11 @@ function renderPresent() {
   const slideMuted = c.subtextColor || 'var(--muted)';
 
   if (slide.slide_type === 'section' && c.sopTrackClass) {
-    const inner = shouldUseSopSplit(slide) ? renderSopSectionSplitView(slide) : renderSopSectionHtml(c);
-    stage.innerHTML = wrapSlide(inner, State.session.current_slide_index || 0);
-    stage.classList.toggle('sop-split-stage', shouldUseSopSplit(slide));
+    const splitOn = shouldUseSopSplit(slide);
+    const meta = getSlideShellMeta(slide);
+    const main = splitOn ? renderSopSectionSplitView(slide) : renderSopSectionHtml(c);
+    stage.innerHTML = wrapSlide(renderWsSlideShell({ ...meta, title: c.title, chips: c.subtitle ? [{ icon: 'fa-layer-group', label: c.subtitle.split(' · ')[0] }] : [], main }), State.session.current_slide_index || 0);
+    stage.classList.toggle('sop-split-stage', splitOn);
     updatePresentHeader();
     updatePresentStats();
     renderPresentParticipants();
@@ -4966,13 +5067,39 @@ function renderPresent() {
   const slideIdx = State.session.current_slide_index || 0;
   const workshopMode = getWorkshopMode(slide);
 
+  if (slide.slide_type === 'content' && c.sopKind === 'dual-pair-orient') {
+    const meta = getSlideShellMeta(slide);
+    const chips = [{ icon: 'fa-table-columns', label: 'Parallel' }, { icon: 'fa-map', label: `Track ${(getDualSopPairIndex(slide) || 0) + 1}` }];
+    stage.innerHTML = wrapSlide(renderWsSlideShell({
+      ...meta, title: c.title, chips, main: renderDualPairOrientSplitView(slide),
+    }), slideIdx);
+    stage.classList.add('sop-split-stage');
+    updatePresentHeader();
+    updatePresentStats();
+    renderPresentParticipants();
+    void renderQrCode();
+    syncSopWorkshopShell('present', slideIdx);
+    finalizePresentUi(slide);
+    return;
+  }
+
   if (isBrainstormCollectSlide(slide)) {
     const splitOn = shouldUseSopSplit(slide);
-    const inner = splitOn
+    const meta = getSlideShellMeta(slide);
+    const chips = [
+      c.sopGroupLabel ? { icon: 'fa-users', label: c.sopGroupLabel } : null,
+      { icon: 'fa-clock', label: `${Math.round((slide.settings?.timeLimitSec || window.LP_WORKSHOP_SETTINGS?.brainstormTimeLimitSec || 300) / 60)} Min.` },
+      { icon: 'fa-hashtag', label: `max. ${window.LP_WORKSHOP_SETTINGS?.brainstormMaxResponses || 2} UC` },
+    ].filter(Boolean);
+    const collectInner = splitOn
       ? renderBrainstormSplitViz(slide)
-      : `${renderWorkshopCardCollectHtml(c)}
-      <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`;
-    stage.innerHTML = wrapSlide(inner, slideIdx);
+      : `${renderWorkshopCardCollectHtml(c)}<div class="viz-wrap viz-wrap-present">${viz}</div>`;
+    stage.innerHTML = wrapSlide(renderWsSlideShell({
+      ...meta,
+      title: c.title || c.sopCardName,
+      chips,
+      main: `${collectInner}${modPanel}`,
+    }), slideIdx);
     stage.classList.toggle('sop-split-stage', splitOn);
     stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
     stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
@@ -4986,17 +5113,16 @@ function renderPresent() {
   }
 
   if (shouldUseVoteWorkshopUi(slide)) {
-    const voteInner = isFinaleSlide(slide)
-      ? `<div class="sop-pslide-section sop-finale-section">
-          ${renderFinalePillHtml()}
-          <h1 class="sop-pslide-title">${esc(c.title || 'Priorisierung')}</h1>
-          ${c.prompt ? `<p class="sop-pslide-sub">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : ''}
-          <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}
-        </div>`
-      : `<h1 class="pslide-q-title">${esc(c.title || 'Priorisierung')}</h1>
-        <p class="pslide-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>
-        <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`;
-    stage.innerHTML = wrapSlide(voteInner, slideIdx);
+    const meta = getSlideShellMeta(slide);
+    const chips = isFinaleSlide(slide) ? [{ icon: 'fa-flag-checkered', label: 'Finale' }] : [];
+    const voteMain = `<div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`;
+    stage.innerHTML = wrapSlide(renderWsSlideShell({
+      ...meta,
+      title: c.title || 'Priorisierung',
+      chips,
+      lead: c.prompt ? String(c.prompt).split('\n')[0] : '',
+      main: voteMain,
+    }), slideIdx);
     stage.querySelectorAll('[data-approve]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.approve, false)));
     stage.querySelectorAll('[data-hide]').forEach((btn) => btn.addEventListener('click', () => moderateResponse(btn.dataset.hide, true)));
     updatePresentHeader();
@@ -5009,14 +5135,14 @@ function renderPresent() {
   }
 
   if (isFinaleSlide(slide)) {
-    // Finale-Folien (z. B. Impact/Effort-Matrix) im selben Stil wie Pitch Session +
-    // Finale Priorisierung: sop-pslide-section + Pill + sop-pslide-title.
-    stage.innerHTML = wrapSlide(`<div class="sop-pslide-section sop-finale-section">
-      ${renderFinalePillHtml()}
-      <h1 class="sop-pslide-title">${esc(c.title || 'Folie')}</h1>
-      ${c.prompt ? `<p class="sop-pslide-sub">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : ''}
-      <div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}
-    </div>`, slideIdx);
+    const meta = getSlideShellMeta(slide);
+    stage.innerHTML = wrapSlide(renderWsSlideShell({
+      ...meta,
+      title: c.title || 'Folie',
+      chips: [{ icon: 'fa-flag-checkered', label: 'Finale' }],
+      lead: c.prompt ? String(c.prompt).split('\n')[0] : '',
+      main: `<div class="viz-wrap viz-wrap-present">${viz}</div>${modPanel}`,
+    }), slideIdx);
   } else {
     stage.innerHTML = wrapSlide(`
       ${!isSopWorkshopPresentation() && workshopMode ? renderWorkshopModeBadge(workshopMode) : ''}
@@ -5045,9 +5171,9 @@ async function moderateResponse(id, keepHidden) {
 
 function updatePresentToolbarUi(slide) {
   const idx = State.session?.current_slide_index || 0;
-  const total = State.slides.length || 1;
+  const { n, total } = visibleSlideCounter(idx);
   const counter = $('#present-slide-counter');
-  if (counter) counter.textContent = `${idx + 1} / ${total}`;
+  if (counter) counter.textContent = `${n} / ${total}`;
 
   const responsesBtn = $('#present-toggle-responses');
   if (responsesBtn) {
@@ -5172,7 +5298,7 @@ function bindPresentToolbar() {
 }
 
 async function changeSlide(delta) {
-  const next = clamp((State.session.current_slide_index || 0) + delta, 0, State.slides.length - 1);
+  const next = advanceSlideIndex(State.session.current_slide_index || 0, delta);
   if (next === State.session.current_slide_index) return;
   State.confettiSlideId = null;
   broadcastSessionPatch({ current_slide_index: next, question_open: true });
@@ -5181,7 +5307,8 @@ async function changeSlide(delta) {
 }
 
 async function goToSlide(index) {
-  const next = clamp(index, 0, State.slides.length - 1);
+  let next = clamp(index, 0, State.slides.length - 1);
+  if (isNavHiddenSlide(State.slides[next])) next = advanceSlideIndex(next, index >= (State.session.current_slide_index || 0) ? 1 : -1);
   if (next === State.session.current_slide_index) return;
   State.confettiSlideId = null;
   broadcastSessionPatch({ current_slide_index: next, question_open: true });
@@ -5402,10 +5529,20 @@ async function renderParticipantQuestion() {
   }
   if (isDualSopParallelWorkshop() && isBrainstormCollectSlide(hostSlide) && !getParticipantSopGroup(State.participant?.id)) {
     root.innerHTML = wrapParticipantSlide(`
-      <div class="participant-wait-block participant-sop-unassigned">
-        <h1 class="pslide-q-title">SOP-Zuweisung ausstehend</h1>
-        <p class="pslide-q-prompt">Du bist verbunden — der Host weist dich gleich einem SOP-Team zu (Internal oder Consulting). Dann kannst du Use Cases einreichen.</p>
-        <p class="participant-sop-wait"><i class="fa-solid fa-hourglass-half"></i> Bitte kurz warten…</p>
+      <div class="participant-wait-block participant-sop-unassigned ws-slide ws-slide--orient">
+        <header class="ws-slide-head"><span class="ws-pill ws-pill--orient"><i class="fa-solid fa-hourglass-half"></i> Warte</span></header>
+        <h1 class="ws-title">SOP-Zuweisung</h1>
+        <p class="ws-lead">Der Host weist dich gleich Internal oder Consulting zu.</p>
+      </div>`, slideIndex);
+    finishParticipant();
+    return;
+  }
+  if (hostSlide?.content?.sopKind === 'dual-pair-orient') {
+    root.innerHTML = wrapParticipantSlide(`
+      <div class="participant-wait-block ws-slide ws-slide--orient">
+        <header class="ws-slide-head"><span class="ws-pill ws-pill--orient"><i class="fa-solid fa-map"></i> Track</span></div>
+        <h1 class="ws-title">${esc(hostSlide.content?.title || 'Überblick')}</h1>
+        <p class="ws-lead"><i class="fa-solid fa-eye"></i> Bitte auf den Beamer achten…</p>
       </div>`, slideIndex);
     finishParticipant();
     return;
@@ -5671,38 +5808,19 @@ function renderParticipantMatrixHtml(slide) {
   </div>`;
   };
   const QICON = { qw: 'fa-rocket', sb: 'fa-star', ts: 'fa-screwdriver-wrench', dr: 'fa-ban' };
-  const cellHead = (q) => `<div class="lp-mx-cell-head"><span class="lp-mx-cell-icon"><i class="fa-solid ${QICON[q] || 'fa-square'}"></i></span><strong>${esc(quadrants[q].label)}</strong></div>${quadrants[q].desc ? `<div class="lp-mx-cell-desc">${esc(quadrants[q].desc)}</div>` : ''}`;
+  const cellHead = (q) => `<div class="lp-mx-quad-head"><span class="lp-mx-quad-ico"><i class="fa-solid ${QICON[q]}"></i></span><strong>${esc(quadrants[q].label)}</strong></div>`;
+  const quad = (q) => `<div class="lp-mx-quad lp-q-${q} lp-mx-cell" data-drop="${q}">${cellHead(q)}<div class="lp-mx-quad-body lp-mx-cell-items">${inQuadrant(q).map(itemCard).join('')}</div></div>`;
+  const gridHtml = `${quad('qw')}${quad('sb')}${quad('dr')}${quad('ts')}`;
+  const frame = window.LPViz.renderMatrixFrame({
+    yLabel: c.yAxisLabel || 'Impact',
+    xLabel: c.xAxisLabel || 'Aufwand',
+    gridHtml,
+  });
   return `<div class="lp-mx-wrap" data-slide-id="${esc(slide.id)}">
-    <div class="lp-mx-instructions">
-      <i class="fa-solid fa-hand-pointer"></i>
-      <span>Ziehe jeden Use Case in den passenden Quadranten — oder tippe ihn an und wähle.</span>
-    </div>
-    <div class="lp-mx-grid-wrap">
-      <div class="lp-mx-y-label">${esc(c.yAxisLabel || 'Impact')}</div>
-      <div class="lp-mx-y-high">↑ hoch</div>
-      <div class="lp-mx-y-low">↓ niedrig</div>
-      <div class="lp-mx-grid">
-        <div class="lp-mx-cell lp-q-qw" data-drop="qw">
-          ${cellHead('qw')}
-          <div class="lp-mx-cell-items">${inQuadrant('qw').map(itemCard).join('')}</div>
-        </div>
-        <div class="lp-mx-cell lp-q-sb" data-drop="sb">
-          ${cellHead('sb')}
-          <div class="lp-mx-cell-items">${inQuadrant('sb').map(itemCard).join('')}</div>
-        </div>
-        <div class="lp-mx-cell lp-q-dr" data-drop="dr">
-          ${cellHead('dr')}
-          <div class="lp-mx-cell-items">${inQuadrant('dr').map(itemCard).join('')}</div>
-        </div>
-        <div class="lp-mx-cell lp-q-ts" data-drop="ts">
-          ${cellHead('ts')}
-          <div class="lp-mx-cell-items">${inQuadrant('ts').map(itemCard).join('')}</div>
-        </div>
-      </div>
-      <div class="lp-mx-x-label"><span class="lp-mx-axis-low">niedrig</span> ${esc(c.xAxisLabel || 'Aufwand')} <span class="lp-mx-axis-high">hoch</span></div>
-    </div>
+    <div class="lp-mx-instructions ws-pill ws-pill--brand"><i class="fa-solid fa-hand-pointer"></i> Use Cases in die Matrix ziehen</div>
+    ${frame}
     <div class="lp-mx-pool" data-drop="pool">
-      <div class="lp-mx-pool-head"><strong><i class="fa-solid fa-layer-group"></i> Use Cases</strong> <span class="lp-mx-pool-count" id="lp-mx-pool-count">${inPool.length} / ${items.length}</span></div>
+      <div class="lp-mx-pool-head"><span class="ws-pill ws-pill--muted"><i class="fa-solid fa-layer-group"></i> Pool</span> <span class="lp-mx-pool-count" id="lp-mx-pool-count">${inPool.length} / ${items.length}</span></div>
       <div class="lp-mx-pool-items">${inPool.map(itemCard).join('')}</div>
     </div>
     <div class="lp-mx-mobile">
