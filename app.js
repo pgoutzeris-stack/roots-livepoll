@@ -2289,7 +2289,7 @@ function renderGoalMatrixPreview() {
     <div class="lp-mx-quad-body">${hint ? `<span class="lp-mx-quad-hint">${hint}</span>` : ''}${extra}</div>
   </div>`;
   const gridHtml = [
-    quad('qw', 'fa-rocket', 'Quick Win', '', qwInner, true),
+    quad('qw', 'fa-rocket', 'Quick Win', 'viel Wirkung · wenig Aufwand', qwInner, true),
     quad('sb', 'fa-star', 'Strategic Bet', 'viel Wirkung · viel Aufwand'),
     quad('dr', 'fa-ban', 'Drop', 'wenig Wirkung · wenig Aufwand'),
     quad('ts', 'fa-screwdriver-wrench', 'Time Sink', 'wenig Wirkung · viel Aufwand'),
