@@ -276,7 +276,9 @@
       const renderItems = (q) => byQuadrant[q].length
         ? byQuadrant[q].sort((a, b) => b.max - a.max).map((it, i) => {
             const pct = Math.round((it.max / Math.max(1, it.total)) * 100);
-        const label = window.LPUseCase?.useCaseFullPlain ? window.LPUseCase.useCaseFullPlain(it.text) : String(it.text || '');
+        const label = window.LPUseCase?.useCaseCollectLabel
+          ? window.LPUseCase.useCaseCollectLabel(it.text)
+          : String(it.text || '');
             return `<div class="lp-matrix-result-item" style="--i:${i}" title="${esc(label)} – ${it.max}/${it.total} Stimmen">
               <span class="lp-matrix-result-text">${esc(label)}</span>
               <span class="lp-matrix-result-pct">${pct}%</span>

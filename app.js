@@ -59,6 +59,7 @@ const State = {
   participantPoll: null,
   sopFocusMode: false,
   showPresentPanels: false,
+  showPresentCode: true,
   participantVoteExpert: false,
   bubbleSeenIds: {},
   participantResponsesKey: null,
@@ -327,18 +328,37 @@ function useCaseFullPlain(text) {
   return bits.join(' · ');
 }
 
-function renderUseCaseDisplayHtml(text, mode = 'full') {
+function renderUseCasePillsHtml(text, mode = 'full') {
   const p = parseUseCaseParts(text);
-  if (mode === 'collect') return esc(useCaseCollectLabel(text));
-  if (!p.hasParts || (!p.feature && !p.dependencies)) {
-    return `<span class="uc-display uc-display--plain">${esc(p.full)}</span>`;
-  }
   const L = getUseCaseLabels();
-  return `<span class="uc-display uc-display--full">
-    <span class="uc-display-summary">${esc(p.summary)}</span>
-    ${p.feature ? `<span class="uc-display-part"><span class="uc-display-label">${esc(L.feature)}</span> ${esc(p.feature)}</span>` : ''}
-    ${p.dependencies ? `<span class="uc-display-part"><span class="uc-display-label">${esc(L.dependencies)}</span> ${esc(p.dependencies)}</span>` : ''}
+  const summaryOnly = mode === 'collect' || mode === 'summary';
+  if (summaryOnly) {
+    const label = useCaseCollectLabel(text);
+    if (!label) return '';
+    return `<span class="uc-pills uc-pills--summary"><span class="uc-pill uc-pill--idea">${esc(label)}</span></span>`;
+  }
+  if (!p.hasParts || (!p.feature && !p.dependencies)) {
+    return `<span class="uc-pills"><span class="uc-pill uc-pill--idea">${esc(p.full)}</span></span>`;
+  }
+  return `<span class="uc-pills uc-pills--full">
+    ${p.summary ? `<span class="uc-pill uc-pill--idea"><span class="uc-pill-k">${esc(L.formula[0])}</span><span class="uc-pill-v">${esc(p.summary)}</span></span>` : ''}
+    ${p.feature ? `<span class="uc-pill uc-pill--feature"><span class="uc-pill-k">${esc(L.formula[1])}</span><span class="uc-pill-v">${esc(p.feature)}</span></span>` : ''}
+    ${p.dependencies ? `<span class="uc-pill uc-pill--deps"><span class="uc-pill-k">${esc(L.formula[2])}</span><span class="uc-pill-v">${esc(p.dependencies)}</span></span>` : ''}
   </span>`;
+}
+
+function renderUseCaseDisplayHtml(text, mode = 'full') {
+  return renderUseCasePillsHtml(text, mode);
+}
+
+function useCaseDisplayModeForSlide(slide) {
+  if (!slide) return 'full';
+  if (isBrainstormCollectSlide(slide)) return 'collect';
+  if (slide.slide_type === 'priority_matrix' || slide.settings?.sopAllTracksMatrix) return 'collect';
+  if (slide.content?.sopKind === 'pitch-session' || slide.settings?.sopPitchSession) return 'full';
+  if (slide.settings?.sopAllTracksVote || slide.settings?.sopTrackVote || slide.settings?.sopPhaseVote
+    || slide.settings?.sopCardVote || slide.settings?.brainstormVote) return 'full';
+  return 'full';
 }
 
 function readParticipantUseCaseInput(slide) {
@@ -359,6 +379,7 @@ window.LPUseCase = {
   useCaseCollectLabel,
   useCaseFullPlain,
   getUseCaseLabels,
+  renderUseCasePillsHtml,
   renderUseCaseDisplayHtml,
 };
 
@@ -2958,6 +2979,7 @@ function mountPresentWsSlide(stage, slide, slideIdx, { main = '', splitOn = fals
   updatePresentStats();
   renderPresentParticipants();
   void renderQrCode();
+  syncPresentCodeBar(State.showPresentCode);
   syncSopWorkshopShell('present', slideIdx);
   finalizePresentUi(slide);
 }
@@ -3506,17 +3528,7 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
           mode = 'avoid';
           instrHtml += `<div class="wi-section-head wi-section-avoid"><i class="fa-solid fa-circle-minus"></i> <span>Bitte vermeiden</span></div>`;
         } else if (mode === 'good' && (t.includes('|') || t.includes(' · '))) {
-          const parts = t.split(/\s*\|\s*|\s·\s/).map((p) => p.trim());
-          const uc = parts[0] || '';
-          const row = (label, val) => val
-            ? `<div class="wi-ex-row"><span class="wi-ex-label">${esc(label)}</span><span class="wi-ex-val">${esc(val)}</span></div>`
-            : '';
-          const rows = [
-            row(ucLabels.formula[0], uc),
-            row(ucLabels.formula[1], parts[1]),
-            row(ucLabels.formula[2], parts.slice(2).join(' | ')),
-          ].filter(Boolean).join('');
-          instrHtml += `<div class="wi-example">${rows}</div>`;
+          instrHtml += `<div class="wi-example">${renderUseCasePillsHtml(t, 'full')}</div>`;
         } else if (mode === 'avoid') {
           avoidBuf.push(t);
         } else {
@@ -3798,25 +3810,13 @@ function maybeLaunchClosingCelebration(slide) {
   launchResultsConfetti(4800);
 }
 
-function renderHeroJoinQrHtml() {
-  const code = State.session?.code;
-  if (!code) {
-    return `<div class="ws-hero-qr ws-hero-qr--placeholder">
-      <div class="ws-hero-qr-card">
-        <span class="ws-hero-qr-icon"><i class="fa-solid fa-qrcode"></i></span>
-        <span class="ws-hero-qr-hint">QR-Code erscheint in der Live-Session</span>
-      </div>
-    </div>`;
-  }
-  return `<div class="ws-hero-qr">
-    <div class="ws-hero-qr-card">
-      <img class="ws-hero-qr-img" alt="Teilnahme-QR-Code" width="148" height="148" />
-      <div class="ws-hero-qr-meta">
-        <span class="ws-hero-qr-label">Mitmachen</span>
-        <strong class="ws-hero-qr-code">${esc(code)}</strong>
-        <span class="ws-hero-qr-hint">QR scannen · Name & Avatar wählen</span>
-      </div>
-    </div>
+function renderEditorUseCaseFieldsPreviewHtml() {
+  const L = getUseCaseLabels();
+  return `<div class="editor-uc-fields-preview">
+    <p class="editor-uc-fields-head"><i class="fa-solid fa-mobile-screen-button"></i> Teilnehmer-Eingabe · drei Felder</p>
+    <div class="editor-uc-field"><span class="editor-uc-field-label">${esc(L.formula[0])}</span><span class="editor-uc-field-ph">Was wollt ihr umsetzen?</span></div>
+    <div class="editor-uc-field"><span class="editor-uc-field-label">${esc(L.formula[1])}</span><span class="editor-uc-field-ph">Was soll die KI tun?</span></div>
+    <div class="editor-uc-field"><span class="editor-uc-field-label">${esc(L.formula[2])}</span><span class="editor-uc-field-ph">Was muss vorhanden sein?</span></div>
   </div>`;
 }
 
@@ -3832,13 +3832,10 @@ function renderHeroSlideHtml(c, editable = false, opts = {}) {
         <div class="ws-hero-ai-grid" aria-hidden="true"></div>
         <div class="ws-hero-glow ws-hero-glow--a" aria-hidden="true"></div>
         <div class="ws-hero-glow ws-hero-glow--b" aria-hidden="true"></div>
-        <div class="ws-hero-content ws-hero-content--join">
-          <div class="ws-hero-copy">
-            <div class="ws-hero-icon-ring"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
-            ${hideChrome ? '' : `<h1 class="ws-hero-title ws-hero-title--shimmer">${esc(c.title || '')}</h1>`}
-            ${bodyEl.replace('ws-hero-body', 'ws-hero-body ws-hero-lead')}
-          </div>
-          ${renderHeroJoinQrHtml()}
+        <div class="ws-hero-content">
+          <div class="ws-hero-icon-ring"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+          ${hideChrome ? '' : `<h1 class="ws-hero-title ws-hero-title--shimmer">${esc(c.title || '')}</h1>`}
+          ${bodyEl.replace('ws-hero-body', 'ws-hero-body ws-hero-lead')}
         </div>
       </div>`;
   }
@@ -5225,7 +5222,7 @@ function renderEditorCanvas() {
         main: renderBrainstormSplitViz(slide),
       }), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-eye"></i> Split-View · SOP-Boards + Live-Eingaben</div>`;
     } else {
-      canvas.innerHTML = `${wrapSlide(renderWorkshopCardCollectHtml(c, true), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Freitext sammeln${hasCollectChain(slide) ? ' · Ranking & Ergebnis folgen automatisch' : ''}</div>`;
+      canvas.innerHTML = `${wrapSlide(renderWorkshopCardCollectHtml(c, true), State.slides.findIndex((s) => s.id === slide.id))}${renderEditorUseCaseFieldsPreviewHtml()}<div class="canvas-hint"><i class="fa-solid fa-pen"></i> Freitext sammeln · Teilnehmer füllen drei Felder aus${hasCollectChain(slide) ? ' · Ranking & Ergebnis folgen automatisch' : ''}</div>`;
     }
     bindCanvasInlineEdit();
     return;
@@ -5967,9 +5964,12 @@ async function startPresentation() {
   showScreen('present');
   await loadSessionData();
   subscribeSessionChannel();
+  State.showPresentCode = true;
+  syncPresentCodeBar(true);
   renderPresentParticipants();
   renderPresent();
   bindPresentToolbar();
+  void renderQrCode();
   toast(`Session gestartet – Code ${code}`, 'success');
 }
 
@@ -7226,6 +7226,7 @@ function renderPresentNow() {
   updatePresentStats();
   renderPresentParticipants();
   void renderQrCode();
+  syncPresentCodeBar(State.showPresentCode);
   syncSopWorkshopShell('present', State.session.current_slide_index || 0);
   finalizePresentUi(slide);
 }
@@ -7270,6 +7271,18 @@ function updatePresentToolbarUi(slide) {
       modeBtn.classList.add('is-active');
     }
   }
+
+  const codeBtn = $('#present-show-code');
+  if (codeBtn) {
+    codeBtn.classList.toggle('is-active', !!State.showPresentCode);
+    codeBtn.title = State.showPresentCode ? 'Teilnahme-Code ausblenden' : 'Teilnahme-Code anzeigen';
+  }
+}
+
+function syncPresentCodeBar(visible = State.showPresentCode) {
+  State.showPresentCode = visible !== false;
+  $('#present-code-bar')?.classList.toggle('hidden', !State.showPresentCode);
+  $('#present-show-code')?.classList.toggle('is-active', State.showPresentCode);
 }
 
 function updatePresentStats() {
@@ -7298,7 +7311,7 @@ async function renderQrCode() {
       });
     }
   } catch { /* fallback url above */ }
-  const targets = [...document.querySelectorAll('.ws-hero-qr-img, #present-qr')];
+  const targets = [...document.querySelectorAll('#present-qr')];
   targets.forEach((el) => {
     el.src = dataUrl;
     el.alt = `QR Code ${State.session.code}`;
@@ -7341,7 +7354,7 @@ function bindPresentToolbar() {
     renderPresent();
   });
   $('#present-show-code').onclick = () => {
-    $('#present-code-bar').classList.toggle('hidden');
+    syncPresentCodeBar(!State.showPresentCode);
     void renderQrCode();
   };
   $('#present-focus-toggle')?.addEventListener('click', () => {
@@ -8031,8 +8044,8 @@ function renderParticipantMatrixHtml(slide) {
   const inPool = items.filter((it) => !placements[it.id]);
   const itemCard = (it) => {
     const origin = [it.trackLabel, it.phase].filter(Boolean).join(' · ');
-    return `<div class="lp-mx-item" data-item-id="${esc(it.id)}" data-text="${esc(it.text)}" title="${esc(useCaseFullPlain(it.text))}${origin ? ' — ' + esc(origin) : ''}">
-    <span class="lp-mx-item-text">${renderUseCaseDisplayHtml(it.text, 'full')}</span>
+    return `<div class="lp-mx-item" data-item-id="${esc(it.id)}" data-text="${esc(it.text)}" title="${esc(useCaseCollectLabel(it.text))}${origin ? ' — ' + esc(origin) : ''}">
+    <span class="lp-mx-item-text">${renderUseCasePillsHtml(it.text, 'collect')}</span>
     ${origin ? `<span class="lp-mx-item-origin">${esc(origin)}</span>` : ''}
   </div>`;
   };
@@ -8057,7 +8070,7 @@ function renderParticipantMatrixHtml(slide) {
       ${items.map((it) => {
         const origin = [it.trackLabel, it.phase].filter(Boolean).join(' · ');
         return `<div class="lp-mxm-item" data-item-id="${esc(it.id)}">
-          <div class="lp-mxm-text">${renderUseCaseDisplayHtml(it.text, 'full')}${origin ? `<span class="lp-mxm-origin">${esc(origin)}</span>` : ''}</div>
+          <div class="lp-mxm-text">${renderUseCasePillsHtml(it.text, 'collect')}${origin ? `<span class="lp-mxm-origin">${esc(origin)}</span>` : ''}</div>
           <div class="lp-mxm-choices">${['qw', 'sb', 'ts', 'dr'].map((q) => `<button type="button" class="lp-mxm-btn lp-q-${q}${placements[it.id] === q ? ' is-active' : ''}" data-item="${esc(it.id)}" data-q="${q}" aria-label="${esc(quadrants[q].label)}" title="${esc(quadrants[q].label)}"><i class="fa-solid ${QICON[q] || 'fa-square'}"></i></button>`).join('')}</div>
         </div>`;
       }).join('')}
@@ -8611,9 +8624,12 @@ async function routeFromHash() {
     await loadSessionData();
     showScreen('present');
     subscribeSessionChannel();
+    State.showPresentCode = true;
+    syncPresentCodeBar(true);
     renderPresentParticipants();
     renderPresent();
     bindPresentToolbar();
+    void renderQrCode();
     return;
   }
   if (hash.startsWith('results/')) {
