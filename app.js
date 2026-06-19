@@ -4202,30 +4202,83 @@ function stopHeroAiFx() {
   }
 }
 
-function initHeroAiFx(stage) {
+function cleanupParticipantHeroFx() {
+  const wrap = document.querySelector('#participant-root .ws-hero-stage');
+  wrap?._heroAiCleanup?.();
+  $('#screen-participant')?.classList.remove('participant-hero-active');
+}
+
+function participantOpeningHeroKey(slide, slideIndex) {
+  return `${slide?.id || 'x'}:${slideIndex}`;
+}
+
+function isParticipantOpeningHeroSlide(slide) {
+  return slide?.content?.isHeroSlide && isWorkshopOpeningSlide(slide);
+}
+
+function mountParticipantOpeningHero(hostSlide, slideIndex, root, finishParticipant) {
+  const key = participantOpeningHeroKey(hostSlide, slideIndex);
+  const mobileFx = isParticipantMobileLayout();
+  const screen = $('#screen-participant');
+  screen?.classList.toggle('participant-hero-active', mobileFx);
+
+  if (State._participantHeroMountKey === key && root.querySelector('.participant-opening-hero .ws-hero-stage')) {
+    requestAnimationFrame(() => initHeroAiFx(root, { reuse: true }));
+    finishParticipant();
+    return true;
+  }
+
+  State._participantHeroMountKey = key;
+  cleanupParticipantHeroFx();
+
+  const heroHtml = renderHeroSlideHtml(hostSlide.content, false, { shellMode: true, presentFx: true });
+  const fullscreenClass = mobileFx ? ' participant-hero-fullscreen' : '';
+  root.innerHTML = wrapParticipantSlide(`
+    <div class="participant-wait-block participant-opening-hero${fullscreenClass}">
+      ${heroHtml}
+      <p class="participant-sop-wait participant-sop-wait--hero"><i class="fa-solid fa-eye"></i> Bitte auf die Präsentation achten…</p>
+    </div>`, slideIndex);
+
+  requestAnimationFrame(() => initHeroAiFx(root));
+  finishParticipant();
+  return true;
+}
+
+function initHeroAiFx(stage, opts = {}) {
+  const { reuse = false } = opts;
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
-  stopHeroAiFx();
   const wrap = stage?.querySelector('.ws-hero-stage');
   const canvas = wrap?.querySelector('.ws-hero-ai-canvas');
   if (!wrap || !canvas) return;
+  if (reuse && wrap._heroAiRunning && State._heroAiWrap === wrap && State.heroAiRaf) return;
+  wrap._heroAiCleanup?.();
+  stopHeroAiFx();
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
+  State._heroAiWrap = wrap;
+  wrap._heroAiRunning = true;
   const particles = [];
-  const links = [];
+  let lastW = 0;
+  let lastH = 0;
   const resize = () => {
     const rect = wrap.getBoundingClientRect();
+    const w = Math.max(1, Math.floor(rect.width));
+    const h = Math.max(1, Math.floor(rect.height));
+    if (w === lastW && h === lastH && particles.length) return;
+    lastW = w;
+    lastH = h;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
-    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
-    canvas.style.width = `${rect.width}px`;
-    canvas.style.height = `${rect.height}px`;
+    canvas.width = Math.max(1, Math.floor(w * dpr));
+    canvas.height = Math.max(1, Math.floor(h * dpr));
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (!particles.length) {
-      const count = Math.min(88, Math.max(42, Math.floor(rect.width / 16)));
+      const count = Math.min(88, Math.max(42, Math.floor(w / 16)));
       for (let i = 0; i < count; i += 1) {
         particles.push({
-          x: Math.random() * rect.width,
-          y: Math.random() * rect.height,
+          x: Math.random() * w,
+          y: Math.random() * h,
           vx: (Math.random() - 0.5) * 0.62,
           vy: (Math.random() - 0.5) * 0.62,
           r: 1.6 + Math.random() * 3.4,
@@ -4272,6 +4325,8 @@ function initHeroAiFx(stage) {
   };
   State.heroAiRaf = requestAnimationFrame(tick);
   wrap._heroAiCleanup = () => {
+    wrap._heroAiRunning = false;
+    if (State._heroAiWrap === wrap) State._heroAiWrap = null;
     stopHeroAiFx();
     ro?.disconnect();
   };
@@ -7360,6 +7415,12 @@ function shouldSkipParticipantBroadcastRender(payload, prevIndex, prevOpen) {
   if (!payload || State.session.current_slide_index !== prevIndex || State.session.question_open !== prevOpen) {
     return false;
   }
+  const hostSlide = State.slides[State.session.current_slide_index || 0];
+  if (isParticipantOpeningHeroSlide(hostSlide)
+      && !payload.voteOptions && !payload.matrixItems && !payload.pitchItems
+      && payload.current_slide_index === undefined && payload.question_open === undefined) {
+    return true;
+  }
   if (payload.pitchSync && !payload.pitchItems && !payload.voteOptions && !payload.matrixItems && !payload.quickWinItems && !payload.settings) {
     return true;
   }
@@ -8580,6 +8641,8 @@ function hasAnsweredSlide(slide) {
 async function renderParticipantQuestion() {
   const slideIndex = State.session.current_slide_index || 0;
   if (State._participantSlideRenderIdx !== slideIndex) {
+    cleanupParticipantHeroFx();
+    State._participantHeroMountKey = null;
     State._participantSlideRenderIdx = slideIndex;
     State._participantVoteOptionsSig = null;
     State._participantMatrixItemsSig = null;
@@ -8598,10 +8661,16 @@ async function renderParticipantQuestion() {
   if (!hostSlide?.settings?.sopTrackVote) State.participantVoteExpert = false;
   if (!hostSlide) { root.innerHTML = '<div class="participant-card"><p>Warte auf Folie…</p></div>'; finishParticipant(); return; }
   if (!State.session.question_open) {
+    cleanupParticipantHeroFx();
     root.innerHTML = `<div class="participant-card"><h1>${esc(hostSlide.content?.title || 'Warte…')}</h1><p>Die Frage ist geschlossen. Bitte warte auf die nächste Karte…</p></div>`;
     finishParticipant();
     return;
   }
+  if (isParticipantOpeningHeroSlide(hostSlide)) {
+    mountParticipantOpeningHero(hostSlide, slideIndex, root, finishParticipant);
+    return;
+  }
+  cleanupParticipantHeroFx();
   if (hostSlide?.content?.sopKind === 'participants') {
     root.innerHTML = wrapParticipantSlide(renderParticipantSopWaitHtml({
       title: 'SOP-Zuweisung läuft',
@@ -8681,8 +8750,9 @@ async function renderParticipantQuestion() {
   if (hostSlide?.content?.sopKind === 'workshop-close' || isWorkshopClosingSlide(hostSlide)) {
     root.innerHTML = wrapParticipantSlide(`
       <div class="participant-wait-block participant-closing-block">
-        ${renderClosingSlideHtml(hostSlide.content || {}, false, { shellMode: true, presentFx: false })}
+        ${renderClosingSlideHtml(hostSlide.content || {}, false, { shellMode: true, presentFx: true })}
       </div>`, slideIndex);
+    requestAnimationFrame(() => initClosingAiFx(root));
     maybeLaunchClosingCelebration(hostSlide);
     finishParticipant();
     return;
@@ -8718,9 +8788,9 @@ async function renderParticipantQuestion() {
     }
     if (slide.slide_type === 'content' && (slide.content?.isHeroSlide || slide.content?.sopKind === 'workshop-close' || slide.content?.sopKind || slide.content?.sopTrackResults || isSopCardResultsSlide(slide))) {
       const html = isWorkshopClosingSlide(slide)
-        ? renderClosingSlideHtml(slide.content, false, { shellMode: true, presentFx: false })
+        ? renderClosingSlideHtml(slide.content, false, { shellMode: true, presentFx: true })
         : (slide.content.isHeroSlide
-          ? renderHeroSlideHtml(slide.content, false, { shellMode: true, presentFx: false })
+          ? renderHeroSlideHtml(slide.content, false, { shellMode: true, presentFx: true })
           : (isSopCardResultsSlide(slide) ? '' : renderSopContentHtml(slide.content)));
       if (html || isSopCardResultsSlide(slide)) {
         root.innerHTML = wrapParticipantSlide(`
