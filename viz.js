@@ -12,23 +12,25 @@
   }
 
   function renderMatrixFrame({ yLabel, xLabel, gridHtml, footerHtml = '' }) {
-    return `<div class="lp-mx-frame">
+    const y = esc(yLabel || 'Impact');
+    const x = esc(xLabel || 'Aufwand');
+    return `<div class="lp-mx-frame" role="region" aria-label="${y} vs ${x} Matrix">
       <div class="lp-mx-chart">
-        <aside class="lp-mx-axis lp-mx-axis--y" aria-hidden="true">
+        <aside class="lp-mx-axis lp-mx-axis--y" aria-label="${y}">
           <span class="lp-mx-axis-tip lp-mx-axis-tip--high"><i class="fa-solid fa-arrow-up"></i> hoch</span>
           <div class="lp-mx-axis-track">
             <div class="lp-mx-axis-line lp-mx-axis-line--y"></div>
-            <span class="lp-mx-axis-label lp-mx-axis-label--y">${esc(yLabel || 'Impact')}</span>
+            <span class="lp-mx-axis-label lp-mx-axis-label--y">${y}</span>
           </div>
           <span class="lp-mx-axis-tip lp-mx-axis-tip--low"><i class="fa-solid fa-arrow-down"></i> niedrig</span>
         </aside>
         <div class="lp-mx-chart-body">
           <div class="lp-mx-quad-grid lp-mx-quad-grid--chart">${gridHtml}</div>
-          <div class="lp-mx-axis lp-mx-axis--x" aria-hidden="true">
+          <div class="lp-mx-axis lp-mx-axis--x" aria-label="${x}">
             <span class="lp-mx-axis-tip lp-mx-axis-tip--low"><i class="fa-solid fa-arrow-left"></i> niedrig</span>
             <div class="lp-mx-axis-track lp-mx-axis-track--x">
               <div class="lp-mx-axis-line lp-mx-axis-line--x"></div>
-              <span class="lp-mx-axis-label lp-mx-axis-label--x">${esc(xLabel || 'Aufwand')}</span>
+              <span class="lp-mx-axis-label lp-mx-axis-label--x">${x}</span>
             </div>
             <span class="lp-mx-axis-tip lp-mx-axis-tip--high">hoch <i class="fa-solid fa-arrow-right"></i></span>
           </div>
@@ -280,7 +282,7 @@
               ? window.LPUseCase.useCaseCollectLabel(it.text)
               : String(it.text || '');
             const labelHtml = window.LPUseCase?.renderUseCasePillsHtml
-              ? window.LPUseCase.renderUseCasePillsHtml(it.text, 'collect', { icon: 'fa-table-cells-large', label: 'Matrix', tone: 'finale' })
+              ? window.LPUseCase.renderUseCasePillsHtml(it.text, 'collect')
               : esc(label);
             return `<div class="lp-matrix-result-item" style="--i:${i}" title="${esc(label)} – ${it.max}/${it.total} Stimmen">
               <span class="lp-matrix-result-text">${labelHtml}</span>

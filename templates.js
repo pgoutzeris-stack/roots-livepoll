@@ -643,10 +643,11 @@ function sopTrackVote(track, trackIndex) {
 
 // Präsentations-Session nach dem Track-Vote: Gewinner stellen ihre Use Cases kurz vor.
 function sopTrackPresentationSession(track) {
+  const label = track.title.replace(/^Track \d+: /, '');
   return tplSlide('content', {
-    title: `Presentation Session · ${track.title.replace(/^Track \d+: /, '')}`,
+    title: `Präsentationsrunde · ${label}`,
     subtitle: 'Top-gewählte Use Cases · jetzt kurz vorstellen',
-    body: `Die Abstimmung ist abgeschlossen — die meistgewählten Use Cases sind sichtbar.\n\nJede Person hat 1–2 Minuten: Was ist die KI-Idee? · Wer im Team profitiert? · Welches Tool kommt zum Einsatz?\n\nDanach: Top-Ideen gemeinsam in die ICE Matrix eintragen.`,
+    body: `Die Abstimmung ist abgeschlossen — die meistgewählten Use Cases sind sichtbar.\n\nJede Person hat 1–2 Minuten: Was ist die KI-Idee? · Wer im Team profitiert? · Welches Tool kommt zum Einsatz?\n\nDanach: Top-Ideen gemeinsam in die Impact/Effort-Matrix einordnen.`,
     isHeroSlide: false,
     sopKind: SK.TRACK_PRESENTATION,
     ...sopMeta(track),
@@ -703,7 +704,7 @@ function sopWorkshopClose() {
   return [
     tplSlide('content', {
       title: 'Danke! 🙌',
-      body: 'Die Top-Use-Cases übergeben wir an die SOP-Owner.\nAction Items sammeln wir in Notion.\nKickoffs für die nominierten Use Cases folgen.\n\nLet\'s build the future of ROOTS.',
+      body: 'Die Top-Use-Cases übergeben wir an die SOP-Owner.\nAction Items sammeln wir in Notion.\nKickoffs für die nominierten Use Cases folgen.\n\nGemeinsam bauen wir die Zukunft von ROOTS.',
       isHeroSlide: true,
       sopKind: SK.WORKSHOP_CLOSE,
     }),
@@ -714,7 +715,7 @@ function sopWorkshopClose() {
 
 function sopPitchSession() {
   return tplSlide('content', {
-    title: 'Pitch Session',
+    title: 'Pitch-Runde',
     subtitle: 'Jede Person stellt ihren Use Case kurz vor · 2 Minuten pro Person',
     body: '',
     sopKind: SK.PITCH_SESSION,

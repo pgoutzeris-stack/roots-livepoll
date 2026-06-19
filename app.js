@@ -273,31 +273,6 @@ function getUseCaseLabels() {
   };
 }
 
-function getUseCasePhaseTagForSlide(slide) {
-  if (!slide) return null;
-  const c = slide.content || {};
-  if (c.sopKind === 'pitch-session' || slide.settings?.sopPitchSession) {
-    return { icon: 'fa-person-chalkboard', label: 'Pitch', tone: 'finale' };
-  }
-  if (slide.settings?.sopAllTracksVote || c.sopKind === 'final-vote') {
-    return { icon: 'fa-ranking-star', label: 'Priorisierung', tone: 'finale' };
-  }
-  if (slide.slide_type === 'priority_matrix' || slide.settings?.sopAllTracksMatrix || c.sopKind === 'final-matrix') {
-    return { icon: 'fa-table-cells-large', label: 'Matrix', tone: 'finale' };
-  }
-  return null;
-}
-
-const USE_CASE_PITCH_TAG = { icon: 'fa-person-chalkboard', label: 'Pitch', tone: 'finale' };
-
-function renderUseCasePhaseTagHtml(tag) {
-  if (!tag) return '';
-  const icon = tag.icon || tag.pillIcon || 'fa-circle';
-  const label = tag.label || tag.pillLabel || '';
-  const tone = tag.tone || tag.pillTone || 'finale';
-  return `<span class="uc-phase-tag ws-pill ws-pill--${tone}"><i class="fa-solid ${icon}"></i> ${esc(label)}</span>`;
-}
-
 function parseUseCaseParts(text) {
   const raw = String(text || '').trim();
   if (!raw) return { summary: '', feature: '', dependencies: '', full: '', hasParts: false };
@@ -342,33 +317,27 @@ function useCaseFullPlain(text) {
   return bits.join(' · ');
 }
 
-function renderUseCasePillsHtml(text, mode = 'full', phaseTag = null) {
+function renderUseCasePillsHtml(text, mode = 'full') {
   const p = parseUseCaseParts(text);
   const L = getUseCaseLabels();
   const summaryOnly = mode === 'collect' || mode === 'summary';
-  let pillsHtml = '';
   if (summaryOnly) {
     const label = useCaseCollectLabel(text);
     if (!label) return '';
-    pillsHtml = `<span class="uc-pills uc-pills--summary"><span class="uc-pill uc-pill--idea">${esc(label)}</span></span>`;
-  } else if (!p.hasParts || (!p.feature && !p.dependencies)) {
-    pillsHtml = `<span class="uc-pills"><span class="uc-pill uc-pill--idea">${esc(p.full)}</span></span>`;
-  } else {
-    pillsHtml = `<span class="uc-pills uc-pills--full">
+    return `<span class="uc-pills uc-pills--summary"><span class="uc-pill uc-pill--idea">${esc(label)}</span></span>`;
+  }
+  if (!p.hasParts || (!p.feature && !p.dependencies)) {
+    return `<span class="uc-pills"><span class="uc-pill uc-pill--idea">${esc(p.full)}</span></span>`;
+  }
+  return `<span class="uc-pills uc-pills--full">
     ${p.summary ? `<span class="uc-pill uc-pill--idea"><span class="uc-pill-k">${esc(L.formula[0])}</span><span class="uc-pill-v">${esc(p.summary)}</span></span>` : ''}
     ${p.feature ? `<span class="uc-pill uc-pill--feature"><span class="uc-pill-k">${esc(L.formula[1])}</span><span class="uc-pill-v">${esc(p.feature)}</span></span>` : ''}
     ${p.dependencies ? `<span class="uc-pill uc-pill--deps"><span class="uc-pill-k">${esc(L.formula[2])}</span><span class="uc-pill-v">${esc(p.dependencies)}</span></span>` : ''}
   </span>`;
-  }
-  if (!phaseTag) return pillsHtml;
-  return `<span class="uc-pills-wrap">${renderUseCasePhaseTagHtml(phaseTag)}${pillsHtml}</span>`;
 }
 
-function renderUseCaseDisplayHtml(text, mode = 'full', slideOrTag = null) {
-  const tag = slideOrTag && (slideOrTag.icon || slideOrTag.pillIcon)
-    ? slideOrTag
-    : getUseCasePhaseTagForSlide(slideOrTag);
-  return renderUseCasePillsHtml(text, mode, tag);
+function renderUseCaseDisplayHtml(text, mode = 'full') {
+  return renderUseCasePillsHtml(text, mode);
 }
 
 function useCaseDisplayModeForSlide(slide) {
@@ -401,7 +370,6 @@ window.LPUseCase = {
   getUseCaseLabels,
   renderUseCasePillsHtml,
   renderUseCaseDisplayHtml,
-  getUseCasePhaseTagForSlide,
 };
 
 function aggregateTrackUseCases(trackKey) {
@@ -1633,6 +1601,18 @@ function getSopBoardContextFromSlide(slide) {
   return { show: true, trackKey: ctx.trackKey, phaseName: null, cardName: null };
 }
 
+function isGenericCollectCardLabel(label) {
+  return !label || /^(use cases sammeln|ki use cases|use cases)$/i.test(String(label).trim());
+}
+
+function renderTrackVoteGroupHeadHtml(g) {
+  const showCard = g.card && !isGenericCollectCardLabel(g.card);
+  if (showCard) {
+    return `<div class="track-vote-group-head"><span>${esc(g.phase)}</span><strong>${esc(g.card)}</strong></div>`;
+  }
+  return `<div class="track-vote-group-head track-vote-group-head--phase-only"><strong>${esc(g.phase)}</strong></div>`;
+}
+
 function getTrackVoteOptionsGrouped(slide) {
   const scope = getVoteSlideScope(slide);
   if (scope?.kind === 'brainstorm') {
@@ -1997,9 +1977,9 @@ function participantAssignButtonsHtml(p, { large = false } = {}) {
       </button>
     </span>`;
   }
-  return `<span class="sop-assign-btns" role="group" aria-label="SOP-Zuweisung">
-    <button type="button" class="sop-assign-btn sop-assign-btn--internal${activeInternal}" data-sop-assign="internal" data-participant-id="${esc(p.id)}" title="${esc(intMeta.label)}">Int</button>
-    <button type="button" class="sop-assign-btn sop-assign-btn--consulting${activeConsulting}" data-sop-assign="consulting" data-participant-id="${esc(p.id)}" title="${esc(conMeta.label)}">Con</button>
+  return `<span class="sop-assign-btns" role="group" aria-label="SOP-Zuweisung für ${esc(p.display_name || 'Gast')}">
+    <button type="button" class="sop-assign-btn sop-assign-btn--internal${activeInternal}" data-sop-assign="internal" data-participant-id="${esc(p.id)}" title="${esc(intMeta.label)}">${esc(intMeta.shortLabel || 'Internal')}</button>
+    <button type="button" class="sop-assign-btn sop-assign-btn--consulting${activeConsulting}" data-sop-assign="consulting" data-participant-id="${esc(p.id)}" title="${esc(conMeta.label)}">${esc(conMeta.shortLabel || 'Consulting')}</button>
   </span>`;
 }
 
@@ -2428,7 +2408,7 @@ function renderFinalVotePresentHtml(slide, visible) {
       h += `<div class="ws-row${topClass}">
         <span class="ws-c-rank">${i + 1}</span>
         <span class="ws-c-uc">
-          <span class="ws-uc-text">${renderUseCaseDisplayHtml(r.text, 'full', slide)}${matrixBadge}</span>
+          <span class="ws-uc-text">${renderUseCaseDisplayHtml(r.text, 'full')}${matrixBadge}</span>
           <span class="ws-uc-meta"><span class="ws-uc-track">${esc(r.trackLabel)}</span>${r.phase && r.phase !== r.trackLabel ? `<span class="ws-uc-phase">${esc(r.phase)}</span>` : ''}</span>
         </span>
         <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
@@ -2454,18 +2434,17 @@ function renderTrackVotePresentHtml(slide, visible) {
   const key = slide.content?.sopTrackKey || slide.content?.sopTrackClass;
   const { allItems } = aggregateTrackUseCases(key);
   if (!allItems.length) {
-    return '<div class="present-wait-msg">Noch keine Use Cases gesammelt. Bitte zuerst das Brainstorming in den Karten abschließen.</div>';
+    return '<div class="present-wait-msg">Noch keine Use Cases gesammelt. Bitte zuerst das Brainstorming in den Phasen abschließen.</div>';
   }
-  const newIds = markNewBubbleIds(`track-vote-${key}`, allItems);
-  const voteBubbleItems = allItems.map((item) => ({ ...item, text: useCaseFullPlain(item.text) }));
-  const bubbleHtml = window.LPViz.renderBrainstormBubbles(voteBubbleItems, { mode: 'present', maxItems: 120, newIds });
   const hasVotes = visible.length > 0 || !State.session.question_open;
+  const previewHtml = renderTrackVoteGroupedListHtml(slide);
   return `<div class="track-vote-present">
     <div class="track-vote-present-head">
       <span class="track-vote-count">${allItems.length} Use Cases</span>
       <span class="track-vote-hint">Kontext aus allen SOP-Phasen · ${State.session.question_open ? 'Teilnehmer wählen jetzt Top 3' : 'Priorisierung abgeschlossen'}</span>
     </div>
     ${renderCardVoteParticipationHtml(slide)}
+    <div class="track-vote-preview"><div class="track-vote-live-label">Abstimmungsoptionen</div>${previewHtml}</div>
     ${hasVotes ? `<div class="track-vote-live-ranking"><div class="track-vote-live-label">Live-Ergebnis</div>${renderVoteResultsHtml(slide, visible)}</div>` : '<div class="present-wait-msg">Warte auf die ersten Stimmen …</div>'}
   </div>`;
 }
@@ -2476,17 +2455,17 @@ function renderTrackVoteGroupedListHtml(slide, { selectable = false, selectedIds
   const myId = fairVote ? (State.participant?.id) : null;
   return `<div class="track-vote-grouped">${groups.map((g) => `
     <div class="track-vote-group">
-      <div class="track-vote-group-head"><span>${esc(g.phase)}</span><strong>${esc(g.card)}</strong></div>
+      ${renderTrackVoteGroupHeadHtml(g)}
       <div class="track-vote-group-items">${g.options.map((o) => {
         const isOwn = myId && o.participant_id === myId;
         if (selectable && !isOwn) {
           const checked = selectedIds.includes(o.id) ? ' checked' : '';
-          return `<label class="track-vote-option"><input type="checkbox" value="${esc(o.id)}"${checked} /><span>${renderUseCaseDisplayHtml(o.text, 'full', slide)}</span></label>`;
+          return `<label class="track-vote-option"><input type="checkbox" value="${esc(o.id)}"${checked} /><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span></label>`;
         }
         if (selectable && isOwn) {
-          return `<div class="track-vote-option track-vote-option--own"><span>${renderUseCaseDisplayHtml(o.text, 'full', slide)}</span><span class="vote-own-badge">Mein Beitrag</span></div>`;
+          return `<div class="track-vote-option track-vote-option--own"><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span><span class="vote-own-badge">Mein Beitrag</span></div>`;
         }
-        return `<div class="track-vote-option-read">${renderUseCaseDisplayHtml(o.text, 'full', slide)}</div>`;
+        return `<div class="track-vote-option-read">${renderUseCaseDisplayHtml(o.text, 'full')}</div>`;
       }).join('')}</div>
     </div>`).join('')}</div>`;
 }
@@ -2501,14 +2480,14 @@ function renderTrackVoteResultsHtml(slide, visible) {
   const scoreFor = (id) => (top3Counts[id] || 0) * 10 + (pointTotals[id] || 0);
   let html = '<div class="track-vote-results">';
   groups.forEach((g) => {
-    html += `<div class="track-vote-group"><div class="track-vote-group-head"><span>${esc(g.phase)}</span><strong>${esc(g.card)}</strong></div><div class="track-vote-group-items">`;
+    html += `<div class="track-vote-group">${renderTrackVoteGroupHeadHtml(g)}<div class="track-vote-group-items">`;
     g.options
       .map((o) => ({ ...o, score: scoreFor(o.id), votes: top3Counts[o.id] || 0, points: pointTotals[o.id] || 0 }))
       .sort((a, b) => b.score - a.score)
       .forEach((o) => {
         const max = Math.max(1, ...g.options.map((x) => scoreFor(x.id)));
         const pct = Math.round((o.score / max) * 100);
-        html += `<div class="track-vote-result-row"><span>${renderUseCaseDisplayHtml(o.text, 'full', slide)}</span><div class="viz-bar-track"><div class="viz-bar-fill" style="width:${pct}%"></div></div><strong>${o.votes ? `${o.votes}× Top 3` : ''}${o.votes && o.points ? ' · ' : ''}${o.points ? `${Math.round(o.points)} Pkt` : ''}</strong></div>`;
+        html += `<div class="track-vote-result-row"><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span><div class="viz-bar-track"><div class="viz-bar-fill" style="width:${pct}%"></div></div><strong>${o.votes ? `${o.votes}× Top 3` : ''}${o.votes && o.points ? ' · ' : ''}${o.points ? `${Math.round(o.points)} Pkt` : ''}</strong></div>`;
       });
     html += '</div></div>';
   });
@@ -2873,7 +2852,7 @@ function getSlideShellMeta(slide) {
   if (c.sopKind === 'dual-pair-orient') return { pillIcon: 'fa-map', pillLabel: 'Orientierung', pillTone: 'orient' };
   if (c.sopKind === 'dual-pair-collect') return { pillIcon: 'fa-lightbulb', pillLabel: 'Sammeln', pillTone: 'collect' };
   if (isBrainstormCollectSlide(slide)) return { pillIcon: 'fa-lightbulb', pillLabel: 'Sammeln', pillTone: 'collect' };
-  if (shouldUseVoteWorkshopUi(slide)) return { pillIcon: 'fa-ranking-star', pillLabel: 'Vote', pillTone: 'decide' };
+  if (shouldUseVoteWorkshopUi(slide)) return { pillIcon: 'fa-ranking-star', pillLabel: 'Priorisierung', pillTone: 'decide' };
   if (slide?.slide_type === 'section' && c.sopTrackClass) return { pillIcon: 'fa-map', pillLabel: (c.sopTrackLabel || 'SOP').replace(/^Track \d+: /, ''), pillTone: 'orient' };
   if (c.isHeroSlide && !isWorkshopClosingSlide(slide)) return { pillIcon: 'fa-signal', pillLabel: 'Start', pillTone: 'brand' };
   if (c.sopKind === 'workshop-close') return { pillIcon: 'fa-heart', pillLabel: 'Abschluss', pillTone: 'muted' };
@@ -3368,10 +3347,21 @@ function renderSopBoardPreview(c, editable = false, { hideTrackHeader = false, a
     </div>`;
 }
 
-function renderSopSectionHtml(c, editable = false, { shellMode = false, splitCol = false } = {}) {
+function renderSopSectionHtml(c, editable = false, { shellMode = false, splitCol = false, participantCompact = false } = {}) {
   const content = enrichSopContent(c);
   const theme = sopTrackTheme(content.sopTrackClass);
   const isTrack = content.sopKind === 'track';
+  if (participantCompact && !editable) {
+    const board = content.sopBoard || [];
+    const phases = board.map((p) => `<li class="sop-participant-phase-item"><i class="fa-solid fa-circle-dot"></i> ${esc(p.name)}</li>`).join('');
+    return `<div class="sop-participant-track-intro" style="--sop-accent:${theme.accent}">
+      <div class="sop-pslide-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(content.sopTrackLabel || 'SOP')}</div>
+      <h2 class="sop-participant-track-title">${esc(content.title || '')}</h2>
+      ${content.subtitle ? `<p class="sop-participant-track-sub">${esc(content.subtitle)}</p>` : ''}
+      ${content.body ? `<p class="sop-participant-track-body">${esc(content.body).replace(/\n/g, '<br>')}</p>` : ''}
+      ${phases ? `<ul class="sop-participant-phase-list">${phases}</ul>` : ''}
+    </div>`;
+  }
   if (shellMode && !editable) {
     const colTitle = splitCol && editable
       ? `<h2 class="ws-col-title">${esc(workshopDisplayTitle(content))}</h2>`
@@ -3407,6 +3397,19 @@ function renderSopSectionHtml(c, editable = false, { shellMode = false, splitCol
     </div>`;
 }
 
+function renderGroupTransitionHtml(c, editable = false, { shellMode = false } = {}) {
+  const progress = c.sopDualProgress?.label || '';
+  const bodyEl = editable
+    ? `<div class="canvas-editable sop-pslide-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
+    : (c.body ? `<p class="ws-transition-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+  const inner = `<div class="ws-transition-card">
+    <div class="ws-transition-icon"><i class="fa-solid fa-arrows-turn-right"></i></div>
+    ${progress ? `<span class="ws-transition-badge ws-pill ws-pill--orient">${esc(progress)}</span>` : ''}
+    ${bodyEl}
+  </div>`;
+  return shellMode ? `<div class="ws-sop-main ws-sop-main--transition">${inner}</div>` : inner;
+}
+
 function renderSopCardHtml(c, editable = false) {
   const theme = sopTrackTheme(c.sopTrackClass);
   const titleEl = editable
@@ -3432,11 +3435,15 @@ function renderSopCardHtml(c, editable = false) {
 function renderSopTrackResultsHtml(trackKey) {
   const { byCard, allItems } = aggregateTrackUseCases(trackKey);
   if (!allItems.length) return '<div class="present-wait-msg">Noch keine Use Cases in diesem Track gesammelt.</div>';
-  return `<div class="sop-track-results">${byCard.filter((g) => g.items.length).map((group) => `
-    <div class="sop-track-result-group">
-      <div class="sop-track-result-head"><span>${esc(group.phase)}</span><strong>${esc(group.card)}</strong></div>
-      <div class="sop-track-result-items">${group.items.map((item) => `<div class="sop-track-result-item">${esc(item.text || item)}</div>`).join('')}</div>
-    </div>`).join('')}<div class="sop-track-result-total">${allItems.length} Use Cases gesammelt</div></div>`;
+  return `<div class="sop-track-results">${byCard.filter((g) => g.items.length).map((group) => {
+    const head = isGenericCollectCardLabel(group.card)
+      ? `<div class="sop-track-result-head"><strong>${esc(group.phase)}</strong></div>`
+      : `<div class="sop-track-result-head"><span>${esc(group.phase)}</span><strong>${esc(group.card)}</strong></div>`;
+    return `<div class="sop-track-result-group">
+      ${head}
+      <div class="sop-track-result-items">${group.items.map((item) => `<div class="sop-track-result-item">${renderUseCaseDisplayHtml(item.text, 'full')}</div>`).join('')}</div>
+    </div>`;
+  }).join('')}<div class="sop-track-result-total">${allItems.length} Use Cases gesammelt</div></div>`;
 }
 
 function renderSopContentHtml(c, editable = false, opts = {}) {
@@ -3633,11 +3640,26 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
     const bodyEl = editable
       ? `<div class="canvas-editable sop-pslide-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
       : (c.body ? `<p class="sop-pslide-body">${esc(c.body).replace(/\n/g, '<br>')}</p>` : '');
+    let top3Html = '';
+    if (c.sopKind === 'track-presentation' && State.session && !editable) {
+      const key = c.sopTrackKey || c.sopTrackClass;
+      const topData = aggregateTopTrackVotedUseCases().find((t) => t.trackKey === key);
+      if (topData?.items?.length) {
+        top3Html = `<div class="sop-presentation-top3">
+          <div class="sop-presentation-top3-head"><i class="fa-solid fa-trophy"></i> Top ${topData.items.length} aus der Track-Abstimmung</div>
+          ${topData.items.map((it, i) => `<div class="sop-presentation-top3-item"><span class="sop-presentation-top3-rank">#${i + 1}</span>${renderUseCaseDisplayHtml(it.text, 'full')}${it.votes ? `<small>${it.votes}× gewählt</small>` : ''}</div>`).join('')}
+        </div>`;
+      }
+    }
+    if (shellMode && !editable) {
+      return `<div class="ws-sop-main ws-sop-main--presentation">${top3Html}${bodyEl}${renderSopBoardPresentHtml(c, false, { hideTrackHeader: true, alignCards: true })}</div>`;
+    }
     return `
       <div class="sop-pslide-section sop-pslide-${c.sopKind} ${esc(c.sopTrackClass || '')}" style="--sop-accent:${theme.accent};--sop-soft:${theme.soft}">
         <div class="sop-pslide-badge" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(c.sopTrackLabel || 'SOP')}</div>
         ${titleEl}
         ${subEl}
+        ${top3Html}
         ${bodyEl}
         ${renderSopBoardPreview(c, editable)}
       </div>`;
@@ -3761,6 +3783,7 @@ function stopClosingAiFx() {
 }
 
 function initClosingAiFx(stage) {
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
   stopClosingAiFx();
   const wrap = stage?.querySelector('.ws-closing-stage');
   const canvas = wrap?.querySelector('.ws-closing-ai-canvas');
@@ -3877,6 +3900,7 @@ function stopHeroAiFx() {
 }
 
 function initHeroAiFx(stage) {
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
   stopHeroAiFx();
   const wrap = stage?.querySelector('.ws-hero-stage');
   const canvas = wrap?.querySelector('.ws-hero-ai-canvas');
@@ -4981,7 +5005,7 @@ function renderAllTracksUseCasesWithAuthors(timerSec = 120) {
         html += `<div class="ws-row" data-pitch-row="${esc(item.id)}">
           <span class="ws-c-rank">${n}</span>
           <span class="ws-c-uc">
-            <span class="ws-uc-text">${renderUseCaseDisplayHtml(item.text, 'full', USE_CASE_PITCH_TAG)}</span>
+            <span class="ws-uc-text">${renderUseCaseDisplayHtml(item.text, 'full')}</span>
             <span class="ws-uc-meta"><span class="ws-uc-track">${esc(trk.trackLabel)}</span>${p.phase && p.phase !== trk.trackLabel ? `<span class="ws-uc-phase">${esc(p.phase)}</span>` : ''}</span>
           </span>
           <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
@@ -5094,7 +5118,7 @@ function renderParticipantPitchHtml() {
             <span class="participant-pitch-num">${n}</span>
             <span class="participant-pitch-track">${esc(trk.trackLabel)}</span>
           </div>
-          <p class="participant-pitch-text">${renderUseCaseDisplayHtml(item.text, 'full', USE_CASE_PITCH_TAG)}</p>
+          <p class="participant-pitch-text">${renderUseCaseDisplayHtml(item.text, 'full')}</p>
           <div class="participant-pitch-author">
             ${author ? participantAvatarHtml(author, 'sm') : '<span class="participant-pitch-avatar-fallback"><i class="fa-solid fa-user"></i></span>'}
             <span>Eingebracht von <strong>${esc(authorName)}</strong></span>
@@ -5104,7 +5128,7 @@ function renderParticipantPitchHtml() {
     });
   });
   return `<div class="participant-pitch-list">
-    <p class="participant-pitch-hint"><i class="fa-solid fa-person-chalkboard"></i> Pitch Session — wer pitcht welchen Use Case?</p>
+    <p class="participant-pitch-hint"><i class="fa-solid fa-person-chalkboard"></i> Pitch-Runde — wer pitcht welchen Use Case?</p>
     ${cards}
   </div>`;
 }
@@ -7033,10 +7057,13 @@ function renderPresentNow() {
       ${pending.slice(0, 5).map((r) => {
         const p = State.participants.find((x) => x.id === r.participant_id);
         const who = p ? `<span class="present-mod-who">${participantAvatarHtml(p, 'xs')} ${esc(p.display_name)}</span>` : '';
+        const textHtml = isBrainstormCollectSlide(slide)
+          ? renderUseCaseDisplayHtml(r.response?.text, 'full')
+          : esc(r.response?.text || r.response?.value || JSON.stringify(r.response));
         return `
         <div class="present-mod-item">
           ${who}
-          <span>${esc(isBrainstormCollectSlide(slide) ? useCaseCollectLabel(r.response?.text) : (r.response?.text || r.response?.value || JSON.stringify(r.response)))}</span>
+          <span class="present-mod-text">${textHtml}</span>
           <button type="button" class="present-mod-btn" data-approve="${r.id}">Freigeben</button>
           <button type="button" class="present-mod-btn danger" data-hide="${r.id}">Verbergen</button>
         </div>`;
@@ -7056,7 +7083,7 @@ function renderPresentNow() {
 
   if (slide.slide_type === 'section' && c.sopKind === 'group-transition') {
     mountPresentWsSlide(stage, slide, slideIdx, {
-      main: '<div class="ws-sop-main ws-sop-main--transition"></div>',
+      main: renderGroupTransitionHtml(c, false, { shellMode: true }),
     });
     return;
   }
@@ -7856,11 +7883,20 @@ async function renderParticipantQuestion() {
     finishParticipant();
     return;
   }
+  if (hostSlide?.content?.sopKind === 'group-transition') {
+    root.innerHTML = wrapParticipantSlide(`
+      <div class="participant-wait-block">
+        ${renderGroupTransitionHtml(hostSlide.content || {}, false)}
+        <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf den Beamer achten…</p>
+      </div>`, slideIndex);
+    finishParticipant();
+    return;
+  }
   if (!isInteractive(slide.slide_type)) {
     if (slide.slide_type === 'section' && slide.content?.sopTrackClass) {
       root.innerHTML = wrapParticipantSlide(`
         <div class="participant-wait-block">
-          ${renderSopSectionHtml(slide.content)}
+          ${renderSopSectionHtml(slide.content, false, { participantCompact: true })}
           <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf den Vortragenden achten…</p>
         </div>`, slideIndex);
       finishParticipant();
@@ -8134,7 +8170,7 @@ function renderParticipantMatrixHtml(slide) {
   const itemCard = (it) => {
     const origin = [it.trackLabel, it.phase].filter(Boolean).join(' · ');
     return `<div class="lp-mx-item" data-item-id="${esc(it.id)}" data-text="${esc(it.text)}" title="${esc(useCaseCollectLabel(it.text))}${origin ? ' — ' + esc(origin) : ''}">
-    <span class="lp-mx-item-text">${renderUseCaseDisplayHtml(it.text, 'collect', slide)}</span>
+    <span class="lp-mx-item-text">${renderUseCaseDisplayHtml(it.text, 'collect')}</span>
     ${origin ? `<span class="lp-mx-item-origin">${esc(origin)}</span>` : ''}
   </div>`;
   };
@@ -8159,7 +8195,7 @@ function renderParticipantMatrixHtml(slide) {
       ${items.map((it) => {
         const origin = [it.trackLabel, it.phase].filter(Boolean).join(' · ');
         return `<div class="lp-mxm-item" data-item-id="${esc(it.id)}">
-          <div class="lp-mxm-text">${renderUseCaseDisplayHtml(it.text, 'collect', slide)}${origin ? `<span class="lp-mxm-origin">${esc(origin)}</span>` : ''}</div>
+          <div class="lp-mxm-text">${renderUseCaseDisplayHtml(it.text, 'collect')}${origin ? `<span class="lp-mxm-origin">${esc(origin)}</span>` : ''}</div>
           <div class="lp-mxm-choices">${['qw', 'sb', 'ts', 'dr'].map((q) => `<button type="button" class="lp-mxm-btn lp-q-${q}${placements[it.id] === q ? ' is-active' : ''}" data-item="${esc(it.id)}" data-q="${q}" aria-label="${esc(quadrants[q].label)}" title="${esc(quadrants[q].label)}"><i class="fa-solid ${QICON[q] || 'fa-square'}"></i></button>`).join('')}</div>
         </div>`;
       }).join('')}
