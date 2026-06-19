@@ -741,9 +741,14 @@ function sopFinalAllTracksVote() {
 //  'pro-phase' → Brainstorm je Phase → Track-Vote → Presentation Session → ICE-Matrix → Abschluss
 //  'pro-track' → EIN Brainstorm → Pitch-Session → faire Abstimmung → ICE-Matrix → Abschluss
 
-function buildSopKiWorkshopSlides(mode = 'pro-phase') {
+// Einzel-SOP-Builder. Über `opts.tracks` für Consulting (Default) ODER Internal
+// nutzbar — so teilen sich „Consulting SOP" und „Internal SOP" denselben Ablauf.
+function buildSopKiWorkshopSlides(mode = 'pro-phase', opts = {}) {
   const slides = [];
   const ws = window.LP_WORKSHOP_SETTINGS;
+  const tracks = opts.tracks || SOP_TOOL_TRACKS;
+  const exampleKey = opts.exampleKey || 'consulting';
+  const title = opts.title || 'SOP · KI Use-Case Workshop';
   const timeMin = ws.brainstormTimeLimitSec > 0
     ? `${Math.round(ws.brainstormTimeLimitSec / 60)} Min.`
     : '';
@@ -755,13 +760,13 @@ function buildSopKiWorkshopSlides(mode = 'pro-phase') {
 
   // 1.–3. Opener → Zielbild → Instruktionen (gemeinsamer Auftakt)
   slides.push(...sopWorkshopIntro({
-    title: 'SOP · KI Use-Case Workshop',
+    title,
     subtitle: modeLabel,
-    exampleKey: 'consulting',
+    exampleKey,
   }));
 
   // 4. Per Track
-  SOP_TOOL_TRACKS.forEach((track, ti) => {
+  tracks.forEach((track, ti) => {
     slides.push(sopTrackIntro(track, ti));
 
     if (mode === 'pro-phase') {
@@ -1290,26 +1295,71 @@ function buildDualSopParallelWorkshopSlides() {
 }
 
 window.LP_TEMPLATES = [
+  // ── Endausbaustufe / Go-To: beide SOPs parallel ──────────────────────────
   {
-    key: 'roots-sop-ki-workshop-phase',
+    key: 'roots-sop-dual-internal-consulting-parallel',
     category: 'ROOTS · SOP & KI',
-    name: 'SOP-Workshop · Pro Phase',
-    desc: 'SOP-Kontext je Phase → Brainstorm → Track-Vote → Presentation Session → Pitch → Übersicht → ICE Matrix.',
-    duration: '90–150 Min.',
-    group: '6–25',
-    tips: 'Höchste Tiefe. SOP-Übersicht vor jedem Brainstorm. 5 Min. / max. 2 Use Cases je Phase — 10 Phasen × 5 Min ≈ 50 Min nur Sammeln, plus Votes/Presentations/Matrix.',
-    slides: buildSopKiWorkshopSlides('pro-phase'),
+    name: 'Internal + Consulting · parallel',
+    desc: 'Empfohlen. Beide SOPs gleichzeitig · eine Sammel-Folie pro Track · Split-View mit voller SOP-Breite · Host-Zuweisung · konsolidierte Priorisierung + Matrix.',
+    duration: '90–120 Min.',
+    group: '5–25',
+    tips: 'Go-To-Vorlage. Pro Track nur eine Host-Folie (Sammeln mit SOP im Split). QR-Join → Host weist Internal/Consulting zu. Pitch Session, dann Gesamt-Priorisierung, Matrix und Abschluss.',
+    slides: buildDualSopParallelWorkshopSlides(),
   },
+  // ── Fallback 1: beide SOPs, aber nacheinander ────────────────────────────
+  {
+    key: 'roots-sop-dual-internal-consulting-sequential',
+    category: 'ROOTS · SOP & KI',
+    name: 'Internal + Consulting · nacheinander',
+    desc: 'Fallback ohne Split-View: erst Internal-SOP, dann Consulting-SOP · EINE konsolidierte Priorisierung + gemeinsame ICE-Matrix.',
+    duration: '90–120 Min.',
+    group: '5–25',
+    tips: 'Wenn parallel nicht passt. Pro Track eine Sammel-Folie mit SOP-Board. Internal komplett durch, danach Consulting. Pitch Session, dann Gesamt-Priorisierung, Matrix und Abschluss.',
+    slides: buildDualSopSequentialWorkshopSlides(),
+  },
+  // ── Fallback 2: nur Consulting-SOP ───────────────────────────────────────
   {
     key: 'roots-sop-ki-workshop-track',
     category: 'ROOTS · SOP & KI',
-    name: 'SOP-Workshop · Pro Track',
-    desc: 'Alle Phasen auf einen Blick → Track-Brainstorm → Pitch Session → finale Priorisierung → ICE Matrix.',
+    name: 'Nur Consulting SOP · Pro Track',
+    desc: 'Nur die Consulting-/Engagement-SOP. Alle Phasen auf einen Blick → Track-Brainstorm → Pitch Session → finale Priorisierung → ICE Matrix.',
     duration: '60–90 Min.',
     group: '6–25',
-    tips: 'Tempo-Format. Vollständige SOP-Übersicht als Kontext. 5 Min. / max. 2 Use Cases pro Track. Am Ende Pitch, dann Gesamt-Priorisierung.',
-    slides: buildSopKiWorkshopSlides('pro-track'),
+    tips: 'Tempo-Format für ein reines Consulting-Team. 5 Min. / max. 2 Use Cases pro Track. Am Ende Pitch, dann Gesamt-Priorisierung.',
+    slides: buildSopKiWorkshopSlides('pro-track', { tracks: SOP_TOOL_TRACKS, exampleKey: 'consulting', title: 'Consulting SOP · KI Use-Case Workshop' }),
   },
+  {
+    key: 'roots-sop-ki-workshop-phase',
+    category: 'ROOTS · SOP & KI',
+    name: 'Nur Consulting SOP · Pro Phase',
+    desc: 'Nur die Consulting-/Engagement-SOP, höchste Tiefe. SOP-Kontext je Phase → Brainstorm → Track-Vote → Presentation Session → Pitch → Übersicht → ICE Matrix.',
+    duration: '90–150 Min.',
+    group: '6–25',
+    tips: 'Tiefstes Format. SOP-Übersicht vor jedem Brainstorm. 5 Min. / max. 2 Use Cases je Phase — viele Phasen × 5 Min summieren sich, Zeitlimit ggf. senken.',
+    slides: buildSopKiWorkshopSlides('pro-phase', { tracks: SOP_TOOL_TRACKS, exampleKey: 'consulting', title: 'Consulting SOP · KI Use-Case Workshop' }),
+  },
+  // ── Fallback 3: nur Internal-SOP ─────────────────────────────────────────
+  {
+    key: 'roots-sop-ki-workshop-internal-track',
+    category: 'ROOTS · SOP & KI',
+    name: 'Nur Internal SOP · Pro Track',
+    desc: 'Nur die Internal-/Betriebs-SOP von ROOTS. Alle Phasen auf einen Blick → Track-Brainstorm → Pitch Session → finale Priorisierung → ICE Matrix.',
+    duration: '60–90 Min.',
+    group: '6–25',
+    tips: 'Tempo-Format für ein reines Internal-Team. 5 Min. / max. 2 Use Cases pro Track. Am Ende Pitch, dann Gesamt-Priorisierung.',
+    slides: buildSopKiWorkshopSlides('pro-track', { tracks: INTERNAL_SOP_TRACKS, exampleKey: 'consulting', title: 'Internal SOP · KI Use-Case Workshop' }),
+  },
+  {
+    key: 'roots-sop-ki-workshop-internal-phase',
+    category: 'ROOTS · SOP & KI',
+    name: 'Nur Internal SOP · Pro Phase',
+    desc: 'Nur die Internal-/Betriebs-SOP von ROOTS, höchste Tiefe. SOP-Kontext je Phase → Brainstorm → Track-Vote → Presentation Session → Pitch → Übersicht → ICE Matrix.',
+    duration: '90–150 Min.',
+    group: '6–25',
+    tips: 'Tiefstes Internal-Format. SOP-Übersicht vor jedem Brainstorm. 5 Min. / max. 2 Use Cases je Phase — Zeitlimit ggf. senken.',
+    slides: buildSopKiWorkshopSlides('pro-phase', { tracks: INTERNAL_SOP_TRACKS, exampleKey: 'consulting', title: 'Internal SOP · KI Use-Case Workshop' }),
+  },
+  // ── Spezial: Marketing-SOP ───────────────────────────────────────────────
   {
     key: 'roots-marketing-sop-workshop',
     category: 'ROOTS · SOP & KI',
@@ -1319,26 +1369,6 @@ window.LP_TEMPLATES = [
     group: '6–20',
     tips: 'Pro Karte 5 Min. · max. 2 Use Cases. Achtung: 10 Karten × 5 Min ≈ 50 Min nur Sammeln — Zeitlimit ggf. in LP_WORKSHOP_SETTINGS senken.',
     slides: buildMarketingSopWorkshopSlides(),
-  },
-  {
-    key: 'roots-sop-dual-internal-consulting-sequential',
-    category: 'ROOTS · SOP & KI',
-    name: 'Internal + Consulting · nacheinander',
-    desc: 'Erst Internal-SOP, dann Consulting-SOP · keine Split-View · EINE konsolidierte Priorisierung + gemeinsame ICE-Matrix.',
-    duration: '90–120 Min.',
-    group: '5–25',
-    tips: 'Pro Track eine Sammel-Folie mit SOP-Board. Internal komplett durch, danach Consulting. Pitch Session, dann Gesamt-Priorisierung, Matrix und Abschluss.',
-    slides: buildDualSopSequentialWorkshopSlides(),
-  },
-  {
-    key: 'roots-sop-dual-internal-consulting-parallel',
-    category: 'ROOTS · SOP & KI',
-    name: 'Internal + Consulting · parallel',
-    desc: 'Beide SOPs gleichzeitig · eine Sammel-Folie pro Track · Split-View mit voller SOP-Breite · Host-Zuweisung · konsolidierte Priorisierung + Matrix.',
-    duration: '90–120 Min.',
-    group: '5–25',
-    tips: 'Pro Track nur eine Host-Folie (Sammeln mit SOP im Split). QR-Join → Host weist Internal/Consulting zu. Pitch Session, dann Gesamt-Priorisierung, Matrix und Abschluss.',
-    slides: buildDualSopParallelWorkshopSlides(),
   },
 ];
 

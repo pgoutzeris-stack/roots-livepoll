@@ -6225,6 +6225,80 @@ function resolveSimUseCasesForSlide(slide) {
   return generic.slice(offset).concat(generic.slice(0, offset)).slice(0, 6);
 }
 
+// Eindeutigkeits-Schlüssel eines simulierten Use Case = normalisierte "Use Case Idee".
+// So gelten zwei Einträge mit gleicher Idee (auch bei abweichendem Feature/Abhängigkeit)
+// als Dublette und werden in der Simulation nie doppelt vergeben.
+function simUseCaseKey(text) {
+  return parseUseCaseParts(text).summary.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+// Globaler Pool aller verfügbaren Sim-Use-Cases (alle Phasen + generische), dedupliziert.
+// Dient als Nachschub, falls die folienspezifische Liste durch bereits vergebene
+// Use Cases zu klein wird.
+function buildGlobalSimUseCasePool() {
+  const byPhase = window.LP_DEBUG_PHASE_USE_CASES || {};
+  const generic = window.LP_SIM_GENERIC_USE_CASES || [];
+  const pool = [];
+  const seen = new Set();
+  const add = (t) => {
+    const k = simUseCaseKey(t);
+    if (!k || seen.has(k)) return;
+    seen.add(k);
+    pool.push(t);
+  };
+  Object.values(byPhase).forEach((list) => (list || []).forEach(add));
+  generic.forEach(add);
+  return pool;
+}
+
+// Erzeugt aus einem Use Case eine eindeutige Variante, indem die "Use Case Idee"
+// um einen Kontext-Zusatz (Phase/Track) ergänzt wird. Wird nur genutzt, wenn der
+// Pool einzigartiger Use Cases erschöpft ist — so entstehen nie wörtliche Dubletten.
+function makeUseCaseVariant(text, suffix) {
+  const parts = parseUseCaseParts(text);
+  if (!parts.hasParts) return `${text} (${suffix})`;
+  const summary = `${parts.summary} (${suffix})`;
+  return [summary, parts.feature, parts.dependencies].filter(Boolean).join(' | ');
+}
+
+// Wählt für eine Brainstorm-Folie ausschließlich Use Cases, deren Idee in dieser
+// Session noch NICHT vergeben wurde. Reicht die folienspezifische Liste nicht aus
+// (weil viele Einträge bereits anderswo benutzt wurden), wird aus dem globalen Pool
+// aufgefüllt. Ist auch dieser erschöpft, werden kontextualisierte Varianten gebildet.
+// `usedKeys` wird dabei fortgeschrieben (Session-weite Eindeutigkeit).
+function pickUniqueSimUseCases(slide, usedKeys, globalPool, targetCount, contextLabel = '') {
+  const resolved = resolveSimUseCasesForSlide(slide);
+  const target = Math.max(1, targetCount || resolved.length);
+  const chosen = [];
+  const take = (text) => {
+    const k = simUseCaseKey(text);
+    if (!k || usedKeys.has(k)) return false;
+    usedKeys.add(k);
+    chosen.push(text);
+    return true;
+  };
+  resolved.forEach((t) => { if (chosen.length < target) take(t); });
+  if (chosen.length < target) {
+    globalPool.forEach((t) => { if (chosen.length < target) take(t); });
+  }
+  // Pool erschöpft → eindeutige Varianten mit Kontext-Suffix bilden.
+  if (chosen.length < target && globalPool.length) {
+    const ctx = String(contextLabel || 'Variante').trim() || 'Variante';
+    let round = 2;
+    while (chosen.length < target) {
+      let progressed = false;
+      for (const base of globalPool) {
+        if (chosen.length >= target) break;
+        const suffix = round > 2 ? `${ctx} ${round}` : ctx;
+        if (take(makeUseCaseVariant(base, suffix))) progressed = true;
+      }
+      round += 1;
+      if (!progressed && round > 50) break; // Sicherheitsnetz gegen Endlosschleife
+    }
+  }
+  return chosen;
+}
+
 const LP_DebugSim = {
   active: false,
   joinIdx: 0,
@@ -6312,16 +6386,25 @@ const LP_DebugSim = {
     function pseudoRandom(seed) { let x = Math.sin(seed) * 10000; return x - Math.floor(x); }
 
     // First pass: brainstorm slides — Use Cases im Instruktions-Format (Use Case | Feature | Abhängigkeiten)
+    // Session-weite Eindeutigkeit: jede Use-Case-Idee wird in der gesamten Simulation
+    // nur EINMAL vergeben — kein Teilnehmer und keine Folie bekommt eine Dublette.
     const allCollected = [];
+    const usedUseCaseKeys = new Set();
+    const globalSimPool = buildGlobalSimUseCasePool();
     State.slides.forEach((slide) => {
       if (slide.slide_type !== 'brainstorm') return;
       const c = slide.content || {};
       const phaseName = c.sopPhaseName || c.title || '';
-      const useCases = resolveSimUseCasesForSlide(slide);
+      const responseLimit = getCollectResponseLimit(slide);
+      // Wie viele Use Cases passen realistisch auf diese Folie?
+      const designed = resolveSimUseCasesForSlide(slide).length;
+      const capacity = responseLimit > 0 ? defs.length * responseLimit : designed;
+      const targetCount = Math.max(1, Math.min(designed || capacity, capacity));
+      const contextLabel = c.sopPhaseName || c.sopTrackLabel || c.title || '';
+      const useCases = pickUniqueSimUseCases(slide, usedUseCaseKeys, globalSimPool, targetCount, contextLabel);
       if (!useCases.length) return;
       const queue = [];
       const perParticipantCount = new Map();
-      const responseLimit = getCollectResponseLimit(slide);
       useCases.forEach((text, i) => {
         const pIdx = i % defs.length;
         const fakeP = `debug-p-${pIdx}-${sessionId}`;
