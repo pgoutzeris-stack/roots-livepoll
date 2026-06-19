@@ -410,31 +410,7 @@ function aggregateTopTrackVotedUseCases() {
 // Top Use Cases aus der FINALEN Cross-Track-Abstimmung (sopAllTracksVote).
 // Diese wandern automatisch in die Impact/Effort-Matrix.
 function aggregateTopFinalVotedUseCases(limit = 12) {
-  const voteSlides = (State.slides || []).filter((s) => s.settings?.sopAllTracksVote);
-  if (!voteSlides.length) return [];
-  const voteIds = new Set(voteSlides.map((s) => s.id));
-  const { allItems } = aggregateAllTracksUseCases();
-  const itemByVoteId = {};
-  allItems.forEach((item) => { itemByVoteId[`resp-${item.id}`] = item; });
-  const totals = {};
-  const votes = {};
-  (State.responses || [])
-    .filter((r) => voteIds.has(r.slide_id) && !r.is_hidden)
-    .forEach((r) => {
-      (r.response?.values || []).forEach((id) => {
-        votes[id] = (votes[id] || 0) + 1;
-        totals[id] = (totals[id] || 0) + 10;
-      });
-      Object.entries(r.response?.points || {}).forEach(([id, val]) => {
-        totals[id] = (totals[id] || 0) + Number(val || 0);
-      });
-    });
-  return Object.entries(totals)
-    .map(([id, score]) => ({ ...itemByVoteId[id], voteId: id, score, votes: votes[id] || 0 }))
-    .filter((item) => item?.text && item.score > 0)
-    .sort((a, b) => b.score - a.score || b.votes - a.votes)
-    .slice(0, limit)
-    .map((item) => ({ id: item.id, text: item.text, phase: item.phase, trackLabel: item.trackLabel, score: item.score, votes: item.votes }));
+  return resolveFinalPriorityTopN(limit);
 }
 
 // Die final priorisierten Use Cases (genau die, die in der Matrix gelandet sind).
@@ -442,11 +418,10 @@ function getFinalPrioritizedUseCases() {
   const matrixSlide = getMatrixSlide();
   if (matrixSlide) {
     const items = getMatrixItems(matrixSlide);
-    if (items && items.length) return items;
+    if (items?.length) return items;
   }
-  const voteSlide = (State.slides || []).find((s) => s.settings?.sopAllTracksVote);
-  const count = Number(voteSlide?.settings?.sopVoteMax || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
-  return aggregateTopFinalVotedUseCases(count);
+  const count = getFinalMatrixItemCount(matrixSlide);
+  return resolveFinalPriorityTopN(count, { allowTrackFallback: !getFinalAllTracksVoteSlide() });
 }
 
 const NEXT_STEP_STATUSES = [
@@ -670,6 +645,161 @@ function getVoteSlideScope(slide) {
 function finalPriorityCount(slide) {
   const st = slide?.settings || {};
   return Number(st.sopVoteMax || st.sopFinalCount || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
+}
+
+// ─── Finale Priorisierung & Matrix: strikte Integrität ───────────────────────
+function getFinalAllTracksVoteSlide() {
+  return (State.slides || []).find((s) => s.settings?.sopAllTracksVote) || null;
+}
+
+function getFinalMatrixItemCount(matrixSlide) {
+  const voteSlide = getFinalAllTracksVoteSlide();
+  if (voteSlide) return finalPriorityCount(voteSlide);
+  return Number(matrixSlide?.settings?.sopMatrixCount || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
+}
+
+function getAllTracksVoteOptionMap() {
+  const { allItems } = aggregateAllTracksUseCases();
+  const map = {};
+  allItems.forEach((item) => { map[`resp-${item.id}`] = item; });
+  return map;
+}
+
+function getAllTracksVoteOptionIds(slide) {
+  const scope = getVoteSlideScope(slide);
+  if (!scope || scope.kind !== 'all-tracks') {
+    return new Set(Object.keys(getAllTracksVoteOptionMap()));
+  }
+  const grp = slide?.content?.sopGroup || null;
+  if (!grp) return new Set(Object.keys(getAllTracksVoteOptionMap()));
+  const ids = new Set();
+  getTrackVoteOptionsGrouped(slide).forEach((g) => g.options.forEach((o) => ids.add(o.id)));
+  return ids;
+}
+
+function computeFinalVoteTotals(voteSlide) {
+  const itemByVoteId = getAllTracksVoteOptionMap();
+  const totals = {};
+  const votes = {};
+  if (!voteSlide) return { totals, votes, itemByVoteId };
+  (State.responses || [])
+    .filter((r) => r.slide_id === voteSlide.id && !r.is_hidden)
+    .forEach((r) => {
+      (r.response?.values || []).forEach((id) => {
+        if (!itemByVoteId[id]) return;
+        votes[id] = (votes[id] || 0) + 1;
+        totals[id] = (totals[id] || 0) + 10;
+      });
+      Object.entries(r.response?.points || {}).forEach(([id, val]) => {
+        if (!itemByVoteId[id]) return;
+        totals[id] = (totals[id] || 0) + Number(val || 0);
+      });
+    });
+  return { totals, votes, itemByVoteId };
+}
+
+function resolveFinalPriorityTopN(count, { allowTrackFallback = false } = {}) {
+  const n = Math.max(1, Number(count) || 5);
+  const voteSlide = getFinalAllTracksVoteSlide();
+  if (voteSlide) {
+    const { totals, votes, itemByVoteId } = computeFinalVoteTotals(voteSlide);
+    return Object.entries(totals)
+      .map(([id, score]) => ({ ...itemByVoteId[id], voteId: id, score, votes: votes[id] || 0 }))
+      .filter((item) => item?.id && item?.text && item.score > 0)
+      .sort((a, b) => b.score - a.score || b.votes - a.votes || String(a.text).localeCompare(String(b.text), 'de'))
+      .slice(0, n)
+      .map(({ id, text, phase, trackLabel, score, votes: v }) => ({ id, text, phase, trackLabel, score, votes: v }));
+  }
+  if (allowTrackFallback) {
+    return aggregateTopTrackVotedUseCases()
+      .flatMap((trk) => trk.items.map((item) => ({
+        id: item.id, text: item.text, phase: item.phase, trackLabel: trk.trackLabel, score: item.score, votes: item.votes,
+      })))
+      .sort((a, b) => (b.score || 0) - (a.score || 0) || (b.votes || 0) - (a.votes || 0))
+      .slice(0, n)
+      .filter((item) => item?.id && item?.text);
+  }
+  return [];
+}
+
+function assertMatrixItemsIntegrity(items, slide, { count } = {}) {
+  const n = count ?? getFinalMatrixItemCount(slide);
+  const expected = resolveFinalPriorityTopN(n, { allowTrackFallback: !getFinalAllTracksVoteSlide() });
+  const expectedIds = expected.map((i) => i.id);
+  const actual = Array.isArray(items) ? items : [];
+  const actualIds = actual.map((i) => i?.id).filter(Boolean);
+  const ok = actual.length <= n
+    && actual.every((i) => i?.id && i?.text && expectedIds.includes(i.id))
+    && actualIds.length === new Set(actualIds).size
+    && (expected.length === 0 || actual.length === expected.length);
+  if (!ok && typeof console !== 'undefined') {
+    console.warn('[LP] Matrix-Integrität: Items weichen von Final-Vote Top-N ab', { expected: expectedIds, actual: actualIds });
+  }
+  return ok ? actual : expected;
+}
+
+function sanitizeMatrixPlacements(placements, allowedIds) {
+  const out = {};
+  Object.entries(placements || {}).forEach(([id, q]) => {
+    if (!allowedIds.has(id)) return;
+    if (['qw', 'sb', 'ts', 'dr'].includes(q)) out[id] = q;
+  });
+  return out;
+}
+
+function validateVoteValues(slide, values) {
+  const scope = getVoteSlideScope(slide);
+  if (!scope) return { ok: true, values: values || [] };
+  const vals = Array.isArray(values) ? values.filter(Boolean) : [];
+  const max = scope.maxSelections || 3;
+  if (!vals.length) return { ok: false, error: 'Mindestens 1 Use Case wählen' };
+  if (vals.length > max) return { ok: false, error: `Maximal ${max} Use Cases` };
+  const validIds = scope.kind === 'all-tracks'
+    ? getAllTracksVoteOptionIds(slide)
+    : new Set(getVoteOptions(slide).map((o) => o.id).filter((id) => id !== 'none'));
+  if (vals.some((id) => !validIds.has(id))) {
+    return { ok: false, error: 'Ungültige Auswahl — bitte erneut wählen' };
+  }
+  if (slide.settings?.sopFairVote && State.participant?.id) {
+    const ownIds = new Set();
+    getTrackVoteOptionsGrouped(slide).forEach((g) => {
+      g.options.forEach((o) => {
+        if (o.participant_id === State.participant.id) ownIds.add(o.id);
+      });
+    });
+    if (vals.some((id) => ownIds.has(id))) {
+      return { ok: false, error: 'Eigene Beiträge können nicht gewählt werden' };
+    }
+  }
+  if (!slide.settings?.multipleResponses && State.participant?.id) {
+    const dup = (State.responses || []).some((r) =>
+      r.slide_id === slide.id && r.participant_id === State.participant.id && !r.is_hidden
+    );
+    if (dup) return { ok: false, error: 'Du hast bereits abgestimmt' };
+  }
+  return { ok: true, values: vals };
+}
+
+function invalidateMatrixItemsCache(slideId) {
+  if (slideId && State.matrixItemsBySlide) {
+    const next = { ...State.matrixItemsBySlide };
+    delete next[slideId];
+    State.matrixItemsBySlide = next;
+  } else {
+    State.matrixItemsBySlide = {};
+  }
+  State._lastMatrixSig = null;
+}
+
+function maybeRefreshMatrixBroadcastFromVote(response) {
+  if (!response?.slide_id) return;
+  const voteSlide = getFinalAllTracksVoteSlide();
+  if (!voteSlide || response.slide_id !== voteSlide.id) return;
+  invalidateMatrixItemsCache();
+  const matrixSlide = getMatrixSlide();
+  if (!matrixSlide) return;
+  const cur = State.slides[State.session?.current_slide_index || 0];
+  if (cur?.id === matrixSlide.id || cur?.id === voteSlide.id) broadcastMatrixItems(matrixSlide);
 }
 
 function isSopVoteSlide(slide) {
@@ -1119,6 +1249,13 @@ function getVoteOptions(slide) {
     const { items } = aggregatePhaseUseCases(scope.key, scope.phaseName);
     if (!items.length) return [{ id: 'none', text: 'Noch keine Use Cases in dieser Phase gesammelt' }];
     return items.map((item) => ({ id: `resp-${item.id}`, text: item.text }));
+  }
+  if (scope.kind === 'all-tracks') {
+    const grp = slide?.content?.sopGroup || null;
+    let { allItems } = aggregateAllTracksUseCases();
+    if (grp) allItems = allItems.filter((it) => it.sopGroup === grp);
+    if (!allItems.length) return [{ id: 'none', text: 'Noch keine Use Cases gesammelt' }];
+    return allItems.map((item) => ({ id: `resp-${item.id}`, text: item.text }));
   }
   const { allItems } = aggregateTrackUseCases(scope.key);
   if (!allItems.length) return [{ id: 'none', text: 'Noch keine Use Cases gesammelt' }];
@@ -2117,16 +2254,18 @@ function renderFinalVotePresentHtml(slide, visible) {
   if (!allItems.length) {
     return '<div class="present-wait-msg">Noch keine Use Cases gesammelt. Bitte zuerst die Brainstormings durchführen.</div>';
   }
+  const topN = finalPriorityCount(slide);
   const { voteCounts, totalVotes } = aggregateVoteResponses(slide, visible);
   const { votedCount, totalCount } = getCardVoteParticipation(slide);
   const partPct = totalCount ? Math.round((votedCount / totalCount) * 100) : 0;
   const decorate = (items) => items
     .map((item) => ({ ...item, votes: voteCounts[`resp-${item.id}`] || 0 }))
-    .sort((a, b) => b.votes - a.votes);
+    .sort((a, b) => b.votes - a.votes || String(a.text).localeCompare(String(b.text), 'de'));
   const head = `<div class="ws-board-head">
       <span class="ws-board-stat"><i class="fa-solid fa-list-check"></i> ${allItems.length} Use Cases</span>
       <span class="ws-board-stat"><i class="fa-solid fa-users"></i> ${votedCount} / ${totalCount} abgestimmt</span>
       <span class="ws-board-stat ws-board-stat--accent"><i class="fa-solid fa-check-to-slot"></i> ${totalVotes} Stimmen</span>
+      <span class="ws-board-stat ws-board-stat--matrix"><i class="fa-solid fa-table-cells-large"></i> Top ${topN} → Matrix</span>
       <span class="ws-board-progress"><span class="ws-board-progress-fill" style="width:${partPct}%"></span></span>
     </div>`;
   const tableFor = (rows) => {
@@ -2143,12 +2282,16 @@ function renderFinalVotePresentHtml(slide, visible) {
       const author = (State.participants || []).find((x) => x.id === r.participant_id);
       const authorName = author?.display_name || r.authorName || '–';
       const ranked = r.votes > 0;
+      const isMatrixTop = i < topN;
+      const topClass = isMatrixTop ? ` ws-row--top ws-row--top${Math.min(i + 1, 5)}` : '';
       const barPct = Math.round((r.votes / maxVotes) * 100);
-      const topClass = ranked && i < 3 ? ` ws-row--top ws-row--top${i + 1}` : '';
+      const matrixBadge = isMatrixTop
+        ? `<span class="ws-matrix-badge"><i class="fa-solid fa-table-cells-large"></i> Matrix</span>`
+        : '';
       h += `<div class="ws-row${topClass}">
         <span class="ws-c-rank">${i + 1}</span>
         <span class="ws-c-uc">
-          <span class="ws-uc-text">${esc(r.text)}</span>
+          <span class="ws-uc-text">${esc(r.text)}${matrixBadge}</span>
           <span class="ws-uc-meta"><span class="ws-uc-track">${esc(r.trackLabel)}</span>${r.phase && r.phase !== r.trackLabel ? `<span class="ws-uc-phase">${esc(r.phase)}</span>` : ''}</span>
         </span>
         <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
@@ -5983,23 +6126,13 @@ const LP_DebugSim = {
           const weights = [0.4, 0.3, 0.15, 0.15];
           const matrix = {}, meta = {};
           // SOP-Matrix: NUR die priorisierten Top-N Use Cases (gleiche, die getMatrixItems
-          // anzeigt) — ermittelt aus den bereits erzeugten Abstimmungs-Antworten.
+          // anzeigt) — ermittelt aus der finalen Gesamt-Priorisierung.
           let mxPool = allCollected;
           if (st.sopAllTracksMatrix) {
-            const voteSlide = State.slides.find((sl) => sl.settings?.sopAllTracksVote);
-            const mxCount = Number(voteSlide?.settings?.sopVoteMax || st.sopMatrixCount || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
-            const tally = {};
-            this.responsesBySlide.forEach((q, sid) => {
-              const sl = State.slides.find((x) => x.id === sid);
-              if (!sl || !(sl.settings?.sopAllTracksVote || sl.settings?.sopTrackVote || sl.settings?.sopPhaseVote)) return;
-              q.forEach((entry) => {
-                (entry.response?.response?.values || []).forEach((vid) => { tally[vid] = (tally[vid] || 0) + 1; });
-                Object.entries(entry.response?.response?.points || {}).forEach(([vid, val]) => { tally[vid] = (tally[vid] || 0) + Number(val || 0); });
-              });
-            });
-            const topIds = Object.entries(tally).sort((a, b) => b[1] - a[1]).slice(0, mxCount).map(([vid]) => vid.replace(/^resp-/, ''));
-            mxPool = topIds.map((rid) => allCollected.find((it) => it.respId === rid)).filter(Boolean);
-            if (!mxPool.length) mxPool = allCollected.slice(0, mxCount);
+            const mxCount = getFinalMatrixItemCount(slide);
+            const allowTrackFallback = !getFinalAllTracksVoteSlide();
+            const topItems = resolveFinalPriorityTopN(mxCount, { allowTrackFallback });
+            mxPool = topItems.map((it) => allCollected.find((c) => c.respId === it.id)).filter(Boolean);
           }
           mxPool.forEach((it, i) => {
             const r = pseudoRandom(idx * 31 + i);
@@ -6305,13 +6438,17 @@ function broadcastMatrixItems(slide) {
   if (!slide) return;
   const isMatrix = slide.slide_type === 'priority_matrix' || slide.settings?.sopAllTracksMatrix;
   if (!isMatrix) return;
-  // Presenter berechnet die Top-N immer frisch (Cache-Bypass), damit die an die
-  // Teilnehmer gesendeten Use Cases den aktuellen Abstimmungsstand widerspiegeln.
-  const items = getMatrixItems(slide, { fresh: true });
-  if (!items.length) return;
+  const count = getFinalMatrixItemCount(slide);
+  const allowTrackFallback = !getFinalAllTracksVoteSlide();
+  let items = resolveFinalPriorityTopN(count, { allowTrackFallback });
+  items = assertMatrixItemsIntegrity(items, slide, { count });
   const sig = slide.id + ':' + items.map((i) => i.id).join(',');
   if (State._lastMatrixSig === sig) return;
   State._lastMatrixSig = sig;
+  if (!items.length) {
+    invalidateMatrixItemsCache(slide.id);
+    return;
+  }
   State.matrixItemsBySlide = { ...(State.matrixItemsBySlide || {}), [slide.id]: items };
   try { State.sessionChannel?.send({ type: 'broadcast', event: 'session_sync', payload: { matrixItems: { [slide.id]: items } } }); } catch {}
 }
@@ -6471,6 +6608,7 @@ function subscribeSessionChannel() {
       if (payload.new.participant_id) pushPresentActivity(payload.new.participant_id);
       const p = State.participants.find((x) => x.id === payload.new.participant_id);
       liveDebugLog('ok', `${esc(p?.display_name || 'Teilnehmer')} → ${responseSummary(payload.new)} gespeichert`);
+      maybeRefreshMatrixBroadcastFromVote(payload.new);
       renderPresent();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lp_responses', filter: `session_id=eq.${State.session.id}` }, (payload) => {
@@ -6479,6 +6617,7 @@ function subscribeSessionChannel() {
       if (idx >= 0) State.responses[idx] = payload.new;
       else State.responses.push(payload.new);
       liveDebugLog('info', `Antwort aktualisiert (${payload.new.is_hidden ? 'verborgen' : 'freigegeben'})`);
+      maybeRefreshMatrixBroadcastFromVote(payload.new);
       renderPresent();
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lp_participants', filter: `session_id=eq.${State.session.id}` }, (payload) => {
@@ -7522,37 +7661,19 @@ function getMatrixItems(slide, { fresh = false } = {}) {
   //    spät eingehende Stimmen die Top-N noch aktualisieren.
   if (!fresh) {
     const pushed = State.matrixItemsBySlide && State.matrixItemsBySlide[slide?.id];
-    if (Array.isArray(pushed) && pushed.length) return pushed;
+    if (Array.isArray(pushed) && pushed.length) {
+      return assertMatrixItemsIntegrity(pushed, slide);
+    }
   }
 
   // 1. SOP-Workshop-Matrix: NUR die final priorisierten Use Cases (Top-N) übernehmen.
-  //    Anzahl N: folgt der finalen Abstimmung (sopVoteMax), sonst der Matrix-eigenen
-  //    Einstellung (sopMatrixCount), sonst Vorlagen-Default — einstellbar pro Slide/Vorlage.
+  //    Strikte Quelle: Gesamt-Priorisierung (sopAllTracksVote). Kein Fallback auf
+  //    Sammel-Reihenfolge — verhindert falsche Items (z. B. nicht gewählte Use Cases).
   if (slide?.settings?.sopAllTracksMatrix) {
-    const voteSlidesAll = (State.slides || []).filter((s) => s.settings?.sopAllTracksVote);
-    const count = voteSlidesAll.length
-      ? voteSlidesAll.reduce((n, s) => n + Number(s.settings?.sopVoteMax || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5), 0)
-      : Number(slide.settings?.sopMatrixCount || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
-
-    // 1a. Bevorzugt: Gewinner der FINALEN Cross-Track-Abstimmung (Pro-Track-Flow).
-    const finalTop = aggregateTopFinalVotedUseCases(count);
-    if (finalTop.length) return finalTop;
-
-    // 1b. Fallback: Top-Use-Cases aus den per-Track-Votes (Pro-Phase-Flow), nach
-    //     Score sortiert auf N begrenzt.
-    const trackTop = aggregateTopTrackVotedUseCases();
-    const rankedTop = trackTop.flatMap((trk) => trk.items.map((item) => ({
-      id: item.id,
-      text: item.text,
-      phase: item.phase,
-      trackLabel: trk.trackLabel,
-      score: item.score,
-    }))).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, count);
-    if (rankedTop.length) return rankedTop;
-
-    // 1c. Letzter Fallback: erste N Use Cases (z. B. wenn noch nicht abgestimmt wurde).
-    const { allItems } = aggregateAllTracksUseCases();
-    return allItems.slice(0, count).map((u, i) => ({ id: u.id || `it-${i}`, text: u.text, phase: u.phase, trackLabel: u.trackLabel }));
+    const count = getFinalMatrixItemCount(slide);
+    const allowTrackFallback = !getFinalAllTracksVoteSlide();
+    const items = resolveFinalPriorityTopN(count, { allowTrackFallback });
+    return assertMatrixItemsIntegrity(items, slide, { count });
   }
 
   const c = slide?.content || {};
@@ -7913,8 +8034,9 @@ function bindParticipantHandlers(slide) {
 
   const submitFavorites = () => {
     const values = $$('.track-vote-option input:checked').map((i) => i.value);
-    if (!values.length) { toast('Mindestens 1 Use Case wählen', 'warn'); return; }
-    submitResponse({ values });
+    const check = validateVoteValues(slide, values);
+    if (!check.ok) { toast(check.error, 'warn'); return; }
+    submitResponse({ values: check.values });
   };
   $('#submit-favorites')?.addEventListener('click', submitFavorites);
   $('#submit-top3')?.addEventListener('click', submitFavorites);
@@ -8024,6 +8146,28 @@ async function submitResponse(response) {
     response.score = response.correct ? 100 : 0;
   }
 
+  if (isSopVoteSlide(slide) && response?.values) {
+    const voteCheck = validateVoteValues(slide, response.values);
+    if (!voteCheck.ok) { toast(voteCheck.error, 'warn'); return; }
+    response = { ...response, values: voteCheck.values };
+  }
+
+  const isMatrixSlide = slide.slide_type === 'priority_matrix' || slide.settings?.sopAllTracksMatrix;
+  if (isMatrixSlide && response?.matrix) {
+    const allowedItems = getMatrixItems(slide);
+    const allowedIds = new Set(allowedItems.map((i) => i.id));
+    const placements = sanitizeMatrixPlacements(response.matrix, allowedIds);
+    if (!Object.keys(placements).length) {
+      toast('Ungültige Matrix-Einordnung — nur priorisierte Use Cases erlaubt', 'warn');
+      return;
+    }
+    const meta = {};
+    allowedItems.forEach((it) => {
+      if (placements[it.id]) meta[it.id] = { text: it.text, phase: it.phase, trackLabel: it.trackLabel };
+    });
+    response = { matrix: placements, meta };
+  }
+
   // Autor-Name direkt in der Antwort speichern (Snapshot), damit "Eingebracht von"
   // robust ist — unabhängig davon, ob der Teilnehmer beim Host gerade in
   // State.participants vorliegt (Realtime-Lücken o. Ä.).
@@ -8052,6 +8196,7 @@ async function submitResponse(response) {
     const idx = State.responses.findIndex((r) => r.id === data.id);
     if (idx >= 0) State.responses[idx] = data;
     else State.responses.push(data);
+    maybeRefreshMatrixBroadcastFromVote(data);
   }
 
   State._submitting = false;

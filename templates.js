@@ -722,6 +722,7 @@ function buildSopKiWorkshopSlides(mode = 'pro-phase') {
     // Pro Phase: pro Track gab es bereits eine Presentation Session → Pitch, dann Gesamt-Überblick.
     slides.push(sopPitchSession());
     slides.push(sopAllTracksSummary());
+    slides.push(sopFinalAllTracksVote());
   }
   slides.push(sopIceMatrix());
   slides.push(sopWorkshopNextSteps());
@@ -1013,9 +1014,10 @@ function buildMarketingSopWorkshopSlides() {
     slides.push(sopTrackPresentationSession(track));
   });
 
-  // Finale: Pitch → Übersicht (optional) → ICE-Matrix → Next Steps → Abschluss
+  // Finale: Pitch → Übersicht (optional) → Gesamt-Priorisierung → ICE-Matrix → Next Steps → Abschluss
   slides.push(sopPitchSession());
   if (MARKETING_SOP_TRACKS.length > 1) slides.push(sopAllTracksSummary());
+  slides.push(sopFinalAllTracksVote());
   slides.push(sopIceMatrix());
   slides.push(sopWorkshopNextSteps());
   slides.push(...sopWorkshopClose());
