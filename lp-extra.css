@@ -994,7 +994,10 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   opacity:.7;
 }
 .workshop-instructions-card .wi-note{
-  font-size:.85rem;color:var(--muted,#475569);margin:.6rem 0;line-height:1.5;
+  margin:.35rem 0 .5rem;font-size:.92rem;line-height:1.55;color:var(--muted,#475569);
+}
+.workshop-instructions-card .wi-note.wi-intro{
+  color:var(--ink);font-weight:600;font-size:.95rem;
 }
 
 /* ═══ FINALE: nav panel + vote/matrix polish ═══ */

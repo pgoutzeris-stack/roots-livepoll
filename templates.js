@@ -491,22 +491,81 @@ function sopWorkshopGoal() {
   }, { workshopMode: 'orient' });
 }
 
-// Beispiel-Sets je Kontext — damit die Instruktionen zum jeweiligen SOP passen.
-window.LP_INSTRUCTION_EXAMPLES = {
-  consulting: 'Aufbau eines Rechnungstools mittels KI-Programmierung · Automatische Erkennung der Umsatzsteuer, EN 16931-konform · Rechnungen liegen im SharePoint\nDiscovery-Calls automatisch transkribieren · Highlights + Action Items markieren, Export nach Notion · Calls laufen über MS Teams',
-  marketing: 'Creative-Varianten automatisch generieren · Hook + Format je Zielgruppe, Export nach Meta Ads · Briefing liegt in Figma\nKampagnen-Reporting automatisieren · KPI-Digest mit Anomalie-Alerts, wöchentlich · Daten aus GA4 + Meta',
-};
+// ─── Use-Case-Format (Instruktionen + Simulation) ───────────────────────────
+// Einheitliches Dreiteiler-Format: Was | KI-Feature | Abhängigkeiten
+function simUseCase(useCase, feature, dependencies) {
+  return `${useCase} | ${feature} | ${dependencies}`;
+}
+
+function buildUseCaseInstructionBody(exampleKey = 'consulting') {
+  const good = {
+    consulting: [
+      simUseCase(
+        'Discovery-Calls automatisch auswerten',
+        'Transkript, Themen-Cluster und Action Items werden erzeugt und nach Notion exportiert',
+        'MS Teams-Aufzeichnungen + Notion-Workspace für das Projekt',
+      ),
+      simUseCase(
+        'Rechnungsentwürfe aus Projektzeiten erstellen',
+        'GPT füllt Positionen, prüft Umsatzsteuer und EN 16931-Konformität',
+        'Zeiterfassung in Harvest + Rechnungsvorlage in SharePoint',
+      ),
+      simUseCase(
+        'Erstes Angebot aus Kundenbriefing skizzieren',
+        'Scope wird zu Workplan, Meilensteinen und grober Aufwandsschätzung',
+        'Briefing-Dokument in Google Docs + interne Angebots-Templates',
+      ),
+    ],
+    marketing: [
+      simUseCase(
+        'Paid-Social-Creatives aus Briefing ableiten',
+        'Hook, Headline und Format-Varianten je Zielgruppe, Export als CSV für Meta Ads',
+        'Creative-Briefing in Figma + Zielgruppen-Definition in Notion',
+      ),
+      simUseCase(
+        'Wöchentlichen Kampagnen-Report versenden',
+        'KPI-Digest mit Anomalie-Hinweisen und Handlungsempfehlungen per E-Mail',
+        'Zugang zu GA4 + Meta Ads + feste Report-Vorlage',
+      ),
+      simUseCase(
+        'Landingpage-Texte aus Produkt-One-Pager',
+        'SEO-Titel, Meta-Description und drei CTA-Varianten zum A/B-Test',
+        'Produkt-One-Pager in Notion + Marken-Tonalität dokumentiert',
+      ),
+    ],
+  };
+  const avoid = [
+    'Neues vollautomatisiertes Rechnungstool',
+    'KI für Rechnungen',
+    'ChatGPT nutzen',
+    'Automatisierung',
+    'Mehr Effizienz mit KI',
+  ];
+  const examples = good[exampleKey] || good.consulting;
+  return [
+    'Format: Was ihr umsetzen wollt | Konkretes KI-Feature | Was im Team schon vorhanden sein muss',
+    '',
+    'Pro Eintrag genau diese drei Teile. Schreibt so konkret, dass jemand anderes sofort versteht, was gemeint ist, welches Tool was tut und welche Voraussetzungen ihr braucht.',
+    '',
+    'Gute Use Cases:',
+    ...examples,
+    '',
+    'Bitte vermeiden:',
+    ...avoid,
+    '',
+    'Je präziser Use Case, Feature und Abhängigkeiten, desto besser könnt ihr später priorisieren und in die Matrix einordnen.',
+  ].join('\n');
+}
 
 function sopWorkshopInstructions(exampleKey = 'consulting') {
   const ws = window.LP_WORKSHOP_SETTINGS;
   const timeMin = ws.brainstormTimeLimitSec > 0
     ? `${Math.round(ws.brainstormTimeLimitSec / 60)} Minuten`
     : 'offene Zeit';
-  const examples = window.LP_INSTRUCTION_EXAMPLES[exampleKey] || window.LP_INSTRUCTION_EXAMPLES.consulting;
   return tplSlide('content', {
     title: 'So formuliert ihr Use Cases',
-    subtitle: `${timeMin} pro Runde · max. ${ws.brainstormMaxResponses} Use Cases pro Person`,
-    body: `Gute Use Cases:\n${examples}\n\nBitte vermeiden:\nNeues vollautomatisiertes Rechnungstool\nKI für Rechnungen\n\nJe konkreter eure Idee, desto wertvoller für die Auswertung.`,
+    subtitle: `${timeMin} pro Runde · max. ${ws.brainstormMaxResponses} Use Cases pro Person · Format: Use Case | Feature | Abhängigkeiten`,
+    body: buildUseCaseInstructionBody(exampleKey),
     isHeroSlide: false,
     sopKind: SK.INSTRUCTIONS,
   }, { workshopMode: 'orient' });
@@ -1278,81 +1337,76 @@ window.LP_TEMPLATES = [
 ];
 
 // ─── DEBUG MOCK DATA ─────────────────────────────────────────────────────────
+// Simulation: Use Cases im gleichen Format wie die Instruktionsfolie (Use Case | Feature | Abhängigkeiten)
+window.LP_SIM_GENERIC_USE_CASES = [
+  simUseCase('Meeting-Protokolle strukturieren', 'Transkript, Summary und To-dos landen in Notion', 'Teams-Aufzeichnung + Notion-Seite pro Projekt'),
+  simUseCase('Erstkontakt-Mail vor Gespräch vorbereiten', 'Recherche zu Firma und Ansprechpartner, drei Gesprächseinstiege als Entwurf', 'LinkedIn-Profil + Website + CRM-Eintrag'),
+  simUseCase('Workshop-Ergebnisse aufbereiten', 'Cluster aus Post-its, Priorisierung und nächste Schritte als Protokoll', 'Miro-Board oder Foto der Flipcharts + Notion-Vorlage'),
+  simUseCase('Wiederkehrende Reports erstellen', 'Daten werden zusammengeführt, KPIs kommentiert, PDF versendet', 'Excel-Exporte + feste Report-Vorlage in PowerPoint'),
+  simUseCase('Onboarding neuer Teammitglieder', 'Checkliste, Lernpfad und Q&A-Bot aus internen SOPs', 'SharePoint-SOPs + Confluence/Notion-Wissensbasis'),
+  simUseCase('Kundenfeedback aus Umfragen auswerten', 'Sentiment, Top-Themen und Zitate als Kurzbericht', 'Typeform/Forms-Export + anonymisierte Rohdaten'),
+];
+
 window.LP_DEBUG_PHASE_USE_CASES = {
   'Anbahnung': [
-    'LinkedIn-Signal-Monitoring für Bedarfserkennung',
-    'Otter.ai für Discovery-Call-Transcripts',
-    'Perplexity Deep Research zum Zielkunden',
-    'ChatGPT für personalisiertes Outreach',
-    'Synthesia für Pitch-Video vorab',
+    simUseCase('Bedarfssignale bei Zielkunden erkennen', 'LinkedIn-Posts, News und Stellenanzeigen werden gescannt, wöchentliche Shortlist', 'Sales Navigator + Liste der Zielaccounts'),
+    simUseCase('Outreach vor Erstgespräch personalisieren', 'GPT recherchiert Firma und schlägt drei konkrete Gesprächseinstiege vor', 'CRM-Eintrag + öffentliche Unternehmensinfos'),
+    simUseCase('Erstgespräch-Protokoll automatisch', 'Transkript, Pain Points und nächste Schritte nach Notion', 'Teams-Call-Aufzeichnung + Notion-Template'),
   ],
   'Exploration': [
-    'Auto-Transkript von Discovery-Calls + Themen-Cluster',
-    '5-Why-Bot für Symptom-Ursache-Mapping',
-    'Highlight-Extraktion aus Stakeholder-Interviews',
-    'SMART-Goal-Coach für Zieldefinition',
-    'Perplexity für initiale Markt- und Wettbewerbsanalyse',
-    'Issue-Tree-Generator für erste Hypothesen',
+    simUseCase('Discovery-Call auswerten', 'Themen-Cluster, Zitate und offene Fragen aus Transkript', 'Aufgezeichnete Calls + Glossar der Kundenbegriffe'),
+    simUseCase('Symptome von Ursachen trennen', '5-Why-Kette aus Interview-Notizen, Visualisierung als Issue Tree', 'Interview-Transkripte oder Moderations-Notizen'),
+    simUseCase('SMART-Ziele aus Workshop-Notizen', 'Ziele mit Messgrößen, Verantwortlichen und Deadline-Vorschlag', 'Workshop-Protokoll + Stakeholder-Liste'),
+    simUseCase('Markt- und Wettbewerbs-Snapshot', 'Perplexity-Research zu Markt, Wettbewerbern und Trends als Memo', 'Branche + Region definiert + Quellenfreigabe'),
+    simUseCase('Erste Hypothesen strukturieren', 'Issue Tree und Hypothesen aus Gesprächsnotizen', 'Gesammelte Erkenntnisse aus Exploration-Phase'),
   ],
   'Pitch': [
-    'Proposal-Generator aus Brief + Templates',
-    'Auto-Workplan aus Scope-Doc',
-    'Pricing-Optimizer mit Marktvergleich',
-    'Contract-Template-Filler für KVA',
-    'Pitch-Deck-Optimizer mit AI-Feedback',
+    simUseCase('Angebots-Workplan aus Scope', 'Meilensteine, Deliverables und grobe Aufwände aus Briefing-Dokument', 'Scope-Doc + interne Workplan-Templates'),
+    simUseCase('KVA-Entwurf aus Leistungsumfang', 'Positionen, Tagessätze und USt-Prüfung als Excel/PDF-Entwurf', 'Scope + Pricing-Guidelines + Vertragsvorlage'),
+    simUseCase('Pitch-Deck aus Angebotsstory', 'Folienstruktur, Kernbotschaften und Sprecher-Notizen', 'Angebotsinhalt + ROOTS-Deck-Template'),
+    simUseCase('Follow-up-Mail nach Pitch', 'Personalisierte Zusammenfassung, offene Punkte und nächster Termin', 'Pitch-Protokoll + CRM-Kontakt'),
   ],
   'Ramp-up': [
-    'Auto-Kanban-Board aus Scope-Doc',
-    'Skill-Matching-Bot für Team-Staffing',
-    'Timeline-Generator aus Briefing',
-    'Data-Catalog-AI für Datenquellen',
-    'Kickoff-Agenda-Generator',
-    'Stakeholder-Map-AI für Erwartungsmanagement',
+    simUseCase('Kickoff-Agenda aus Projektbrief', 'Agenda, Rollen, Erwartungen und RACI-Entwurf', 'Projektbrief + Teilnehmerliste'),
+    simUseCase('Team-Staffing vorschlagen', 'Skill-Matching aus Profilen und Verfügbarkeiten', 'Team-Skills-Matrix + Projektanforderungen'),
+    simUseCase('Datenquellen-Katalog anlegen', 'Übersicht aller benötigten Daten inkl. Owner und Zugangsstatus', 'Liste der Datenbedarfe aus Workplan'),
+    simUseCase('Projekt-Timeline generieren', 'Gantt-Entwurf aus Meilensteinen und Abhängigkeiten', 'Workplan + Feiertags-/Urlaubsplanung'),
   ],
   'Analyse': [
-    'Survey-Generator für Datenanforderung',
-    'Auto-Dashboards aus Rohdaten',
-    'Process-Mining-AI für IST-Analyse',
-    'Industry-Benchmark-Scraper',
-    'Competitive-Intelligence-AI für Benchmarking',
+    simUseCase('Umfrage für Datenbedarf', 'Fragebogen-Entwurf, Versandtext und Auswertungsplan', 'Liste der Datenlücken + Zielgruppe der Befragten'),
+    simUseCase('Dashboard aus Rohdaten', 'Charts, Filter und Kommentar-Spalten in Excel/PBI', 'Bereinigte Rohdaten + KPI-Definition'),
+    simUseCase('IST-Prozess aus Interviews', 'Prozessschritte, Medienbrüche und Pain Points visualisiert', 'Interview-Notizen + Prozess-Notation vereinbart'),
+    simUseCase('Benchmark-Zahlen recherchieren', 'Branchenvergleich mit Quellenangaben als Tabelle', 'Benchmark-Fragen + freigegebene Research-Tools'),
   ],
   'Synthese': [
-    'LLM-Sparring für So-What-Test aus Analysen',
-    'Storyline-Coach-AI nach Pyramid Principle',
-    'Impact-Effort-Matrix-AI für Priorisierung',
-    'Business-Case-Calculator mit ROI-Modell',
-    'Auto-Roadmap aus Empfehlungen',
-    'Exec-Summary-Generator',
+    simUseCase('So-What aus Analysefolien', 'Kernaussagen, Implikationen und Empfehlungsoptionen pro Chart', 'Fertige Analyse-Slides + Storyline-Rahmen'),
+    simUseCase('Storyline nach Pyramid Principle', 'Argumentationsstruktur mit Überschriften und Belegfolien', 'Analyse-Ergebnisse + Zielgruppe der Präsentation'),
+    simUseCase('Impact/Effort für Maßnahmen', 'Priorisierungsmatrix mit Begründung je Quadrant', 'Liste der Maßnahmen + Bewertungskriterien'),
+    simUseCase('Business-Case-Rechnung', 'ROI-Szenario mit Annahmen, Sensitivität und Break-even', 'Kosten-/Nutzen-Annahmen + Excel-Modellvorlage'),
+    simUseCase('Executive Summary', 'One-Pager mit Empfehlung, Risiken und nächsten Schritten', 'Finale Storyline + Freigabe durch Projektleitung'),
   ],
   'Delivery': [
-    'Auto-Charting aus Excel',
-    'Slide-Optimizer für Steering-Committee',
-    'Fragen-Anticipation-Bot für Q&A',
-    'Elevator-Test-Simulator für Empfehlungen',
-    'Deliverable-Checklist-AI für Sign-off',
+    simUseCase('Charts aus Excel-Daten', 'Standardisierte Diagramme nach ROOTS-Design in PowerPoint', 'Excel-Daten + Chart-Templates'),
+    simUseCase('Steering-Committee-Deck optimieren', 'Kürzen, Klarheit, Sprecher-Notizen und Q&A-Vorbereitung', 'Rohentwurf + Feedback vom PL'),
+    simUseCase('Q&A-Antworten vorbereiten', 'Wahrscheinliche Fragen mit evidenzbasierten Antwortentwürfen', 'Finale Empfehlungsfolien + Anhang'),
+    simUseCase('Elevator-Pitch testen', '30-Sekunden- und 2-Minuten-Version mit Feedback-Score', 'Kernbotschaft + Testpersonen aus dem Team'),
   ],
   'Implementierung': [
-    'Personalisierter Lernpfad für Capability Building',
-    'Change-Story-Generator',
-    'RACI-Generator für Governance',
-    'A/B-Test-Design-AI für Pilots',
-    'KPI-Tracker-AI für Monitoring',
-    'Anomalie-Alert-Bot bei Zielabweichung',
+    simUseCase('Schulungsplan für Capability Building', 'Module, Formate, Materialien und Zeitplan', 'Skill-Gaps + verfügbare Trainer'),
+    simUseCase('Change-Story für Betroffene', 'Narrativ, FAQ und Kommunikationsplan', 'Change-Impact-Analyse + Kanäle (Intranet/Teams)'),
+    simUseCase('Governance/RACI definieren', 'Rollen, Entscheidungswege und Eskalation', 'Organigramm + Prozessverantwortliche'),
+    simUseCase('Pilot-KPIs überwachen', 'Dashboard mit Schwellenwerten und Alert bei Abweichung', 'Pilot-Scope + Messkonzept'),
   ],
   'Closeout': [
-    'Auto-Abschlussbericht aus Projektdaten',
-    'Invoicing-AI für Rechnungsstellung',
-    'NPS-Bot für Team-Feedback',
-    'Retro-Facilitator-Bot',
-    'Auto-Learning-Database für Learnings',
-    'Auto-Profitabilitäts-Report für Margin-Analyse',
+    simUseCase('Abschlussbericht aus Projektdaten', 'Lessons Learned, Ergebnisse und offene Punkte', 'Projektordner + Meilenstein-Historie'),
+    simUseCase('Rechnungsstellung vorbereiten', 'Leistungsnachweis, Positionen und Prüfung vor Versand', 'Timesheets + Vertrag/KVA'),
+    simUseCase('Team-Retro moderieren', 'Retro-Protokoll mit Maßnahmen und Verantwortlichen', 'Anonymes Feedback oder Live-Runde'),
+    simUseCase('Learnings in Wissensdatenbank', 'Strukturierte Einträge für ähnliche Projekte', 'Notion/SharePoint-Wissensbereich'),
   ],
   'Follow-up': [
-    'KPI-Dashboard-AI für Impact-Tracking',
-    'Case-Study-Draft-Generator',
-    'Customer-Health-Score',
-    'Buying-Signal-Detection für Folgeprojekte',
-    'Upsell-Pitch-Generator',
+    simUseCase('Impact der Empfehlungen tracken', 'KPI-Dashboard mit Ist vs. Soll und Kommentar', 'Verabredete KPIs + Datenzugänge beim Kunden'),
+    simUseCase('Case Study aus Projekt', 'Entwurf mit Situation, Lösung, Ergebnis und Zitat', 'Freigabe Kunde + anonymisierte Facts'),
+    simUseCase('Upsell-Signale erkennen', 'Monitoring von News, Stellen, Budgets bei Bestandskunden', 'Account-Liste + CRM-Historie'),
   ],
 };
 

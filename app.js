@@ -3390,8 +3390,8 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
           flushAvoid();
           mode = 'avoid';
           instrHtml += `<div class="wi-section-head wi-section-avoid"><i class="fa-solid fa-circle-minus"></i> <span>Bitte vermeiden</span></div>`;
-        } else if (mode === 'good' && t.includes('|')) {
-          const parts = t.split('|').map((p) => p.trim());
+        } else if (mode === 'good' && (t.includes('|') || t.includes(' · '))) {
+          const parts = t.split(/\s*\|\s*|\s·\s/).map((p) => p.trim());
           const uc = parts[0] || '';
           const rest = parts.slice(1).map((val, i) => val
             ? `<div class="wi-ex-part"><span class="wi-ex-label">${esc(partLabels[i + 1] || '')}</span><span class="wi-ex-val">${esc(val)}</span></div>`
@@ -3401,7 +3401,8 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
           avoidBuf.push(t);
         } else {
           flushAvoid();
-          instrHtml += `<p class="wi-note">${esc(t)}</p>`;
+          const introClass = /^(Pro Eintrag|Je präziser|Schreibt)/i.test(t) ? ' wi-intro' : '';
+          instrHtml += `<p class="wi-note${introClass}">${esc(t)}</p>`;
         }
       }
       flushAvoid();
@@ -5890,6 +5891,42 @@ function sessionChannelName(sessionId) {
 // Teilnehmer joinen zeitversetzt, Antworten kommen drip-by-drip wie in
 // einem echten Workshop. Alles ausschließlich client-seitig.
 // ════════════════════════════════════════════════════════════════
+// DEBUG SIMULATOR — simulierte Teilnehmer & Antworten für Tests
+// ════════════════════════════════════════════════════════════════
+
+function resolveSimUseCasesForSlide(slide) {
+  const c = slide?.content || {};
+  const byPhase = window.LP_DEBUG_PHASE_USE_CASES || {};
+  const generic = window.LP_SIM_GENERIC_USE_CASES || [];
+  const phaseName = c.sopPhaseName || '';
+
+  if (phaseName && byPhase[phaseName]?.length) return byPhase[phaseName];
+
+  const trackKey = c.sopTrackClass || c.sopTrackKey;
+  if (c.sopKind === 'track-collect' && trackKey) {
+    const tracks = [
+      ...(window.SOP_TOOL_TRACKS || []),
+      ...(window.MARKETING_SOP_TRACKS || []),
+      ...(window.INTERNAL_SOP_TRACKS || []),
+    ];
+    const track = tracks.find((t) => t.class === trackKey);
+    if (track?.phases?.length) {
+      const merged = track.phases.flatMap((p) => byPhase[p.name] || []).filter(Boolean);
+      if (merged.length) {
+        const seed = String(slide.id).split('').reduce((a, ch) => a + ch.charCodeAt(0), 0);
+        return merged.slice(seed % merged.length).concat(merged.slice(0, seed % merged.length)).slice(0, 6);
+      }
+    }
+  }
+
+  if (c.title && byPhase[c.title]?.length) return byPhase[c.title];
+
+  if (!generic.length) return [];
+  const seed = String(slide.id).split('').reduce((a, ch) => a + ch.charCodeAt(0), 0);
+  const offset = seed % generic.length;
+  return generic.slice(offset).concat(generic.slice(0, offset)).slice(0, 6);
+}
+
 const LP_DebugSim = {
   active: false,
   joinIdx: 0,
@@ -6010,26 +6047,14 @@ const LP_DebugSim = {
     const now = Date.now();
     function pseudoRandom(seed) { let x = Math.sin(seed) * 10000; return x - Math.floor(x); }
 
-    // First pass: brainstorm slides
+    // First pass: brainstorm slides — Use Cases im Instruktions-Format (Use Case | Feature | Abhängigkeiten)
     const allCollected = [];
-    const GENERIC_USE_CASES = [
-      'KI-gestützte Recherche', 'Automatische Protokolle', 'Chatbot für häufige Fragen',
-      'Datenanalyse-Assistent', 'Vorlagen-Generator', 'E-Mail-Entwürfe automatisieren',
-      'Übersetzungen on demand', 'Meeting-Zusammenfassungen', 'Wettbewerbs-Monitoring',
-      'Reporting automatisieren', 'Wissensdatenbank-Suche', 'Onboarding-Assistent',
-    ];
     State.slides.forEach((slide) => {
       if (slide.slide_type !== 'brainstorm') return;
       const c = slide.content || {};
       const phaseName = c.sopPhaseName || c.title || '';
-      let useCases = PHASE_USE_CASES[phaseName] || PHASE_USE_CASES[c.title] || [];
-      // Fallback: generische Use Cases, damit JEDE Brainstorm-Folie (auch eigene)
-      // in der Simulation Antworten erhält und nachgelagerte Matrizen befüllt werden.
-      if (!useCases.length) {
-        const seed = String(slide.id).split('').reduce((a, ch) => a + ch.charCodeAt(0), 0);
-        const offset = seed % GENERIC_USE_CASES.length;
-        useCases = GENERIC_USE_CASES.slice(offset).concat(GENERIC_USE_CASES.slice(0, offset)).slice(0, 6);
-      }
+      const useCases = resolveSimUseCasesForSlide(slide);
+      if (!useCases.length) return;
       const queue = [];
       const perParticipantCount = new Map();
       const responseLimit = getCollectResponseLimit(slide);
