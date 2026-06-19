@@ -256,6 +256,96 @@ function stableUseCaseOptionId(text, index) {
   return base ? `uc-${base}` : `uc-${index}`;
 }
 
+const USE_CASE_PART_SEP = ' | ';
+
+function getUseCaseLabels() {
+  return window.LP_USE_CASE_LABELS || {
+    summary: 'Use Case grob formuliert',
+    feature: 'Konkretes KI-Feature',
+    dependencies: 'Abhängigkeiten',
+    formula: ['Was ihr umsetzen wollt', 'Konkretes KI-Feature', 'Was im Team schon vorhanden sein muss'],
+  };
+}
+
+function parseUseCaseParts(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return { summary: '', feature: '', dependencies: '', full: '', hasParts: false };
+  const parts = raw.split(/\s*\|\s*|\s·\s/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 3) {
+    return {
+      summary: parts[0],
+      feature: parts[1],
+      dependencies: parts.slice(2).join(USE_CASE_PART_SEP),
+      full: raw,
+      hasParts: true,
+    };
+  }
+  if (parts.length === 2) {
+    return { summary: parts[0], feature: parts[1], dependencies: '', full: raw, hasParts: true };
+  }
+  return { summary: raw, feature: '', dependencies: '', full: raw, hasParts: false };
+}
+
+function joinUseCaseParts(summary, feature, dependencies) {
+  const s = String(summary || '').trim();
+  const f = String(feature || '').trim();
+  const d = String(dependencies || '').trim();
+  if (!s) return '';
+  if (!f && !d) return s;
+  if (!d) return `${s}${USE_CASE_PART_SEP}${f}`;
+  return `${s}${USE_CASE_PART_SEP}${f}${USE_CASE_PART_SEP}${d}`;
+}
+
+function useCaseCollectLabel(text) {
+  const p = parseUseCaseParts(text);
+  return p.summary || p.full;
+}
+
+function useCaseFullPlain(text) {
+  const p = parseUseCaseParts(text);
+  if (!p.hasParts || (!p.feature && !p.dependencies)) return p.full;
+  const L = getUseCaseLabels();
+  const bits = [p.summary];
+  if (p.feature) bits.push(`${L.feature}: ${p.feature}`);
+  if (p.dependencies) bits.push(`${L.dependencies}: ${p.dependencies}`);
+  return bits.join(' · ');
+}
+
+function renderUseCaseDisplayHtml(text, mode = 'full') {
+  const p = parseUseCaseParts(text);
+  if (mode === 'collect') return esc(useCaseCollectLabel(text));
+  if (!p.hasParts || (!p.feature && !p.dependencies)) {
+    return `<span class="uc-display uc-display--plain">${esc(p.full)}</span>`;
+  }
+  const L = getUseCaseLabels();
+  return `<span class="uc-display uc-display--full">
+    <span class="uc-display-summary">${esc(p.summary)}</span>
+    ${p.feature ? `<span class="uc-display-part"><span class="uc-display-label">${esc(L.feature)}</span> ${esc(p.feature)}</span>` : ''}
+    ${p.dependencies ? `<span class="uc-display-part"><span class="uc-display-label">${esc(L.dependencies)}</span> ${esc(p.dependencies)}</span>` : ''}
+  </span>`;
+}
+
+function readParticipantUseCaseInput(slide) {
+  const summaryEl = $('#p-uc-summary');
+  if (summaryEl && isBrainstormCollectSlide(slide)) {
+    return joinUseCaseParts(
+      summaryEl.value.trim(),
+      $('#p-uc-feature')?.value.trim() || '',
+      $('#p-uc-deps')?.value.trim() || '',
+    );
+  }
+  return String($('#p-text')?.value || '').trim();
+}
+
+window.LPUseCase = {
+  parseUseCaseParts,
+  joinUseCaseParts,
+  useCaseCollectLabel,
+  useCaseFullPlain,
+  getUseCaseLabels,
+  renderUseCaseDisplayHtml,
+};
+
 function aggregateTrackUseCases(trackKey) {
   const slides = getTrackBrainstormSlides(trackKey);
   const byCard = [];
@@ -336,7 +426,7 @@ function renderAllTracksResultsHtml() {
         <div class="sop-all-track-phase">
           <div class="sop-all-track-phase-head">Priorisiert im Track-Voting</div>
           <div class="sop-all-track-phase-items">${trk.items.map((it, idx) =>
-            `<div class="sop-all-track-item"><strong>#${idx + 1}</strong> ${esc(it.text)}<small>${esc(it.phase || '')}${it.votes ? ` · ${it.votes}× gewählt` : ''}</small></div>`
+            `<div class="sop-all-track-item"><strong>#${idx + 1}</strong> ${renderUseCaseDisplayHtml(it.text, 'full')}<small>${esc(it.phase || '')}${it.votes ? ` · ${it.votes}× gewählt` : ''}</small></div>`
           ).join('')}</div>
         </div>
       </div>`;
@@ -355,7 +445,7 @@ function renderAllTracksResultsHtml() {
       <div class="sop-all-track-phase">
         ${p.phase ? `<div class="sop-all-track-phase-head">${esc(p.phase)}</div>` : ''}
         <div class="sop-all-track-phase-items">${p.items.map((it) =>
-          `<div class="sop-all-track-item">${esc(it.text)}</div>`
+          `<div class="sop-all-track-item">${renderUseCaseDisplayHtml(it.text, 'full')}</div>`
         ).join('')}</div>
       </div>`).join('');
     if (!phasesHtml) return '';
@@ -539,7 +629,7 @@ function renderNextStepsActionLogHtml({ editable = false } = {}) {
     return `<div class="ws-row ws-row--action${editable ? ' ws-row--action-edit' : ''}" data-ns-item="${esc(it.id)}">
         <span class="ws-c-rank">${i + 1}</span>
         <span class="ws-c-uc">
-          <span class="ws-uc-text">${esc(it.text)}</span>
+          <span class="ws-uc-text">${renderUseCaseDisplayHtml(it.text, 'full')}</span>
           ${(it.trackLabel || it.phase) ? `<span class="ws-uc-meta">${it.trackLabel ? `<span class="ws-uc-track">${esc(it.trackLabel)}</span>` : ''}${it.phase && it.phase !== it.trackLabel ? `<span class="ws-uc-phase">${esc(it.phase)}</span>` : ''}</span>` : ''}
         </span>
         <span class="ws-c-owner">${ownerCell}</span>
@@ -1605,7 +1695,7 @@ function renderVoteResultsHtml(slide, visible, { showWinners = false, displayMod
       html += `<div class="card-vote-winners">${winners.map((w, i) => `
         <div class="card-vote-winner card-vote-winner--${i + 1}${i === 0 ? ' card-vote-winner--confetti' : ''}">
           <span class="card-vote-winner-rank">#${i + 1}</span>
-          <span class="card-vote-winner-text">${esc(w.text)}</span>
+          <span class="card-vote-winner-text">${renderUseCaseDisplayHtml(w.text, 'full')}</span>
           <span class="card-vote-winner-pct">${mode === 'count' ? `${w.votes} Stimmen` : `${w.pct}% · ${w.votes} Stimmen`}</span>
         </div>`).join('')}</div>`;
     }
@@ -1614,7 +1704,7 @@ function renderVoteResultsHtml(slide, visible, { showWinners = false, displayMod
     const barPct = mode === 'count' ? Math.round((o.votes / maxVotes) * 100) : Math.round((o.pct / maxPct) * 100);
     const label = mode === 'count' ? `${o.votes}` : `${o.pct}%`;
     return `<div class="track-vote-result-row card-vote-result-row">
-      <span>${esc(o.text)}</span>
+      <span>${renderUseCaseDisplayHtml(o.text, 'full')}</span>
       <div class="viz-bar-track"><div class="viz-bar-fill" style="width:${barPct}%"></div></div>
       <strong>${label}${mode === 'percent' ? '' : ` · ${o.votes}`}</strong>
     </div>`;
@@ -1672,7 +1762,8 @@ function renderCardVotePresentHtml(slide, visible) {
   }
   const bubbleKey = scope.kind === 'brainstorm' ? `brainstorm-vote-${scope.sourceId}` : `card-vote-${scope.key}-${scope.cardName}`;
   const newIds = markNewBubbleIds(bubbleKey, items);
-  const bubbleHtml = window.LPViz.renderBrainstormBubbles(items, { mode: 'present', maxItems: 80, newIds });
+  const voteBubbleItems = items.map((item) => ({ ...item, text: useCaseFullPlain(item.text) }));
+  const bubbleHtml = window.LPViz.renderBrainstormBubbles(voteBubbleItems, { mode: 'present', maxItems: 80, newIds });
   const hasVotes = visible.length > 0;
   const maxHint = scope.maxSelections || 2;
   return `<div class="track-vote-present card-vote-present">
@@ -1737,7 +1828,7 @@ function renderCardResultsPresentHtml(slide) {
 
 function renderBrainstormPresentViz(slide, visible) {
   const items = visible
-    .map((r) => ({ id: r.id, text: String(r.response?.text || '').trim() }))
+    .map((r) => ({ id: r.id, text: useCaseCollectLabel(String(r.response?.text || '').trim()) }))
     .filter((item) => item.text);
   const newIds = markNewBubbleIds(slide.id, items);
   return window.LPViz.renderBrainstormBubbles(items, { mode: 'present', maxItems: 100, newIds });
@@ -2284,7 +2375,7 @@ function renderFinalVotePresentHtml(slide, visible) {
       h += `<div class="ws-row${topClass}">
         <span class="ws-c-rank">${i + 1}</span>
         <span class="ws-c-uc">
-          <span class="ws-uc-text">${esc(r.text)}${matrixBadge}</span>
+          <span class="ws-uc-text">${renderUseCaseDisplayHtml(r.text, 'full')}${matrixBadge}</span>
           <span class="ws-uc-meta"><span class="ws-uc-track">${esc(r.trackLabel)}</span>${r.phase && r.phase !== r.trackLabel ? `<span class="ws-uc-phase">${esc(r.phase)}</span>` : ''}</span>
         </span>
         <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
@@ -2313,7 +2404,8 @@ function renderTrackVotePresentHtml(slide, visible) {
     return '<div class="present-wait-msg">Noch keine Use Cases gesammelt. Bitte zuerst das Brainstorming in den Karten abschließen.</div>';
   }
   const newIds = markNewBubbleIds(`track-vote-${key}`, allItems);
-  const bubbleHtml = window.LPViz.renderBrainstormBubbles(allItems, { mode: 'present', maxItems: 120, newIds });
+  const voteBubbleItems = allItems.map((item) => ({ ...item, text: useCaseFullPlain(item.text) }));
+  const bubbleHtml = window.LPViz.renderBrainstormBubbles(voteBubbleItems, { mode: 'present', maxItems: 120, newIds });
   const hasVotes = visible.length > 0 || !State.session.question_open;
   return `<div class="track-vote-present">
     <div class="track-vote-present-head">
@@ -2336,12 +2428,12 @@ function renderTrackVoteGroupedListHtml(slide, { selectable = false, selectedIds
         const isOwn = myId && o.participant_id === myId;
         if (selectable && !isOwn) {
           const checked = selectedIds.includes(o.id) ? ' checked' : '';
-          return `<label class="track-vote-option"><input type="checkbox" value="${esc(o.id)}"${checked} /><span>${esc(o.text)}</span></label>`;
+          return `<label class="track-vote-option"><input type="checkbox" value="${esc(o.id)}"${checked} /><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span></label>`;
         }
         if (selectable && isOwn) {
-          return `<div class="track-vote-option track-vote-option--own"><span>${esc(o.text)}</span><span class="vote-own-badge">Mein Beitrag</span></div>`;
+          return `<div class="track-vote-option track-vote-option--own"><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span><span class="vote-own-badge">Mein Beitrag</span></div>`;
         }
-        return `<div class="track-vote-option-read">${esc(o.text)}</div>`;
+        return `<div class="track-vote-option-read">${renderUseCaseDisplayHtml(o.text, 'full')}</div>`;
       }).join('')}</div>
     </div>`).join('')}</div>`;
 }
@@ -2363,7 +2455,7 @@ function renderTrackVoteResultsHtml(slide, visible) {
       .forEach((o) => {
         const max = Math.max(1, ...g.options.map((x) => scoreFor(x.id)));
         const pct = Math.round((o.score / max) * 100);
-        html += `<div class="track-vote-result-row"><span>${esc(o.text)}</span><div class="viz-bar-track"><div class="viz-bar-fill" style="width:${pct}%"></div></div><strong>${o.votes ? `${o.votes}× Top 3` : ''}${o.votes && o.points ? ' · ' : ''}${o.points ? `${Math.round(o.points)} Pkt` : ''}</strong></div>`;
+        html += `<div class="track-vote-result-row"><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span><div class="viz-bar-track"><div class="viz-bar-fill" style="width:${pct}%"></div></div><strong>${o.votes ? `${o.votes}× Top 3` : ''}${o.votes && o.points ? ' · ' : ''}${o.points ? `${Math.round(o.points)} Pkt` : ''}</strong></div>`;
       });
     html += '</div></div>';
   });
@@ -2638,7 +2730,7 @@ function renderParticipantTrackVoteHtml(slide) {
     if (expert) {
       const opts = getTrackVoteOptions(slide);
       return `<p class="vote-mode-hint">Expertenmodus: Verteile genau <strong>100 Punkte</strong>.</p>
-        ${opts.map((o) => `<div class="split-row"><span>${esc(o.text)}</span><input type="number" min="0" max="100" value="0" data-split="${esc(o.id)}" class="split-input" /></div>`).join('')}
+        ${opts.map((o) => `<div class="split-row"><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span><input type="number" min="0" max="100" value="0" data-split="${esc(o.id)}" class="split-input" /></div>`).join('')}
         <div id="split-total" style="font-weight:700;margin:.5rem 0">Summe: 0 / 100</div>
         <button type="button" class="btn-ghost vote-mode-toggle" id="vote-mode-toggle">← Zurück zu Top 3</button>
         <button type="button" class="btn-primary participant-submit" id="submit-split">Punkte senden</button>`;
@@ -3377,9 +3469,9 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
           avoidBuf = [];
         }
       };
-      // Formel: feste Komponenten-Labels (Use Case · Feature · Abhängigkeiten)
-      const partLabels = ['Use Case', 'Feature', 'Abhängigkeiten'];
-      const partIcons = ['fa-lightbulb', 'fa-gear', 'fa-link'];
+      // Formel: feste Komponenten-Labels (Was · KI-Feature · Voraussetzungen)
+      const ucLabels = getUseCaseLabels();
+      const partLabels = [ucLabels.formula[1], ucLabels.formula[2]];
       for (const line of c.body.split('\n')) {
         const t = line.trim();
         if (!t) { flushAvoid(); mode = ''; continue; }
@@ -3388,7 +3480,7 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
           mode = '';
           const formula = t.replace(/^Format:\s*/, '').split('|').map((p) => p.trim()).filter(Boolean);
           instrHtml += `<div class="wi-formula">${formula.map((p, i) =>
-            `${i > 0 ? '<span class="wi-formula-plus">+</span>' : ''}<span class="wi-formula-part"><i class="fa-solid ${partIcons[i] || 'fa-circle'}"></i> ${esc(p)}</span>`
+            `${i > 0 ? '<span class="wi-formula-plus">+</span>' : ''}<span class="wi-formula-part"><i class="fa-solid ${['fa-lightbulb', 'fa-gear', 'fa-link'][i] || 'fa-circle'}"></i> ${esc(p)}</span>`
           ).join('')}</div>`;
         } else if (t === 'Gute Use Cases:') {
           flushAvoid();
@@ -3404,7 +3496,7 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
           const rest = parts.slice(1).map((val, i) => val
             ? `<div class="wi-ex-part"><span class="wi-ex-label">${esc(partLabels[i + 1] || '')}</span><span class="wi-ex-val">${esc(val)}</span></div>`
             : '').join('');
-          instrHtml += `<div class="wi-example"><div class="wi-ex-uc"><i class="fa-solid fa-lightbulb"></i> ${esc(uc)}</div>${rest}</div>`;
+          instrHtml += `<div class="wi-example"><div class="wi-ex-uc"><i class="fa-solid fa-lightbulb"></i> <span class="wi-ex-label">${esc(ucLabels.formula[0])}</span> ${esc(uc)}</div>${rest}</div>`;
         } else if (mode === 'avoid') {
           avoidBuf.push(t);
         } else {
@@ -4829,7 +4921,7 @@ function renderAllTracksUseCasesWithAuthors(timerSec = 120) {
         html += `<div class="ws-row" data-pitch-row="${esc(item.id)}">
           <span class="ws-c-rank">${n}</span>
           <span class="ws-c-uc">
-            <span class="ws-uc-text">${esc(item.text)}</span>
+            <span class="ws-uc-text">${renderUseCaseDisplayHtml(item.text, 'full')}</span>
             <span class="ws-uc-meta"><span class="ws-uc-track">${esc(trk.trackLabel)}</span>${p.phase && p.phase !== trk.trackLabel ? `<span class="ws-uc-phase">${esc(p.phase)}</span>` : ''}</span>
           </span>
           <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
@@ -4942,7 +5034,7 @@ function renderParticipantPitchHtml() {
             <span class="participant-pitch-num">${n}</span>
             <span class="participant-pitch-track">${esc(trk.trackLabel)}</span>
           </div>
-          <p class="participant-pitch-text">${esc(item.text)}</p>
+          <p class="participant-pitch-text">${renderUseCaseDisplayHtml(item.text, 'full')}</p>
           <div class="participant-pitch-author">
             ${author ? participantAvatarHtml(author, 'sm') : '<span class="participant-pitch-avatar-fallback"><i class="fa-solid fa-user"></i></span>'}
             <span>Eingebracht von <strong>${esc(authorName)}</strong></span>
@@ -6881,7 +6973,7 @@ function renderPresentNow() {
         return `
         <div class="present-mod-item">
           ${who}
-          <span>${esc(r.response?.text || r.response?.value || JSON.stringify(r.response))}</span>
+          <span>${esc(isBrainstormCollectSlide(slide) ? useCaseCollectLabel(r.response?.text) : (r.response?.text || r.response?.value || JSON.stringify(r.response)))}</span>
           <button type="button" class="present-mod-btn" data-approve="${r.id}">Freigeben</button>
           <button type="button" class="present-mod-btn danger" data-hide="${r.id}">Verbergen</button>
         </div>`;
@@ -7680,9 +7772,14 @@ async function renderParticipantQuestion() {
     const maxAttr = lim > 0 ? ` maxlength="${lim}"` : '';
     const counter = lim > 0 ? `<div class="p-char-counter"><span id="p-char-n">0</span>/${lim}</div>` : '';
     if (isCollect) {
-      input = `<div class="participant-collect-fields">
-        <label class="join-label" for="p-text">Dein KI Use Case${collectLimit > 1 ? ` (${collectSubmitted + 1} von ${collectLimit})` : ''}</label>
-        <textarea id="p-text" rows="4" class="participant-textarea participant-textarea-lg"${maxAttr} placeholder="${esc((collectDisplayContent.prompt || '').split('\n')[0] || 'Use Case beschreiben…')}"></textarea>
+      const ucL = getUseCaseLabels();
+      input = `<div class="participant-collect-fields participant-collect-fields--structured">
+        <label class="join-label" for="p-uc-summary">${esc(ucL.summary)}${collectLimit > 1 ? ` (${collectSubmitted + 1} von ${collectLimit})` : ''}</label>
+        <textarea id="p-uc-summary" rows="2" class="participant-textarea participant-textarea-lg"${maxAttr} placeholder="Was wollt ihr umsetzen?"></textarea>
+        <label class="join-label" for="p-uc-feature">${esc(ucL.feature)}</label>
+        <textarea id="p-uc-feature" rows="2" class="participant-textarea" placeholder="Was soll die KI konkret tun?"></textarea>
+        <label class="join-label" for="p-uc-deps">${esc(ucL.dependencies)}</label>
+        <textarea id="p-uc-deps" rows="2" class="participant-textarea" placeholder="Was muss im Team schon vorhanden sein?"></textarea>
         ${counter}
       </div>`;
     } else {
@@ -7885,8 +7982,8 @@ function renderParticipantMatrixHtml(slide) {
   const inPool = items.filter((it) => !placements[it.id]);
   const itemCard = (it) => {
     const origin = [it.trackLabel, it.phase].filter(Boolean).join(' · ');
-    return `<div class="lp-mx-item" data-item-id="${esc(it.id)}" data-text="${esc(it.text)}" title="${esc(it.text)}${origin ? ' — ' + esc(origin) : ''}">
-    <span class="lp-mx-item-text">${esc(it.text)}</span>
+    return `<div class="lp-mx-item" data-item-id="${esc(it.id)}" data-text="${esc(it.text)}" title="${esc(useCaseFullPlain(it.text))}${origin ? ' — ' + esc(origin) : ''}">
+    <span class="lp-mx-item-text">${renderUseCaseDisplayHtml(it.text, 'full')}</span>
     ${origin ? `<span class="lp-mx-item-origin">${esc(origin)}</span>` : ''}
   </div>`;
   };
@@ -7911,7 +8008,7 @@ function renderParticipantMatrixHtml(slide) {
       ${items.map((it) => {
         const origin = [it.trackLabel, it.phase].filter(Boolean).join(' · ');
         return `<div class="lp-mxm-item" data-item-id="${esc(it.id)}">
-          <div class="lp-mxm-text">${esc(it.text)}${origin ? `<span class="lp-mxm-origin">${esc(origin)}</span>` : ''}</div>
+          <div class="lp-mxm-text">${renderUseCaseDisplayHtml(it.text, 'full')}${origin ? `<span class="lp-mxm-origin">${esc(origin)}</span>` : ''}</div>
           <div class="lp-mxm-choices">${['qw', 'sb', 'ts', 'dr'].map((q) => `<button type="button" class="lp-mxm-btn lp-q-${q}${placements[it.id] === q ? ' is-active' : ''}" data-item="${esc(it.id)}" data-q="${q}" aria-label="${esc(quadrants[q].label)}" title="${esc(quadrants[q].label)}"><i class="fa-solid ${QICON[q] || 'fa-square'}"></i></button>`).join('')}</div>
         </div>`;
       }).join('')}
@@ -8202,15 +8299,22 @@ function bindParticipantHandlers(slide) {
   // Zeichen-Counter aktualisieren
   const charN = $('#p-char-n');
   if (charN) {
-    const ta = $('#p-text');
-    const upd = () => { charN.textContent = String((ta?.value || '').length); };
-    ta?.addEventListener('input', upd);
+    const structured = ['#p-uc-summary', '#p-uc-feature', '#p-uc-deps'];
+    const fields = structured.some((sel) => $(sel)) ? structured.map((sel) => $(sel)).filter(Boolean) : [$('#p-text')].filter(Boolean);
+    const upd = () => {
+      charN.textContent = String(fields.reduce((n, el) => n + (el?.value || '').length, 0));
+    };
+    fields.forEach((el) => el?.addEventListener('input', upd));
     upd();
   }
   const submitText = () => {
-    const text = filterProfanity($('#p-text').value.trim(), slide.settings?.profanityFilter !== false);
     const isCollect = isBrainstormCollectSlide(slide);
-    if (!text && (slide.settings?.required || isCollect)) { toast(isCollect ? 'Bitte Idee eingeben' : 'Antwort erforderlich', 'warn'); return; }
+    const rawText = readParticipantUseCaseInput(slide);
+    const text = filterProfanity(rawText, slide.settings?.profanityFilter !== false);
+    if (!text && (slide.settings?.required || isCollect)) {
+      toast(isCollect ? 'Bitte Use Case grob formulieren' : 'Antwort erforderlich', 'warn');
+      return;
+    }
     const lim = Number(slide.content?.charLimit || 0);
     if (lim > 0 && text.length > lim) { toast(`Maximal ${lim} Zeichen erlaubt`, 'warn'); return; }
     if (isCollect) {

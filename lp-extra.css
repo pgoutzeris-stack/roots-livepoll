@@ -720,6 +720,18 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .workshop-instructions-card .wi-ex-label{min-width:0}
 }
 
+/* Use-Case-Anzeige (Sammeln vs. vollständig) */
+.uc-display{display:flex;flex-direction:column;gap:.2rem;min-width:0}
+.uc-display-summary{font-weight:700;line-height:1.35}
+.uc-display-part{font-size:.88rem;line-height:1.4;color:var(--ink)}
+.uc-display-label{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-right:.35rem}
+.track-vote-option span .uc-display,.lp-mx-item-text .uc-display,.ws-uc-text .uc-display{gap:.15rem}
+.participant-collect-fields--structured{display:flex;flex-direction:column;gap:.35rem;margin-top:.25rem}
+.participant-collect-fields--structured .join-label{margin-top:.15rem;font-size:.78rem}
+.participant-collect-fields--structured .join-label:first-child{margin-top:0}
+.participant-collect-fields--structured .participant-textarea-lg{min-height:3.25rem}
+.participant-collect-fields--structured .participant-textarea{min-height:2.75rem;font-size:.92rem}
+
 /* ─── ICE Matrix — bessere Quadrant Labels ───────────────────── */
 .lp-mx-quad-label{
   font-size:.88rem;

@@ -492,7 +492,18 @@ function sopWorkshopGoal() {
 }
 
 // ─── Use-Case-Format (Instruktionen + Simulation) ───────────────────────────
-// Einheitliches Dreiteiler-Format: Was | KI-Feature | Abhängigkeiten
+// Einheitliches Dreiteiler-Format: grob | KI-Feature | Abhängigkeiten (intern per | getrennt)
+window.LP_USE_CASE_LABELS = {
+  summary: 'Use Case grob formuliert',
+  feature: 'Konkretes KI-Feature',
+  dependencies: 'Abhängigkeiten',
+  formula: [
+    'Was ihr umsetzen wollt',
+    'Konkretes KI-Feature',
+    'Was im Team schon vorhanden sein muss',
+  ],
+};
+
 function simUseCase(useCase, feature, dependencies) {
   return `${useCase} | ${feature} | ${dependencies}`;
 }
@@ -542,10 +553,11 @@ function buildUseCaseInstructionBody(exampleKey = 'consulting') {
     'Mehr Effizienz mit KI',
   ];
   const examples = good[exampleKey] || good.consulting;
+  const L = window.LP_USE_CASE_LABELS;
   return [
-    'Format: Was ihr umsetzen wollt | Konkretes KI-Feature | Was im Team schon vorhanden sein muss',
+    `Format: ${L.formula.join(' | ')}`,
     '',
-    'Pro Eintrag genau diese drei Teile. Schreibt so konkret, dass jemand anderes sofort versteht, was gemeint ist, welches Tool was tut und welche Voraussetzungen ihr braucht.',
+    'Pro Eintrag genau drei Teile: Use Case grob formuliert, konkretes KI-Feature, Abhängigkeiten. In der Sammlung erscheint nur der erste Teil — ab Pitch, Priorisierung und Matrix der komplette Use Case.',
     '',
     'Gute Use Cases:',
     ...examples,
@@ -553,7 +565,7 @@ function buildUseCaseInstructionBody(exampleKey = 'consulting') {
     'Bitte vermeiden:',
     ...avoid,
     '',
-    'Je präziser Use Case, Feature und Abhängigkeiten, desto besser könnt ihr später priorisieren und in die Matrix einordnen.',
+    'Je präziser alle drei Teile, desto besser könnt ihr später priorisieren und in die Matrix einordnen.',
   ].join('\n');
 }
 
@@ -564,7 +576,7 @@ function sopWorkshopInstructions(exampleKey = 'consulting') {
     : 'offene Zeit';
   return tplSlide('content', {
     title: 'So formuliert ihr Use Cases',
-    subtitle: `${timeMin} pro Runde · max. ${ws.brainstormMaxResponses} Use Cases pro Person · Format: Use Case | Feature | Abhängigkeiten`,
+    subtitle: `${timeMin} pro Runde · max. ${ws.brainstormMaxResponses} Use Cases pro Person · Use Case grob + KI-Feature + Abhängigkeiten`,
     body: buildUseCaseInstructionBody(exampleKey),
     isHeroSlide: false,
     sopKind: SK.INSTRUCTIONS,
