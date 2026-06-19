@@ -305,10 +305,50 @@ function presentationHasWorkshopFlow() {
   });
 }
 
-function syncWorkshopSettingsToSlides({ finalPriorityCount, trackVoteCount, pitchTimerSec } = {}) {
+function collectLimitLabel(limit) {
+  const n = Number(limit) || 1;
+  return n === 1 ? '1 Use Case' : `${n} Use Cases`;
+}
+
+function patchMaxUseCasesInText(text, limit) {
+  const label = collectLimitLabel(limit);
+  let t = String(text || '');
+  if (!t.trim()) return t;
+  t = t.replace(/Max\.\s*\d+\s*(Use Cases?|UC)?(\s*pro (Person|Teilnehmer))?/gi, `Max. ${label} pro Person`);
+  t = t.replace(/max\.\s*\d+\s*Use Cases?/gi, `max. ${label}`);
+  return t;
+}
+
+function applyCollectLimitToSlide(slide, limit) {
+  if (!slide) return false;
+  const n = Math.min(10, Math.max(1, Number(limit) || 1));
+  const c = slide.content || (slide.content = {});
+  const isCollect = COLLECT_CHAIN_TYPES.has(slide.slide_type);
+  const isOpenerSub = c.isHeroSlide && c.subtitle && /max\.\s*\d+/i.test(String(c.subtitle));
+  if (!isCollect && !isOpenerSub) return false;
+  let changed = false;
+  if (isCollect) {
+    const st = slide.settings || (slide.settings = {});
+    if (st.responseLimit !== n) { st.responseLimit = n; changed = true; }
+    if (st.multipleResponses !== (n > 1)) { st.multipleResponses = n > 1; changed = true; }
+    if (c.maxResponsesPerUser !== n) { c.maxResponsesPerUser = n; changed = true; }
+    if (c.prompt) {
+      const patched = patchMaxUseCasesInText(c.prompt, n);
+      if (c.prompt !== patched) { c.prompt = patched; changed = true; }
+    }
+  }
+  if (c.subtitle && /max\.\s*\d+/i.test(String(c.subtitle))) {
+    const patched = patchMaxUseCasesInText(c.subtitle, n);
+    if (c.subtitle !== patched) { c.subtitle = patched; changed = true; }
+  }
+  return changed;
+}
+
+function syncWorkshopSettingsToSlides({ finalPriorityCount, trackVoteCount, pitchTimerSec, brainstormMaxResponses } = {}) {
   const fin = finalPriorityCount != null ? Math.min(30, Math.max(1, Number(finalPriorityCount) || 10)) : null;
   const tvc = trackVoteCount != null ? Math.min(15, Math.max(1, Number(trackVoteCount) || 3)) : null;
   const pit = pitchTimerSec != null ? Math.max(15, Number(pitchTimerSec) || 120) : null;
+  const bmr = brainstormMaxResponses != null ? Math.min(10, Math.max(1, Number(brainstormMaxResponses) || 1)) : null;
   const jobs = [];
   const touched = new Set();
   const mark = (s) => { if (!touched.has(s)) { touched.add(s); jobs.push(persistSlide(s)); } };
@@ -349,6 +389,8 @@ function syncWorkshopSettingsToSlides({ finalPriorityCount, trackVoteCount, pitc
       }
       mark(s);
     }
+    // Sammeln: max. Use Cases pro Person (Brainstorm / Open / Wordcloud + Opener-Subtitle)
+    if (bmr != null && applyCollectLimitToSlide(s, bmr)) mark(s);
   });
   return Promise.all(jobs);
 }
@@ -2474,7 +2516,7 @@ function renderBrainstormSlideColumn(slide) {
       <div class="viz-wrap viz-wrap-present">${renderBrainstormPresentViz(slide, visible)}</div>
     </div>`;
   }
-  return `${renderWorkshopCardCollectHtml(enrichSopContent(slide.content || {}), false, { shellMode: true, splitCol: true })}
+  return `${renderWorkshopCardCollectHtml(enrichSopContent(slide.content || {}), false, { shellMode: true, splitCol: true, slide })}
     <div class="present-wait-msg ws-collect-wait"><i class="fa-solid fa-lightbulb"></i> Use Cases erscheinen hier live …</div>`;
 }
 
@@ -2903,8 +2945,9 @@ function initSopBoardAutoScroll(root = document) {
   });
 }
 
-function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false, splitCol = false, hideBoard = false, participantMode = false, shellWrapped = false } = {}) {
+function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false, splitCol = false, hideBoard = false, participantMode = false, shellWrapped = false, slide = null } = {}) {
   const content = enrichSopContent(c);
+  const promptSource = (!editable && slide) ? getCollectPromptForSlide(slide) : content.prompt;
   const titleEl = editable
     ? `<div class="canvas-editable pslide-q-title" contenteditable="true" data-field="title" data-placeholder="Titel der Folie…">${esc(content.title || '')}</div>`
     : `<h1 class="pslide-q-title">${esc(content.title || content.sopCardName || '')}</h1>`;
@@ -2928,7 +2971,7 @@ function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false,
   const boardEl = !editable && displayContent.sopBoard?.length && !hideBoard
     ? `<div class="workshop-collect-board">${boardInner}</div>`
     : '';
-  const { question, note } = parseCollectPrompt(content.prompt);
+  const { question, note } = parseCollectPrompt(promptSource);
   const showInlineQuestion = question && !(participantMode && shellWrapped);
   const questionEl = showInlineQuestion
     ? `<p class="pslide-q-prompt workshop-collect-question${participantMode ? ' workshop-collect-question--plain' : ''}">${participantMode ? esc(question) : `<i class="fa-solid fa-circle-question workshop-q-icon"></i><span>${esc(question)}</span>`}</p>`
@@ -3198,8 +3241,9 @@ function getWsPresentChips(slide) {
     if (c.sopTrackLabel) {
       chips.push({ icon: 'fa-bookmark', label: workshopDisplayTitle(c) });
     }
+    const ws = getWorkshopSettings();
     chips.push(
-      { icon: 'fa-clock', label: `${Math.round((slide.settings?.timeLimitSec || window.LP_WORKSHOP_SETTINGS?.brainstormTimeLimitSec || 300) / 60)} Min.` },
+      { icon: 'fa-clock', label: `${Math.round((slide.settings?.timeLimitSec || ws.brainstormTimeLimitSec || 300) / 60)} Min.` },
       { icon: 'fa-list-ol', label: collectLimitPillLabel(slide) },
     );
   }
@@ -3233,8 +3277,8 @@ function getWsPresentLead(slide) {
   const c = slide?.content || {};
   if (isWorkshopClosingSlide(slide) || isWorkshopOpeningSlide(slide)) return '';
   if (isBrainstormCollectSlide(slide)) {
-    const { question, note } = parseCollectPrompt(c.prompt);
-    return [question, note].filter(Boolean).join('\n') || c.subtitle || '';
+    const { question, note } = parseCollectPrompt(getCollectPromptForSlide(slide));
+    return [question, note].filter(Boolean).join('\n') || getPatchedWorkshopSubtitle(c.subtitle) || '';
   }
   if (slide.slide_type === 'section' && c.sopTrackClass && c.body) {
     return String(c.body).trim();
@@ -3242,7 +3286,7 @@ function getWsPresentLead(slide) {
   if (c.sopKind === 'group-transition' || (slide.slide_type === 'section' && c.body && !c.subtitle)) {
     return String(c.body).trim();
   }
-  if (c.subtitle) return c.subtitle;
+  if (c.subtitle) return getPatchedWorkshopSubtitle(c.subtitle);
   if (c.sopKind === 'next-steps' && c.body) return String(c.body).trim();
   if (shouldUseVoteWorkshopUi(slide) && c.prompt) {
     return String(c.prompt).split('\n').map((l) => l.trim()).filter(Boolean)[0] || '';
@@ -4873,6 +4917,15 @@ async function openEditor(id) {
   State.presentation = pres;
   State.slides = normalizeSlides(slides);
   await stripWorkshopFeedbackSlides();
+  if (presentationHasWorkshopFlow()) {
+    const ws = getWorkshopSettings();
+    await syncWorkshopSettingsToSlides({
+      brainstormMaxResponses: ws.brainstormMaxResponses,
+      trackVoteCount: ws.trackVoteCount,
+      finalPriorityCount: ws.finalPriorityCount,
+      pitchTimerSec: ws.pitchTimerSec,
+    });
+  }
   State.resultsDisplayMode = getPresentationSettings().resultsDisplayMode || 'percent';
   State.selectedSlideId = State.slides[0]?.id || null;
   $('#editor-title').value = pres.title;
@@ -6402,6 +6455,7 @@ function renderEditorProps() {
       finalPriorityCount: next.finalPriorityCount,
       trackVoteCount: next.trackVoteCount,
       pitchTimerSec: next.pitchTimerSec,
+      brainstormMaxResponses: next.brainstormMaxResponses,
     });
     renderEditorCanvas();
     toast('Workshop-Einstellungen gespeichert', 'success');
@@ -8130,7 +8184,7 @@ function renderPresentNow() {
     const hideBoard = visible.length > 0;
     const collectInner = splitOn
       ? renderBrainstormSplitViz(slide)
-      : `${renderWorkshopCardCollectHtml(enriched, false, { shellMode: true, hideBoard })}<div class="viz-wrap viz-wrap-present${hideBoard ? ' viz-wrap-present--solo' : ''}">${viz}</div>`;
+      : `${renderWorkshopCardCollectHtml(enriched, false, { shellMode: true, hideBoard, slide })}<div class="viz-wrap viz-wrap-present${hideBoard ? ' viz-wrap-present--solo' : ''}">${viz}</div>`;
     mountPresentWsSlide(stage, slide, slideIdx, {
       main: `${collectInner}${modPanel}`,
       splitOn,
@@ -8680,32 +8734,38 @@ async function loadQaResponses(slideId) {
 
 function getCollectResponseLimit(slide) {
   if (!slide) return 1;
+  if (presentationHasWorkshopFlow() && (isBrainstormCollectSlide(slide) || COLLECT_CHAIN_TYPES.has(slide.slide_type))) {
+    return Math.max(1, Math.min(10, Math.floor(Number(getWorkshopSettings().brainstormMaxResponses) || 1)));
+  }
   const st = slide.settings || {};
   const c = slide.content || {};
   const fromSettings = Number(st.responseLimit);
   if (Number.isFinite(fromSettings) && fromSettings > 0) return Math.floor(fromSettings);
   const fromContent = Number(c.maxResponsesPerUser);
   if (Number.isFinite(fromContent) && fromContent > 0) return Math.floor(fromContent);
-  const wsDefault = Number(window.LP_WORKSHOP_SETTINGS?.brainstormMaxResponses);
-  return Number.isFinite(wsDefault) && wsDefault > 0 ? Math.floor(wsDefault) : 1;
+  return Math.max(1, Math.floor(Number(getWorkshopSettings().brainstormMaxResponses) || 1));
 }
 
-function collectLimitLabel(limit) {
-  const n = Number(limit) || 1;
-  return n === 1 ? '1 Use Case' : `${n} Use Cases`;
+function getCollectPromptForSlide(slide) {
+  return patchMaxUseCasesInText(slide?.content?.prompt, getCollectResponseLimit(slide));
+}
+
+function getPatchedWorkshopSubtitle(text) {
+  if (!text || !presentationHasWorkshopFlow()) return text;
+  if (/max\.\s*\d+/i.test(String(text))) {
+    return patchMaxUseCasesInText(text, getWorkshopSettings().brainstormMaxResponses);
+  }
+  return text;
 }
 
 function collectLimitPillLabel(slide) {
-  const n = getCollectResponseLimit(slide);
-  return `${n} Use Cases`;
+  return collectLimitLabel(getCollectResponseLimit(slide));
 }
 
 function patchCollectPromptLimit(prompt, limit) {
-  const text = String(prompt || '');
   const label = collectLimitLabel(limit);
-  if (/max\.\s*\d+/i.test(text)) {
-    return text.replace(/Max\.\s*\d+\s*(Use Cases?|UC)?(\s*pro (Person|Teilnehmer))?/gi, `Max. ${label} pro Person`);
-  }
+  const text = String(prompt || '');
+  if (/max\.\s*\d+/i.test(text)) return patchMaxUseCasesInText(text, limit);
   if (!text.trim()) return `Max. ${label} pro Person.`;
   const lines = text.split('\n');
   lines.splice(1, 0, `Max. ${label} pro Person.`);
@@ -9039,7 +9099,7 @@ async function renderParticipantQuestion() {
         title: getWsPresentTitle(slide),
         chips: getWsPresentChips(slide),
         lead: getWsPresentLead(slide),
-        main: `${teamBadge}${renderWorkshopCardCollectHtml(collectDisplayContent, false, { participantMode: true, shellWrapped: true })}${input}`,
+        main: `${teamBadge}${renderWorkshopCardCollectHtml(collectDisplayContent, false, { participantMode: true, shellWrapped: true, slide })}${input}`,
       })}
     </div>` : isMatrixInteract ? `
     <div class="participant-ws-slide-wrap participant-matrix-block">
