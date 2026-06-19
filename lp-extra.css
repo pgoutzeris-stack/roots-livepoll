@@ -851,12 +851,11 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   display:flex;align-items:center;justify-content:center;
 }
 .ws-row--head .ws-c-rank{background:none;color:var(--muted);font-size:.68rem}
-.ws-row--top1 .ws-c-rank{background:linear-gradient(135deg,#206efb,#60a5fa)}
-.ws-row--top2 .ws-c-rank{background:linear-gradient(135deg,#3b82f6,#93c5fd)}
-.ws-row--top3 .ws-c-rank{background:linear-gradient(135deg,#60a5fa,#bfdbfe);color:#1e40af}
-.ws-row--top4 .ws-c-rank,.ws-row--top5 .ws-c-rank{background:var(--brand-light,#eff6ff);color:var(--brand);border:1.5px solid rgba(32,110,251,.35)}
+.ws-row--top{
+  background:linear-gradient(90deg,rgba(32,110,251,.09),rgba(32,110,251,.025));
+  border-color:rgba(32,110,251,.24);
+}
 .ws-row--top .ws-c-uc .ws-uc-text{font-weight:700}
-.ws-row--top .ws-c-uc{background:linear-gradient(90deg,rgba(32,110,251,.06),transparent);border-radius:8px;padding:.15rem 0}
 .ws-matrix-badge{
   display:inline-flex;align-items:center;gap:.25rem;margin-left:.45rem;
   background:var(--brand);color:#fff;padding:2px 8px;border-radius:99px;
@@ -885,8 +884,6 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   font-family:'SF Mono',Menlo,monospace;font-size:1.05rem;font-weight:800;
   color:var(--ink);min-width:1.6ch;text-align:right;font-variant-numeric:tabular-nums;
 }
-.ws-row--top1 .ws-votebar-fill{background:linear-gradient(90deg,#206efb,#60a5fa)}
-.ws-row--top1 .ws-votenum{color:var(--brand)}
 
 /* Aktion-Spalte: Pitch-Timer + Start/Stop-Pill */
 .ws-timer{gap:.6rem}

@@ -2283,7 +2283,7 @@ function renderFinalVotePresentHtml(slide, visible) {
       const authorName = author?.display_name || r.authorName || '–';
       const ranked = r.votes > 0;
       const isMatrixTop = i < topN;
-      const topClass = isMatrixTop ? ` ws-row--top ws-row--top${Math.min(i + 1, 5)}` : '';
+      const topClass = isMatrixTop ? ' ws-row--top' : '';
       const barPct = Math.round((r.votes / maxVotes) * 100);
       const matrixBadge = isMatrixTop
         ? `<span class="ws-matrix-badge"><i class="fa-solid fa-table-cells-large"></i> Matrix</span>`
@@ -5905,10 +5905,10 @@ const LP_DebugSim = {
     this.triggeredSlides = new Set();
     this.responsesBySlide = new Map();
     this.pendingTimers = [];
+    this.ensureAllParticipants();
     this.prepareResponses();
     this.dripNextParticipant();
-    // Für aktuellen Slide schon vorbereiten
-    setTimeout(() => this.maybeDripCurrentSlide(), 1500 / this.speed);
+    this.schedule(() => this.catchUpDripsThrough(State.session?.current_slide_index || 0), 400);
     try { toast(`🧪 Simulation gestartet — simulierte Teilnehmer joinen zeitversetzt`, 'info'); } catch {}
   },
 
@@ -5920,12 +5920,53 @@ const LP_DebugSim = {
   },
 
   schedule(fn, ms) {
+    const scaled = Math.max(35, ms / this.speed);
     const t = setTimeout(() => {
       this.pendingTimers = this.pendingTimers.filter((x) => x !== t);
       if (this.active) fn();
-    }, Math.max(0, ms / this.speed));
+    }, scaled);
     this.pendingTimers.push(t);
     return t;
+  },
+
+  ensureAllParticipants() {
+    const defs = window.LP_DEBUG_PARTICIPANTS || [];
+    const sessionId = State.session?.id;
+    defs.forEach((p, idx) => {
+      const id = `debug-p-${idx}-${sessionId}`;
+      if (State.participants.find((x) => x.id === id)) return;
+      State.participants.push({
+        id,
+        session_id: sessionId,
+        device_id: `debug-d-${idx}`,
+        display_name: p.name,
+        avatar_emoji: p.emoji,
+        avatar_color: p.color,
+        joined_at: new Date().toISOString(),
+        last_active_at: new Date().toISOString(),
+      });
+    });
+  },
+
+  ensureDebugParticipant(fakeP) {
+    const m = String(fakeP || '').match(/^debug-p-(\d+)-/);
+    if (!m) return;
+    const idx = Number(m[1]);
+    const defs = window.LP_DEBUG_PARTICIPANTS || [];
+    const pDef = defs[idx];
+    const sessionId = State.session?.id;
+    if (!pDef || !sessionId) return;
+    if (State.participants.find((x) => x.id === fakeP)) return;
+    State.participants.push({
+      id: fakeP,
+      session_id: sessionId,
+      device_id: `debug-d-${idx}`,
+      display_name: pDef.name,
+      avatar_emoji: pDef.emoji,
+      avatar_color: pDef.color,
+      joined_at: new Date().toISOString(),
+      last_active_at: new Date().toISOString(),
+    });
   },
 
   // ─── Teilnehmer drip-by-drip joinen lassen ──────────────────
@@ -6122,29 +6163,10 @@ const LP_DebugSim = {
             }
           }
         } else if (type === 'priority_matrix') {
-          const quadrants = ['qw', 'sb', 'ts', 'dr'];
-          const weights = [0.4, 0.3, 0.15, 0.15];
-          const matrix = {}, meta = {};
-          // SOP-Matrix: NUR die priorisierten Top-N Use Cases (gleiche, die getMatrixItems
-          // anzeigt) — ermittelt aus der finalen Gesamt-Priorisierung.
-          let mxPool = allCollected;
-          if (st.sopAllTracksMatrix) {
-            const mxCount = getFinalMatrixItemCount(slide);
-            const allowTrackFallback = !getFinalAllTracksVoteSlide();
-            const topItems = resolveFinalPriorityTopN(mxCount, { allowTrackFallback });
-            mxPool = topItems.map((it) => allCollected.find((c) => c.respId === it.id)).filter(Boolean);
-          }
-          mxPool.forEach((it, i) => {
-            const r = pseudoRandom(idx * 31 + i);
-            let acc = 0, picked = 'qw';
-            for (let q = 0; q < quadrants.length; q++) {
-              acc += weights[q];
-              if (r <= acc) { picked = quadrants[q]; break; }
-            }
-            matrix[it.respId] = picked;
-            meta[it.respId] = { text: it.text, phase: it.phaseName, trackLabel: it.trackLabel };
+          queue.push({
+            delayMs: 1000 + idx * (1400 + Math.random() * 1500),
+            buildMatrix: { slideId: slide.id, fakeP, respId, participantIdx: idx },
           });
-          if (Object.keys(matrix).length) response = { matrix, meta };
         } else if (type === 'pin_image') {
           response = { pin: { x: Math.round(pseudoRandom(idx) * 100), y: Math.round(pseudoRandom(idx + 1) * 100) } };
         }
@@ -6169,32 +6191,113 @@ const LP_DebugSim = {
     });
   },
 
+  buildSimMatrixResponse(slide, fakeP, respId, participantIdx) {
+    const st = slide.settings || {};
+    const quadrants = ['qw', 'sb', 'ts', 'dr'];
+    const weights = [0.4, 0.3, 0.15, 0.15];
+    function pseudoRandom(seed) { let x = Math.sin(seed) * 10000; return x - Math.floor(x); }
+    const mxCount = getFinalMatrixItemCount(slide);
+    const allowTrackFallback = !getFinalAllTracksVoteSlide();
+    const topItems = resolveFinalPriorityTopN(mxCount, { allowTrackFallback });
+    if (!topItems.length) return null;
+    const matrix = {};
+    const meta = {};
+    topItems.forEach((it, i) => {
+      const r = pseudoRandom(participantIdx * 31 + i + String(respId).length);
+      let acc = 0;
+      let picked = 'qw';
+      for (let q = 0; q < quadrants.length; q++) {
+        acc += weights[q];
+        if (r <= acc) { picked = quadrants[q]; break; }
+      }
+      matrix[it.id] = picked;
+      meta[it.id] = { text: it.text, phase: it.phase, trackLabel: it.trackLabel };
+    });
+    if (!Object.keys(matrix).length) return null;
+    const now = Date.now();
+    return {
+      id: respId,
+      session_id: State.session?.id,
+      slide_id: slide.id,
+      participant_id: fakeP,
+      response: { matrix, meta },
+      is_hidden: false,
+      created_at: new Date(now).toISOString(),
+      updated_at: new Date(now).toISOString(),
+    };
+  },
+
+  resolveQueueItemResponse(item, slide) {
+    if (item.response) return item.response;
+    if (item.buildMatrix && slide) {
+      const { fakeP, respId, participantIdx } = item.buildMatrix;
+      return this.buildSimMatrixResponse(slide, fakeP, respId, participantIdx);
+    }
+    return null;
+  },
+
+  ensureParticipantAndPush(item, slide, attempt = 0) {
+    const response = this.resolveQueueItemResponse(item, slide);
+    if (!response) return;
+    this.ensureDebugParticipant(response.participant_id);
+    if (!State.participants.find((p) => p.id === response.participant_id) && attempt < 8) {
+      this.schedule(() => this.ensureParticipantAndPush(item, slide, attempt + 1), 250);
+      return;
+    }
+    this.pushResponse(response);
+  },
+
+  startSlideDrip(slide, baseOffset = 0) {
+    if (!slide || this.triggeredSlides.has(slide.id)) return baseOffset;
+    const queue = this.responsesBySlide.get(slide.id);
+    if (!queue?.length) return baseOffset;
+    this.triggeredSlides.add(slide.id);
+    let maxEnd = baseOffset;
+    queue.forEach((item) => {
+      const when = baseOffset + (item.delayMs || 0);
+      maxEnd = Math.max(maxEnd, when);
+      this.schedule(() => this.ensureParticipantAndPush(item, slide), when);
+    });
+    return maxEnd + Math.max(120, 400 / this.speed);
+  },
+
+  catchUpDripsThrough(index) {
+    if (!this.active || !Array.isArray(State.slides)) return;
+    const end = Math.max(0, Math.min(index, State.slides.length - 1));
+    const seen = [];
+    for (let i = 0; i <= end; i++) seen.push(State.slides[i]);
+    const isCollect = (s) => ['brainstorm', 'open', 'wordcloud'].includes(s.slide_type);
+    const isVote = (s) => Boolean(
+      s.settings?.sopAllTracksVote || s.settings?.sopTrackVote || s.settings?.sopPhaseVote
+      || s.settings?.sopCardVote || s.settings?.brainstormVote
+    );
+    const isMatrix = (s) => Boolean(s.settings?.sopAllTracksMatrix || s.slide_type === 'priority_matrix');
+    const waves = [
+      seen.filter(isCollect),
+      seen.filter(isVote),
+      seen.filter((s) => !isCollect(s) && !isVote(s) && !isMatrix(s)),
+      seen.filter(isMatrix),
+    ];
+    let offset = 0;
+    waves.forEach((wave) => {
+      if (!wave.length) return;
+      let waveEnd = offset;
+      wave.forEach((slide) => { waveEnd = Math.max(waveEnd, this.startSlideDrip(slide, offset)); });
+      offset = waveEnd + Math.max(150, 350 / this.speed);
+    });
+  },
+
   // ─── Drip-Funktion: läuft, wenn Host zu einem Slide wechselt ──
   maybeDripCurrentSlide() {
     if (!this.active) return;
-    const idx = State.session?.current_slide_index || 0;
-    const slide = State.slides[idx];
-    if (!slide || this.triggeredSlides.has(slide.id)) return;
-    const queue = this.responsesBySlide.get(slide.id);
-    if (!queue || !queue.length) return;
-    this.triggeredSlides.add(slide.id);
-    queue.forEach((item) => {
-      this.schedule(() => {
-        // Skip wenn Teilnehmer noch nicht da → später nochmal versuchen
-        const haveP = State.participants.find((p) => p.id === item.response.participant_id);
-        if (!haveP) {
-          this.schedule(() => this.pushResponse(item.response), 1500);
-          return;
-        }
-        this.pushResponse(item.response);
-      }, item.delayMs);
-    });
+    this.catchUpDripsThrough(State.session?.current_slide_index || 0);
   },
 
   pushResponse(response) {
     // Dedupe
     if (State.responses.find((r) => r.id === response.id)) return;
     State.responses.push(response);
+    try { maybeRefreshMatrixBroadcastFromVote(response); } catch {}
     try { if (response.participant_id) pushPresentActivity(response.participant_id); } catch {}
     try {
       const p = State.participants.find((x) => x.id === response.participant_id);
@@ -6207,15 +6310,35 @@ const LP_DebugSim = {
   setSpeed(s) {
     this.speed = Math.max(0.25, Math.min(10, Number(s) || 1));
     console.info(`[DebugSim] Speed = ${this.speed}x`);
+    if (!this.active) return;
+    this.pendingTimers.forEach((t) => clearTimeout(t));
+    this.pendingTimers = [];
+    const doneIds = new Set(
+      (State.responses || []).filter((r) => String(r.id).startsWith('debug-r-')).map((r) => r.id)
+    );
+    this.triggeredSlides = new Set();
+    this.responsesBySlide.forEach((queue, slideId) => {
+      const slide = State.slides.find((sl) => sl.id === slideId);
+      const allDone = queue.every((item) => {
+        const resp = this.resolveQueueItemResponse(item, slide);
+        return resp && doneIds.has(resp.id);
+      });
+      if (allDone) this.triggeredSlides.add(slideId);
+    });
+    this.catchUpDripsThrough(State.session?.current_slide_index || 0);
   },
 
   // Sofort-Modus: alles auf einmal (für QA-Sprung)
   flushAll() {
+    this.ensureAllParticipants();
     this.responsesBySlide.forEach((queue, slideId) => {
       this.triggeredSlides.add(slideId);
+      const slide = State.slides.find((s) => s.id === slideId);
       queue.forEach((item) => {
-        if (!State.responses.find((r) => r.id === item.response.id)) {
-          State.responses.push(item.response);
+        const response = this.resolveQueueItemResponse(item, slide);
+        if (response && !State.responses.find((r) => r.id === response.id)) {
+          State.responses.push(response);
+          try { maybeRefreshMatrixBroadcastFromVote(response); } catch {}
         }
       });
     });
@@ -6234,6 +6357,8 @@ const LP_DebugSim = {
     this.joinIdx = defs.length;
     if (this.joinTimer) { clearTimeout(this.joinTimer); this.joinTimer = null; }
     try { renderPresentParticipants(); updatePresentStats(); renderPresent(); } catch {}
+    const matrixSlide = getMatrixSlide();
+    if (matrixSlide) broadcastMatrixItems(matrixSlide);
     console.info('[DebugSim] flushAll: alle Antworten + Teilnehmer sofort injiziert');
   },
 };
