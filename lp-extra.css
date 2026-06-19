@@ -3323,6 +3323,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
     position:fixed;
     left:0;right:0;bottom:0;
     z-index:100000;
+    display:flex;flex-direction:column;align-items:stretch;
     padding:.45rem .85rem calc(.45rem + env(safe-area-inset-bottom));
     background:#fff;
     border-top:1px solid #e2e8f0;
@@ -3382,6 +3383,11 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   #participant-action-bar .participant-submit::before,
   #participant-action-bar .participant-submit-lg::before,
   #participant-action-bar [id^="submit-"]::before{display:none!important;content:none!important}
+  #participant-action-bar .participant-action-bar-status{
+    display:block!important;width:100%;margin:0 0 .4rem!important;padding:0!important;
+    font-size:.8rem;font-weight:700;text-align:center;color:var(--muted);
+    background:none!important;border:none!important;
+  }
   .participant-collect-fields{margin-top:.35rem}
 }
 

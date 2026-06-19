@@ -64,6 +64,8 @@ const State = {
   bubbleSeenIds: {},
   participantResponsesKey: null,
   participantResponsesAt: 0,
+  matrixItemsBySlide: {},
+  voteOptionsBySlide: {},
   pitchTimers: {},
   sopAssignSeen: null,
   closingCelebrationSlideId: null,
@@ -940,6 +942,14 @@ function getAllTracksVoteOptionMap() {
 }
 
 function getAllTracksVoteOptionIds(slide) {
+  // Teilnehmer: gültige IDs aus den gebroadcasteten Optionen (lokale Aggregation
+  // ist auf der Teilnehmerseite ggf. leer → würde sonst gültige Auswahl ablehnen).
+  const broadcast = getBroadcastVoteGroups(slide);
+  if (broadcast) {
+    const ids = new Set();
+    broadcast.forEach((g) => (g.options || []).forEach((o) => o?.id && ids.add(o.id)));
+    return ids;
+  }
   const scope = getVoteSlideScope(slide);
   if (!scope || scope.kind !== 'all-tracks') {
     return new Set(Object.keys(getAllTracksVoteOptionMap()));
@@ -1509,6 +1519,13 @@ function findCardVoteSlide(trackKey, phaseName, cardName) {
 function getVoteOptions(slide) {
   const scope = getVoteSlideScope(slide);
   if (!scope) return slide?.content?.options || [];
+  // Teilnehmer: aus den gebroadcasteten Gruppen ableiten (flach), damit Experten-
+  // modus + Validierung dieselben Optionen kennen wie die Auswahlliste.
+  const broadcast = getBroadcastVoteGroups(slide);
+  if (broadcast) {
+    const flat = broadcast.flatMap((g) => g.options || []);
+    return flat.length ? flat : [{ id: 'none', text: 'Noch keine Use Cases gesammelt' }];
+  }
   if (scope.kind === 'brainstorm') {
     const { items } = aggregateBrainstormItems(scope.sourceId);
     if (!items.length) return [{ id: 'none', text: 'Noch keine Ideen gesammelt' }];
@@ -1771,7 +1788,24 @@ function renderTrackVoteGroupHeadHtml(g) {
   return `<div class="track-vote-group-head track-vote-group-head--phase-only"><strong>${esc(g.phase)}</strong></div>`;
 }
 
+// Teilnehmer: vom Moderator gebroadcastete Vote-Optionen (funktioniert auch im
+// Simulationsmodus, wo fremde Antworten nur lokal beim Presenter liegen — analog
+// zu den Matrix-Items). Lookup über die Folien-ID, mit Fallback auf den Host-Slide.
+function getBroadcastVoteGroups(slide) {
+  // Nur auf der Teilnehmerseite (kein eingeloggter Host) gebroadcastete Optionen nutzen.
+  if (!slide || !State.participant || State.user) return null;
+  const store = State.voteOptionsBySlide || {};
+  if (Array.isArray(store[slide.id]) && store[slide.id].length) return store[slide.id];
+  const hostSlide = State.slides?.[State.session?.current_slide_index || 0];
+  if (hostSlide && hostSlide.id !== slide.id && Array.isArray(store[hostSlide.id]) && store[hostSlide.id].length) {
+    return store[hostSlide.id];
+  }
+  return null;
+}
+
 function getTrackVoteOptionsGrouped(slide) {
+  const broadcast = getBroadcastVoteGroups(slide);
+  if (broadcast) return broadcast;
   const scope = getVoteSlideScope(slide);
   if (scope?.kind === 'brainstorm') {
     const opts = getVoteOptions(slide).filter((o) => o.id !== 'none');
@@ -2924,7 +2958,7 @@ function clearParticipantActionBar() {
 function findParticipantPrimarySubmit(root) {
   if (!root) return null;
   const ids = [
-    'submit-text', 'submit-favorites', 'submit-split', 'submit-multi', 'submit-num',
+    'submit-text', 'submit-choice', 'submit-favorites', 'submit-split', 'submit-multi', 'submit-num',
     'submit-rank', 'submit-pin', 'lp-mx-submit', 'join-submit', 'submit-top3',
   ];
   for (const id of ids) {
@@ -2949,7 +2983,15 @@ function relocateParticipantSubmitToActionBar() {
   if (!btn) return;
   showParticipantActionBar();
   btn.classList.add('participant-action-bar-btn');
-  bar.replaceChildren(btn);
+  // Live-Status (Vote-Zähler / Punkte-Summe) mit nach unten nehmen, damit er beim
+  // Tippen sichtbar bleibt (Button verdeckt sonst den Zähler im Scroll-Inhalt).
+  const status = root.querySelector('#fav-counter, #split-total');
+  if (status) {
+    status.classList.add('participant-action-bar-status');
+    bar.replaceChildren(status, btn);
+  } else {
+    bar.replaceChildren(btn);
+  }
 }
 
 function syncParticipantMobileActionBar() {
@@ -2979,20 +3021,20 @@ function renderParticipantTrackVoteHtml(slide) {
       const opts = getTrackVoteOptions(slide);
       return `<p class="vote-mode-hint">Expertenmodus: Verteile genau <strong>100 Punkte</strong>.</p>
         ${opts.map((o) => `<div class="split-row"><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span><input type="number" min="0" max="100" value="0" data-split="${esc(o.id)}" class="split-input" /></div>`).join('')}
-        <div id="split-total" style="font-weight:700;margin:.5rem 0">Summe: 0 / 100</div>
+        <div id="split-total" style="font-weight:700;margin:.5rem 0" role="status" aria-live="polite">Summe: 0 / 100</div>
         <button type="button" class="btn-ghost vote-mode-toggle" id="vote-mode-toggle">← Zurück zu Top ${n}</button>
         <button type="button" class="btn-primary participant-submit" id="submit-split">Punkte senden</button>`;
     }
     return `<p class="vote-mode-hint">Wähle deine <strong>Top ${n} Use Cases</strong> in diesem Track.</p>
       ${renderTrackVoteGroupedListHtml(slide, { selectable: true, fairVote: !!slide.settings?.sopFairVote })}
-      <div id="fav-counter" class="top3-counter">0 / ${n} gewählt</div>
+      <div id="fav-counter" class="top3-counter" role="status" aria-live="polite">0 / ${n} gewählt</div>
       <button type="button" class="btn-ghost vote-mode-toggle" id="vote-mode-toggle">Expertenmodus: 100 Punkte</button>
       <button type="button" class="btn-primary participant-submit" id="submit-favorites">Top ${n} senden</button>`;
   }
   if (scope?.kind === 'phase') {
     return `<p class="vote-mode-hint">Wähle deine <strong>Top ${max} KI Use Cases</strong> in dieser Phase.</p>
       ${renderTrackVoteGroupedListHtml(slide, { selectable: true, fairVote: !!slide.settings?.sopFairVote })}
-      <div id="fav-counter" class="top3-counter">0 / ${max} gewählt</div>
+      <div id="fav-counter" class="top3-counter" role="status" aria-live="polite">0 / ${max} gewählt</div>
       <button type="button" class="btn-primary participant-submit" id="submit-favorites">Priorisierung senden</button>`;
   }
   if (scope?.kind === 'all-tracks') {
@@ -3002,12 +3044,12 @@ function renderParticipantTrackVoteHtml(slide) {
       : `Wähle <strong>Top ${max} Use Cases</strong> aus allen Tracks.`;
     return `<p class="vote-mode-hint">${hint}</p>
       ${renderTrackVoteGroupedListHtml(slide, { selectable: true, fairVote, hideGroupHeaders: true })}
-      <div id="fav-counter" class="top3-counter">0 / ${max} gewählt</div>
+      <div id="fav-counter" class="top3-counter" role="status" aria-live="polite">0 / ${max} gewählt</div>
       <button type="button" class="btn-primary participant-submit" id="submit-favorites">Priorisierung senden</button>`;
   }
   return `<p class="vote-mode-hint">Wähle <strong>maximal ${max} Lieblings-Use-Cases</strong> aus dem Brainstorming.</p>
     ${renderTrackVoteGroupedListHtml(slide, { selectable: true, fairVote: !!slide.settings?.sopFairVote })}
-    <div id="fav-counter" class="top3-counter">0 / ${max} gewählt</div>
+    <div id="fav-counter" class="top3-counter" role="status" aria-live="polite">0 / ${max} gewählt</div>
     <button type="button" class="btn-primary participant-submit" id="submit-favorites">Favoriten senden</button>`;
 }
 
@@ -6805,6 +6847,7 @@ const LP_DebugSim = {
     if (State.responses.find((r) => r.id === response.id)) return;
     State.responses.push(response);
     try { maybeRefreshMatrixBroadcastFromVote(response); } catch {}
+    try { maybeRefreshVoteBroadcastFromResponse(response); } catch {}
     try { if (response.participant_id) pushPresentActivity(response.participant_id); } catch {}
     try {
       const p = State.participants.find((x) => x.id === response.participant_id);
@@ -6846,6 +6889,7 @@ const LP_DebugSim = {
         if (response && !State.responses.find((r) => r.id === response.id)) {
           State.responses.push(response);
           try { maybeRefreshMatrixBroadcastFromVote(response); } catch {}
+          try { maybeRefreshVoteBroadcastFromResponse(response); } catch {}
         }
       });
     });
@@ -6857,6 +6901,8 @@ const LP_DebugSim = {
     try { renderPresentParticipants(); updatePresentStats(); renderPresent(); } catch {}
     const matrixSlide = getMatrixSlide();
     if (matrixSlide) broadcastMatrixItems(matrixSlide);
+    const curVoteSlide = currentSessionSlide();
+    if (curVoteSlide && isVoteBroadcastSlide(curVoteSlide)) broadcastVoteOptions(curVoteSlide);
     console.info('[DebugSim] flushAll: alle Antworten + Teilnehmer sofort injiziert');
   },
 };
@@ -7026,7 +7072,11 @@ function applySessionPatch(patch) {
   if (patch && patch.matrixItems && typeof patch.matrixItems === 'object') {
     State.matrixItemsBySlide = { ...(State.matrixItemsBySlide || {}), ...patch.matrixItems };
   }
-  const { matrixItems, ...rest } = patch || {};
+  // Presenter→Teilnehmer: gebroadcastete Vote-Optionen übernehmen
+  if (patch && patch.voteOptions && typeof patch.voteOptions === 'object') {
+    State.voteOptionsBySlide = { ...(State.voteOptionsBySlide || {}), ...patch.voteOptions };
+  }
+  const { matrixItems, voteOptions, ...rest } = patch || {};
   if (rest.settings) {
     rest.settings = { ...(State.session.settings || {}), ...rest.settings };
   }
@@ -7089,6 +7139,41 @@ function broadcastMatrixItems(slide) {
   }
   State.matrixItemsBySlide = { ...(State.matrixItemsBySlide || {}), [slide.id]: items };
   try { State.sessionChannel?.send({ type: 'broadcast', event: 'session_sync', payload: { matrixItems: { [slide.id]: items } } }); } catch {}
+}
+
+// Presenter: aufgelöste Vote-Optionen (gruppiert, inkl. participant_id für FairVote)
+// an Teilnehmer broadcasten — analog zu broadcastMatrixItems. Damit sehen Teilnehmer
+// dieselben Use Cases wie der Beamer, auch wenn ihre lokale Antwortliste leer ist
+// (Simulation oder reduzierte Sichtbarkeit).
+function isVoteBroadcastSlide(slide) {
+  const st = slide?.settings || {};
+  return !!(st.sopAllTracksVote || st.sopTrackVote || st.sopPhaseVote || st.sopCardVote || st.brainstormVote);
+}
+
+function broadcastVoteOptions(slide) {
+  if (!slide || !isVoteBroadcastSlide(slide)) return;
+  const groups = getTrackVoteOptionsGrouped(slide) || [];
+  const clean = groups
+    .map((g) => ({
+      phase: g.phase || '',
+      card: g.card || '',
+      options: (g.options || [])
+        .filter((o) => o && o.id && o.id !== 'none' && o.text)
+        .map((o) => ({ id: o.id, text: o.text, participant_id: o.participant_id || null })),
+    }))
+    .filter((g) => g.options.length);
+  const sig = slide.id + ':' + clean.map((g) => g.options.map((o) => o.id).join(',')).join('|');
+  if (State._lastVoteSig === sig) return;
+  State._lastVoteSig = sig;
+  if (!clean.length) return;
+  State.voteOptionsBySlide = { ...(State.voteOptionsBySlide || {}), [slide.id]: clean };
+  try { State.sessionChannel?.send({ type: 'broadcast', event: 'session_sync', payload: { voteOptions: { [slide.id]: clean } } }); } catch {}
+}
+
+function maybeRefreshVoteBroadcastFromResponse(response) {
+  if (!response) return;
+  const cur = currentSessionSlide();
+  if (cur && isVoteBroadcastSlide(cur)) broadcastVoteOptions(cur);
 }
 
 function broadcastSessionPatch(patch) {
@@ -7248,6 +7333,7 @@ function subscribeSessionChannel() {
       const p = State.participants.find((x) => x.id === payload.new.participant_id);
       liveDebugLog('ok', `${esc(p?.display_name || 'Teilnehmer')} → ${responseSummary(payload.new)} gespeichert`);
       maybeRefreshMatrixBroadcastFromVote(payload.new);
+      maybeRefreshVoteBroadcastFromResponse(payload.new);
       renderPresent();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lp_responses', filter: `session_id=eq.${State.session.id}` }, (payload) => {
@@ -7257,6 +7343,7 @@ function subscribeSessionChannel() {
       else State.responses.push(payload.new);
       liveDebugLog('info', `Antwort aktualisiert (${payload.new.is_hidden ? 'verborgen' : 'freigegeben'})`);
       maybeRefreshMatrixBroadcastFromVote(payload.new);
+      maybeRefreshVoteBroadcastFromResponse(payload.new);
       renderPresent();
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lp_participants', filter: `session_id=eq.${State.session.id}` }, (payload) => {
@@ -7265,6 +7352,13 @@ function subscribeSessionChannel() {
         State.participants.push(normalizeParticipantAvatar(payload.new));
         pushPresentActivity(payload.new.id, 'ist beigetreten');
         liveDebugLog('join', `${esc(payload.new.display_name || 'Teilnehmer')} beigetreten`);
+        // Spät beigetretene Teilnehmer: aktuelle Vote-/Matrix-Daten erneut senden.
+        const cur = currentSessionSlide();
+        if (cur) {
+          State._lastVoteSig = null; State._lastMatrixSig = null;
+          try { broadcastVoteOptions(cur); } catch {}
+          try { broadcastMatrixItems(cur); } catch {}
+        }
       }
       updatePresentStats();
       renderPresentParticipants();
@@ -7327,6 +7421,8 @@ function renderPresentNow() {
   if (window.LP_DebugSim?.active) window.LP_DebugSim.maybeDripCurrentSlide();
   // Matrix-Items an Teilnehmer broadcasten, damit sie dieselben Items ziehen können
   broadcastMatrixItems(slide);
+  // Vote-Optionen an Teilnehmer broadcasten, damit sie alle Use Cases sehen + wählen können
+  broadcastVoteOptions(slide);
   // #13 Track-Farb-Coding: propagiere SOP-Track-Class auf Stage-Wrapper,
   // damit CSS-Akzente (Header-Border, Badge-Farben) automatisch zur Geltung kommen.
   const trackClass = c.sopTrackClass || c.sopTrackKey || '';
@@ -8018,17 +8114,46 @@ async function joinSession(code, name, emoji, color) {
   await renderParticipantQuestion();
 }
 
+// Hat der Teilnehmer gerade eine laufende Eingabe/Auswahl, die ein Re-Render
+// zerstören würde? (Checkbox gewählt, Text getippt, Matrix-Item platziert)
+function participantHasActiveInput() {
+  const root = $('#participant-root');
+  const bar = $('#participant-action-bar');
+  const scope = bar ? [root, bar] : [root];
+  for (const el of scope) {
+    if (!el) continue;
+    if (el.querySelector('.track-vote-option input:checked, #multi-wrap input:checked')) return true;
+    const ta = el.querySelectorAll('textarea, input[type="text"], input[type="number"]');
+    for (const f of ta) { if (String(f.value || '').trim()) return true; }
+  }
+  // Matrix: bereits platzierte Items
+  const cur = State.slides?.[State.session?.current_slide_index || 0];
+  if (cur && (cur.slide_type === 'priority_matrix' || cur.settings?.sopAllTracksMatrix)) {
+    const placed = loadMatrixLocal(cur.id);
+    if (placed && Object.keys(placed).length) return true;
+  }
+  return false;
+}
+
 function subscribeParticipantChannel() {
   if (State.sessionChannel) sb.removeChannel(State.sessionChannel);
   const chName = sessionChannelName(State.session.id);
   State.sessionChannel = sb.channel(chName)
     .on('broadcast', { event: 'session_sync' }, ({ payload }) => {
       window.LP?.channelHeartbeat(chName);
+      const prevIndex = State.session.current_slide_index;
+      const prevOpen = State.session.question_open;
       applySessionPatch(payload || {});
       if (State.session.status === 'ended') {
         handleParticipantSessionEnd();
         return;
       }
+      // Reines Optionen-/Items-Update (kein Folien-/Status-Wechsel): laufende
+      // Auswahl/Eingabe nicht zerstören, nur neu rendern wenn noch nichts gewählt.
+      const onlyDataUpdate = (payload && (payload.voteOptions || payload.matrixItems))
+        && State.session.current_slide_index === prevIndex
+        && State.session.question_open === prevOpen;
+      if (onlyDataUpdate && participantHasActiveInput()) return;
       void renderParticipantQuestion();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lp_sessions', filter: `id=eq.${State.session.id}` }, (payload) => {
@@ -8155,7 +8280,7 @@ async function renderParticipantQuestion() {
   if (!hostSlide?.settings?.sopTrackVote) State.participantVoteExpert = false;
   if (!hostSlide) { root.innerHTML = '<div class="participant-card"><p>Warte auf Folie…</p></div>'; finishParticipant(); return; }
   if (!State.session.question_open) {
-    root.innerHTML = `<div class="participant-card"><h1>${esc(hostSlide.content?.title || 'Warte…')}</h1><p>Die Frage ist geschlossen. Bitte warte auf die nächste Folie.</p></div>`;
+    root.innerHTML = `<div class="participant-card"><h1>${esc(hostSlide.content?.title || 'Warte…')}</h1><p>Die Frage ist geschlossen. Bitte warte auf die nächste Karte…</p></div>`;
     finishParticipant();
     return;
   }
@@ -8225,7 +8350,7 @@ async function renderParticipantQuestion() {
       <div class="participant-wait-block ws-slide ws-slide--orient">
         <header class="ws-slide-head"><span class="ws-pill ws-pill--orient"><i class="fa-solid fa-map"></i> Track</span></header>
         <h1 class="ws-title">${esc(hostSlide.content?.title || 'Überblick')}</h1>
-        <p class="ws-lead"><i class="fa-solid fa-eye"></i> Bitte auf den Beamer achten…</p>
+        <p class="ws-lead"><i class="fa-solid fa-eye"></i> Bitte auf die Präsentation achten…</p>
       </div>`, slideIndex);
     finishParticipant();
     return;
@@ -8234,7 +8359,7 @@ async function renderParticipantQuestion() {
     root.innerHTML = wrapParticipantSlide(`
       <div class="participant-wait-block">
         ${renderGroupTransitionHtml(hostSlide.content || {}, false)}
-        <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf den Beamer achten…</p>
+        <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf die Präsentation achten…</p>
       </div>`, slideIndex);
     finishParticipant();
     return;
@@ -8244,7 +8369,7 @@ async function renderParticipantQuestion() {
       root.innerHTML = wrapParticipantSlide(`
         <div class="participant-wait-block">
           ${renderSopSectionHtml(slide.content, false, { participantCompact: true })}
-          <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf den Vortragenden achten…</p>
+          <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf die Präsentation achten…</p>
         </div>`, slideIndex);
       finishParticipant();
       return;
@@ -8258,12 +8383,12 @@ async function renderParticipantQuestion() {
       if (html || isSopCardResultsSlide(slide)) {
         root.innerHTML = wrapParticipantSlide(`
           <div class="participant-wait-block">${html || `<h1 class="pslide-q-title">${esc(slide.content?.title || 'Ergebnis')}</h1><p class="pslide-q-prompt">${esc(slide.content?.body || '')}</p>`}
-          <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf die Ergebnisse auf dem Beamer achten…</p></div>`, slideIndex);
+          <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf die Präsentation achten…</p></div>`, slideIndex);
         finishParticipant();
         return;
       }
     }
-    root.innerHTML = `<div class="participant-card"><h1>${esc(slide.content?.title || 'Folie')}</h1><p>${esc(slide.content?.body || slide.content?.prompt || '')}</p><p style="color:var(--muted);margin-top:1rem">Bitte auf den Vortragenden achten…</p></div>`;
+    root.innerHTML = `<div class="participant-card"><h1>${esc(slide.content?.title || 'Folie')}</h1><p>${esc(slide.content?.body || slide.content?.prompt || '')}</p><p style="color:var(--muted);margin-top:1rem">Bitte auf die Präsentation achten…</p></div>`;
     finishParticipant();
     return;
   }
@@ -8293,7 +8418,10 @@ async function renderParticipantQuestion() {
     const opts = type === 'yesno'
       ? [{ id: 'yes', text: 'Ja' }, { id: 'no', text: 'Nein' }]
       : (slide.settings?.sopTrackVote ? getTrackVoteOptions(slide) : (c.options || []));
-    input = opts.map((o) => `<button type="button" class="participant-option" data-val="${esc(o.id)}" style="border-color:${esc(o.color || c.accentColor || 'var(--line)')}">${esc(o.text)}</button>`).join('');
+    // Zweistufig: erst auswählen (markieren), dann unten „Senden" bestätigen —
+    // verhindert versehentliches Absenden durch Fehl-Tap (wichtig bei Quiz).
+    input = `<div id="choice-wrap" class="participant-choice-wrap">${opts.map((o) => `<button type="button" class="participant-option" data-val="${esc(o.id)}" aria-pressed="false" style="border-color:${esc(o.color || c.accentColor || 'var(--line)')}">${esc(o.text)}</button>`).join('')}</div>
+      <button type="button" class="btn-primary participant-submit" id="submit-choice" disabled>Senden</button>`;
   } else if (type === 'mc_multi') {
     if (isSopVoteSlide(slide)) {
       input = renderParticipantTrackVoteHtml(slide);
@@ -8313,15 +8441,15 @@ async function renderParticipantQuestion() {
             <span class="participant-collect-quota-hint">Alle drei Felder unten = ein Use Case</span>
           </div>`
         : '';
+      // charLimit gilt pro Feld (konsistent, kein verwirrender Summen-Counter).
       input = `<div class="participant-collect-fields participant-collect-fields--structured">
         ${collectQuotaHtml}
         <label class="join-label" for="p-uc-summary">${esc(ucL.summary)}</label>
         <textarea id="p-uc-summary" rows="2" class="participant-textarea participant-textarea-lg"${maxAttr} placeholder="Was wollt ihr umsetzen oder verbessern?"></textarea>
         <label class="join-label" for="p-uc-feature">${esc(ucL.feature)}</label>
-        <textarea id="p-uc-feature" rows="2" class="participant-textarea" placeholder="Was soll die KI konkret tun?"></textarea>
+        <textarea id="p-uc-feature" rows="2" class="participant-textarea"${maxAttr} placeholder="Was soll die KI konkret tun?"></textarea>
         <label class="join-label" for="p-uc-deps">${esc(ucL.dependencies)}</label>
-        <textarea id="p-uc-deps" rows="2" class="participant-textarea" placeholder="Was muss im Team schon vorhanden sein?"></textarea>
-        ${counter}
+        <textarea id="p-uc-deps" rows="2" class="participant-textarea"${maxAttr} placeholder="Was muss im Team schon vorhanden sein?"></textarea>
         <button type="button" class="btn-primary participant-submit participant-submit-lg" id="submit-text">Use Case senden</button>
       </div>`;
     } else {
@@ -8331,13 +8459,13 @@ async function renderParticipantQuestion() {
     input = `<textarea id="p-text" rows="2" class="participant-textarea" placeholder="Deine Frage…"></textarea><button type="button" class="btn-primary participant-submit" id="submit-text">Frage senden</button><div id="qa-list" class="qa-list"></div>`;
   } else if (type === 'scale') {
     input = `<div class="scale-labels"><span>${esc(c.minLabel || c.min || 1)}</span><span>${esc(c.maxLabel || c.max || 10)}</span></div>
-      <input id="p-range" type="range" min="${c.min ?? 1}" max="${c.max ?? 10}" value="${Math.round(((c.min ?? 1) + (c.max ?? 10)) / 2)}" class="participant-range" />
-      <div id="p-range-val" style="text-align:center;font-size:1.5rem;font-weight:700;margin:.5rem 0">${Math.round(((c.min ?? 1) + (c.max ?? 10)) / 2)}</div>
+      <input id="p-range" type="range" min="${c.min ?? 1}" max="${c.max ?? 10}" value="${Math.round(((c.min ?? 1) + (c.max ?? 10)) / 2)}" class="participant-range" aria-label="${esc(c.title || c.prompt || 'Skala')}" aria-valuetext="${Math.round(((c.min ?? 1) + (c.max ?? 10)) / 2)}" />
+      <div id="p-range-val" style="text-align:center;font-size:1.5rem;font-weight:700;margin:.5rem 0" aria-hidden="true">${Math.round(((c.min ?? 1) + (c.max ?? 10)) / 2)}</div>
       <button type="button" class="btn-primary participant-submit" id="submit-num">Senden</button>`;
   } else if (type === 'number_guess') {
     input = `<input id="p-num" type="number" class="participant-num-input" placeholder="Deine Schätzung"><button type="button" class="btn-primary participant-submit" id="submit-num" style="margin-top:.75rem">Senden</button>`;
   } else if (type === 'reaction') {
-    input = ['👍', '👎', '❤️', '😂', '😮', '👏'].map((e) => `<button type="button" class="participant-option participant-emoji" data-emoji="${e}">${e}</button>`).join('');
+    input = `<div class="participant-reaction-grid">${['👍', '👎', '❤️', '😂', '😮', '👏'].map((e) => `<button type="button" class="participant-emoji" data-emoji="${e}" aria-label="Reaktion ${e}">${e}</button>`).join('')}</div>`;
   } else if (type === 'ranking') {
     input = `<p style="font-size:.85rem;color:var(--muted);margin-bottom:.5rem">Tippe Optionen in Reihenfolge (1 = wichtigste)</p>
       <div id="rank-list">${(c.options || []).map((o) => `<button type="button" class="participant-option rank-opt" data-id="${esc(o.id)}">${esc(o.text)}</button>`).join('')}</div>
@@ -8349,7 +8477,7 @@ async function renderParticipantQuestion() {
     } else {
       input = `<p style="font-size:.85rem;color:var(--muted)">Verteile 100 Punkte</p>
         ${(c.options || []).map((o) => `<div class="split-row"><span>${esc(o.text)}</span><input type="number" min="0" max="100" value="0" data-split="${esc(o.id)}" class="split-input" /></div>`).join('')}
-        <div id="split-total" style="font-weight:700;margin:.5rem 0">Summe: 0 / 100</div>
+        <div id="split-total" style="font-weight:700;margin:.5rem 0" role="status" aria-live="polite">Summe: 0 / 100</div>
         <button type="button" class="btn-primary participant-submit" id="submit-split">Senden</button>`;
     }
   } else if (type === 'pin_image') {
@@ -8399,7 +8527,7 @@ async function renderParticipantQuestion() {
         <div><div class="participant-meta">Code ${esc(State.session.code)}${slide.settings?.anonymous ? ' · Anonym' : ''}</div><div class="participant-you">${esc(State.participant?.display_name || '')}</div></div>
       </div>` : ''}
       ${teamBadge}
-      ${!isCollect && !isDecide ? `<h1 class="pslide-q-title">${esc(c.title || c.prompt || 'Frage')}</h1>` : ''}
+      ${!isCollect && !isDecide ? `<h1 class="pslide-q-title">${esc(c.title || c.prompt || participantTypeFallbackTitle(type))}</h1>` : ''}
       ${!isCollect && !isDecide && c.prompt && c.title ? `<p class="pslide-q-prompt">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : ''}
       ${timeLimit ? `<div id="p-timer" class="p-timer">${timeLimit}s</div>` : ''}
       ${input}
@@ -8409,6 +8537,17 @@ async function renderParticipantQuestion() {
   bindParticipantHandlers(slide);
   syncParticipantMobileActionBar();
   finishParticipant();
+}
+
+function participantTypeFallbackTitle(type) {
+  const map = {
+    mc_single: 'Bitte wählen', quiz: 'Quiz', yesno: 'Ja oder Nein?',
+    mc_multi: 'Mehrfachauswahl', scale: 'Deine Einschätzung', number_guess: 'Deine Schätzung',
+    reaction: 'Deine Reaktion', ranking: 'Deine Reihenfolge', percent_split: 'Punkte verteilen',
+    pin_image: 'Setze deinen Pin', open: 'Deine Antwort', wordcloud: 'Dein Stichwort',
+    brainstorm: 'Deine Idee', qa: 'Deine Frage', priority_matrix: 'Priorisierung',
+  };
+  return map[type] || 'Deine Antwort';
 }
 
 function startQuestionTimer(sec) {
@@ -8421,7 +8560,7 @@ function startQuestionTimer(sec) {
     if (left <= 0) {
       clearInterval(State.questionTimer);
       clearParticipantActionBar();
-      $('#participant-root').innerHTML = '<div class="participant-card"><h1>Zeit abgelaufen</h1><p>Warte auf die nächste Frage…</p></div>';
+      $('#participant-root').innerHTML = '<div class="participant-card"><h1>Zeit abgelaufen</h1><p>Bitte warte auf die nächste Karte…</p></div>';
     }
   }, 1000);
 }
@@ -8556,7 +8695,7 @@ function renderParticipantMatrixHtml(slide) {
     </div>
     <div class="lp-mx-actions">
       <button type="button" class="btn-ghost" id="lp-mx-reset"><i class="fa-solid fa-rotate-left"></i> Zurücksetzen</button>
-      <button type="button" class="btn-primary participant-submit" id="lp-mx-submit"><i class="fa-solid fa-paper-plane"></i> Absenden <span class="lp-mx-progress">(<span id="lp-mx-progress-n">${items.length - inPool.length}</span>/${items.length})</span></button>
+      <button type="button" class="btn-primary participant-submit" id="lp-mx-submit"><i class="fa-solid fa-paper-plane"></i> Senden <span class="lp-mx-progress">(<span id="lp-mx-progress-n">${items.length - inPool.length}</span>/${items.length})</span></button>
     </div>
   </div>`;
 }
@@ -8831,10 +8970,31 @@ function bindParticipantHandlers(slide) {
     void renderParticipantQuestion();
   });
 
-  $('#participant-root').querySelectorAll('.participant-option[data-val]').forEach((btn) => {
-    btn.onclick = () => submitResponse({ value: btn.dataset.val });
-  });
-  $('#participant-root').querySelectorAll('.participant-option[data-emoji]').forEach((btn) => {
+  // Auswahlfragen (mc_single / quiz / yesno): markieren → unten „Senden"
+  const choiceWrap = $('#choice-wrap');
+  if (choiceWrap) {
+    let selectedVal = null;
+    const submitChoiceBtn = $('#submit-choice');
+    choiceWrap.querySelectorAll('.participant-option[data-val]').forEach((btn) => {
+      btn.onclick = () => {
+        selectedVal = btn.dataset.val;
+        choiceWrap.querySelectorAll('.participant-option').forEach((b) => {
+          const on = b === btn;
+          b.classList.toggle('is-selected', on);
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        if (submitChoiceBtn) submitChoiceBtn.disabled = false;
+      };
+    });
+    const sendChoice = () => {
+      if (!selectedVal) { toast('Bitte zuerst eine Option wählen', 'warn'); return; }
+      submitResponse({ value: selectedVal });
+    };
+    if (submitChoiceBtn) {
+      submitChoiceBtn.addEventListener('click', sendChoice);
+    }
+  }
+  $('#participant-root').querySelectorAll('.participant-reaction-grid [data-emoji]').forEach((btn) => {
     btn.onclick = () => submitResponse({ emoji: btn.dataset.emoji });
   });
   // Zeichen-Counter aktualisieren
@@ -8885,7 +9045,12 @@ function bindParticipantHandlers(slide) {
     if (!Number.isFinite(val)) { toast('Bitte Zahl eingeben', 'warn'); return; }
     submitResponse({ value: val });
   });
-  $('#p-range')?.addEventListener('input', () => { const el = $('#p-range-val'); if (el) el.textContent = $('#p-range').value; });
+  $('#p-range')?.addEventListener('input', () => {
+    const r = $('#p-range');
+    const el = $('#p-range-val');
+    if (el) el.textContent = r.value;
+    r.setAttribute('aria-valuetext', r.value);
+  });
   $('#submit-multi')?.addEventListener('click', () => {
     const values = Array.from($('#multi-wrap').querySelectorAll('input:checked')).map((i) => i.value);
     const max = c.maxSelections || 3;
@@ -8900,25 +9065,60 @@ function bindParticipantHandlers(slide) {
   if (type === 'priority_matrix') setupMatrixDragDrop(slide);
 }
 
+function getQaUpvotedIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(`lp_qa_voted_${State.session?.id || ''}`) || '[]')); }
+  catch { return new Set(); }
+}
+
+function markQaUpvoted(id) {
+  const set = getQaUpvotedIds();
+  set.add(id);
+  localStorage.setItem(`lp_qa_voted_${State.session?.id || ''}`, JSON.stringify([...set]));
+}
+
 async function renderQaList(slide) {
   const list = await loadQaResponses(slide.id);
   const el = $('#qa-list');
   if (!el) return;
+  const voted = getQaUpvotedIds();
+  const myId = State.participant?.id;
   el.innerHTML = list.length
-    ? list.sort((a, b) => (b.response?.upvotes || 0) - (a.response?.upvotes || 0)).slice(0, 10).map((r) => `
-      <div class="qa-item">
-        <span>${esc(r.response.text)}</span>
-        <button type="button" class="qa-up" data-id="${r.id}" data-votes="${Number(r.response.upvotes) || 0}">▲ ${Number(r.response.upvotes) || 0}</button>
-      </div>`).join('')
+    ? list.sort((a, b) => (b.response?.upvotes || 0) - (a.response?.upvotes || 0)).slice(0, 10).map((r) => {
+      const isOwn = myId && r.participant_id === myId;
+      const hasVoted = voted.has(r.id);
+      const disabled = isOwn || hasVoted ? ' disabled' : '';
+      const title = isOwn ? 'Eigene Frage' : hasVoted ? 'Bereits gevotet' : 'Hochstimmen';
+      return `
+      <div class="qa-item${isOwn ? ' qa-item--own' : ''}">
+        <span>${esc(r.response.text)}${isOwn ? ' <em class="qa-own-tag">(deine Frage)</em>' : ''}</span>
+        <button type="button" class="qa-up${hasVoted ? ' is-voted' : ''}" data-id="${r.id}" data-votes="${Number(r.response.upvotes) || 0}" title="${title}"${disabled}>▲ ${Number(r.response.upvotes) || 0}</button>
+      </div>`;
+    }).join('')
     : '<p style="color:var(--muted);font-size:.85rem">Noch keine Fragen</p>';
-  el.querySelectorAll('.qa-up').forEach((btn) => btn.addEventListener('click', async () => {
+  el.querySelectorAll('.qa-up:not([disabled])').forEach((btn) => btn.addEventListener('click', async () => {
     const id = btn.dataset.id;
+    if (getQaUpvotedIds().has(id)) return;
     const votes = Number(btn.dataset.votes || 0) + 1;
     const row = list.find((r) => r.id === id);
     if (!row) return;
+    markQaUpvoted(id);
     await sb.from('lp_responses').update({ response: { ...row.response, upvotes: votes } }).eq('id', id);
     void renderQaList(slide);
   }));
+}
+
+// Einheitlicher „Antwort gesendet"-Zustand (gleiches Design wie hasAnsweredSlide).
+function showParticipantSentState(message) {
+  const slideIndex = State.session?.current_slide_index || 0;
+  clearParticipantActionBar();
+  const root = $('#participant-root');
+  if (!root) return;
+  root.innerHTML = wrapParticipantSlide(`
+    <div class="participant-sent-card">
+      <div class="participant-sent-icon"><i class="fa-solid fa-check"></i></div>
+      <h1 class="pslide-q-title">Antwort gesendet</h1>
+      <p class="pslide-q-prompt">${esc(message || 'Danke! Bitte warte auf die nächste Karte…')}</p>
+    </div>`, slideIndex);
 }
 
 async function submitResponse(response) {
@@ -8995,6 +9195,9 @@ async function submitResponse(response) {
     localStorage.setItem('lp_pending_queue', JSON.stringify(State.pendingQueue));
     toast('Offline gespeichert – wird nachgereicht', 'warn');
     State._submitting = false;
+    // View sperren, damit kein versehentliches Doppel-Senden passiert.
+    markAnswered(slide.id);
+    showParticipantSentState('Offline gespeichert – wird automatisch nachgereicht.');
     return;
   }
   if (data) {
@@ -9013,9 +9216,10 @@ async function submitResponse(response) {
     return;
   }
   markAnswered(slide.id);
-  const modMsg = slide.settings?.moderation ? 'Antwort zur Freigabe gesendet.' : 'Antwort gesendet.';
-  clearParticipantActionBar();
-  $('#participant-root').innerHTML = `<div class="participant-card"><h1>Danke!</h1><p>${modMsg} Warte auf die nächste Frage…</p></div>`;
+  const modMsg = slide.settings?.moderation
+    ? 'Zur Freigabe gesendet. Bitte warte auf die nächste Karte…'
+    : 'Danke! Bitte warte auf die nächste Karte…';
+  showParticipantSentState(modMsg);
 }
 
 async function flushPendingQueue() {
