@@ -2282,12 +2282,7 @@ function getDualPairTrackLabel(slide) {
 
 function renderGoalMatrixPreview() {
   const qwInner = `<div class="lp-mx-qw-target" aria-hidden="true">
-    <div class="lp-mx-qw-aurora">
-      <span class="lp-mx-qw-aurora-blob lp-mx-qw-aurora-blob--a"></span>
-      <span class="lp-mx-qw-aurora-blob lp-mx-qw-aurora-blob--b"></span>
-      <span class="lp-mx-qw-aurora-blob lp-mx-qw-aurora-blob--c"></span>
-    </div>
-    <p class="lp-mx-qw-tagline">Hier wollen wir hin</p>
+    <p class="lp-mx-qw-tagline"><i class="fa-solid fa-arrow-trend-up"></i> Hier wollen wir hin</p>
   </div>`;
   const quad = (q, icon, label, hint, extra = '', focus = false) => `<div class="lp-mx-quad lp-mx-quad--goal lp-q-${q}${focus ? ' lp-mx-quad--qw-focus' : ''}">
     <div class="lp-mx-quad-head"><span class="lp-mx-quad-ico"><i class="fa-solid ${icon}"></i></span><strong>${label}</strong></div>
@@ -7306,6 +7301,77 @@ function syncPresentCodeBar(visible = State.showPresentCode) {
   State.showPresentCode = visible !== false;
   $('#present-code-bar')?.classList.toggle('hidden', !State.showPresentCode);
   $('#present-show-code')?.classList.toggle('is-active', State.showPresentCode);
+  setupPresentCodeBarDrag();
+}
+
+function setupPresentCodeBarDrag() {
+  const bar = $('#present-code-bar');
+  if (!bar || bar._dragBound) return;
+  bar._dragBound = true;
+
+  const clampToViewport = () => {
+    const r = bar.getBoundingClientRect();
+    const maxLeft = Math.max(8, window.innerWidth - r.width - 8);
+    const maxTop = Math.max(8, window.innerHeight - r.height - 8);
+    let left = parseFloat(bar.style.left);
+    let top = parseFloat(bar.style.top);
+    if (Number.isNaN(left)) left = r.left;
+    if (Number.isNaN(top)) top = r.top;
+    bar.style.left = `${Math.min(Math.max(8, left), maxLeft)}px`;
+    bar.style.top = `${Math.min(Math.max(8, top), maxTop)}px`;
+  };
+
+  let dragging = false;
+  let startX = 0;
+  let startY = 0;
+  let baseLeft = 0;
+  let baseTop = 0;
+  let moved = false;
+
+  const onMove = (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
+    bar.style.left = `${baseLeft + dx}px`;
+    bar.style.top = `${baseTop + dy}px`;
+  };
+
+  const onUp = () => {
+    if (!dragging) return;
+    dragging = false;
+    bar.classList.remove('is-dragging');
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    clampToViewport();
+  };
+
+  bar.addEventListener('pointerdown', (e) => {
+    if (e.button != null && e.button !== 0) return;
+    const r = bar.getBoundingClientRect();
+    baseLeft = r.left;
+    baseTop = r.top;
+    startX = e.clientX;
+    startY = e.clientY;
+    dragging = true;
+    moved = false;
+    bar.classList.add('is-positioned', 'is-dragging');
+    bar.style.left = `${baseLeft}px`;
+    bar.style.top = `${baseTop}px`;
+    bar.style.right = 'auto';
+    bar.style.bottom = 'auto';
+    bar.style.transform = 'none';
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    e.preventDefault();
+  });
+
+  bar.addEventListener('click', (e) => { if (moved) { e.preventDefault(); e.stopPropagation(); } });
+
+  if (!bar._dragResizeBound) {
+    bar._dragResizeBound = true;
+    window.addEventListener('resize', () => { if (bar.classList.contains('is-positioned')) clampToViewport(); });
+  }
 }
 
 function updatePresentStats() {
