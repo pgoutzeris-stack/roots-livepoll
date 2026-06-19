@@ -660,9 +660,11 @@ html.lp-join-route #screen-participant{display:flex!important}
 .track-vote-group{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:.85rem 1rem}
 .track-vote-group-head{display:flex;flex-wrap:wrap;gap:.35rem .65rem;font-size:.75rem;color:var(--muted);margin-bottom:.5rem}
 .track-vote-group-head strong{color:var(--ink);font-size:.85rem}
-.track-vote-option{display:flex;align-items:flex-start;gap:.55rem;padding:.55rem .65rem;border:1px solid var(--line);border-radius:10px;margin-bottom:.4rem;cursor:pointer;background:var(--surface)}
-.track-vote-option:has(input:checked){border-color:var(--brand);background:var(--brand-light)}
+.track-vote-option{display:flex;align-items:flex-start;gap:.55rem;padding:.55rem .65rem;border:1px solid var(--line);border-radius:10px;margin-bottom:.4rem;cursor:pointer;background:var(--surface);width:100%;text-align:left;font:inherit;color:inherit}
+.track-vote-option--pick{border:none;text-align:left}
+.track-vote-option--pick.is-selected,.track-vote-option:has(input:checked){border-color:var(--brand);background:var(--brand-light)}
 .track-vote-option input{margin-top:.15rem;accent-color:var(--brand)}
+.track-vote-option--pick.is-selected{box-shadow:0 0 0 2px rgba(32,110,251,.18)}
 .track-vote-option-read{padding:.45rem .65rem;border-radius:8px;background:var(--surface);font-size:.88rem;margin-bottom:.35rem}
 .track-vote-result-row{display:grid;grid-template-columns:1fr 120px 88px;gap:.65rem;align-items:center;font-size:.85rem;margin-bottom:.4rem}
 .top3-counter{font-size:.85rem;font-weight:700;margin:.65rem 0;text-align:center}

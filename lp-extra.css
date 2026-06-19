@@ -1421,7 +1421,15 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .present-btn{min-width:44px;min-height:44px}
   .avatar-color-btn{width:40px;height:40px}
   .participant-join-card .avatar-emoji-btn{min-height:0;min-width:0}
-  .participant-option,.track-vote-option,.lp-mxm-btn{min-height:44px}
+  .participant-option,.track-vote-option,.track-vote-option--pick,.lp-mxm-btn{min-height:44px}
+  .track-vote-option--pick{
+    display:block;width:100%;text-align:left;
+    padding:.65rem .75rem;border-radius:12px;
+  }
+  .track-vote-option--pick.is-selected{
+    border:1.5px solid var(--brand)!important;
+    background:var(--brand-light)!important;
+  }
   .lp-mxm-btn{height:48px}
   .qa-up,.lp-upvote-btn{min-height:40px}
 }
@@ -3437,7 +3445,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
     position:fixed;
     left:0;right:0;bottom:0;
     z-index:100000;
-    display:flex;flex-direction:column;align-items:stretch;
+    display:flex;flex-direction:column;align-items:center;
     padding:.45rem .85rem calc(.45rem + env(safe-area-inset-bottom));
     background:#fff;
     border-top:1px solid #e2e8f0;
@@ -3463,11 +3471,13 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   #participant-action-bar #join-submit,
   #participant-action-bar #lp-mx-submit{
     position:relative!important;
-    display:flex!important;
+    display:inline-flex!important;
     align-items:center;
     justify-content:center;
-    width:100%!important;
-    margin:0!important;
+    width:auto!important;
+    min-width:8.5rem!important;
+    max-width:min(220px,72vw)!important;
+    margin:0 auto!important;
     min-height:44px!important;
     max-height:44px!important;
     padding:.5rem 1rem!important;
@@ -3551,4 +3561,11 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .lp-sop-workshop.participant-mode .ws-hero-stage{
     background:linear-gradient(165deg,rgba(32,110,251,.08) 0%,rgba(99,102,241,.05) 45%,rgba(16,185,129,.03) 100%);
   }
+  .lp-sop-workshop.participant-mode .ws-hero-glow,
+  .lp-sop-workshop.participant-mode .ws-hero-icon-ring,
+  .lp-sop-workshop.participant-mode .ws-hero-title--shimmer,
+  .lp-sop-workshop.participant-mode .ws-hero-ai-grid{
+    animation:none!important;
+  }
+  .lp-sop-workshop.participant-mode .ws-hero-ai-canvas{display:none!important}
 }

@@ -2692,8 +2692,8 @@ function renderTrackVoteGroupedListHtml(slide, { selectable = false, selectedIds
       <div class="track-vote-group-items">${g.options.map((o) => {
         const isOwn = myId && o.participant_id === myId;
         if (selectable && !isOwn) {
-          const checked = selectedIds.includes(o.id) ? ' checked' : '';
-          return `<label class="track-vote-option"><input type="checkbox" value="${esc(o.id)}"${checked} /><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span></label>`;
+          const sel = selectedIds.includes(o.id);
+          return `<button type="button" class="track-vote-option track-vote-option--pick${sel ? ' is-selected' : ''}" data-vote-id="${esc(o.id)}" aria-pressed="${sel ? 'true' : 'false'}">${renderUseCaseDisplayHtml(o.text, 'full')}</button>`;
         }
         if (selectable && isOwn) {
           return `<div class="track-vote-option track-vote-option--own"><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span><span class="vote-own-badge">Mein Beitrag</span></div>`;
@@ -5582,8 +5582,6 @@ function bindPitchTimers(stage) {
           timerEl.classList.add('is-done');
           setIcon('fa-rotate-left');
           pushPitchTimerSync(key);
-        } else if (st.remaining % 3 === 0) {
-          pushPitchTimerSync(key);
         }
       }, 1000);
     };
@@ -5600,8 +5598,6 @@ function bindPitchTimers(stage) {
           halt();
           timerEl.classList.add('is-done');
           setIcon('fa-rotate-left');
-          pushPitchTimerSync(key);
-        } else if (st.remaining % 3 === 0) {
           pushPitchTimerSync(key);
         }
       }, 1000);
@@ -7334,15 +7330,82 @@ function applySessionPatch(patch) {
   }
   const slide = State.slides?.[State.session.current_slide_index || 0];
   if (patch?.settings?.nextStepActions && slide && (slide.content?.sopKind === 'next-steps' || slide.settings?.sopNextSteps)) {
-    if (State.participant) void renderParticipantQuestion();
+    if (State.participant) syncParticipantNextStepsDom();
   }
-  if (State.participant && slide && (
-    patch?.pitchItems || patch?.pitchSync || patch?.quickWinItems
-    || (slide.content?.sopKind === 'pitch-session' || slide.settings?.sopPitchSession)
-    || (slide.content?.sopKind === 'next-steps' || slide.settings?.sopNextSteps)
-  )) {
+}
+
+// Teilnehmer: Broadcast-Updates ohne Voll-Re-Render (verhindert Flackern bei Timer/Data-Sync).
+function syncParticipantPitchFocusFromSync(prevSync) {
+  const prevKey = prevSync?.running ? prevSync.activeKey : null;
+  const newKey = State.pitchSync?.running ? State.pitchSync.activeKey : null;
+  updateParticipantPitchTimerDom();
+  if (prevKey !== newKey) void renderParticipantQuestion();
+}
+
+function syncParticipantNextStepsDom() {
+  const block = document.querySelector('.participant-nextsteps-block .ws-body-inner, .participant-nextsteps-block .participant-nextsteps-list');
+  if (!block) {
     void renderParticipantQuestion();
+    return;
   }
+  const hostSlide = State.slides[State.session?.current_slide_index || 0];
+  if (!hostSlide) return;
+  const inner = block.closest('.participant-nextsteps-block');
+  if (!inner) return;
+  const shell = inner.querySelector('.ws-body-inner');
+  if (shell) shell.innerHTML = renderParticipantNextStepsHtml();
+}
+
+function shouldSkipParticipantBroadcastRender(payload, prevIndex, prevOpen) {
+  if (!payload || State.session.current_slide_index !== prevIndex || State.session.question_open !== prevOpen) {
+    return false;
+  }
+  if (payload.pitchSync && !payload.pitchItems && !payload.voteOptions && !payload.matrixItems && !payload.quickWinItems && !payload.settings) {
+    return true;
+  }
+  if (payload.pitchItems && !payload.pitchSync && !payload.voteOptions && !payload.matrixItems && !payload.settings) {
+    return true;
+  }
+  if (payload.voteOptions) {
+    const sig = JSON.stringify(payload.voteOptions);
+    if (State._participantVoteOptionsSig === sig) return true;
+    State._participantVoteOptionsSig = sig;
+    if (participantHasActiveInput()) return true;
+    return false;
+  }
+  if (payload.matrixItems) {
+    const sig = JSON.stringify(payload.matrixItems);
+    if (State._participantMatrixItemsSig === sig) return true;
+    State._participantMatrixItemsSig = sig;
+    if (participantHasActiveInput()) return true;
+    return false;
+  }
+  if (payload.settings?.nextStepActions) {
+    return true;
+  }
+  if (payload.quickWinItems) {
+    const sig = JSON.stringify(payload.quickWinItems);
+    if (State._participantQuickWinSig === sig) return true;
+    State._participantQuickWinSig = sig;
+    return true;
+  }
+  return false;
+}
+
+function handleParticipantBroadcastPayload(payload, { prevIndex, prevOpen } = {}) {
+  if (!payload) return;
+  const prevPitchSync = State.pitchSync ? { ...State.pitchSync } : null;
+  applySessionPatch(payload);
+  if (State.session.status === 'ended') {
+    handleParticipantSessionEnd();
+    return;
+  }
+  if (shouldSkipParticipantBroadcastRender(payload, prevIndex, prevOpen)) {
+    if (payload.pitchSync) syncParticipantPitchFocusFromSync(prevPitchSync);
+    if (payload.settings?.nextStepActions) syncParticipantNextStepsDom();
+    return;
+  }
+  void renderParticipantQuestion();
 }
 
 function showSopAssignCelebration(group) {
@@ -8382,7 +8445,7 @@ function participantHasActiveInput() {
   const scope = bar ? [root, bar] : [root];
   for (const el of scope) {
     if (!el) continue;
-    if (el.querySelector('.track-vote-option input:checked, #multi-wrap input:checked')) return true;
+    if (el.querySelector('.track-vote-option--pick.is-selected, #multi-wrap input:checked')) return true;
     const ta = el.querySelectorAll('textarea, input[type="text"], input[type="number"]');
     for (const f of ta) { if (String(f.value || '').trim()) return true; }
   }
@@ -8403,18 +8466,7 @@ function subscribeParticipantChannel() {
       window.LP?.channelHeartbeat(chName);
       const prevIndex = State.session.current_slide_index;
       const prevOpen = State.session.question_open;
-      applySessionPatch(payload || {});
-      if (State.session.status === 'ended') {
-        handleParticipantSessionEnd();
-        return;
-      }
-      // Reines Optionen-/Items-Update (kein Folien-/Status-Wechsel): laufende
-      // Auswahl/Eingabe nicht zerstören, nur neu rendern wenn noch nichts gewählt.
-      const onlyDataUpdate = (payload && (payload.voteOptions || payload.matrixItems))
-        && State.session.current_slide_index === prevIndex
-        && State.session.question_open === prevOpen;
-      if (onlyDataUpdate && participantHasActiveInput()) return;
-      void renderParticipantQuestion();
+      handleParticipantBroadcastPayload(payload || {}, { prevIndex, prevOpen });
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lp_sessions', filter: `id=eq.${State.session.id}` }, (payload) => {
       window.LP?.channelHeartbeat(chName);
@@ -8527,6 +8579,12 @@ function hasAnsweredSlide(slide) {
 
 async function renderParticipantQuestion() {
   const slideIndex = State.session.current_slide_index || 0;
+  if (State._participantSlideRenderIdx !== slideIndex) {
+    State._participantSlideRenderIdx = slideIndex;
+    State._participantVoteOptionsSig = null;
+    State._participantMatrixItemsSig = null;
+    State._participantQuickWinSig = null;
+  }
   const hostSlide = State.slides[slideIndex];
   const slide = resolveParticipantSlide(hostSlide) || hostSlide;
   const isMatrixSlide = slide?.slide_type === 'priority_matrix' || slide?.settings?.sopAllTracksMatrix;
@@ -8623,7 +8681,7 @@ async function renderParticipantQuestion() {
   if (hostSlide?.content?.sopKind === 'workshop-close' || isWorkshopClosingSlide(hostSlide)) {
     root.innerHTML = wrapParticipantSlide(`
       <div class="participant-wait-block participant-closing-block">
-        ${renderClosingSlideHtml(hostSlide.content || {}, false, { shellMode: true, presentFx: true })}
+        ${renderClosingSlideHtml(hostSlide.content || {}, false, { shellMode: true, presentFx: false })}
       </div>`, slideIndex);
     maybeLaunchClosingCelebration(hostSlide);
     finishParticipant();
@@ -8660,9 +8718,9 @@ async function renderParticipantQuestion() {
     }
     if (slide.slide_type === 'content' && (slide.content?.isHeroSlide || slide.content?.sopKind === 'workshop-close' || slide.content?.sopKind || slide.content?.sopTrackResults || isSopCardResultsSlide(slide))) {
       const html = isWorkshopClosingSlide(slide)
-        ? renderClosingSlideHtml(slide.content, false, { shellMode: true, presentFx: true })
+        ? renderClosingSlideHtml(slide.content, false, { shellMode: true, presentFx: false })
         : (slide.content.isHeroSlide
-          ? renderHeroSlideHtml(slide.content, false, { shellMode: true, presentFx: true })
+          ? renderHeroSlideHtml(slide.content, false, { shellMode: true, presentFx: false })
           : (isSopCardResultsSlide(slide) ? '' : renderSopContentHtml(slide.content)));
       if (html || isSopCardResultsSlide(slide)) {
         root.innerHTML = wrapParticipantSlide(`
@@ -9272,16 +9330,19 @@ function bindParticipantHandlers(slide) {
   const voteScope = getVoteSlideScope(slide);
   const favMax = voteScope?.maxSelections || 3;
   const updateFavCounter = () => {
-    const n = $$('.track-vote-option input:checked').length;
+    const n = $$('.track-vote-option--pick.is-selected').length;
     const el = $('#fav-counter') || $('#top3-counter');
     if (el) {
       el.textContent = `${n} / ${favMax} gewählt`;
       el.style.color = n > favMax ? 'var(--danger)' : n >= 1 && n <= favMax ? 'var(--success)' : 'var(--muted)';
     }
   };
-  $$('.track-vote-option input').forEach((inp) => inp.addEventListener('change', () => {
-    if ($$('.track-vote-option input:checked').length > favMax) {
-      inp.checked = false;
+  $$('.track-vote-option--pick').forEach((btn) => btn.addEventListener('click', () => {
+    const on = btn.classList.toggle('is-selected');
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    if ($$('.track-vote-option--pick.is-selected').length > favMax) {
+      btn.classList.remove('is-selected');
+      btn.setAttribute('aria-pressed', 'false');
       toast(`Maximal ${favMax} Use Cases`, 'warn');
     }
     updateFavCounter();
@@ -9289,7 +9350,7 @@ function bindParticipantHandlers(slide) {
   updateFavCounter();
 
   const submitFavorites = () => {
-    const values = $$('.track-vote-option input:checked').map((i) => i.value);
+    const values = $$('.track-vote-option--pick.is-selected').map((b) => b.dataset.voteId).filter(Boolean);
     const check = validateVoteValues(slide, values);
     if (!check.ok) { toast(check.error, 'warn'); return; }
     submitResponse({ values: check.values });
