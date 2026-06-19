@@ -122,8 +122,29 @@ function iceQuadrants() {
 window.LP_WORKSHOP_SETTINGS = {
   brainstormTimeLimitSec: 300,   // Sammelzeit pro Folie in Sekunden (0 = kein Limit)
   brainstormMaxResponses: 2,     // Maximale Use Cases pro Teilnehmer pro Folie
+  trackVoteCount: 3,             // Anzahl je Track priorisierter Use Cases (Zwischen-Vote)
   finalPriorityCount: 10,        // Anzahl final priorisierter Use Cases → wandern in die Matrix
+  pitchTimerSec: 120,            // Pitch-Timer pro Person (Sekunden)
 };
+
+// Geschätzte Workshop-Dauer aus den Folien (für Vorlagen-Karten).
+// Nur grobe Heuristik: Sammel-/Vote-/Pitch-Folien gewichtet, Orientierung pauschal.
+function estimateWorkshopMinutes(slides) {
+  const ws = window.LP_WORKSHOP_SETTINGS;
+  const collectMin = Math.max(3, Math.round((ws.brainstormTimeLimitSec || 300) / 60));
+  let min = 0;
+  (slides || []).forEach((s) => {
+    const c = s.content || {};
+    const st = s.settings || {};
+    if (s.slide_type === 'brainstorm') min += collectMin;
+    else if (st.sopTrackVote || st.sopAllTracksVote || s.slide_type === 'priority_matrix') min += 5;
+    else if (c.sopKind === 'pitch-session' || c.sopKind === 'track-presentation') min += 6;
+    else min += 1; // Orientierung/Intro/Abschluss
+  });
+  const lo = Math.round(min / 5) * 5;
+  const hi = Math.round((min * 1.4) / 5) * 5;
+  return { lo, hi, label: `${lo}–${hi} Min.` };
+}
 
 function tplSlide(type, content, settings = {}) {
   return {
@@ -545,6 +566,23 @@ function buildUseCaseInstructionBody(exampleKey = 'consulting') {
         'Produkt-One-Pager in Notion + Marken-Tonalität dokumentiert',
       ),
     ],
+    internal: [
+      simUseCase(
+        'Onboarding-Plan für neue Teammitglieder erstellen',
+        '30/60/90-Tage-Plan, Checkliste und Lernpfad aus internen SOPs generieren',
+        'SharePoint-SOPs + Rollenprofil + Mentor-Zuweisung',
+      ),
+      simUseCase(
+        'Meeting-Minutes in Actions überführen',
+        'Transkript wird zu Beschlüssen, To-dos und Verantwortlichen in der Aufgabenliste',
+        'Teams-Aufzeichnung + Meeting-Etiquette-Vorlage',
+      ),
+      simUseCase(
+        'OKR-Review aus Team-Updates verdichten',
+        'Status pro Key Result, Ampel und Vorschläge fürs Planungs-Meeting',
+        'OKR-Board + letzte Wochen-Updates der Teams',
+      ),
+    ],
   };
   const avoid = [
     'Neues vollautomatisiertes Rechnungstool',
@@ -628,17 +666,18 @@ function sopTrackBrainstorm(track) {
 
 function sopTrackVote(track, trackIndex) {
   const label = track.title.replace(/^Track \d+: /, '');
+  const n = window.LP_WORKSHOP_SETTINGS?.trackVoteCount || 3;
   return tplSlide('mc_multi', {
-    title: `Top 3 priorisieren · ${label}`,
+    title: `Top ${n} priorisieren · ${label}`,
     subtitle: `Track ${trackIndex + 1} · alle gesammelten Use Cases`,
-    prompt: 'Wählt die drei KI Use Cases, die in diesem Track den größten Hebel für ROOTS haben.\nNutzt die SOP-Übersicht als Kontext: In welchen Phasen zahlen die Ideen wirklich ein?',
+    prompt: `Wählt die ${n} KI Use Cases, die in diesem Track den größten Hebel für ROOTS haben.\nNutzt die SOP-Übersicht als Kontext: In welchen Phasen zahlen die Ideen wirklich ein?`,
     isQuestionSlide: true,
     options: [],
-    maxSelections: 3,
+    maxSelections: n,
     sopKind: SK.TRACK_VOTE,
     sopBoard: sopBoardData(track),
     ...sopMeta(track),
-  }, { showResultsLive: true, sopTrackVote: true, sopVoteMax: 3, workshopMode: 'decide' });
+  }, { showResultsLive: true, sopTrackVote: true, sopVoteMax: n, workshopMode: 'decide' });
 }
 
 // Präsentations-Session nach dem Track-Vote: Gewinner stellen ihre Use Cases kurz vor.
@@ -657,8 +696,9 @@ function sopTrackPresentationSession(track) {
 // ─── CROSS-TRACK SUMMARY ───────────────────────────────────────────────────────
 
 function sopAllTracksSummary() {
+  const n = window.LP_WORKSHOP_SETTINGS?.trackVoteCount || 3;
   return tplSlide('content', {
-    title: 'Track-Top-3 im Überblick',
+    title: `Track-Top-${n} im Überblick`,
     subtitle: 'Aus den priorisierten Use Cases aller Tracks',
     body: 'Hier seht ihr die priorisierten Use Cases aus den Track-Abstimmungen. Diese Auswahl wandert im nächsten Schritt in die Impact/Effort-Matrix.',
     sopKind: SK.ALL_TRACKS_SUMMARY,
@@ -700,11 +740,12 @@ function sopWorkshopNextSteps() {
 // ─── ABSCHLUSS-FOLIEN ──────────────────────────────────────────────────────────
 
 // Abschluss: Danke-Folie (ohne Feedback-Runde).
+// Tool-Namen bewusst generisch & im Editor frei editierbar (kein Hardcoding auf Notion etc.).
 function sopWorkshopClose() {
   return [
     tplSlide('content', {
       title: 'Danke! 🙌',
-      body: 'Die Top-Use-Cases übergeben wir an die SOP-Owner.\nAction Items sammeln wir in Notion.\nKickoffs für die nominierten Use Cases folgen.\n\nGemeinsam bauen wir die Zukunft von ROOTS.',
+      body: 'Die Top-Use-Cases übergeben wir an die jeweiligen SOP-Owner.\nAction Items sammeln wir in unserem Aufgaben-Tool.\nKickoffs für die nominierten Use Cases folgen.\n\nGemeinsam bauen wir die Zukunft von ROOTS.',
       isHeroSlide: true,
       sopKind: SK.WORKSHOP_CLOSE,
     }),
@@ -714,12 +755,14 @@ function sopWorkshopClose() {
 // ─── PITCH SESSION + FINALE ABSTIMMUNG ─────────────────────────────────────────
 
 function sopPitchSession() {
+  const sec = window.LP_WORKSHOP_SETTINGS?.pitchTimerSec || 120;
+  const minLabel = sec % 60 === 0 ? `${sec / 60} Minute${sec / 60 === 1 ? '' : 'n'}` : `${sec} Sek.`;
   return tplSlide('content', {
     title: 'Pitch-Runde',
-    subtitle: 'Jede Person stellt ihren Use Case kurz vor · 2 Minuten pro Person',
+    subtitle: `Jede Person stellt ihren Use Case kurz vor · ${minLabel} pro Person`,
     body: '',
     sopKind: SK.PITCH_SESSION,
-    pitchTimerSec: 120,
+    pitchTimerSec: sec,
   }, { workshopMode: 'present', sopPitchSession: true });
 }
 
@@ -1059,26 +1102,31 @@ function sopCardBrainstorm(track, phase, card) {
 }
 
 // ─── MARKETING SOP · KI WORKSHOP ──────────────────────────────────────
-function buildMarketingSopWorkshopSlides() {
+function buildMarketingSopWorkshopSlides(mode = 'pro-card') {
   const slides = [];
   const ws = window.LP_WORKSHOP_SETTINGS;
   const timeMin = ws.brainstormTimeLimitSec > 0
     ? `${Math.round(ws.brainstormTimeLimitSec / 60)} Min.`
     : '';
+  const scopeLabel = mode === 'pro-phase' ? 'Pro Phase' : 'Pro Karte';
 
   // Opener → Zielbild → Instruktionen (Marketing-Beispiele)
   slides.push(...sopWorkshopIntro({
     title: 'Marketing SOP · KI Use-Case Workshop',
-    subtitle: `Pro Karte ${timeMin ? timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases pro Person`,
+    subtitle: `${scopeLabel} ${timeMin ? timeMin + ' · ' : ''}max. ${ws.brainstormMaxResponses} Use Cases pro Person`,
     exampleKey: 'marketing',
   }));
 
   MARKETING_SOP_TRACKS.forEach((track, ti) => {
     slides.push(sopTrackIntro(track, ti));
     track.phases.forEach((phase) => {
-      phase.cards.forEach((card) => {
-        slides.push(sopCardBrainstorm(track, phase, card));
-      });
+      if (mode === 'pro-phase') {
+        slides.push(sopPhaseBrainstorm(track, phase));
+      } else {
+        phase.cards.forEach((card) => {
+          slides.push(sopCardBrainstorm(track, phase, card));
+        });
+      }
     });
     slides.push(sopTrackVote(track, ti));
     slides.push(sopTrackPresentationSession(track));
@@ -1294,82 +1342,85 @@ function buildDualSopParallelWorkshopSlides() {
   return slides;
 }
 
+// Vorlagen-Definition: Slides einmal bauen, Dauer daraus schätzen (estimateWorkshopMinutes).
+function defineTemplate(meta, slides) {
+  return {
+    ...meta,
+    duration: meta.duration || estimateWorkshopMinutes(slides).label,
+    slides,
+  };
+}
+
 window.LP_TEMPLATES = [
   // ── Endausbaustufe / Go-To: beide SOPs parallel ──────────────────────────
-  {
+  defineTemplate({
     key: 'roots-sop-dual-internal-consulting-parallel',
     category: 'ROOTS · SOP & KI',
     name: 'Internal + Consulting · parallel',
     desc: 'Empfohlen. Beide SOPs gleichzeitig · eine Sammel-Folie pro Track · Split-View mit voller SOP-Breite · Host-Zuweisung · konsolidierte Priorisierung + Matrix.',
-    duration: '90–120 Min.',
     group: '5–25',
-    tips: 'Go-To-Vorlage. Pro Track nur eine Host-Folie (Sammeln mit SOP im Split). QR-Join → Host weist Internal/Consulting zu. Pitch Session, dann Gesamt-Priorisierung, Matrix und Abschluss.',
-    slides: buildDualSopParallelWorkshopSlides(),
-  },
+    tips: `Go-To-Vorlage. Pro Track nur eine Host-Folie (Sammeln mit SOP im Split). QR-Join → Host weist Internal/Consulting zu. Hinweis: Internal hat ${INTERNAL_SOP_TRACKS.length} Tracks, Consulting ${SOP_TOOL_TRACKS.length} — die letzten Paare sind einseitig (nur Internal), das ist beabsichtigt. Danach Pitch, Gesamt-Priorisierung, Matrix, Abschluss.`,
+  }, buildDualSopParallelWorkshopSlides()),
   // ── Fallback 1: beide SOPs, aber nacheinander ────────────────────────────
-  {
+  defineTemplate({
     key: 'roots-sop-dual-internal-consulting-sequential',
     category: 'ROOTS · SOP & KI',
     name: 'Internal + Consulting · nacheinander',
     desc: 'Fallback ohne Split-View: erst Internal-SOP, dann Consulting-SOP · EINE konsolidierte Priorisierung + gemeinsame ICE-Matrix.',
-    duration: '90–120 Min.',
     group: '5–25',
     tips: 'Wenn parallel nicht passt. Pro Track eine Sammel-Folie mit SOP-Board. Internal komplett durch, danach Consulting. Pitch Session, dann Gesamt-Priorisierung, Matrix und Abschluss.',
-    slides: buildDualSopSequentialWorkshopSlides(),
-  },
+  }, buildDualSopSequentialWorkshopSlides()),
   // ── Fallback 2: nur Consulting-SOP ───────────────────────────────────────
-  {
+  defineTemplate({
     key: 'roots-sop-ki-workshop-track',
     category: 'ROOTS · SOP & KI',
     name: 'Nur Consulting SOP · Pro Track',
     desc: 'Nur die Consulting-/Engagement-SOP. Alle Phasen auf einen Blick → Track-Brainstorm → Pitch Session → finale Priorisierung → ICE Matrix.',
-    duration: '60–90 Min.',
     group: '6–25',
     tips: 'Tempo-Format für ein reines Consulting-Team. 5 Min. / max. 2 Use Cases pro Track. Am Ende Pitch, dann Gesamt-Priorisierung.',
-    slides: buildSopKiWorkshopSlides('pro-track', { tracks: SOP_TOOL_TRACKS, exampleKey: 'consulting', title: 'Consulting SOP · KI Use-Case Workshop' }),
-  },
-  {
+  }, buildSopKiWorkshopSlides('pro-track', { tracks: SOP_TOOL_TRACKS, exampleKey: 'consulting', title: 'Consulting SOP · KI Use-Case Workshop' })),
+  defineTemplate({
     key: 'roots-sop-ki-workshop-phase',
     category: 'ROOTS · SOP & KI',
     name: 'Nur Consulting SOP · Pro Phase',
     desc: 'Nur die Consulting-/Engagement-SOP, höchste Tiefe. SOP-Kontext je Phase → Brainstorm → Track-Vote → Presentation Session → Pitch → Übersicht → ICE Matrix.',
-    duration: '90–150 Min.',
-    group: '6–25',
-    tips: 'Tiefstes Format. SOP-Übersicht vor jedem Brainstorm. 5 Min. / max. 2 Use Cases je Phase — viele Phasen × 5 Min summieren sich, Zeitlimit ggf. senken.',
-    slides: buildSopKiWorkshopSlides('pro-phase', { tracks: SOP_TOOL_TRACKS, exampleKey: 'consulting', title: 'Consulting SOP · KI Use-Case Workshop' }),
-  },
+    group: '6–18',
+    tips: 'Tiefstes Format — nur für kleine Runden & genügend Zeit. SOP-Übersicht vor jedem Brainstorm. 5 Min. / max. 2 Use Cases je Phase; viele Phasen × 5 Min summieren sich, Zeitlimit ggf. senken.',
+  }, buildSopKiWorkshopSlides('pro-phase', { tracks: SOP_TOOL_TRACKS, exampleKey: 'consulting', title: 'Consulting SOP · KI Use-Case Workshop' })),
   // ── Fallback 3: nur Internal-SOP ─────────────────────────────────────────
-  {
+  defineTemplate({
     key: 'roots-sop-ki-workshop-internal-track',
     category: 'ROOTS · SOP & KI',
     name: 'Nur Internal SOP · Pro Track',
     desc: 'Nur die Internal-/Betriebs-SOP von ROOTS. Alle Phasen auf einen Blick → Track-Brainstorm → Pitch Session → finale Priorisierung → ICE Matrix.',
-    duration: '60–90 Min.',
     group: '6–25',
     tips: 'Tempo-Format für ein reines Internal-Team. 5 Min. / max. 2 Use Cases pro Track. Am Ende Pitch, dann Gesamt-Priorisierung.',
-    slides: buildSopKiWorkshopSlides('pro-track', { tracks: INTERNAL_SOP_TRACKS, exampleKey: 'consulting', title: 'Internal SOP · KI Use-Case Workshop' }),
-  },
-  {
+  }, buildSopKiWorkshopSlides('pro-track', { tracks: INTERNAL_SOP_TRACKS, exampleKey: 'internal', title: 'Internal SOP · KI Use-Case Workshop' })),
+  defineTemplate({
     key: 'roots-sop-ki-workshop-internal-phase',
     category: 'ROOTS · SOP & KI',
     name: 'Nur Internal SOP · Pro Phase',
     desc: 'Nur die Internal-/Betriebs-SOP von ROOTS, höchste Tiefe. SOP-Kontext je Phase → Brainstorm → Track-Vote → Presentation Session → Pitch → Übersicht → ICE Matrix.',
-    duration: '90–150 Min.',
-    group: '6–25',
-    tips: 'Tiefstes Internal-Format. SOP-Übersicht vor jedem Brainstorm. 5 Min. / max. 2 Use Cases je Phase — Zeitlimit ggf. senken.',
-    slides: buildSopKiWorkshopSlides('pro-phase', { tracks: INTERNAL_SOP_TRACKS, exampleKey: 'consulting', title: 'Internal SOP · KI Use-Case Workshop' }),
-  },
+    group: '6–15',
+    tips: `Tiefstes Internal-Format — nur für kleine Runden & viel Zeit (${INTERNAL_SOP_TRACKS.length} Tracks). SOP-Übersicht vor jedem Brainstorm. 5 Min. / max. 2 Use Cases je Phase; Zeitlimit ggf. senken.`,
+  }, buildSopKiWorkshopSlides('pro-phase', { tracks: INTERNAL_SOP_TRACKS, exampleKey: 'internal', title: 'Internal SOP · KI Use-Case Workshop' })),
   // ── Spezial: Marketing-SOP ───────────────────────────────────────────────
-  {
+  defineTemplate({
     key: 'roots-marketing-sop-workshop',
     category: 'ROOTS · SOP & KI',
     name: 'Marketing SOP · Pro Karte',
-    desc: 'Marketing-SOP (1 Track, 10 Karten): je Karte sammeln · Top-3 priorisieren · Presentation Session · Pitch → ICE Matrix.',
-    duration: '75–110 Min.',
+    desc: 'Marketing-SOP (1 Track, alle Karten): je Karte sammeln · Top-3 priorisieren · Presentation Session · Pitch → ICE Matrix.',
     group: '6–20',
-    tips: 'Pro Karte 5 Min. · max. 2 Use Cases. Achtung: 10 Karten × 5 Min ≈ 50 Min nur Sammeln — Zeitlimit ggf. in LP_WORKSHOP_SETTINGS senken.',
-    slides: buildMarketingSopWorkshopSlides(),
-  },
+    tips: 'Höchste Tiefe pro Karte. 5 Min. · max. 2 Use Cases je Karte. Achtung: viele Karten × 5 Min summieren sich — Zeitlimit ggf. senken oder „Pro Phase"-Variante nutzen.',
+  }, buildMarketingSopWorkshopSlides('pro-card')),
+  defineTemplate({
+    key: 'roots-marketing-sop-workshop-phase',
+    category: 'ROOTS · SOP & KI',
+    name: 'Marketing SOP · Pro Phase',
+    desc: 'Kürzere Marketing-SOP-Variante: je Phase (statt je Karte) sammeln · Top-3 priorisieren · Presentation Session · Pitch → ICE Matrix.',
+    group: '6–20',
+    tips: 'Tempo-Variante für Marketing. Eine Sammel-Folie je Phase statt je Karte — deutlich kürzer. 5 Min. · max. 2 Use Cases pro Phase.',
+  }, buildMarketingSopWorkshopSlides('pro-phase')),
 ];
 
 // ─── DEBUG MOCK DATA ─────────────────────────────────────────────────────────
@@ -1447,13 +1498,23 @@ window.LP_DEBUG_PHASE_USE_CASES = {
 };
 
 window.LP_DEBUG_PARTICIPANTS = [
-  { name: 'Anna Becker',  emoji: '🦊', color: '#206efb' },
-  { name: 'Max Hoffmann', emoji: '🐼', color: '#10b981' },
-  { name: 'Lena Schmidt', emoji: '🦁', color: '#06b6d4' },
-  { name: 'Tom Werner',   emoji: '🐸', color: '#a855f7' },
-  { name: 'Sara Klein',   emoji: '🦄', color: '#ec4899' },
-  { name: 'Felix Bauer',  emoji: '🐙', color: '#0ea5e9' },
+  { name: 'Anna Becker',    emoji: '🦊', color: '#206efb' },
+  { name: 'Max Hoffmann',   emoji: '🐼', color: '#10b981' },
+  { name: 'Lena Schmidt',   emoji: '🦁', color: '#06b6d4' },
+  { name: 'Tom Werner',     emoji: '🐸', color: '#a855f7' },
+  { name: 'Sara Klein',     emoji: '🦄', color: '#ec4899' },
+  { name: 'Felix Bauer',    emoji: '🐙', color: '#0ea5e9' },
+  { name: 'Mara Lindqvist', emoji: '🦋', color: '#14b8a6' },
+  { name: 'Jonas Peters',   emoji: '🐳', color: '#3b82f6' },
+  { name: 'Clara Vogt',     emoji: '🌟', color: '#f59e0b' },
+  { name: 'David Roth',     emoji: '🔥', color: '#ef4444' },
+  { name: 'Nina Frank',     emoji: '💎', color: '#8b5cf6' },
+  { name: 'Paul Arnold',    emoji: '🎯', color: '#0891b2' },
 ];
+
+// Anzahl simulierter Teilnehmer (1…LP_DEBUG_PARTICIPANTS.length). Zur Laufzeit
+// per window.LP_SIM_PARTICIPANT_COUNT oder im Simulations-Panel anpassbar.
+window.LP_SIM_PARTICIPANT_COUNT = 6;
 
 window.LP_SLIDE_TYPES = [
   { type: 'content', label: 'Inhalt', icon: 'fa-align-left', desc: 'Titel, Text, Bild' },

@@ -275,8 +275,20 @@ function getWorkshopSettings() {
   return {
     brainstormTimeLimitSec: presWs.brainstormTimeLimitSec ?? global.brainstormTimeLimitSec ?? 300,
     brainstormMaxResponses: presWs.brainstormMaxResponses ?? global.brainstormMaxResponses ?? 2,
+    trackVoteCount: presWs.trackVoteCount ?? global.trackVoteCount ?? 3,
     finalPriorityCount: presWs.finalPriorityCount ?? global.finalPriorityCount ?? 10,
+    pitchTimerSec: presWs.pitchTimerSec ?? global.pitchTimerSec ?? 120,
   };
+}
+
+// Anzahl je Track priorisierter Use Cases (Zwischen-Vote). Slide-Override > Workshop-Setting.
+function getTrackVoteCount(slide) {
+  return Number(slide?.settings?.sopVoteMax || getWorkshopSettings().trackVoteCount || 3);
+}
+
+// Pitch-Timer in Sekunden. Slide-Override > Workshop-Setting.
+function getPitchTimerSec(slide) {
+  return Number(slide?.content?.pitchTimerSec || getWorkshopSettings().pitchTimerSec || 120);
 }
 
 function presentationHasWorkshopFlow() {
@@ -287,27 +299,64 @@ function presentationHasWorkshopFlow() {
   });
 }
 
-function syncWorkshopFinalCountToSlides(count) {
-  const n = Math.min(30, Math.max(1, Number(count) || 10));
+function syncWorkshopSettingsToSlides({ finalPriorityCount, trackVoteCount, pitchTimerSec } = {}) {
+  const fin = finalPriorityCount != null ? Math.min(30, Math.max(1, Number(finalPriorityCount) || 10)) : null;
+  const tvc = trackVoteCount != null ? Math.min(15, Math.max(1, Number(trackVoteCount) || 3)) : null;
+  const pit = pitchTimerSec != null ? Math.max(15, Number(pitchTimerSec) || 120) : null;
   const jobs = [];
+  const touched = new Set();
+  const mark = (s) => { if (!touched.has(s)) { touched.add(s); jobs.push(persistSlide(s)); } };
   (State.slides || []).forEach((s) => {
-    if (s.settings?.sopAllTracksVote || s.content?.sopKind === 'final-vote' || s.content?.sopKind === 'group-vote') {
-      s.settings.sopVoteMax = n;
-      s.content.maxSelections = n;
-      if (s.content.subtitle && /Top \d+/i.test(String(s.content.subtitle))) {
-        s.content.subtitle = String(s.content.subtitle).replace(/Top \d+/i, `Top ${n}`);
-      }
-      if (s.content.prompt && /Welche \d+ Use Cases/i.test(String(s.content.prompt))) {
-        s.content.prompt = String(s.content.prompt).replace(/Welche \d+ Use Cases/i, `Welche ${n} Use Cases`);
-      }
-      jobs.push(persistSlide(s));
+    const c = s.content || {};
+    const st = s.settings || {};
+    // Finale Priorisierung / Gesamt-Vote
+    if (fin != null && (st.sopAllTracksVote || c.sopKind === 'final-vote' || c.sopKind === 'group-vote')) {
+      st.sopVoteMax = fin;
+      c.maxSelections = fin;
+      if (c.subtitle && /Top \d+/i.test(String(c.subtitle))) c.subtitle = String(c.subtitle).replace(/Top \d+/i, `Top ${fin}`);
+      if (c.prompt && /Welche \d+ Use Cases/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/Welche \d+ Use Cases/i, `Welche ${fin} Use Cases`);
+      mark(s);
     }
-    if (s.settings?.sopAllTracksMatrix || s.content?.sopKind === 'final-matrix') {
-      s.settings.sopMatrixCount = n;
-      jobs.push(persistSlide(s));
+    // Matrix
+    if (fin != null && (st.sopAllTracksMatrix || c.sopKind === 'final-matrix')) {
+      st.sopMatrixCount = fin;
+      mark(s);
+    }
+    // Track-Zwischen-Vote
+    if (tvc != null && (st.sopTrackVote || c.sopKind === 'track-vote')) {
+      st.sopVoteMax = tvc;
+      c.maxSelections = tvc;
+      if (c.title && /Top \d+/i.test(String(c.title))) c.title = String(c.title).replace(/Top \d+/i, `Top ${tvc}`);
+      if (c.prompt && /Wählt die \d+/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/Wählt die \d+/i, `Wählt die ${tvc}`);
+      mark(s);
+    }
+    if (tvc != null && c.sopKind === 'all-tracks-summary' && c.title && /Top-\d+/i.test(String(c.title))) {
+      c.title = String(c.title).replace(/Top-\d+/i, `Top-${tvc}`);
+      mark(s);
+    }
+    // Pitch-Timer
+    if (pit != null && (c.sopKind === 'pitch-session' || st.sopPitchSession)) {
+      c.pitchTimerSec = pit;
+      const minLabel = pit % 60 === 0 ? `${pit / 60} Minute${pit / 60 === 1 ? '' : 'n'}` : `${pit} Sek.`;
+      if (c.subtitle && /· [^·]+ pro Person/i.test(String(c.subtitle))) {
+        c.subtitle = String(c.subtitle).replace(/· [^·]+ pro Person/i, `· ${minLabel} pro Person`);
+      }
+      mark(s);
     }
   });
   return Promise.all(jobs);
+}
+
+// Rückwärtskompatibler Alias (nur finale Anzahl).
+function syncWorkshopFinalCountToSlides(count) {
+  return syncWorkshopSettingsToSlides({ finalPriorityCount: count });
+}
+
+// Aktive simulierte Teilnehmer = erste N aus dem Pool (N = LP_SIM_PARTICIPANT_COUNT).
+function simParticipantDefs() {
+  const all = window.LP_DEBUG_PARTICIPANTS || [];
+  const n = Math.max(1, Math.min(all.length, Number(window.LP_SIM_PARTICIPANT_COUNT) || all.length));
+  return all.slice(0, n);
 }
 
 function simParticipantRecord(idx, sessionId, pDef = null) {
@@ -557,7 +606,7 @@ function renderAllTracksResultsHtml() {
     return `<div class="sop-all-tracks-results sop-all-tracks-results--top3">${topByTrack.map((trk) => {
       const theme = sopTrackTheme(trk.trackKey);
       return `<div class="sop-all-track-group ${esc(trk.trackKey || '')}" style="--track-accent:${theme.accent};--track-soft:${theme.soft}">
-        <div class="sop-all-track-head" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(trk.trackLabel || '')} · Top 3</div>
+        <div class="sop-all-track-head" style="background:${theme.badgeBg};color:${theme.badgeColor}">${esc(trk.trackLabel || '')} · Top ${getWorkshopSettings().trackVoteCount}</div>
         <div class="sop-all-track-phase">
           <div class="sop-all-track-phase-head">Priorisiert im Track-Voting</div>
           <div class="sop-all-track-phase-items">${trk.items.map((it, idx) =>
@@ -857,7 +906,7 @@ function getVoteSlideScope(slide) {
     return { kind: 'phase', key, phaseName: c.sopPhaseName, cardName: null, maxSelections: st.sopVoteMax || c.maxSelections || 3 };
   }
   if (st.sopTrackVote && key) {
-    return { kind: 'track', key, maxSelections: 3 };
+    return { kind: 'track', key, maxSelections: getTrackVoteCount(slide) };
   }
   if (st.sopAllTracksVote) {
     return { kind: 'all-tracks', key: null, maxSelections: finalPriorityCount(slide) };
@@ -1932,7 +1981,7 @@ function renderPhaseVotePresentHtml(slide, visible) {
   return `<div class="phase-vote-present">
     <div class="track-vote-present-head">
       <span class="track-vote-count">${items.length} Use Cases · ${esc(scope.phaseName || 'Phase')}</span>
-      <span class="track-vote-hint">${State.session.question_open ? 'Teilnehmer priorisieren jetzt die Top 3' : 'Priorisierung abgeschlossen'}</span>
+      <span class="track-vote-hint">${State.session.question_open ? `Teilnehmer priorisieren jetzt die Top ${getTrackVoteCount(slide)}` : 'Priorisierung abgeschlossen'}</span>
     </div>
     ${renderCardVoteParticipationHtml(slide)}
     <div class="phase-vote-leaderboard">
@@ -2546,7 +2595,7 @@ function renderTrackVotePresentHtml(slide, visible) {
   return `<div class="track-vote-present">
     <div class="track-vote-present-head">
       <span class="track-vote-count">${allItems.length} Use Cases</span>
-      <span class="track-vote-hint">Kontext aus allen SOP-Phasen · ${State.session.question_open ? 'Teilnehmer wählen jetzt Top 3' : 'Priorisierung abgeschlossen'}</span>
+      <span class="track-vote-hint">Kontext aus allen SOP-Phasen · ${State.session.question_open ? `Teilnehmer wählen jetzt Top ${getTrackVoteCount(slide)}` : 'Priorisierung abgeschlossen'}</span>
     </div>
     ${renderCardVoteParticipationHtml(slide)}
     <div class="track-vote-preview"><div class="track-vote-live-label">Abstimmungsoptionen</div>${previewHtml}</div>
@@ -2592,7 +2641,7 @@ function renderTrackVoteResultsHtml(slide, visible) {
       .forEach((o) => {
         const max = Math.max(1, ...g.options.map((x) => scoreFor(x.id)));
         const pct = Math.round((o.score / max) * 100);
-        html += `<div class="track-vote-result-row"><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span><div class="viz-bar-track"><div class="viz-bar-fill" style="width:${pct}%"></div></div><strong>${o.votes ? `${o.votes}× Top 3` : ''}${o.votes && o.points ? ' · ' : ''}${o.points ? `${Math.round(o.points)} Pkt` : ''}</strong></div>`;
+        html += `<div class="track-vote-result-row"><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span><div class="viz-bar-track"><div class="viz-bar-fill" style="width:${pct}%"></div></div><strong>${o.votes ? `${o.votes}× Top ${getTrackVoteCount(slide)}` : ''}${o.votes && o.points ? ' · ' : ''}${o.points ? `${Math.round(o.points)} Pkt` : ''}</strong></div>`;
       });
     html += '</div></div>';
   });
@@ -2863,20 +2912,21 @@ function renderParticipantTrackVoteHtml(slide) {
   const scope = getVoteSlideScope(slide);
   const max = scope?.maxSelections || 2;
   if (scope?.kind === 'track') {
+    const n = getTrackVoteCount(slide);
     const expert = State.participantVoteExpert;
     if (expert) {
       const opts = getTrackVoteOptions(slide);
       return `<p class="vote-mode-hint">Expertenmodus: Verteile genau <strong>100 Punkte</strong>.</p>
         ${opts.map((o) => `<div class="split-row"><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span><input type="number" min="0" max="100" value="0" data-split="${esc(o.id)}" class="split-input" /></div>`).join('')}
         <div id="split-total" style="font-weight:700;margin:.5rem 0">Summe: 0 / 100</div>
-        <button type="button" class="btn-ghost vote-mode-toggle" id="vote-mode-toggle">← Zurück zu Top 3</button>
+        <button type="button" class="btn-ghost vote-mode-toggle" id="vote-mode-toggle">← Zurück zu Top ${n}</button>
         <button type="button" class="btn-primary participant-submit" id="submit-split">Punkte senden</button>`;
     }
-    return `<p class="vote-mode-hint">Wähle deine <strong>Top 3 Use Cases</strong> in diesem Track.</p>
+    return `<p class="vote-mode-hint">Wähle deine <strong>Top ${n} Use Cases</strong> in diesem Track.</p>
       ${renderTrackVoteGroupedListHtml(slide, { selectable: true, fairVote: !!slide.settings?.sopFairVote })}
-      <div id="fav-counter" class="top3-counter">0 / 3 gewählt</div>
+      <div id="fav-counter" class="top3-counter">0 / ${n} gewählt</div>
       <button type="button" class="btn-ghost vote-mode-toggle" id="vote-mode-toggle">Expertenmodus: 100 Punkte</button>
-      <button type="button" class="btn-primary participant-submit" id="submit-favorites">Top 3 senden</button>`;
+      <button type="button" class="btn-primary participant-submit" id="submit-favorites">Top ${n} senden</button>`;
   }
   if (scope?.kind === 'phase') {
     return `<p class="vote-mode-hint">Wähle deine <strong>Top ${max} KI Use Cases</strong> in dieser Phase.</p>
@@ -3308,7 +3358,7 @@ function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigat
 
   if (trackVoteIdx >= 0) {
     html += `<button type="button" class="workshop-sop-vote ${currentIndex === trackVoteIdx ? 'active' : ''}" data-slide-index="${trackVoteIdx}">
-      <i class="fa-solid fa-ranking-star"></i><span>Top 3 priorisieren</span>
+      <i class="fa-solid fa-ranking-star"></i><span>Top ${getWorkshopSettings().trackVoteCount} priorisieren</span>
     </button>`;
   }
   if (trackPresentationIdx >= 0) {
@@ -3702,7 +3752,7 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
   }
   // Pitch Session — alle Use Cases mit Autornamen + Timer
   if (c.sopKind === 'pitch-session') {
-    const timerSec = Number(c.pitchTimerSec || 120);
+    const timerSec = Number(c.pitchTimerSec || getWorkshopSettings().pitchTimerSec || 120);
     const tMin = Math.floor(timerSec / 60);
     const tSec = timerSec % 60;
     const tLabel = tMin > 0 ? `${tMin}:${String(tSec).padStart(2, '0')} Min` : `${tSec} Sek`;
@@ -5719,6 +5769,10 @@ function renderEditorProps() {
     <input id="prop-ws-final-count" type="number" min="1" max="30" value="${ws.finalPriorityCount || 10}" />
     <p class="props-hint"><i class="fa-solid fa-circle-info"></i> So viele Use Cases werden am Ende priorisiert und in die Matrix übernommen. Aus der Matrix gehen nur Quick Wins in die Next Steps.</p>
     <div class="props-row-2">
+      <div><div class="props-label">Top N je Track (Zwischen-Vote)</div><input id="prop-ws-track-count" type="number" min="1" max="15" value="${ws.trackVoteCount || 3}" /></div>
+      <div><div class="props-label">Pitch-Timer (Sek.)</div><input id="prop-ws-pitch-sec" type="number" min="15" max="600" step="15" value="${ws.pitchTimerSec || 120}" /></div>
+    </div>
+    <div class="props-row-2">
       <div><div class="props-label">Max. Use Cases pro Person (Sammeln)</div><input id="prop-ws-max-responses" type="number" min="1" max="10" value="${ws.brainstormMaxResponses || 2}" /></div>
       <div><div class="props-label">Sammelzeit (Sek., 0 = aus)</div><input id="prop-ws-time-limit" type="number" min="0" value="${ws.brainstormTimeLimitSec ?? 300}" /></div>
     </div>`;
@@ -5891,10 +5945,16 @@ function renderEditorProps() {
     const next = {
       brainstormTimeLimitSec: Math.max(0, Number($('#prop-ws-time-limit')?.value ?? ws.brainstormTimeLimitSec ?? 300)),
       brainstormMaxResponses: Math.max(1, Number($('#prop-ws-max-responses')?.value ?? ws.brainstormMaxResponses ?? 2)),
+      trackVoteCount: Math.min(15, Math.max(1, Number($('#prop-ws-track-count')?.value ?? ws.trackVoteCount ?? 3))),
       finalPriorityCount: Math.min(30, Math.max(1, Number($('#prop-ws-final-count')?.value ?? ws.finalPriorityCount ?? 10))),
+      pitchTimerSec: Math.max(15, Number($('#prop-ws-pitch-sec')?.value ?? ws.pitchTimerSec ?? 120)),
     };
     await persistPresentationSettings({ workshop: next });
-    await syncWorkshopFinalCountToSlides(next.finalPriorityCount);
+    await syncWorkshopSettingsToSlides({
+      finalPriorityCount: next.finalPriorityCount,
+      trackVoteCount: next.trackVoteCount,
+      pitchTimerSec: next.pitchTimerSec,
+    });
     renderEditorCanvas();
     toast('Workshop-Einstellungen gespeichert', 'success');
   }, 650);
@@ -6340,7 +6400,7 @@ const LP_DebugSim = {
   },
 
   ensureAllParticipants() {
-    const defs = window.LP_DEBUG_PARTICIPANTS || [];
+    const defs = simParticipantDefs();
     const sessionId = State.session?.id;
     defs.forEach((p, idx) => pushSimParticipant(simParticipantRecord(idx, sessionId, p)));
   },
@@ -6358,7 +6418,7 @@ const LP_DebugSim = {
   // ─── Teilnehmer drip-by-drip joinen lassen ──────────────────
   dripNextParticipant() {
     if (!this.active) return;
-    const defs = window.LP_DEBUG_PARTICIPANTS || [];
+    const defs = simParticipantDefs();
     if (this.joinIdx >= defs.length) return;
     const p = defs[this.joinIdx];
     const sessionId = State.session?.id;
@@ -6380,7 +6440,7 @@ const LP_DebugSim = {
   prepareResponses() {
     if (!Array.isArray(State.slides) || !State.slides.length) return;
     const PHASE_USE_CASES = window.LP_DEBUG_PHASE_USE_CASES || {};
-    const defs = window.LP_DEBUG_PARTICIPANTS || [];
+    const defs = simParticipantDefs();
     const sessionId = State.session?.id;
     const now = Date.now();
     function pseudoRandom(seed) { let x = Math.sin(seed) * 10000; return x - Math.floor(x); }
@@ -6394,6 +6454,10 @@ const LP_DebugSim = {
     State.slides.forEach((slide) => {
       if (slide.slide_type !== 'brainstorm') return;
       const c = slide.content || {};
+      // Parallel-Vorlage: die sichtbare Sammel-Anker-Folie (dual-pair-collect) ist NICHT
+      // der echte Sammel-Bucket — Teilnehmer schreiben in die versteckten Gruppen-Folien.
+      // Daher hier überspringen, sonst entstünden doppelte/phantom Use Cases.
+      if (c.sopKind === 'dual-pair-collect') return;
       const phaseName = c.sopPhaseName || c.title || '';
       const responseLimit = getCollectResponseLimit(slide);
       // Wie viele Use Cases passen realistisch auf diese Folie?
@@ -6721,7 +6785,7 @@ const LP_DebugSim = {
         }
       });
     });
-    const defs = window.LP_DEBUG_PARTICIPANTS || [];
+    const defs = simParticipantDefs();
     const sessionId = State.session?.id;
     defs.forEach((p, idx) => pushSimParticipant(simParticipantRecord(idx, sessionId, p)));
     this.joinIdx = defs.length;
@@ -6750,6 +6814,9 @@ function ensureDebugPanel() {
     <div class="lp-debug-body">
       <div class="lp-debug-row"><span>Status:</span><strong id="lp-dbg-status">aktiv</strong></div>
       <div class="lp-debug-row"><span>Teilnehmer:</span><strong id="lp-dbg-participants">0</strong></div>
+      <div class="lp-debug-row" style="gap:.4rem"><span>Sim-Anzahl:</span>
+        <input id="lp-dbg-pcount" type="number" min="1" max="${(window.LP_DEBUG_PARTICIPANTS || []).length || 12}" value="${Math.max(1, Math.min((window.LP_DEBUG_PARTICIPANTS || []).length || 12, Number(window.LP_SIM_PARTICIPANT_COUNT) || 6))}" style="width:3.4rem" />
+      </div>
       <div class="lp-debug-row"><span>Antworten:</span><strong id="lp-dbg-responses">0</strong></div>
       <div class="lp-debug-row" style="gap:.4rem"><span>Speed:</span>
         <div class="lp-debug-btn-grp">
@@ -6775,6 +6842,18 @@ function ensureDebugPanel() {
   });
   panel.querySelector('#lp-dbg-flush').onclick = () => LP_DebugSim.flushAll();
   panel.querySelector('#lp-dbg-reset').onclick = () => window.LP_resetDebug?.();
+  // Sim-Teilnehmerzahl live ändern → Simulation neu starten (sauberer Reset).
+  const pCountEl = panel.querySelector('#lp-dbg-pcount');
+  if (pCountEl) {
+    pCountEl.onchange = () => {
+      const max = (window.LP_DEBUG_PARTICIPANTS || []).length || 12;
+      const n = Math.max(1, Math.min(max, Number(pCountEl.value) || 6));
+      pCountEl.value = n;
+      window.LP_SIM_PARTICIPANT_COUNT = n;
+      window.LP_resetDebug?.();
+      window.LP_seedDebug?.();
+    };
+  }
   // Collapse-Toggle: speichert Status in localStorage
   const applyCollapse = (collapsed) => {
     panel.classList.toggle('collapsed', collapsed);
