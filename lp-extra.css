@@ -2780,9 +2780,9 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   margin:0;
 }
 .participant-wait-block .ws-closing-stage{
-  min-height:auto;
+  min-height:min(72vh,680px);
   padding:1.25rem .5rem 1rem;
-  border-radius:16px;
+  border-radius:24px;
 }
 .participant-wait-block .ws-closing-title{font-size:clamp(1.65rem,6vw,2.2rem)}
 .participant-wait-block .ws-closing-body{font-size:.95rem}
@@ -3177,23 +3177,30 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .participant-wait-block .ws-hero-stage{
   min-height:min(72vh,680px);
   padding:1.25rem .5rem 1rem;
-  border-radius:16px;
+  border-radius:24px;
 }
 .participant-opening-hero:not(.participant-hero-fullscreen) .ws-hero-stage{
+  min-height:min(72vh,680px);
+}
+.participant-closing-hero:not(.participant-closing-fullscreen) .ws-closing-stage{
   min-height:min(72vh,680px);
 }
 .participant-wait-block .ws-hero-title{font-size:clamp(1.65rem,6vw,2.2rem)}
 .participant-wait-block .ws-hero-lead{font-size:.95rem}
 
-/* Teilnehmer · Start-Hero mobil fullscreen */
+/* Teilnehmer · Start-/End-Hero mobil fullscreen (wie Presenter: border-radius 24px) */
 @media (max-width:768px){
-  #screen-participant.participant-hero-active{
+  #screen-participant.participant-hero-active,
+  #screen-participant.participant-closing-active{
     padding:0!important;
     overflow:hidden;
   }
   #screen-participant.participant-hero-active .participant-workshop-layout,
   #screen-participant.participant-hero-active .participant-main-wrap,
-  #screen-participant.participant-hero-active .participant-root{
+  #screen-participant.participant-hero-active .participant-root,
+  #screen-participant.participant-closing-active .participant-workshop-layout,
+  #screen-participant.participant-closing-active .participant-main-wrap,
+  #screen-participant.participant-closing-active .participant-root{
     padding:0!important;
     margin:0!important;
     max-width:none!important;
@@ -3202,7 +3209,8 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
     align-items:stretch!important;
     justify-content:stretch!important;
   }
-  #screen-participant.participant-hero-active .pslide-participant-slide{
+  #screen-participant.participant-hero-active .pslide-participant-slide,
+  #screen-participant.participant-closing-active .pslide-participant-slide{
     max-width:none!important;
     width:100%;
     margin:0;
@@ -3210,7 +3218,8 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
     display:flex;
     flex-direction:column;
   }
-  #screen-participant.participant-hero-active .pslide-participant-content{
+  #screen-participant.participant-hero-active .pslide-participant-content,
+  #screen-participant.participant-closing-active .pslide-participant-content{
     flex:1;
     display:flex;
     flex-direction:column;
@@ -3219,32 +3228,43 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
     padding:0;
   }
   #screen-participant.participant-hero-active .workshop-progress-bar,
-  #screen-participant.participant-hero-active #participant-sop-panel{
+  #screen-participant.participant-hero-active #participant-sop-panel,
+  #screen-participant.participant-closing-active .workshop-progress-bar,
+  #screen-participant.participant-closing-active #participant-sop-panel{
     display:none!important;
   }
-  .participant-opening-hero.participant-hero-fullscreen{
+  .participant-opening-hero.participant-hero-fullscreen,
+  .participant-closing-hero.participant-closing-fullscreen{
     position:relative;
     flex:1;
     display:flex;
     flex-direction:column;
+    align-items:center;
+    justify-content:center;
     min-height:100dvh;
     width:100%;
     margin:0;
-    padding:0;
+    padding:calc(.65rem + env(safe-area-inset-top)) clamp(.65rem,2.5vw,.85rem) calc(.65rem + env(safe-area-inset-bottom));
+    box-sizing:border-box;
   }
-  .participant-opening-hero.participant-hero-fullscreen .ws-hero-stage{
+  .participant-opening-hero.participant-hero-fullscreen .ws-hero-stage,
+  .participant-closing-hero.participant-closing-fullscreen .ws-closing-stage{
     flex:1;
-    min-height:100dvh;
     width:100%;
-    border-radius:0;
-    padding:calc(2rem + env(safe-area-inset-top)) clamp(1.25rem,5vw,2rem) calc(3.5rem + env(safe-area-inset-bottom));
+    max-width:100%;
+    min-height:calc(100dvh - clamp(1.3rem,5vw,1.7rem) * 2 - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    border-radius:24px;
+    overflow:hidden;
     margin:0;
+    padding:clamp(2rem,8vh,4rem) clamp(1.25rem,5vw,2rem) calc(3.25rem + env(safe-area-inset-bottom));
+    box-sizing:border-box;
   }
-  .participant-opening-hero.participant-hero-fullscreen .participant-sop-wait--hero{
+  .participant-opening-hero.participant-hero-fullscreen .participant-sop-wait--hero,
+  .participant-closing-hero.participant-closing-fullscreen .participant-sop-wait--closing{
     position:absolute;
     bottom:calc(.85rem + env(safe-area-inset-bottom));
-    left:0;
-    right:0;
+    left:clamp(.65rem,2.5vw,.85rem);
+    right:clamp(.65rem,2.5vw,.85rem);
     text-align:center;
     margin:0;
     padding:0 1rem;
@@ -3253,10 +3273,12 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
     pointer-events:none;
     opacity:.85;
   }
-  .participant-opening-hero.participant-hero-fullscreen .ws-hero-title{
+  .participant-opening-hero.participant-hero-fullscreen .ws-hero-title,
+  .participant-closing-hero.participant-closing-fullscreen .ws-closing-title{
     font-size:clamp(1.9rem,7.5vw,2.75rem);
   }
-  .participant-opening-hero.participant-hero-fullscreen .ws-hero-lead{
+  .participant-opening-hero.participant-hero-fullscreen .ws-hero-lead,
+  .participant-closing-hero.participant-closing-fullscreen .ws-closing-body{
     font-size:clamp(.95rem,3.8vw,1.12rem);
     max-width:34ch;
   }
@@ -3272,6 +3294,14 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
     width:4.25rem;
     height:4.25rem;
     font-size:1.65rem;
+  }
+  .participant-closing-hero.participant-closing-fullscreen .ws-closing-icon-ring{
+    width:4.25rem;
+    height:4.25rem;
+    font-size:1.65rem;
+  }
+  .participant-closing-hero.participant-closing-fullscreen .ws-closing-stats{
+    gap:.4rem;
   }
 }
 

@@ -4082,33 +4082,87 @@ function stopClosingAiFx() {
     cancelAnimationFrame(State.closingAiRaf);
     State.closingAiRaf = 0;
   }
-  document.querySelector('.ws-closing-stage')?._closingAiCleanup?.();
 }
 
-function initClosingAiFx(stage) {
+function cleanupParticipantClosingFx() {
+  const wrap = document.querySelector('#participant-root .ws-closing-stage');
+  wrap?._closingAiCleanup?.();
+  $('#screen-participant')?.classList.remove('participant-closing-active');
+}
+
+function participantClosingHeroKey(slide, slideIndex) {
+  return `${slide?.id || 'x'}:${slideIndex}`;
+}
+
+function isParticipantClosingHeroSlide(slide) {
+  return slide?.content?.sopKind === 'workshop-close' || isWorkshopClosingSlide(slide);
+}
+
+function mountParticipantClosingHero(hostSlide, slideIndex, root, finishParticipant) {
+  const key = participantClosingHeroKey(hostSlide, slideIndex);
+  const mobileFx = isParticipantMobileLayout();
+  const screen = $('#screen-participant');
+  screen?.classList.toggle('participant-closing-active', mobileFx);
+
+  if (State._participantClosingMountKey === key && root.querySelector('.participant-closing-hero .ws-closing-stage')) {
+    requestAnimationFrame(() => initClosingAiFx(root, { reuse: true }));
+    finishParticipant();
+    return true;
+  }
+
+  State._participantClosingMountKey = key;
+  cleanupParticipantClosingFx();
+
+  const closingHtml = renderClosingSlideHtml(hostSlide.content || {}, false, { shellMode: true, presentFx: true });
+  const fullscreenClass = mobileFx ? ' participant-closing-fullscreen' : '';
+  root.innerHTML = wrapParticipantSlide(`
+    <div class="participant-wait-block participant-closing-block participant-closing-hero${fullscreenClass}">
+      ${closingHtml}
+      <p class="participant-sop-wait participant-sop-wait--closing"><i class="fa-solid fa-eye"></i> Bitte auf die Präsentation achten…</p>
+    </div>`, slideIndex);
+
+  requestAnimationFrame(() => initClosingAiFx(root));
+  maybeLaunchClosingCelebration(hostSlide);
+  finishParticipant();
+  return true;
+}
+
+function initClosingAiFx(stage, opts = {}) {
+  const { reuse = false } = opts;
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
-  stopClosingAiFx();
   const wrap = stage?.querySelector('.ws-closing-stage');
   const canvas = wrap?.querySelector('.ws-closing-ai-canvas');
   if (!wrap || !canvas) return;
+  if (reuse && wrap._closingAiRunning && State._closingAiWrap === wrap && State.closingAiRaf) return;
+  wrap._closingAiCleanup?.();
+  stopClosingAiFx();
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
+  State._closingAiWrap = wrap;
+  wrap._closingAiRunning = true;
   const particles = [];
   const colors = ['#206efb', '#10b981', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4'];
+  let lastW = 0;
+  let lastH = 0;
   const resize = () => {
     const rect = wrap.getBoundingClientRect();
+    const w = Math.max(1, Math.floor(rect.width));
+    const h = Math.max(1, Math.floor(rect.height));
+    if (w === lastW && h === lastH && particles.length) return;
+    lastW = w;
+    lastH = h;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
-    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
-    canvas.style.width = `${rect.width}px`;
-    canvas.style.height = `${rect.height}px`;
+    canvas.width = Math.max(1, Math.floor(w * dpr));
+    canvas.height = Math.max(1, Math.floor(h * dpr));
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (!particles.length) {
-      const count = Math.min(72, Math.max(32, Math.floor(rect.width / 18)));
+      const count = Math.min(72, Math.max(32, Math.floor(w / 18)));
       for (let i = 0; i < count; i += 1) {
         particles.push({
-          x: Math.random() * rect.width,
-          y: Math.random() * rect.height,
+          x: Math.random() * w,
+          y: Math.random() * h,
           vx: (Math.random() - 0.5) * 0.48,
           vy: 0.28 + Math.random() * 0.72,
           r: 2 + Math.random() * 3.8,
@@ -4142,6 +4196,8 @@ function initClosingAiFx(stage) {
   };
   State.closingAiRaf = requestAnimationFrame(tick);
   wrap._closingAiCleanup = () => {
+    wrap._closingAiRunning = false;
+    if (State._closingAiWrap === wrap) State._closingAiWrap = null;
     stopClosingAiFx();
     ro?.disconnect();
   };
@@ -7411,15 +7467,61 @@ function syncParticipantNextStepsDom() {
   if (shell) shell.innerHTML = renderParticipantNextStepsHtml();
 }
 
+function participantVoteOptionsMountSig(voteOptions) {
+  if (!voteOptions || typeof voteOptions !== 'object') return '';
+  return Object.keys(voteOptions).sort().map((slideId) => {
+    const groups = voteOptions[slideId] || [];
+    const ids = groups.map((g) => (g.options || []).map((o) => o.id).join(',')).join('|');
+    return `${slideId}:${ids}`;
+  }).join(';');
+}
+
+function isParticipantVoteSelectionSlide(slide) {
+  if (!slide || !State.participant || State.user) return false;
+  if (hasAnsweredSlide(slide)) return false;
+  return isVoteBroadcastSlide(slide);
+}
+
+function participantVoteSelectionKey(slide, slideIndex) {
+  return `${slide?.id || 'x'}:${slideIndex}`;
+}
+
+function participantHasVoteSelectionDom(root) {
+  return Boolean(root?.querySelector('.track-vote-grouped .track-vote-option--pick, .track-vote-grouped .track-vote-option--own'));
+}
+
+function shouldKeepParticipantVoteDom(hostSlide, slideIndex, root) {
+  if (!isParticipantVoteSelectionSlide(hostSlide)) return false;
+  if (State._participantVoteMountKey !== participantVoteSelectionKey(hostSlide, slideIndex)) return false;
+  return participantHasVoteSelectionDom(root);
+}
+
 function shouldSkipParticipantBroadcastRender(payload, prevIndex, prevOpen) {
   if (!payload || State.session.current_slide_index !== prevIndex || State.session.question_open !== prevOpen) {
     return false;
   }
   const hostSlide = State.slides[State.session.current_slide_index || 0];
+  const root = $('#participant-root');
   if (isParticipantOpeningHeroSlide(hostSlide)
       && !payload.voteOptions && !payload.matrixItems && !payload.pitchItems
       && payload.current_slide_index === undefined && payload.question_open === undefined) {
     return true;
+  }
+  if (isParticipantClosingHeroSlide(hostSlide)
+      && !payload.voteOptions && !payload.matrixItems && !payload.pitchItems
+      && payload.current_slide_index === undefined && payload.question_open === undefined) {
+    return true;
+  }
+  if (isParticipantVoteSelectionSlide(hostSlide) && participantHasVoteSelectionDom(root)) {
+    if (payload.voteOptions) {
+      const sig = participantVoteOptionsMountSig(payload.voteOptions);
+      if (State._participantVoteOptionsSig === sig) return true;
+      State._participantVoteOptionsSig = sig;
+      return true;
+    }
+    if (!payload.current_slide_index && payload.question_open === undefined && !payload.matrixItems && !payload.pitchItems) {
+      return true;
+    }
   }
   if (payload.pitchSync && !payload.pitchItems && !payload.voteOptions && !payload.matrixItems && !payload.quickWinItems && !payload.settings) {
     return true;
@@ -7428,10 +7530,11 @@ function shouldSkipParticipantBroadcastRender(payload, prevIndex, prevOpen) {
     return true;
   }
   if (payload.voteOptions) {
-    const sig = JSON.stringify(payload.voteOptions);
+    const sig = participantVoteOptionsMountSig(payload.voteOptions);
     if (State._participantVoteOptionsSig === sig) return true;
     State._participantVoteOptionsSig = sig;
     if (participantHasActiveInput()) return true;
+    if (participantHasVoteSelectionDom(root)) return true;
     return false;
   }
   if (payload.matrixItems) {
@@ -8531,9 +8634,19 @@ function subscribeParticipantChannel() {
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lp_sessions', filter: `id=eq.${State.session.id}` }, (payload) => {
       window.LP?.channelHeartbeat(chName);
+      const prevIndex = State.session.current_slide_index;
+      const prevOpen = State.session.question_open;
       applySessionPatch(payload.new || {});
       if (State.session.status === 'ended') {
         handleParticipantSessionEnd();
+        return;
+      }
+      const slide = State.slides[State.session.current_slide_index || 0];
+      const root = $('#participant-root');
+      if (slide && State.session.current_slide_index === prevIndex && State.session.question_open === prevOpen
+          && (shouldKeepParticipantVoteDom(slide, prevIndex, root)
+            || (isParticipantOpeningHeroSlide(slide) && root?.querySelector('.participant-opening-hero .ws-hero-stage'))
+            || (isParticipantClosingHeroSlide(slide) && root?.querySelector('.participant-closing-hero .ws-closing-stage')))) {
         return;
       }
       void renderParticipantQuestion();
@@ -8642,7 +8755,10 @@ async function renderParticipantQuestion() {
   const slideIndex = State.session.current_slide_index || 0;
   if (State._participantSlideRenderIdx !== slideIndex) {
     cleanupParticipantHeroFx();
+    cleanupParticipantClosingFx();
     State._participantHeroMountKey = null;
+    State._participantClosingMountKey = null;
+    State._participantVoteMountKey = null;
     State._participantSlideRenderIdx = slideIndex;
     State._participantVoteOptionsSig = null;
     State._participantMatrixItemsSig = null;
@@ -8651,17 +8767,23 @@ async function renderParticipantQuestion() {
   const hostSlide = State.slides[slideIndex];
   const slide = resolveParticipantSlide(hostSlide) || hostSlide;
   const isMatrixSlide = slide?.slide_type === 'priority_matrix' || slide?.settings?.sopAllTracksMatrix;
+  const root = $('#participant-root');
+  if (shouldKeepParticipantVoteDom(hostSlide, slideIndex, root)) {
+    syncParticipantMobileActionBar();
+    syncSopWorkshopShell('participant', slideIndex);
+    return;
+  }
   if (isSopVoteSlide(slide) || isMatrixSlide) await ensureParticipantResponses(true);
   if (isBrainstormCollectSlide(slide) || (COLLECT_CHAIN_TYPES.has(slide?.slide_type) && getCollectResponseLimit(slide) > 0)) {
     await ensureParticipantResponses(true);
   }
-  const root = $('#participant-root');
   clearParticipantActionBar();
   const finishParticipant = () => syncSopWorkshopShell('participant', slideIndex);
   if (!hostSlide?.settings?.sopTrackVote) State.participantVoteExpert = false;
   if (!hostSlide) { root.innerHTML = '<div class="participant-card"><p>Warte auf Folie…</p></div>'; finishParticipant(); return; }
   if (!State.session.question_open) {
     cleanupParticipantHeroFx();
+    cleanupParticipantClosingFx();
     root.innerHTML = `<div class="participant-card"><h1>${esc(hostSlide.content?.title || 'Warte…')}</h1><p>Die Frage ist geschlossen. Bitte warte auf die nächste Karte…</p></div>`;
     finishParticipant();
     return;
@@ -8671,6 +8793,7 @@ async function renderParticipantQuestion() {
     return;
   }
   cleanupParticipantHeroFx();
+  cleanupParticipantClosingFx();
   if (hostSlide?.content?.sopKind === 'participants') {
     root.innerHTML = wrapParticipantSlide(renderParticipantSopWaitHtml({
       title: 'SOP-Zuweisung läuft',
@@ -8747,14 +8870,8 @@ async function renderParticipantQuestion() {
     finishParticipant();
     return;
   }
-  if (hostSlide?.content?.sopKind === 'workshop-close' || isWorkshopClosingSlide(hostSlide)) {
-    root.innerHTML = wrapParticipantSlide(`
-      <div class="participant-wait-block participant-closing-block">
-        ${renderClosingSlideHtml(hostSlide.content || {}, false, { shellMode: true, presentFx: true })}
-      </div>`, slideIndex);
-    requestAnimationFrame(() => initClosingAiFx(root));
-    maybeLaunchClosingCelebration(hostSlide);
-    finishParticipant();
+  if (isParticipantClosingHeroSlide(hostSlide)) {
+    mountParticipantClosingHero(hostSlide, slideIndex, root, finishParticipant);
     return;
   }
   if (hostSlide?.content?.sopKind === 'dual-pair-orient') {
@@ -8956,6 +9073,11 @@ async function renderParticipantQuestion() {
     </div>`, slideIndex);
 
   if (timeLimit) startQuestionTimer(timeLimit);
+  if (isParticipantVoteSelectionSlide(slide)) {
+    State._participantVoteMountKey = participantVoteSelectionKey(slide, slideIndex);
+  } else {
+    State._participantVoteMountKey = null;
+  }
   bindParticipantHandlers(slide);
   syncParticipantMobileActionBar();
   finishParticipant();
