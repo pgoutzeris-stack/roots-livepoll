@@ -122,7 +122,7 @@ function iceQuadrants() {
 window.LP_WORKSHOP_SETTINGS = {
   brainstormTimeLimitSec: 300,   // Sammelzeit pro Folie in Sekunden (0 = kein Limit)
   brainstormMaxResponses: 2,     // Maximale Use Cases pro Teilnehmer pro Folie
-  finalPriorityCount: 5,         // Anzahl final priorisierter Use Cases → wandern in die Matrix
+  finalPriorityCount: 10,        // Anzahl final priorisierter Use Cases → wandern in die Matrix
 };
 
 function tplSlide(type, content, settings = {}) {
@@ -683,7 +683,7 @@ function sopIceMatrix() {
     yAxisHigh: 'hoch',
     quadrants: iceQuadrants(),
     sopKind: SK.FINAL_MATRIX,
-  }, { showResultsLive: true, sopAllTracksMatrix: true, sopMatrixCount: (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5), workshopMode: 'decide' });
+  }, { showResultsLive: true, sopAllTracksMatrix: true, sopMatrixCount: (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 10), workshopMode: 'decide' });
 }
 
 // Next Steps: Quick Wins aus der Matrix → Action Log (Host pflegt Verantwortliche & Deadlines).
@@ -725,7 +725,7 @@ function sopPitchSession() {
 
 function sopFinalAllTracksVote() {
   const ws = window.LP_WORKSHOP_SETTINGS;
-  const count = ws?.finalPriorityCount || 5;
+  const count = ws?.finalPriorityCount || 10;
   return tplSlide('mc_multi', {
     title: 'Finale Priorisierung',
     subtitle: `Alle Use Cases · wähle deine Top ${count} (keine eigenen)`,
@@ -1096,7 +1096,7 @@ function buildMarketingSopWorkshopSlides() {
 // Gesamt-Priorisierung über beide SOPs. Faire Abstimmung: eigene Beiträge sind
 // nicht wählbar (sopFairVote) — konsistent mit der Single-SOP-Finalabstimmung.
 function dualCombinedVote() {
-  const n = (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
+  const n = (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 10);
   return tplSlide('mc_multi', {
     title: 'Gesamt-Priorisierung über beide SOPs',
     subtitle: `Wählt die Top ${n} KI Use Cases aus Internal und Consulting`,

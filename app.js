@@ -220,10 +220,119 @@ function filterProfanity(text, enabled) {
 }
 
 function participantAvatarHtml(p, size = 'md') {
-  const emoji = p?.avatar_emoji || '👤';
-  const color = p?.avatar_color || '#206efb';
-  const name = p?.display_name || 'Gast';
+  const norm = normalizeParticipantAvatar(p);
+  const emoji = norm?.avatar_emoji || LP_AVATAR_EMOJIS()[0];
+  const color = norm?.avatar_color || LP_AVATAR_COLORS()[0];
+  const name = norm?.display_name || 'Gast';
   return `<span class="p-avatar p-avatar-${size}" style="background:${esc(color)}" title="${esc(name)}" aria-label="${esc(name)}">${emoji}</span>`;
+}
+
+function hashParticipantSeed(p) {
+  const s = String(p?.id || p?.device_id || p?.display_name || 'guest');
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+function normalizeParticipantAvatar(p) {
+  if (!p) return null;
+  const emojis = LP_AVATAR_EMOJIS();
+  const colors = LP_AVATAR_COLORS();
+  const seed = hashParticipantSeed(p);
+  const emojiRaw = String(p.avatar_emoji || '').trim();
+  const colorRaw = String(p.avatar_color || '').trim();
+  const emoji = emojiRaw && emojis.includes(emojiRaw) ? emojiRaw : emojis[seed % emojis.length];
+  const color = colorRaw && /^#[0-9a-f]{6}$/i.test(colorRaw) ? colorRaw : colors[seed % colors.length];
+  return { ...p, avatar_emoji: emoji, avatar_color: color };
+}
+
+function normalizeParticipantsList(list) {
+  return (list || []).map((p) => normalizeParticipantAvatar(p));
+}
+
+function getParticipantForDisplay(id) {
+  if (!id) return null;
+  let p = State.participants.find((x) => x.id === id);
+  if (!p && String(id).startsWith('debug-p-') && window.LP_DebugSim?.ensureDebugParticipant) {
+    LP_DebugSim.ensureDebugParticipant(id);
+    p = State.participants.find((x) => x.id === id);
+  }
+  return p ? normalizeParticipantAvatar(p) : null;
+}
+
+function participantHasRequiredAvatar(p) {
+  if (!p) return false;
+  const emojis = LP_AVATAR_EMOJIS();
+  const colors = LP_AVATAR_COLORS();
+  const emoji = String(p.avatar_emoji || '').trim();
+  const color = String(p.avatar_color || '').trim();
+  return Boolean(p.display_name?.trim() && emoji && emojis.includes(emoji) && color && colors.includes(color));
+}
+
+function getWorkshopSettings() {
+  const presWs = State.presentation?.settings?.workshop || {};
+  const global = window.LP_WORKSHOP_SETTINGS || {};
+  return {
+    brainstormTimeLimitSec: presWs.brainstormTimeLimitSec ?? global.brainstormTimeLimitSec ?? 300,
+    brainstormMaxResponses: presWs.brainstormMaxResponses ?? global.brainstormMaxResponses ?? 2,
+    finalPriorityCount: presWs.finalPriorityCount ?? global.finalPriorityCount ?? 10,
+  };
+}
+
+function presentationHasWorkshopFlow() {
+  return (State.slides || []).some((s) => {
+    const c = s.content || {};
+    const st = s.settings || {};
+    return c.sopKind || st.sopAllTracksVote || st.sopAllTracksMatrix || st.sopTrackVote || st.sopNextSteps;
+  });
+}
+
+function syncWorkshopFinalCountToSlides(count) {
+  const n = Math.min(30, Math.max(1, Number(count) || 10));
+  const jobs = [];
+  (State.slides || []).forEach((s) => {
+    if (s.settings?.sopAllTracksVote || s.content?.sopKind === 'final-vote' || s.content?.sopKind === 'group-vote') {
+      s.settings.sopVoteMax = n;
+      s.content.maxSelections = n;
+      if (s.content.subtitle && /Top \d+/i.test(String(s.content.subtitle))) {
+        s.content.subtitle = String(s.content.subtitle).replace(/Top \d+/i, `Top ${n}`);
+      }
+      if (s.content.prompt && /Welche \d+ Use Cases/i.test(String(s.content.prompt))) {
+        s.content.prompt = String(s.content.prompt).replace(/Welche \d+ Use Cases/i, `Welche ${n} Use Cases`);
+      }
+      jobs.push(persistSlide(s));
+    }
+    if (s.settings?.sopAllTracksMatrix || s.content?.sopKind === 'final-matrix') {
+      s.settings.sopMatrixCount = n;
+      jobs.push(persistSlide(s));
+    }
+  });
+  return Promise.all(jobs);
+}
+
+function simParticipantRecord(idx, sessionId, pDef = null) {
+  const defs = window.LP_DEBUG_PARTICIPANTS || [];
+  const def = pDef || defs[idx] || { name: `Teilnehmer ${idx + 1}` };
+  const id = `debug-p-${idx}-${sessionId}`;
+  return normalizeParticipantAvatar({
+    id,
+    session_id: sessionId,
+    device_id: `debug-d-${idx}`,
+    display_name: def.name || `Teilnehmer ${idx + 1}`,
+    avatar_emoji: def.emoji,
+    avatar_color: def.color,
+    joined_at: new Date().toISOString(),
+    last_active_at: new Date().toISOString(),
+  });
+}
+
+function pushSimParticipant(participant) {
+  const norm = normalizeParticipantAvatar(participant);
+  if (!norm) return null;
+  const existingIdx = State.participants.findIndex((x) => x.id === norm.id);
+  if (existingIdx >= 0) State.participants[existingIdx] = { ...State.participants[existingIdx], ...norm };
+  else State.participants.push(norm);
+  return norm;
 }
 
 function sopTrackTheme(trackClass) {
@@ -757,10 +866,10 @@ function getVoteSlideScope(slide) {
 }
 
 // Zentrale Anzahl der final priorisierten Use Cases (→ wandern in die Matrix).
-// Reihenfolge: Slide-Einstellung → Workshop-/Vorlagen-Default → 5.
 function finalPriorityCount(slide) {
   const st = slide?.settings || {};
-  return Number(st.sopVoteMax || st.sopFinalCount || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
+  const ws = getWorkshopSettings();
+  return Number(st.sopVoteMax || st.sopFinalCount || ws.finalPriorityCount || 10);
 }
 
 // ─── Finale Priorisierung & Matrix: strikte Integrität ───────────────────────
@@ -771,7 +880,7 @@ function getFinalAllTracksVoteSlide() {
 function getFinalMatrixItemCount(matrixSlide) {
   const voteSlide = getFinalAllTracksVoteSlide();
   if (voteSlide) return finalPriorityCount(voteSlide);
-  return Number(matrixSlide?.settings?.sopMatrixCount || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
+  return Number(matrixSlide?.settings?.sopMatrixCount || getWorkshopSettings().finalPriorityCount || 10);
 }
 
 function getAllTracksVoteOptionMap() {
@@ -815,7 +924,7 @@ function computeFinalVoteTotals(voteSlide) {
 }
 
 function resolveFinalPriorityTopN(count, { allowTrackFallback = false } = {}) {
-  const n = Math.max(1, Number(count) || 5);
+  const n = Math.max(1, Number(count) || getWorkshopSettings().finalPriorityCount || 10);
   const voteSlide = getFinalAllTracksVoteSlide();
   if (voteSlide) {
     const { totals, votes, itemByVoteId } = computeFinalVoteTotals(voteSlide);
@@ -2396,7 +2505,7 @@ function renderFinalVotePresentHtml(slide, visible) {
         <span class="ws-c-action">Stimmen</span>
       </div>`;
     rows.forEach((r, i) => {
-      const author = (State.participants || []).find((x) => x.id === r.participant_id);
+      const author = getParticipantForDisplay(r.participant_id);
       const authorName = author?.display_name || r.authorName || '–';
       const ranked = r.votes > 0;
       const isMatrixTop = i < topN;
@@ -2407,7 +2516,7 @@ function renderFinalVotePresentHtml(slide, visible) {
         <span class="ws-c-uc">
           <span class="ws-uc-text">${renderUseCaseDisplayHtml(r.text, 'full')}</span>
         </span>
-        <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
+        <span class="ws-c-author">${participantAvatarHtml(author || { display_name: authorName }, 'xs')}<span class="ws-author-name">${esc(authorName)}</span></span>
         <span class="ws-c-action ws-votes">
           <span class="ws-votebar"><span class="ws-votebar-fill" style="width:${barPct}%"></span></span>
           <strong class="ws-votenum">${r.votes}</strong>
@@ -4386,6 +4495,7 @@ async function createPresentation(templateKey) {
     owner_id: State.user.id,
     title: tpl?.name || 'Neue Präsentation',
     status: 'draft',
+    settings: tpl?.slides?.length ? { workshop: { ...window.LP_WORKSHOP_SETTINGS } } : {},
   }).select().single();
   if (error) { toast(error.message, 'error'); return; }
   const slides = tpl?.slides?.length
@@ -4737,7 +4847,12 @@ async function syncSlideResultsChain(sourceSlide) {
 }
 
 async function persistPresentationSettings(partial) {
-  State.presentation.settings = { ...getPresentationSettings(), ...partial };
+  const current = getPresentationSettings();
+  const merged = { ...current, ...partial };
+  if (partial.workshop) {
+    merged.workshop = { ...(current.workshop || {}), ...partial.workshop };
+  }
+  State.presentation.settings = merged;
   await sb.from('lp_presentations').update({
     settings: State.presentation.settings,
     updated_at: new Date().toISOString(),
@@ -4996,14 +5111,14 @@ function renderAllTracksUseCasesWithAuthors(timerSec = 120) {
     trk.phases.forEach((p) => {
       p.items.forEach((item) => {
         n += 1;
-        const author = (State.participants || []).find((x) => x.id === item.participant_id);
+        const author = getParticipantForDisplay(item.participant_id);
         const authorName = author?.display_name || item.authorName || '–';
         html += `<div class="ws-row" data-pitch-row="${esc(item.id)}">
           <span class="ws-c-rank">${n}</span>
           <span class="ws-c-uc">
             <span class="ws-uc-text">${renderUseCaseDisplayHtml(item.text, 'full')}</span>
           </span>
-          <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
+          <span class="ws-c-author">${participantAvatarHtml(author || { display_name: authorName }, 'xs')}<span class="ws-author-name">${esc(authorName)}</span></span>
           <span class="ws-c-action ws-timer" data-pitch-key="${esc(item.id)}" data-total="${timerSec}">
             <span class="ws-time" aria-live="polite">${pitchFmt(getPitchTimerRemaining(item.id, timerSec))}</span>
             <button type="button" class="ws-timer-btn" data-pitch-toggle aria-label="Pitch-Timer starten / stoppen"><i class="fa-solid fa-play"></i></button>
@@ -5106,7 +5221,7 @@ function renderParticipantPitchHtml() {
     trk.phases.forEach((p) => {
       p.items.forEach((item) => {
         n += 1;
-        const author = (State.participants || []).find((x) => x.id === item.participant_id);
+        const author = getParticipantForDisplay(item.participant_id);
         const authorName = author?.display_name || item.authorName || 'Unbekannt';
         cards += `<article class="participant-pitch-card">
           <div class="participant-pitch-card-head">
@@ -5114,7 +5229,7 @@ function renderParticipantPitchHtml() {
           </div>
           <p class="participant-pitch-text">${renderUseCaseDisplayHtml(item.text, 'full')}</p>
           <div class="participant-pitch-author">
-            ${author ? participantAvatarHtml(author, 'sm') : '<span class="participant-pitch-avatar-fallback"><i class="fa-solid fa-user"></i></span>'}
+            ${participantAvatarHtml(author || { display_name: authorName }, 'sm')}
             <span>Eingebracht von <strong>${esc(authorName)}</strong></span>
           </div>
         </article>`;
@@ -5485,11 +5600,12 @@ function renderEditorProps() {
       const voteMaxLabel = isAllTracks
         ? 'Anzahl Top Use Cases (→ Matrix)'
         : 'Max. Auswahl pro Person';
+      const wsFinal = getWorkshopSettings().finalPriorityCount || 10;
       optionsHtml = `
       <div class="props-section">Antwortoptionen · importiert</div>
       <p class="props-hint"><i class="fa-solid fa-link"></i> Auswahloptionen werden automatisch aus den Brainstorming-Folien ${scopeLabel} übernommen. Mit <strong>„Live-Ergebnisse"</strong> erscheint nach dem Ausfüllen das Leaderboard.</p>
-      <div class="props-label">${voteMaxLabel}</div><input id="prop-sop-vote-max" type="number" min="1" max="20" value="${sopScope.maxSelections || 3}" />
-      ${isAllTracks ? '<p class="props-hint"><i class="fa-solid fa-circle-info"></i> Jede Person wählt so viele Favoriten; die meistgewählten Use Cases dieser Anzahl wandern in die Impact/Effort-Matrix.</p>' : ''}`;
+      <div class="props-label">${voteMaxLabel}</div><input id="prop-sop-vote-max" type="number" min="1" max="30" value="${sopScope.maxSelections || wsFinal}" />
+      ${isAllTracks ? '<p class="props-hint"><i class="fa-solid fa-circle-info"></i> Entspricht der Workshop-Einstellung oben. Jede Person wählt so viele Favoriten; die meistgewählten Use Cases dieser Anzahl wandern in die Impact/Effort-Matrix.</p>' : ''}`;
     } else {
       const importCtrl = canImport ? `
       <label class="props-toggle-row"><input type="checkbox" id="prop-import-brainstorm" ${importOn ? 'checked' : ''}><span><i class="fa-solid fa-link"></i> Optionen aus Brainstorming-Folie importieren</span></label>
@@ -5548,14 +5664,14 @@ function renderEditorProps() {
     const manualText = (c.manualItems || []).map((t) => (typeof t === 'string' ? t : (t.text || ''))).join('\n');
     const q = (k, fb) => esc((c.quadrants && c.quadrants[k] && c.quadrants[k].label) || fb);
     const hasFinalVote = (State.slides || []).some((sl) => sl.settings?.sopAllTracksVote);
-    const mxCount = s.sopMatrixCount || window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5;
+    const mxCount = s.sopMatrixCount || getWorkshopSettings().finalPriorityCount || 10;
     matrixPropsHtml = `
     <div class="props-section">Priorisierungs-Matrix</div>
     ${isSopMatrix ? `
     <p class="props-hint"><i class="fa-solid fa-link"></i> Diese Matrix übernimmt automatisch die <strong>final priorisierten Top Use Cases</strong> des SOP-Workshops.</p>
     ${hasFinalVote
-      ? '<p class="props-hint"><i class="fa-solid fa-circle-info"></i> Die Anzahl folgt der Folie „Finale Priorisierung" — dort „Anzahl Top Use Cases" einstellen.</p>'
-      : `<div class="props-label">Anzahl Use Cases in der Matrix</div><input id="prop-mx-count" type="number" min="1" max="20" value="${mxCount}" />`}
+      ? '<p class="props-hint"><i class="fa-solid fa-circle-info"></i> Die Anzahl folgt der Workshop-Einstellung „Use Cases in finale Priorisierung & Matrix".</p>'
+      : `<div class="props-label">Anzahl Use Cases in der Matrix</div><input id="prop-mx-count" type="number" min="1" max="30" value="${mxCount}" />`}
     ` : `
     <div class="props-label">Use Cases beziehen aus</div>
     <select id="prop-mx-source">
@@ -5593,12 +5709,28 @@ function renderEditorProps() {
     <p class="props-hint"><i class="fa-solid fa-circle-info"></i> 0 = keine Begrenzung.</p>`;
   }
 
+  let workshopSettingsHtml = '';
+  if (presentationHasWorkshopFlow()) {
+    const ws = getWorkshopSettings();
+    workshopSettingsHtml = `
+    <div class="props-section">Workshop-Einstellungen</div>
+    <p class="props-hint" style="margin-top:0">Gilt für finale Priorisierung, Impact/Effort-Matrix und Next Steps dieser Vorlage.</p>
+    <div class="props-label">Use Cases in finale Priorisierung & Matrix</div>
+    <input id="prop-ws-final-count" type="number" min="1" max="30" value="${ws.finalPriorityCount || 10}" />
+    <p class="props-hint"><i class="fa-solid fa-circle-info"></i> So viele Use Cases werden am Ende priorisiert und in die Matrix übernommen. Aus der Matrix gehen nur Quick Wins in die Next Steps.</p>
+    <div class="props-row-2">
+      <div><div class="props-label">Max. Use Cases pro Person (Sammeln)</div><input id="prop-ws-max-responses" type="number" min="1" max="10" value="${ws.brainstormMaxResponses || 2}" /></div>
+      <div><div class="props-label">Sammelzeit (Sek., 0 = aus)</div><input id="prop-ws-time-limit" type="number" min="0" value="${ws.brainstormTimeLimitSec ?? 300}" /></div>
+    </div>`;
+  }
+
   const _typeMeta = editorSlideTypeMeta(slide);
   panel.innerHTML = `
     <div class="props-head">
       <span class="props-head-type"><i class="fa-solid ${_typeMeta.icon}"></i> ${esc(_typeMeta.label)}</span>
       <button type="button" class="btn-ghost props-close-mobile" id="props-close-mobile"><i class="fa-solid fa-xmark"></i></button>
     </div>
+    ${workshopSettingsHtml}
     <div class="props-section">Design</div>
     <div class="color-grid">
       <label class="color-field"><span>Hintergrund</span><input type="color" id="prop-bg" value="${c.bgColor || '#ffffff'}" /></label>
@@ -5657,7 +5789,7 @@ function renderEditorProps() {
     };
     // ── Priorisierungs-Matrix-Felder ──
     if (slideObj.slide_type === 'priority_matrix') {
-      if ($('#prop-mx-count')) slideObj.settings.sopMatrixCount = Number($('#prop-mx-count').value || 5);
+      if ($('#prop-mx-count')) slideObj.settings.sopMatrixCount = Number($('#prop-mx-count').value || getWorkshopSettings().finalPriorityCount || 10);
       if ($('#prop-mx-source')) slideObj.content.matrixSource = $('#prop-mx-source').value;
       if ($('#prop-mx-srcid')) slideObj.content.brainstormSourceId = $('#prop-mx-srcid').value || null;
       if ($('#prop-mx-items')) {
@@ -5753,7 +5885,26 @@ function renderEditorProps() {
     toast('Folien-Kette aktualisiert', 'success');
   };
 
+  const saveWorkshopSettings = debounce(async () => {
+    if (!State.presentation || !$('#prop-ws-final-count')) return;
+    const ws = getWorkshopSettings();
+    const next = {
+      brainstormTimeLimitSec: Math.max(0, Number($('#prop-ws-time-limit')?.value ?? ws.brainstormTimeLimitSec ?? 300)),
+      brainstormMaxResponses: Math.max(1, Number($('#prop-ws-max-responses')?.value ?? ws.brainstormMaxResponses ?? 2)),
+      finalPriorityCount: Math.min(30, Math.max(1, Number($('#prop-ws-final-count')?.value ?? ws.finalPriorityCount ?? 10))),
+    };
+    await persistPresentationSettings({ workshop: next });
+    await syncWorkshopFinalCountToSlides(next.finalPriorityCount);
+    renderEditorCanvas();
+    toast('Workshop-Einstellungen gespeichert', 'success');
+  }, 650);
+
   panel.querySelectorAll('input,textarea,select').forEach((el) => {
+    if (el.id?.startsWith('prop-ws-')) {
+      el.addEventListener('input', saveWorkshopSettings);
+      el.addEventListener('change', saveWorkshopSettings);
+      return;
+    }
     el.addEventListener('input', saveContent);
     el.addEventListener('change', saveContent);
   });
@@ -6020,7 +6171,7 @@ async function loadSessionData() {
   State.resultsDisplayMode = getPresentationSettings().resultsDisplayMode || 'percent';
   State.slides = normalizeSlides(slides);
   State.responses = responses || [];
-  State.participants = participants || [];
+  State.participants = normalizeParticipantsList(participants || []);
   // ─── DEBUG-Modus: Wenn Präsentations-Titel mit [DEBUG] beginnt, injiziere
   //     simulierte Teilnehmer + Antworten lokal (keine DB-Schreibvorgänge).
   const t = String(State.presentation?.title || '');
@@ -6117,20 +6268,7 @@ const LP_DebugSim = {
   ensureAllParticipants() {
     const defs = window.LP_DEBUG_PARTICIPANTS || [];
     const sessionId = State.session?.id;
-    defs.forEach((p, idx) => {
-      const id = `debug-p-${idx}-${sessionId}`;
-      if (State.participants.find((x) => x.id === id)) return;
-      State.participants.push({
-        id,
-        session_id: sessionId,
-        device_id: `debug-d-${idx}`,
-        display_name: p.name,
-        avatar_emoji: p.emoji,
-        avatar_color: p.color,
-        joined_at: new Date().toISOString(),
-        last_active_at: new Date().toISOString(),
-      });
-    });
+    defs.forEach((p, idx) => pushSimParticipant(simParticipantRecord(idx, sessionId, p)));
   },
 
   ensureDebugParticipant(fakeP) {
@@ -6138,20 +6276,9 @@ const LP_DebugSim = {
     if (!m) return;
     const idx = Number(m[1]);
     const defs = window.LP_DEBUG_PARTICIPANTS || [];
-    const pDef = defs[idx];
     const sessionId = State.session?.id;
-    if (!pDef || !sessionId) return;
-    if (State.participants.find((x) => x.id === fakeP)) return;
-    State.participants.push({
-      id: fakeP,
-      session_id: sessionId,
-      device_id: `debug-d-${idx}`,
-      display_name: pDef.name,
-      avatar_emoji: pDef.emoji,
-      avatar_color: pDef.color,
-      joined_at: new Date().toISOString(),
-      last_active_at: new Date().toISOString(),
-    });
+    if (!sessionId) return;
+    pushSimParticipant(simParticipantRecord(idx, sessionId, defs[idx]));
   },
 
   // ─── Teilnehmer drip-by-drip joinen lassen ──────────────────
@@ -6161,18 +6288,8 @@ const LP_DebugSim = {
     if (this.joinIdx >= defs.length) return;
     const p = defs[this.joinIdx];
     const sessionId = State.session?.id;
-    const fake = {
-      id: `debug-p-${this.joinIdx}-${sessionId}`,
-      session_id: sessionId,
-      device_id: `debug-d-${this.joinIdx}`,
-      display_name: p.name,
-      avatar_emoji: p.emoji,
-      avatar_color: p.color,
-      joined_at: new Date().toISOString(),
-      last_active_at: new Date().toISOString(),
-    };
-    if (!State.participants.find((x) => x.id === fake.id)) {
-      State.participants.push(fake);
+    const fake = pushSimParticipant(simParticipantRecord(this.joinIdx, sessionId, p));
+    if (fake) {
       try { pushPresentActivity(fake.id, 'ist beigetreten'); } catch {}
     }
     try { updatePresentStats(); } catch {}
@@ -6214,13 +6331,7 @@ const LP_DebugSim = {
         perParticipantCount.set(fakeP, sent + 1);
         // Sicherstellen, dass der (simulierte) Autor in State.participants existiert —
         // sonst hätten Use Cases von noch nicht "beigetretenen" Teilnehmern keinen Autor.
-        if (!State.participants.find((x) => x.id === fakeP)) {
-          State.participants.push({
-            id: fakeP, session_id: sessionId, device_id: `debug-d-${pIdx}`,
-            display_name: pDef.name, avatar_emoji: pDef.emoji, avatar_color: pDef.color,
-            joined_at: new Date().toISOString(),
-          });
-        }
+        pushSimParticipant(simParticipantRecord(pIdx, sessionId, pDef));
         const respId = `debug-r-${slide.id}-${i}`;
         const response = {
           id: respId,
@@ -6529,16 +6640,7 @@ const LP_DebugSim = {
     });
     const defs = window.LP_DEBUG_PARTICIPANTS || [];
     const sessionId = State.session?.id;
-    defs.forEach((p, idx) => {
-      const id = `debug-p-${idx}-${sessionId}`;
-      if (!State.participants.find((x) => x.id === id)) {
-        State.participants.push({
-          id, session_id: sessionId, device_id: `debug-d-${idx}`,
-          display_name: p.name, avatar_emoji: p.emoji, avatar_color: p.color,
-          joined_at: new Date().toISOString(),
-        });
-      }
-    });
+    defs.forEach((p, idx) => pushSimParticipant(simParticipantRecord(idx, sessionId, p)));
     this.joinIdx = defs.length;
     if (this.joinTimer) { clearTimeout(this.joinTimer); this.joinTimer = null; }
     try { renderPresentParticipants(); updatePresentStats(); renderPresent(); } catch {}
@@ -6934,7 +7036,7 @@ function subscribeSessionChannel() {
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lp_participants', filter: `session_id=eq.${State.session.id}` }, (payload) => {
       window.LP?.channelHeartbeat(chName);
       if (!State.participants.find((p) => p.id === payload.new.id)) {
-        State.participants.push(payload.new);
+        State.participants.push(normalizeParticipantAvatar(payload.new));
         pushPresentActivity(payload.new.id, 'ist beigetreten');
         liveDebugLog('join', `${esc(payload.new.display_name || 'Teilnehmer')} beigetreten`);
       }
@@ -7640,7 +7742,8 @@ function renderParticipantEntry(codePrefill) {
     const name = $('#join-name').value.trim();
     if (!code) { toast('Bitte Code eingeben', 'warn'); return; }
     if (!name) { toast('Bitte Name eingeben', 'warn'); return; }
-    if (!State.joinProfile.emoji) { toast('Bitte Avatar wählen', 'warn'); return; }
+    if (!State.joinProfile.emoji || !LP_AVATAR_EMOJIS().includes(State.joinProfile.emoji)) { toast('Bitte Avatar wählen', 'warn'); return; }
+    if (!State.joinProfile.color || !LP_AVATAR_COLORS().includes(State.joinProfile.color)) { toast('Bitte Avatar-Farbe wählen', 'warn'); return; }
     localStorage.setItem('lp_join_profile', JSON.stringify({ name, emoji: State.joinProfile.emoji, color: State.joinProfile.color }));
     void joinSession(code, name, State.joinProfile.emoji, State.joinProfile.color);
   };
@@ -7649,6 +7752,10 @@ function renderParticipantEntry(codePrefill) {
 }
 
 async function joinSession(code, name, emoji, color) {
+  const emojis = LP_AVATAR_EMOJIS();
+  const colors = LP_AVATAR_COLORS();
+  if (!emoji || !emojis.includes(emoji)) { toast('Bitte Avatar wählen', 'error'); return; }
+  if (!color || !colors.includes(color)) { toast('Bitte Avatar-Farbe wählen', 'error'); return; }
   const { data: session, error } = await sb.from('lp_sessions').select('*').eq('code', code.toUpperCase()).in('status', ['live', 'paused']).maybeSingle();
   if (error || !session) { toast('Code ungültig oder Session beendet', 'error'); return; }
   if (session.join_locked) { toast('Beitritt gesperrt', 'error'); return; }
@@ -7661,7 +7768,7 @@ async function joinSession(code, name, emoji, color) {
   }, { onConflict: 'session_id,device_id' }).select().single();
   if (pErr) { toast(pErr.message, 'error'); return; }
   State.session = session;
-  State.participant = part;
+  State.participant = normalizeParticipantAvatar(part);
   State.sopAssignSeen = getParticipantSopGroup(part.id);
   State.responses = [];
   loadAnsweredSlides(session.id);
