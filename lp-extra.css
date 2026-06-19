@@ -1489,7 +1489,24 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .ws-slide{width:100%;display:flex;flex-direction:column;gap:.85rem;animation:ws-title-in .45s cubic-bezier(.22,1,.36,1)}
 .ws-slide-head{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .65rem}
 .ws-title{font-size:clamp(1.85rem,4.2vw,2.85rem);font-weight:900;line-height:1.08;letter-spacing:-.03em;color:var(--ink);margin:0;animation:ws-title-in .55s cubic-bezier(.22,1,.36,1) .05s backwards}
-.ws-lead{font-size:.95rem;font-weight:600;color:var(--muted);line-height:1.45;margin:0;max-width:52rem}
+.ws-lead,.ws-sub-lead{
+  display:flex;
+  align-items:flex-start;
+  gap:.55rem;
+  font-size:.98rem;
+  font-weight:600;
+  color:var(--muted);
+  line-height:1.45;
+  margin:0 0 .85rem;
+  max-width:52rem;
+}
+.ws-sub-lead-icon,.ws-lead > i{
+  color:var(--brand);
+  font-size:1rem;
+  margin-top:.15em;
+  flex-shrink:0;
+}
+.ws-sub-lead > span,.ws-lead > span{flex:1;min-width:0}
 .ws-body{width:100%;min-width:0}
 .ws-pill{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .75rem;border-radius:999px;font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;animation:ws-pill-in .4s ease backwards}
 .ws-pill i{font-size:.72rem}
@@ -1872,12 +1889,14 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   letter-spacing:-.025em;
   line-height:1.1;
 }
-.lp-sop-workshop.present-mode .ws-lead{
-  font-size:clamp(1.25rem,2vw,1.45rem);
+.lp-sop-workshop.present-mode .ws-lead,
+.lp-sop-workshop.present-mode .ws-sub-lead{
+  font-size:clamp(.95rem,1.6vw,1.05rem);
   font-weight:600;
   color:var(--muted);
   max-width:none;
-  padding-left:.1rem;
+  margin:0 0 .75rem;
+  padding-left:0;
 }
 .lp-sop-workshop.present-mode .ws-body,
 .lp-sop-workshop.present-mode .ws-body-inner{
@@ -2047,7 +2066,12 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   flex-shrink:0;
   border-bottom:1px solid var(--line);
 }
-.lp-sop-workshop.present-mode.sop-split-stage .ws-lead{display:none}
+.lp-sop-workshop.present-mode.sop-split-stage .ws-lead,
+.lp-sop-workshop.present-mode.sop-split-stage .ws-sub-lead{
+  display:flex;
+  max-width:none;
+  margin-bottom:.65rem;
+}
 .lp-sop-workshop.present-mode.sop-split-stage .present-stage{padding-top:clamp(.45rem,1vw,.65rem)}
 .lp-sop-workshop.present-mode .sop-split-grid{gap:clamp(.65rem,1.4vw,.85rem)}
 .lp-sop-workshop.present-mode .sop-split-col{
@@ -2579,11 +2603,22 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   0%,100%{background-position:100% 50%}
   50%{background-position:0% 50%}
 }
-.ws-closing-kicker{
-  font-size:clamp(.95rem,2vw,1.1rem);
-  font-weight:700;
-  color:#10b981;
-  margin:0;
+.ws-closing-kicker,
+.ws-hero-kicker{
+  /* legacy alias — nicht mehr verwendet */
+  display:none;
+}
+.ws-hero-stage .ws-sub-lead,
+.ws-closing-stage .ws-sub-lead{
+  justify-content:center;
+  max-width:min(540px,92vw);
+  margin-left:auto;
+  margin-right:auto;
+  text-align:left;
+}
+.lp-sop-workshop.present-mode .workshop-collect-shell--compact .workshop-collect-question,
+.lp-sop-workshop.present-mode .ws-collect-prompt-bar .workshop-collect-question{
+  display:none!important;
 }
 .ws-closing-stats{
   display:flex;
@@ -2636,6 +2671,28 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-sop-workshop.present-mode .present-stage.ws-hero-present-stage .pslide-slide-content--ws{
   align-items:center;
   justify-content:center;
+}
+.lp-sop-workshop.present-mode .present-stage.ws-hero-present-stage .ws-slide-head,
+.lp-sop-workshop.present-mode .present-stage.ws-hero-present-stage .ws-chips,
+.lp-sop-workshop.present-mode .present-stage.ws-hero-present-stage .ws-title,
+.lp-sop-workshop.present-mode .present-stage.ws-hero-present-stage .ws-sub-lead{
+  justify-content:center;
+  text-align:center;
+  margin-left:auto;
+  margin-right:auto;
+}
+.lp-sop-workshop.present-mode .present-stage.ws-closing-present-stage .ws-slide-head,
+.lp-sop-workshop.present-mode .present-stage.ws-closing-present-stage .ws-chips,
+.lp-sop-workshop.present-mode .present-stage.ws-closing-present-stage .ws-title,
+.lp-sop-workshop.present-mode .present-stage.ws-closing-present-stage .ws-sub-lead{
+  justify-content:center;
+  text-align:center;
+  margin-left:auto;
+  margin-right:auto;
+}
+.lp-sop-workshop.present-mode .ws-body .ws-hero-stage,
+.lp-sop-workshop.present-mode .ws-body .ws-closing-stage{
+  min-height:min(72vh,720px);
 }
 .ws-hero-stage{
   position:relative;
@@ -2745,10 +2802,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   50%{background-position:0% 50%}
 }
 .ws-hero-kicker{
-  font-size:clamp(1rem,2.2vw,1.2rem);
-  font-weight:700;
-  color:var(--brand);
-  margin:0;
+  display:none;
 }
 .ws-hero-lead{
   font-size:clamp(1rem,2vw,1.15rem);

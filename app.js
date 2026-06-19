@@ -2107,7 +2107,7 @@ function renderSopSectionSplitView(currentSlide) {
 }
 
 function renderBrainstormSplitViz(currentSlide) {
-  return `${renderCollectPromptBar(currentSlide)}${renderDualSopSplitView(currentSlide, (group, pairIdx) => renderDualPairCollectColumn(group, pairIdx))}`;
+  return renderDualSopSplitView(currentSlide, (group, pairIdx) => renderDualPairCollectColumn(group, pairIdx));
 }
 
 // Finale Priorisierung (Moderator/Beamer): moderne Tabelle — alle Use Cases mit
@@ -2248,18 +2248,6 @@ function parseCollectPrompt(promptText) {
     noteLines.push(l);
   }
   return { question, formatHint, note: noteLines.join(' ') };
-}
-
-function renderCollectPromptBar(slide) {
-  const { question, note } = parseCollectPrompt(slide?.content?.prompt);
-  if (!question && !note) return '';
-  const questionEl = question
-    ? `<p class="workshop-collect-question"><i class="fa-solid fa-circle-question workshop-q-icon"></i><span>${esc(question)}</span></p>`
-    : '';
-  const noteEl = note
-    ? `<p class="workshop-collect-note"><i class="fa-solid fa-lightbulb"></i><span>${esc(note)}</span></p>`
-    : '';
-  return `<div class="ws-collect-prompt-bar workshop-collect-shell workshop-collect-shell--compact">${questionEl}${noteEl}</div>`;
 }
 
 function brainstormSlideForDualPair(group, pairIdx) {
@@ -2462,8 +2450,8 @@ function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false,
     return `<div class="pslide-question-block workshop-collect-shell">${subEl}${titleEl}${bodyEl}${boardEl}${promptEl}</div>`;
   }
   if (shellMode) {
-    const noteBlock = splitCol ? '' : noteEl;
-    const questionBlock = splitCol ? '' : questionEl;
+    const noteBlock = '';
+    const questionBlock = '';
     const boardBlock = (splitCol || hideBoard) ? '' : boardEl;
     return `<div class="pslide-question-block workshop-collect-shell workshop-collect-shell--compact${splitCol ? ' workshop-collect-shell--split' : ''}">${questionBlock}${boardBlock}${noteBlock}</div>`;
   }
@@ -2640,11 +2628,8 @@ function getWsPresentChips(slide) {
   }
   if (c.sopKind === 'next-steps' || slide?.settings?.sopNextSteps) {
     chips.push({ icon: 'fa-list-check', label: 'Next Steps' });
-  } else if (isFinaleSlide(slide) && !chips.length) {
+  } else   if (isFinaleSlide(slide) && !chips.length) {
     chips.push({ icon: 'fa-flag-checkered', label: 'Finale' });
-  }
-  if (c.subtitle && c.isHeroSlide && !c.sopKind) {
-    chips.push({ icon: 'fa-tag', label: c.subtitle });
   }
   if (slide?.slide_type === 'open' && slide?.settings?.anonymous && c.subtitle) {
     chips.push({ icon: 'fa-user-secret', label: c.subtitle });
@@ -2664,19 +2649,40 @@ function getWsPresentTitle(slide) {
 }
 
 function getWsPresentLead(slide) {
+  if (!slide) return '';
   const c = slide?.content || {};
-  if (c.sopKind === 'instructions') return c.subtitle || '';
+  if (isWorkshopClosingSlide(slide)) return c.subtitle || 'Workshop abgeschlossen';
+  if (isWorkshopOpeningSlide(slide)) return c.subtitle || '';
   if (isBrainstormCollectSlide(slide)) {
     const { question } = parseCollectPrompt(c.prompt);
-    return question || '';
+    return question || c.subtitle || '';
   }
-  if (c.sopKind === 'workshop-goal') return c.subtitle || '';
-  if (c.sopKind === 'pitch-session') return c.subtitle || '';
-  if (c.sopKind === 'next-steps') return c.body || '';
-  if (shouldUseVoteWorkshopUi(slide) && c.prompt) return String(c.prompt).split('\n')[0];
-  if (slide?.slide_type === 'priority_matrix' && c.subtitle) return c.subtitle;
-  if (c.sopKind === 'participants') return c.subtitle || '';
+  if (slide.slide_type === 'section' && c.sopTrackClass && c.body) {
+    return String(c.body).trim();
+  }
+  if (c.sopKind === 'group-transition' || (slide.slide_type === 'section' && c.body && !c.subtitle)) {
+    return String(c.body).trim();
+  }
+  if (c.subtitle) return c.subtitle;
+  if (c.sopKind === 'next-steps' && c.body) return String(c.body).trim();
+  if (shouldUseVoteWorkshopUi(slide) && c.prompt) {
+    return String(c.prompt).split('\n').map((l) => l.trim()).filter(Boolean)[0] || '';
+  }
+  if (slide.slide_type === 'open' && c.prompt) {
+    return String(c.prompt).split('\n').map((l) => l.trim()).filter(Boolean)[0] || '';
+  }
+  if (slide.slide_type === 'priority_matrix' && c.body) return String(c.body).split('\n')[0].trim();
   return '';
+}
+
+/** Einheitliche Sub-Headline (Moderator): blaues Sonnen-Icon + Text — auf allen Folien identisch. */
+function renderWsSubLead(text, { allowHtml = false } = {}) {
+  const raw = String(text || '').trim();
+  if (!raw) return '';
+  const inner = allowHtml && raw.includes('<')
+    ? raw
+    : esc(raw).replace(/\n/g, '<br>');
+  return `<p class="ws-sub-lead"><i class="fa-solid fa-sun ws-sub-lead-icon" aria-hidden="true"></i><span>${inner}</span></p>`;
 }
 
 function mountPresentWsSlide(stage, slide, slideIdx, { main = '', splitOn = false, title = null, lead = null } = {}) {
@@ -2703,9 +2709,7 @@ function renderWsSlideShell({ pillIcon, pillLabel, pillTone = 'brand', title, ch
       ? `<span class="ws-chip">${esc(ch)}</span>`
       : `<span class="ws-chip"><i class="fa-solid ${ch.icon || 'fa-circle'}"></i> ${esc(ch.label)}</span>`
   )).join('');
-  const leadHtml = lead
-    ? `<p class="ws-lead">${typeof lead === 'string' && lead.includes('<') ? lead : esc(String(lead)).replace(/\n/g, '<br>')}</p>`
-    : '';
+  const leadHtml = renderWsSubLead(lead, { allowHtml: typeof lead === 'string' && lead.includes('<') });
   return `<section class="ws-slide ws-slide--${esc(pillTone)}">
     <header class="ws-slide-head">
       <span class="ws-pill ws-pill--${esc(pillTone)}"><i class="fa-solid ${pillIcon}"></i> ${esc(pillLabel)}</span>
@@ -3071,10 +3075,10 @@ function renderSopSectionHtml(c, editable = false, { shellMode = false, splitCol
   const theme = sopTrackTheme(content.sopTrackClass);
   const isTrack = content.sopKind === 'track';
   if (shellMode && !editable) {
-    const colTitle = splitCol
+    const colTitle = splitCol && editable
       ? `<h2 class="ws-col-title">${esc(workshopDisplayTitle(content))}</h2>`
       : '';
-    const bodyEl = content.body
+    const bodyEl = editable && content.body
       ? `<p class="sop-pslide-body sop-pslide-body--shell">${esc(content.body).replace(/\n/g, '<br>')}</p>`
       : '';
     return `
@@ -3411,7 +3415,7 @@ function getWorkshopCloseStats() {
 }
 
 function renderClosingSlideHtml(c, editable = false, opts = {}) {
-  const { shellMode = false, presentFx = false } = opts;
+  const { shellMode = false, presentFx = false, hideChrome = false } = opts;
   const bodyHtml = editable
     ? `<div class="canvas-editable pslide-hero-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
     : `<div class="ws-closing-body">${esc(c.body || '').replace(/\n/g, '<br>')}</div>`;
@@ -3425,8 +3429,8 @@ function renderClosingSlideHtml(c, editable = false, opts = {}) {
         </div>`
       : '';
     const subEl = c.subtitle
-      ? `<p class="ws-closing-kicker">${esc(c.subtitle)}</p>`
-      : '<p class="ws-closing-kicker">Workshop abgeschlossen</p>';
+      ? renderWsSubLead(c.subtitle)
+      : renderWsSubLead('Workshop abgeschlossen');
     return `
       <div class="ws-closing-stage">
         <canvas class="ws-closing-ai-canvas" aria-hidden="true"></canvas>
@@ -3438,8 +3442,7 @@ function renderClosingSlideHtml(c, editable = false, opts = {}) {
         <div class="ws-closing-glow ws-closing-glow--b" aria-hidden="true"></div>
         <div class="ws-closing-content">
           <div class="ws-closing-icon-ring"><i class="fa-solid fa-champagne-glasses"></i></div>
-          <h1 class="ws-closing-title ws-closing-title--shimmer">${esc(c.title || 'Danke!')}</h1>
-          ${subEl}
+          ${hideChrome ? '' : `<h1 class="ws-closing-title ws-closing-title--shimmer">${esc(c.title || 'Danke!')}</h1>${subEl}`}
           ${statsHtml}
           ${bodyHtml}
         </div>
@@ -3534,13 +3537,13 @@ function maybeLaunchClosingCelebration(slide) {
 }
 
 function renderHeroSlideHtml(c, editable = false, opts = {}) {
-  const { shellMode = false, presentFx = false } = opts;
+  const { shellMode = false, presentFx = false, hideChrome = false } = opts;
   const bodyEl = editable
     ? `<div class="canvas-editable pslide-hero-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
     : `<div class="ws-hero-body">${esc(c.body || '').replace(/\n/g, '<br>')}</div>`;
   if (shellMode && !editable && presentFx) {
     const subEl = c.subtitle
-      ? `<p class="ws-hero-kicker">${esc(c.subtitle)}</p>`
+      ? renderWsSubLead(c.subtitle)
       : '';
     return `
       <div class="ws-hero-stage">
@@ -3550,8 +3553,7 @@ function renderHeroSlideHtml(c, editable = false, opts = {}) {
         <div class="ws-hero-glow ws-hero-glow--b" aria-hidden="true"></div>
         <div class="ws-hero-content">
           <div class="ws-hero-icon-ring"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
-          <h1 class="ws-hero-title ws-hero-title--shimmer">${esc(c.title || '')}</h1>
-          ${subEl}
+          ${hideChrome ? '' : `<h1 class="ws-hero-title ws-hero-title--shimmer">${esc(c.title || '')}</h1>${subEl}`}
           ${bodyEl.replace('ws-hero-body', 'ws-hero-body ws-hero-lead')}
         </div>
       </div>`;
@@ -4950,7 +4952,7 @@ function renderEditorCanvas() {
     const meta = getSlideShellMeta(slide);
     const chips = [{ icon: 'fa-table-columns', label: 'Parallel' }, { icon: 'fa-map', label: `Track ${(getDualSopPairIndex(slide) || 0) + 1}` }];
     canvas.innerHTML = `${wrapSlide(renderWsSlideShell({
-      ...meta, title: c.title, chips, main: renderDualPairOrientSplitView(slide),
+      ...meta, title: c.title, chips, lead: getWsPresentLead(slide), main: renderDualPairOrientSplitView(slide),
     }), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-eye"></i> Split-View im Präsentationsmodus · SOP-Boards aus Track-Daten</div>`;
     bindCanvasInlineEdit();
     return;
@@ -4963,6 +4965,7 @@ function renderEditorCanvas() {
         ...meta,
         title: getWsPresentTitle(slide),
         chips: getWsPresentChips(slide),
+        lead: getWsPresentLead(slide),
         main: renderBrainstormSplitViz(slide),
       }), State.slides.findIndex((s) => s.id === slide.id))}<div class="canvas-hint"><i class="fa-solid fa-eye"></i> Split-View · SOP-Boards + Live-Eingaben</div>`;
     } else {
@@ -6621,7 +6624,7 @@ function renderPresentNow() {
 
   if (slide.slide_type === 'section' && c.sopKind === 'group-transition') {
     mountPresentWsSlide(stage, slide, slideIdx, {
-      main: `<div class="ws-sop-main ws-sop-main--transition"><p class="ws-hero-body">${esc(c.body || '').replace(/\n/g, '<br>')}</p></div>`,
+      main: '<div class="ws-sop-main ws-sop-main--transition"></div>',
     });
     return;
   }
@@ -6649,14 +6652,19 @@ function renderPresentNow() {
   }
 
   if (slide.settings?.presentationResults || slide.settings?.presentationClosing || isSlideResultsLinkedSlide(slide)) {
+    if (slide.settings?.presentationClosing && isSopWorkshopPresentation()) {
+      stage.classList.toggle('ws-closing-present-stage', true);
+      mountPresentWsSlide(stage, slide, slideIdx, {
+        main: renderClosingSlideHtml(c, false, { shellMode: true, presentFx: true, hideChrome: true }),
+      });
+      return;
+    }
     let html = '';
     if (slide.settings?.presentationResults) {
       html = `${renderCenteredSlideHtml(c, false, { icon: 'fa-chart-column' })}
         <div class="viz-wrap viz-wrap-present">${renderPresentationResultsPresentHtml()}</div>`;
     } else if (slide.settings?.presentationClosing) {
-      html = isSopWorkshopPresentation()
-        ? renderClosingSlideHtml(c, false, { shellMode: true, presentFx: true })
-        : renderClosingSlideHtml(c, false, { shellMode: true, presentFx: true });
+      html = renderClosingSlideHtml(c, false, { shellMode: true, presentFx: true });
     } else {
       const source = State.slides.find((s) => s.id === slide.content?.resultsSourceId);
       const srcVisible = source ? getVisibleResponses(source.id) : [];
@@ -6677,27 +6685,19 @@ function renderPresentNow() {
     return;
   }
 
-  if (isSopWorkshopPresentation() && slide.slide_type === 'content' && isWorkshopClosingSlide(slide)) {
-    applyPresentStageLayout(stage, slide, { splitOn: false });
-    stage.innerHTML = wrapSlide(renderClosingSlideHtml(c, false, { shellMode: true, presentFx: true }), slideIdx);
-    updatePresentHeader();
-    updatePresentStats();
-    renderPresentParticipants();
-    void renderQrCode();
-    syncSopWorkshopShell('present', slideIdx);
-    finalizePresentUi(slide);
+  if (isWorkshopClosingSlide(slide) && isSopWorkshopPresentation()) {
+    stage.classList.toggle('ws-closing-present-stage', true);
+    mountPresentWsSlide(stage, slide, slideIdx, {
+      main: renderClosingSlideHtml(c, false, { shellMode: true, presentFx: true, hideChrome: true }),
+    });
     return;
   }
 
-  if (isSopWorkshopPresentation() && slide.slide_type === 'content' && isWorkshopOpeningSlide(slide) && !isCardResultsSlide(slide)) {
-    applyPresentStageLayout(stage, slide, { splitOn: false });
-    stage.innerHTML = wrapSlide(renderHeroSlideHtml(c, false, { shellMode: true, presentFx: true }), slideIdx);
-    updatePresentHeader();
-    updatePresentStats();
-    renderPresentParticipants();
-    void renderQrCode();
-    syncSopWorkshopShell('present', slideIdx);
-    finalizePresentUi(slide);
+  if (isWorkshopOpeningSlide(slide) && isSopWorkshopPresentation() && !isCardResultsSlide(slide)) {
+    stage.classList.toggle('ws-hero-present-stage', true);
+    mountPresentWsSlide(stage, slide, slideIdx, {
+      main: renderHeroSlideHtml(c, false, { shellMode: true, presentFx: true, hideChrome: true }),
+    });
     return;
   }
 
