@@ -742,6 +742,17 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .participant-collect-fields--structured .join-label{margin-top:.15rem;font-size:.78rem}
 .participant-collect-fields--structured .participant-textarea-lg{min-height:3.25rem}
 .participant-collect-fields--structured .participant-textarea{min-height:2.75rem;font-size:.92rem}
+.participant-collect-quota{
+  display:flex;flex-direction:column;align-items:flex-start;gap:.25rem;
+  margin:.15rem 0 .5rem;padding:.65rem .75rem;
+  background:var(--brand-light);border:1px solid rgba(32,110,251,.22);border-radius:12px;
+}
+.participant-collect-quota-badge{
+  display:inline-flex;align-items:center;gap:.4rem;
+  font-size:.82rem;font-weight:800;color:var(--brand);
+}
+.participant-collect-quota-hint{font-size:.75rem;color:var(--muted);line-height:1.35}
+.participant-collect-fields--structured .participant-submit:not(.participant-action-bar-btn){margin-top:.35rem}
 
 /* ─── ICE Matrix — bessere Quadrant Labels ───────────────────── */
 .lp-mx-quad-label{
@@ -1359,14 +1370,36 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   #participant-root .pslide-participant-content{
     padding-bottom:calc(80px + env(safe-area-inset-bottom))!important;
   }
-  .participant-join-card{padding-bottom:calc(88px + env(safe-area-inset-bottom))!important}
+  .participant-join-card{
+    padding-bottom:calc(88px + env(safe-area-inset-bottom))!important;
+    max-width:100%;width:100%;
+  }
+  .participant-join-card h1{font-size:1.35rem}
+  .participant-join-card > p{font-size:.92rem;line-height:1.45}
+  .avatar-preview-wrap{padding:.65rem}
+  .avatar-preview{width:48px;height:48px;font-size:1.45rem}
+  .avatar-color-row{gap:.35rem}
+  .avatar-color-btn{width:32px;height:32px}
+  .avatar-emoji-grid{
+    grid-template-columns:repeat(6,minmax(0,1fr));
+    gap:.3rem;width:100%;max-width:100%;margin-bottom:.85rem;
+  }
+  .avatar-emoji-btn{
+    min-height:0;aspect-ratio:1;font-size:1.1rem;padding:0;
+    min-width:0;width:100%;
+  }
+  .participant-code-input,.participant-name-input{font-size:16px}
+}
+@media (max-width:400px){
+  .avatar-emoji-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .avatar-emoji-btn{font-size:1rem}
 }
 
 /* — Tap-Ziele: interaktive Buttons ≥44px auf dem Handy — */
 @media (max-width:768px){
   .present-btn{min-width:44px;min-height:44px}
   .avatar-color-btn{width:40px;height:40px}
-  .avatar-emoji-btn{min-height:44px}
+  .participant-join-card .avatar-emoji-btn{min-height:0;min-width:0}
   .participant-option,.track-vote-option,.lp-mxm-btn{min-height:44px}
   .lp-mxm-btn{height:48px}
   .qa-up,.lp-upvote-btn{min-height:40px}

@@ -2952,13 +2952,9 @@ function relocateParticipantSubmitToActionBar() {
   bar.replaceChildren(btn);
 }
 
-function syncParticipantMobileActionBar({ mountCollect } = {}) {
+function syncParticipantMobileActionBar() {
   if (!isParticipantMobileLayout()) {
     clearParticipantActionBar();
-    return;
-  }
-  if (mountCollect) {
-    mountParticipantActionBar('Use Case senden');
     return;
   }
   relocateParticipantSubmitToActionBar();
@@ -7966,7 +7962,9 @@ function renderParticipantEntry(codePrefill) {
     root.querySelectorAll('.avatar-color-btn').forEach((b) => b.classList.toggle('active', b.dataset.color === State.joinProfile.color));
     updatePreview();
   }));
-  $('#join-submit').onclick = () => {
+  $('#join-code')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#join-name')?.focus(); });
+  syncParticipantMobileActionBar();
+  const submitJoin = () => {
     const code = $('#join-code').value.trim().toUpperCase();
     const name = $('#join-name').value.trim();
     if (!code) { toast('Bitte Code eingeben', 'warn'); return; }
@@ -7976,8 +7974,19 @@ function renderParticipantEntry(codePrefill) {
     localStorage.setItem('lp_join_profile', JSON.stringify({ name, emoji: State.joinProfile.emoji, color: State.joinProfile.color }));
     void joinSession(code, name, State.joinProfile.emoji, State.joinProfile.color);
   };
-  $('#join-code')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#join-name')?.focus(); });
-  syncParticipantMobileActionBar();
+  const joinBtn = $('#join-submit');
+  if (joinBtn) {
+    let touchHandled = false;
+    joinBtn.addEventListener('touchend', (e) => {
+      touchHandled = true;
+      e.preventDefault();
+      submitJoin();
+    }, { passive: false });
+    joinBtn.addEventListener('click', () => {
+      if (touchHandled) { touchHandled = false; return; }
+      submitJoin();
+    });
+  }
   setTimeout(() => $('#join-name')?.focus(), 120);
 }
 
@@ -8291,18 +8300,23 @@ async function renderParticipantQuestion() {
     const counter = lim > 0 ? `<div class="p-char-counter"><span id="p-char-n">0</span>/${lim}</div>` : '';
     if (isCollect) {
       const ucL = getUseCaseLabels();
+      const collectQuotaHtml = collectLimit > 1
+        ? `<div class="participant-collect-quota" role="status" aria-live="polite">
+            <span class="participant-collect-quota-badge"><i class="fa-solid fa-layer-group"></i> Use Case ${collectSubmitted + 1} von ${collectLimit}</span>
+            <span class="participant-collect-quota-hint">Alle drei Felder unten = ein Use Case</span>
+          </div>`
+        : '';
       input = `<div class="participant-collect-fields participant-collect-fields--structured">
-        <label class="join-label" for="p-uc-summary">${esc(ucL.summary)}${collectLimit > 1 ? ` (${collectSubmitted + 1} von ${collectLimit})` : ''}</label>
+        ${collectQuotaHtml}
+        <label class="join-label" for="p-uc-summary">${esc(ucL.summary)}</label>
         <textarea id="p-uc-summary" rows="2" class="participant-textarea participant-textarea-lg"${maxAttr} placeholder="Was wollt ihr umsetzen oder verbessern?"></textarea>
         <label class="join-label" for="p-uc-feature">${esc(ucL.feature)}</label>
         <textarea id="p-uc-feature" rows="2" class="participant-textarea" placeholder="Was soll die KI konkret tun?"></textarea>
         <label class="join-label" for="p-uc-deps">${esc(ucL.dependencies)}</label>
         <textarea id="p-uc-deps" rows="2" class="participant-textarea" placeholder="Was muss im Team schon vorhanden sein?"></textarea>
         ${counter}
+        <button type="button" class="btn-primary participant-submit participant-submit-lg" id="submit-text">Use Case senden</button>
       </div>`;
-      if (!isParticipantMobileLayout()) {
-        input += `<button type="button" class="btn-primary participant-submit participant-submit-lg" id="submit-text">Use Case senden</button>`;
-      }
     } else {
       input = `<textarea id="p-text" rows="3" class="participant-textarea"${maxAttr} placeholder="${esc(c.prompt || 'Antwort')}"></textarea>${counter}<button type="button" class="btn-primary participant-submit" id="submit-text">Senden</button>`;
     }
@@ -8386,7 +8400,7 @@ async function renderParticipantQuestion() {
 
   if (timeLimit) startQuestionTimer(timeLimit);
   bindParticipantHandlers(slide);
-  syncParticipantMobileActionBar({ mountCollect: isCollect });
+  syncParticipantMobileActionBar();
   finishParticipant();
 }
 
