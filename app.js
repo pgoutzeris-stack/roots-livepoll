@@ -2890,20 +2890,85 @@ function wrapParticipantSlide(bodyHtml, slideIndex) {
   return `<div class="pslide-participant-slide">${header}<div class="pslide-participant-content">${bodyHtml}</div></div>`;
 }
 
+const PARTICIPANT_MOBILE_MQ = typeof window !== 'undefined' && window.matchMedia
+  ? window.matchMedia('(max-width:768px)')
+  : null;
+
+function isParticipantMobileLayout() {
+  return PARTICIPANT_MOBILE_MQ ? PARTICIPANT_MOBILE_MQ.matches : window.innerWidth <= 768;
+}
+
+function ensureParticipantActionBarOnBody() {
+  const bar = document.getElementById('participant-action-bar');
+  if (bar && bar.parentElement !== document.body) document.body.appendChild(bar);
+  return bar;
+}
+
+function showParticipantActionBar() {
+  const bar = ensureParticipantActionBarOnBody();
+  if (!bar) return;
+  bar.classList.remove('hidden');
+  bar.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('participant-has-action-bar');
+}
+
 function clearParticipantActionBar() {
-  const bar = $('#participant-action-bar');
+  const bar = ensureParticipantActionBarOnBody();
   if (!bar) return;
   bar.classList.add('hidden');
+  bar.setAttribute('aria-hidden', 'true');
   bar.replaceChildren();
   document.body.classList.remove('participant-has-action-bar');
 }
 
+function findParticipantPrimarySubmit(root) {
+  if (!root) return null;
+  const ids = [
+    'submit-text', 'submit-favorites', 'submit-split', 'submit-multi', 'submit-num',
+    'submit-rank', 'submit-pin', 'lp-mx-submit', 'join-submit', 'submit-top3',
+  ];
+  for (const id of ids) {
+    const el = root.querySelector(`#${id}`);
+    if (el?.matches?.('.btn-primary, .participant-submit')) return el;
+  }
+  const candidates = root.querySelectorAll('.btn-primary.participant-submit, .participant-submit.btn-primary');
+  return candidates.length ? candidates[candidates.length - 1] : null;
+}
+
+function relocateParticipantSubmitToActionBar() {
+  if (!isParticipantMobileLayout()) return;
+  const bar = ensureParticipantActionBarOnBody();
+  const root = $('#participant-root');
+  if (!bar || !root) return;
+  const existing = bar.querySelector('.btn-primary, .participant-submit, [id^="submit-"], #join-submit, #lp-mx-submit');
+  if (existing) {
+    showParticipantActionBar();
+    return;
+  }
+  const btn = findParticipantPrimarySubmit(root);
+  if (!btn) return;
+  showParticipantActionBar();
+  btn.classList.add('participant-action-bar-btn');
+  bar.replaceChildren(btn);
+}
+
+function syncParticipantMobileActionBar({ mountCollect } = {}) {
+  if (!isParticipantMobileLayout()) {
+    clearParticipantActionBar();
+    return;
+  }
+  if (mountCollect) {
+    mountParticipantActionBar('Use Case senden');
+    return;
+  }
+  relocateParticipantSubmitToActionBar();
+}
+
 function mountParticipantActionBar(label, { id = 'submit-text', extraClass = 'participant-submit-lg' } = {}) {
-  const bar = $('#participant-action-bar');
+  const bar = ensureParticipantActionBarOnBody();
   if (!bar) return;
-  bar.classList.remove('hidden');
-  document.body.classList.add('participant-has-action-bar');
-  bar.innerHTML = `<button type="button" class="btn-primary participant-submit ${extraClass}" id="${esc(id)}">${esc(label)}</button>`;
+  showParticipantActionBar();
+  bar.innerHTML = `<button type="button" class="btn-primary participant-submit participant-action-bar-btn ${extraClass}" id="${esc(id)}">${esc(label)}</button>`;
 }
 
 function renderParticipantTrackVoteHtml(slide) {
@@ -7912,6 +7977,7 @@ function renderParticipantEntry(codePrefill) {
     void joinSession(code, name, State.joinProfile.emoji, State.joinProfile.color);
   };
   $('#join-code')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#join-name')?.focus(); });
+  syncParticipantMobileActionBar();
   setTimeout(() => $('#join-name')?.focus(), 120);
 }
 
@@ -8234,6 +8300,9 @@ async function renderParticipantQuestion() {
         <textarea id="p-uc-deps" rows="2" class="participant-textarea" placeholder="Was muss im Team schon vorhanden sein?"></textarea>
         ${counter}
       </div>`;
+      if (!isParticipantMobileLayout()) {
+        input += `<button type="button" class="btn-primary participant-submit participant-submit-lg" id="submit-text">Use Case senden</button>`;
+      }
     } else {
       input = `<textarea id="p-text" rows="3" class="participant-textarea"${maxAttr} placeholder="${esc(c.prompt || 'Antwort')}"></textarea>${counter}<button type="button" class="btn-primary participant-submit" id="submit-text">Senden</button>`;
     }
@@ -8315,10 +8384,9 @@ async function renderParticipantQuestion() {
       ${input}
     </div>`, slideIndex);
 
-  if (isCollect) mountParticipantActionBar('Use Case senden');
-
   if (timeLimit) startQuestionTimer(timeLimit);
   bindParticipantHandlers(slide);
+  syncParticipantMobileActionBar({ mountCollect: isCollect });
   finishParticipant();
 }
 
@@ -9138,6 +9206,20 @@ function exposeLpAppGlobals() {
   try {
     window.dispatchEvent(new CustomEvent('lp-app-ready', { detail: { app: api } }));
   } catch (_) { /* noop */ }
+}
+
+ensureParticipantActionBarOnBody();
+if (PARTICIPANT_MOBILE_MQ) {
+  const onParticipantLayoutChange = () => {
+    if (!$('#screen-participant')?.classList.contains('active')) return;
+    if (State.participant) void renderParticipantQuestion();
+    else if (isJoinRoute()) renderParticipantEntry(parseJoinCodeFromHash());
+  };
+  if (typeof PARTICIPANT_MOBILE_MQ.addEventListener === 'function') {
+    PARTICIPANT_MOBILE_MQ.addEventListener('change', onParticipantLayoutChange);
+  } else if (typeof PARTICIPANT_MOBILE_MQ.addListener === 'function') {
+    PARTICIPANT_MOBILE_MQ.addListener(onParticipantLayoutChange);
+  }
 }
 
 exposeLpAppGlobals();

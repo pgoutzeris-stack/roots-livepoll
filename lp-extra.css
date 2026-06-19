@@ -393,9 +393,9 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .participant-textarea-lg{min-height:110px}
   .scale-labels{font-size:.85rem}
   .participant-range{height:38px;margin:1rem 0}
-  /* Bottom-Sheet-Style für Submit-Button */
-  .participant-submit{position:sticky;bottom:.5rem;z-index:50;box-shadow:0 4px 14px rgba(32,110,251,.25)}
-  .lp-mx-actions .btn-primary{position:sticky;bottom:.5rem}
+  /* Bottom-Sheet-Style: primäre Aktion liegt in #participant-action-bar (JS) */
+  .participant-submit:not(.participant-action-bar-btn),
+  .participant-submit-lg:not(.participant-action-bar-btn){min-height:48px;font-size:1rem}
   /* iOS Safe Area */
   body{padding-bottom:env(safe-area-inset-bottom)}
   .present-toolbar{bottom:calc(.5rem + env(safe-area-inset-bottom))!important}
@@ -1347,45 +1347,19 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .present-stage{padding-left:1rem;padding-right:1rem}
 }
 
-/* — Sticky Submit-Action-Bar auf der Teilnehmer-Ansicht —
-   Der eigentliche Scroll-Container ist #participant-root (.participant-root,
-   overflow-y:auto). Damit der blaue Submit-Button IMMER erreichbar bleibt,
-   heften wir ihn unten an und geben dem Inhalt darüber Platz. */
+/* — Mobile Teilnehmer: fester Submit unten (Action-Bar am body) — */
 @media (max-width:768px){
-  /* Scroll-Container darf den Sheet-Effekt zeigen statt zu zentrieren */
   #participant-root.participant-root,.participant-root{
     align-items:stretch;justify-content:flex-start;
     padding:1rem .85rem 0;
   }
   .pslide-participant-slide{width:100%;max-width:100%}
-  /* Platz schaffen, damit nichts hinter der fixen Bar verschwindet */
-  .participant-card{
-    padding-bottom:calc(72px + env(safe-area-inset-bottom))!important;
+  .participant-card,
+  .participant-ws-slide-wrap,
+  #participant-root .pslide-participant-content{
+    padding-bottom:calc(80px + env(safe-area-inset-bottom))!important;
   }
-  /* Primärer Submit-Button als sticky Bottom-Action-Bar (nur im Scroll-Inhalt) */
-  .participant-card .participant-submit,
-  .participant-card .participant-submit-lg,
-  #participant-root .pslide-participant-content [id^="submit-"],
-  #participant-root .participant-card [id^="submit-"]{
-    position:sticky;bottom:0;z-index:60;width:100%;
-    margin:.75rem 0 0;
-    /* Backdrop-Leiste hinter dem Button, respektiert iOS Safe-Area */
-    padding-bottom:env(safe-area-inset-bottom);
-    box-shadow:0 -8px 18px -8px rgba(15,23,42,.28),0 6px 16px rgba(32,110,251,.28);
-  }
-  /* Hintergrund-Streifen, damit Inhalt nicht „durchscheint" */
-  .participant-card .participant-submit::before,
-  .participant-card .participant-submit-lg::before,
-  #participant-root .pslide-participant-content [id^="submit-"]::before,
-  #participant-root .participant-card [id^="submit-"]::before{
-    content:'';position:absolute;left:-.85rem;right:-.85rem;
-    bottom:calc(-1 * (env(safe-area-inset-bottom) + .75rem));
-    top:-.75rem;z-index:-1;
-    background:linear-gradient(180deg,transparent,var(--bg) 40%);
-    pointer-events:none;
-  }
-  /* Sicherstellen: Buttons sind echte Tap-Ziele */
-  .participant-submit,.participant-submit-lg{min-height:48px;font-size:1rem}
+  .participant-join-card{padding-bottom:calc(88px + env(safe-area-inset-bottom))!important}
 }
 
 /* — Tap-Ziele: interaktive Buttons ≥44px auf dem Handy — */
@@ -3272,21 +3246,24 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 
 @media (max-width:768px){
-  /* Feste Action-Bar direkt unter #screen-participant — außerhalb des Scroll-Containers,
-     damit iOS Safari Taps zuverlässig erhält (kein overflow/transform-Containing-Block). */
+  /* Feste Action-Bar am body — kein overflow/transform-Containing-Block von #screen-participant */
   #participant-action-bar.participant-action-bar{
     position:fixed;
     left:0;right:0;bottom:0;
-    z-index:10000;
+    z-index:100000;
     padding:.75rem .85rem calc(.75rem + env(safe-area-inset-bottom));
     background:#fff;
-    border-top:1px solid var(--line);
-    box-shadow:0 -8px 24px rgba(15,23,42,.12);
-    max-width:100%;
+    border-top:1px solid #e2e8f0;
+    box-shadow:0 -8px 24px rgba(15,23,42,.14);
+    max-width:100vw;
     pointer-events:auto;
     touch-action:manipulation;
-    -webkit-transform:translateZ(0);
-    transform:translateZ(0);
+    isolation:isolate;
+    color-scheme:light;
+    --brand:#206efb;
+    --brand-dark:#165fd9;
+    --bg:#fff;
+    --ink:#0f172a;
   }
   #participant-action-bar.participant-action-bar.hidden{
     display:none!important;
@@ -3294,25 +3271,49 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   }
   #participant-action-bar .participant-submit,
   #participant-action-bar .participant-submit-lg,
-  #participant-action-bar [id^="submit-"]{
-    position:relative;
-    width:100%;
-    margin:0;
-    min-height:52px;
-    font-size:1.05rem;
-    box-shadow:0 6px 16px rgba(32,110,251,.28);
+  #participant-action-bar .participant-action-bar-btn,
+  #participant-action-bar [id^="submit-"],
+  #participant-action-bar #join-submit,
+  #participant-action-bar #lp-mx-submit{
+    position:relative!important;
+    display:flex!important;
+    align-items:center;
+    justify-content:center;
+    width:100%!important;
+    margin:0!important;
+    min-height:52px!important;
+    font-size:1.05rem!important;
+    font-weight:600!important;
+    line-height:1.2!important;
+    border:none!important;
+    border-radius:999px!important;
+    background:#206efb!important;
+    background-color:#206efb!important;
+    color:#fff!important;
+    -webkit-text-fill-color:#fff!important;
+    box-shadow:0 6px 16px rgba(32,110,251,.32)!important;
+    visibility:visible!important;
+    opacity:1!important;
+    -webkit-appearance:none;
+    appearance:none;
     touch-action:manipulation;
     cursor:pointer;
     -webkit-tap-highlight-color:transparent;
   }
+  #participant-action-bar .participant-submit:disabled,
+  #participant-action-bar .participant-action-bar-btn:disabled{
+    opacity:.55!important;
+    cursor:not-allowed;
+  }
   #participant-action-bar .participant-submit::before,
   #participant-action-bar .participant-submit-lg::before,
-  #participant-action-bar [id^="submit-"]::before{display:none}
+  #participant-action-bar [id^="submit-"]::before{display:none!important;content:none!important}
   body.participant-has-action-bar #participant-root.participant-root,
   body.participant-has-action-bar .participant-root{
     padding-bottom:calc(76px + env(safe-area-inset-bottom));
   }
-  body.participant-has-action-bar .participant-ws-slide-wrap{
+  body.participant-has-action-bar .participant-ws-slide-wrap,
+  body.participant-has-action-bar #participant-root .pslide-participant-content{
     padding-bottom:calc(80px + env(safe-area-inset-bottom));
   }
   .participant-collect-fields{margin-top:.35rem}
