@@ -5339,8 +5339,9 @@ function renderParticipantPitchHtml() {
         cards += `<article class="participant-pitch-card">
           <div class="participant-pitch-card-head">
             <span class="participant-pitch-num">${n}</span>
+            ${trk.trackLabel || p.phase ? `<span class="participant-pitch-track">${esc([trk.trackLabel, p.phase].filter(Boolean).join(' · '))}</span>` : ''}
           </div>
-          <p class="participant-pitch-text">${renderUseCaseDisplayHtml(item.text, 'full')}</p>
+          <div class="participant-pitch-text">${renderUseCaseDisplayHtml(item.text, 'full')}</div>
           <div class="participant-pitch-author">
             ${participantAvatarHtml(author || { display_name: authorName }, 'sm')}
             <span>Eingebracht von <strong>${esc(authorName)}</strong></span>
@@ -8188,9 +8189,15 @@ async function renderParticipantQuestion() {
   }
   if (hostSlide?.content?.sopKind === 'pitch-session' || hostSlide?.settings?.sopPitchSession) {
     root.innerHTML = wrapParticipantSlide(`
-      <div class="participant-wait-block participant-pitch-block">
-        ${renderParticipantPitchHtml()}
-        <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf die Pitch Session auf dem Beamer achten…</p>
+      <div class="participant-ws-slide-wrap participant-pitch-block">
+        ${renderWsSlideShell({
+          ...getSlideShellMeta(hostSlide),
+          title: getWsPresentTitle(hostSlide),
+          chips: getWsPresentChips(hostSlide),
+          lead: getWsPresentLead(hostSlide) || 'Überblick: wer pitcht welchen Use Case?',
+          main: renderParticipantPitchHtml(),
+        })}
+        <p class="participant-sop-wait participant-sop-wait--compact"><i class="fa-solid fa-eye"></i> Bitte auf die Pitch Session auf dem Beamer achten…</p>
       </div>`, slideIndex);
     finishParticipant();
     return;

@@ -487,7 +487,7 @@ html.lp-join-route #screen-participant{display:flex!important}
 .pslide-participant-slide{width:100%;max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:.75rem}
 .pslide-participant-content{width:100%}
 .participant-card-pslide{max-width:640px;background:transparent;border:none;box-shadow:none;padding:0}
-.participant-card-pslide .participant-submit-lg{padding:1rem 1.25rem;font-size:1.05rem;border-radius:14px;margin-top:1rem}
+.participant-card-pslide .participant-submit-lg{padding:.75rem 1.1rem;font-size:.94rem;border-radius:14px;margin-top:.75rem}
 .participant-wait-block{text-align:center;width:100%}
 .participant-pslide-q .participant-option{font-size:1rem;padding:1rem 1.25rem;border-radius:var(--radius-pill);transition:transform .12s,box-shadow .12s,border-color .15s,background .15s;border-width:1.5px}
 .participant-pslide-q .participant-option:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(32,110,251,.1)}
