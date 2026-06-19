@@ -1943,14 +1943,7 @@ async function assignParticipantSopGroup(participantId, group) {
 }
 
 function participantChipHtml(p) {
-  if (!isDualSopWorkshop() || !State.session) {
-    return `<div class="present-participant-chip">${participantAvatarHtml(p, 'sm')}<span>${esc(p.display_name || 'Gast')}</span></div>`;
-  }
-  return `<div class="present-participant-chip present-participant-chip--dual" data-participant-id="${esc(p.id)}">
-    ${participantAvatarHtml(p, 'sm')}
-    <span class="present-participant-name">${esc(p.display_name || 'Gast')}</span>
-    ${participantAssignButtonsHtml(p)}
-  </div>`;
+  return `<div class="present-participant-chip">${participantAvatarHtml(p, 'sm')}<span>${esc(p.display_name || 'Gast')}</span></div>`;
 }
 
 // Eine vollständige Brainstorm-Slide als Spalte (Frage + Board + Live-Bubbles DIESER Slide).
@@ -3810,34 +3803,6 @@ function renderPresentParticipants() {
   if (!bar) return;
   if (!State.participants.length) {
     bar.innerHTML = '<span class="present-participants-empty">Warte auf Teilnehmer…</span>';
-    return;
-  }
-  if (isDualSopWorkshop()) {
-    const buckets = getDualSopAssignBuckets();
-    const teamSection = (group, list) => {
-      if (!list.length) return '';
-      const meta = getSopGroupMeta(group);
-      return `<div class="present-participants-team present-participants-team--${group}">
-        <div class="present-participants-team-head">
-          <i class="fa-solid ${meta.icon}"></i> ${esc(meta.label)}
-          <span class="sop-split-col-count">${list.length}</span>
-        </div>
-        <div class="present-participants-list">${list.map(participantChipHtml).join('')}</div>
-      </div>`;
-    };
-    bar.innerHTML = `
-      <div class="present-participants-label"><i class="fa-solid fa-users"></i> ${State.participants.length} Teilnehmer</div>
-      <div class="present-participants-teams">
-        ${teamSection('internal', buckets.internal)}
-        ${teamSection('consulting', buckets.consulting)}
-        ${buckets.unassigned.length ? `<div class="present-participants-team present-participants-team--unassigned">
-          <div class="present-participants-team-head">
-            <i class="fa-solid fa-user-clock"></i> Noch nicht zugewiesen
-            <span class="sop-split-col-count">${buckets.unassigned.length}</span>
-          </div>
-          <div class="present-participants-list">${buckets.unassigned.map(participantChipHtml).join('')}</div>
-        </div>` : ''}
-      </div>`;
     return;
   }
   bar.innerHTML = `
