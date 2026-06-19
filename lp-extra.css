@@ -1907,12 +1907,18 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   color:var(--ink);
   max-width:none;
   margin:0 0 .75rem;
-  padding:1rem 1.25rem;
-  background:var(--surface,#f8fafc);
-  border-left:4px solid var(--brand);
-  border-radius:0 12px 12px 0;
+  padding:.85rem 1.1rem;
+  background:rgba(32,110,251,.08);
+  border:1px solid rgba(32,110,251,.14);
+  border-radius:12px;
   line-height:1.65;
   white-space:pre-wrap;
+}
+.lp-sop-workshop.present-mode .present-stage.ws-hero-present-stage .ws-sub-lead,
+.lp-sop-workshop.present-mode .present-stage.ws-closing-present-stage .ws-sub-lead,
+.lp-sop-workshop #screen-participant .ws-slide--hero .ws-sub-lead,
+.lp-sop-workshop #screen-participant .ws-slide--closing .ws-sub-lead{
+  display:none!important;
 }
 .lp-sop-workshop.present-mode .ws-body .sop-pslide-sub,
 .lp-sop-workshop.present-mode .ws-body .pitch-hint,

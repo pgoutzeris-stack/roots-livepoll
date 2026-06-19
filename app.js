@@ -2795,8 +2795,7 @@ function getWsPresentTitle(slide) {
 function getWsPresentLead(slide) {
   if (!slide) return '';
   const c = slide?.content || {};
-  if (isWorkshopClosingSlide(slide)) return c.subtitle || 'Workshop abgeschlossen';
-  if (isWorkshopOpeningSlide(slide)) return c.subtitle || '';
+  if (isWorkshopClosingSlide(slide) || isWorkshopOpeningSlide(slide)) return '';
   if (isBrainstormCollectSlide(slide)) {
     const { question, note } = parseCollectPrompt(c.prompt);
     return [question, note].filter(Boolean).join('\n') || c.subtitle || '';
@@ -3573,9 +3572,6 @@ function renderClosingSlideHtml(c, editable = false, opts = {}) {
           ${stats.tracks ? `<span class="ws-closing-stat"><strong>${stats.tracks}</strong> Tracks</span>` : ''}
         </div>`
       : '';
-    const subEl = c.subtitle
-      ? renderWsSubLead(c.subtitle)
-      : renderWsSubLead('Workshop abgeschlossen');
     return `
       <div class="ws-closing-stage">
         <canvas class="ws-closing-ai-canvas" aria-hidden="true"></canvas>
@@ -3587,7 +3583,7 @@ function renderClosingSlideHtml(c, editable = false, opts = {}) {
         <div class="ws-closing-glow ws-closing-glow--b" aria-hidden="true"></div>
         <div class="ws-closing-content">
           <div class="ws-closing-icon-ring"><i class="fa-solid fa-champagne-glasses"></i></div>
-          ${hideChrome ? '' : `<h1 class="ws-closing-title ws-closing-title--shimmer">${esc(c.title || 'Danke!')}</h1>${subEl}`}
+          ${hideChrome ? '' : `<h1 class="ws-closing-title ws-closing-title--shimmer">${esc(c.title || 'Danke!')}</h1>`}
           ${statsHtml}
           ${bodyHtml}
         </div>
@@ -3687,9 +3683,6 @@ function renderHeroSlideHtml(c, editable = false, opts = {}) {
     ? `<div class="canvas-editable pslide-hero-body" contenteditable="true" data-field="body">${esc(c.body || '')}</div>`
     : `<div class="ws-hero-body">${esc(c.body || '').replace(/\n/g, '<br>')}</div>`;
   if (shellMode && !editable && presentFx) {
-    const subEl = c.subtitle
-      ? renderWsSubLead(c.subtitle)
-      : '';
     return `
       <div class="ws-hero-stage">
         <canvas class="ws-hero-ai-canvas" aria-hidden="true"></canvas>
@@ -3698,7 +3691,7 @@ function renderHeroSlideHtml(c, editable = false, opts = {}) {
         <div class="ws-hero-glow ws-hero-glow--b" aria-hidden="true"></div>
         <div class="ws-hero-content">
           <div class="ws-hero-icon-ring"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
-          ${hideChrome ? '' : `<h1 class="ws-hero-title ws-hero-title--shimmer">${esc(c.title || '')}</h1>${subEl}`}
+          ${hideChrome ? '' : `<h1 class="ws-hero-title ws-hero-title--shimmer">${esc(c.title || '')}</h1>`}
           ${bodyEl.replace('ws-hero-body', 'ws-hero-body ws-hero-lead')}
         </div>
       </div>`;
