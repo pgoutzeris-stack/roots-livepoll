@@ -2818,14 +2818,14 @@ function getWsPresentLead(slide) {
   return '';
 }
 
-/** Einheitliche Sub-Headline (Moderator): blaues Sonnen-Icon + Text — auf allen Folien identisch. */
+/** Einheitliche Sub-Headline (Moderator): Text ohne Icon — auf allen Folien identisch. */
 function renderWsSubLead(text, { allowHtml = false } = {}) {
   const raw = String(text || '').trim();
   if (!raw) return '';
   const inner = allowHtml && raw.includes('<')
     ? raw
     : esc(raw).replace(/\n/g, '<br>');
-  return `<p class="ws-sub-lead"><i class="fa-solid fa-sun ws-sub-lead-icon" aria-hidden="true"></i><span>${inner}</span></p>`;
+  return `<p class="ws-sub-lead">${inner}</p>`;
 }
 
 function mountPresentWsSlide(stage, slide, slideIdx, { main = '', splitOn = false, title = null, lead = null } = {}) {
