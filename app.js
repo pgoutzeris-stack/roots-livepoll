@@ -2619,6 +2619,22 @@ function wrapParticipantSlide(bodyHtml, slideIndex) {
   return `<div class="pslide-participant-slide">${header}<div class="pslide-participant-content">${bodyHtml}</div></div>`;
 }
 
+function clearParticipantActionBar() {
+  const bar = $('#participant-action-bar');
+  if (!bar) return;
+  bar.classList.add('hidden');
+  bar.replaceChildren();
+  document.body.classList.remove('participant-has-action-bar');
+}
+
+function mountParticipantActionBar(label, { id = 'submit-text', extraClass = 'participant-submit-lg' } = {}) {
+  const bar = $('#participant-action-bar');
+  if (!bar) return;
+  bar.classList.remove('hidden');
+  document.body.classList.add('participant-has-action-bar');
+  bar.innerHTML = `<button type="button" class="btn-primary participant-submit ${extraClass}" id="${esc(id)}">${esc(label)}</button>`;
+}
+
 function renderParticipantTrackVoteHtml(slide) {
   const groups = getTrackVoteOptionsGrouped(slide);
   if (!groups.length) return '<p style="color:var(--muted)">Noch keine Use Cases gesammelt. Bitte warte, bis das Brainstorming abgeschlossen ist.</p>';
@@ -6618,6 +6634,7 @@ function broadcastSessionPatch(patch) {
 
 function handleParticipantSessionEnd() {
   stopParticipantSync();
+  clearParticipantActionBar();
   $('#participant-root').innerHTML = '<div class="participant-card"><h1>Session beendet</h1><p>Vielen Dank für deine Teilnahme.</p></div>';
 }
 
@@ -7346,6 +7363,7 @@ function renderParticipantEntry(codePrefill) {
   if (!hasCode && saved?.emoji) State.joinProfile.emoji = saved.emoji;
   if (!hasCode && saved?.color) State.joinProfile.color = saved.color;
   const root = $('#participant-root');
+  clearParticipantActionBar();
   root.innerHTML = `
     <div class="participant-card participant-join-card">
       <h1>Live teilnehmen</h1>
@@ -7556,6 +7574,7 @@ async function renderParticipantQuestion() {
     await ensureParticipantResponses(true);
   }
   const root = $('#participant-root');
+  clearParticipantActionBar();
   const finishParticipant = () => syncSopWorkshopShell('participant', slideIndex);
   if (!hostSlide?.settings?.sopTrackVote) State.participantVoteExpert = false;
   if (!hostSlide) { root.innerHTML = '<div class="participant-card"><p>Warte auf Folie…</p></div>'; finishParticipant(); return; }
@@ -7760,8 +7779,7 @@ async function renderParticipantQuestion() {
         lead: getWsPresentLead(slide),
         main: `${teamBadge}${renderWorkshopCardCollectHtml(collectDisplayContent, false, { participantMode: true, shellWrapped: true })}${input}`,
       })}
-    </div>
-    <div class="participant-collect-bar"><button type="button" class="btn-primary participant-submit participant-submit-lg" id="submit-text">Use Case senden</button></div>` : isDecide ? `
+    </div>` : isDecide ? `
     <div class="participant-ws-slide-wrap">
       ${renderWsSlideShell({
         ...getSlideShellMeta(slide),
@@ -7783,6 +7801,8 @@ async function renderParticipantQuestion() {
       ${input}
     </div>`, slideIndex);
 
+  if (isCollect) mountParticipantActionBar('Use Case senden');
+
   if (timeLimit) startQuestionTimer(timeLimit);
   bindParticipantHandlers(slide);
   finishParticipant();
@@ -7797,6 +7817,7 @@ function startQuestionTimer(sec) {
     if (el) el.textContent = `${left}s`;
     if (left <= 0) {
       clearInterval(State.questionTimer);
+      clearParticipantActionBar();
       $('#participant-root').innerHTML = '<div class="participant-card"><h1>Zeit abgelaufen</h1><p>Warte auf die nächste Frage…</p></div>';
     }
   }, 1000);
@@ -8221,7 +8242,7 @@ function bindParticipantHandlers(slide) {
     ta?.addEventListener('input', upd);
     upd();
   }
-  $('#submit-text')?.addEventListener('click', () => {
+  const submitText = () => {
     const text = filterProfanity($('#p-text').value.trim(), slide.settings?.profanityFilter !== false);
     const isCollect = isBrainstormCollectSlide(slide);
     if (!text && (slide.settings?.required || isCollect)) { toast(isCollect ? 'Bitte Idee eingeben' : 'Antwort erforderlich', 'warn'); return; }
@@ -8235,7 +8256,20 @@ function bindParticipantHandlers(slide) {
       }
     }
     submitResponse({ text, upvotes: 0 });
-  });
+  };
+  const submitTextBtn = $('#submit-text');
+  if (submitTextBtn) {
+    let touchHandled = false;
+    submitTextBtn.addEventListener('touchend', (e) => {
+      touchHandled = true;
+      e.preventDefault();
+      submitText();
+    }, { passive: false });
+    submitTextBtn.addEventListener('click', () => {
+      if (touchHandled) { touchHandled = false; return; }
+      submitText();
+    });
+  }
   $('#submit-num')?.addEventListener('click', () => {
     const val = type === 'scale' ? Number($('#p-range')?.value) : Number($('#p-num')?.value);
     if (!Number.isFinite(val)) { toast('Bitte Zahl eingeben', 'warn'); return; }
@@ -8370,6 +8404,7 @@ async function submitResponse(response) {
   }
   markAnswered(slide.id);
   const modMsg = slide.settings?.moderation ? 'Antwort zur Freigabe gesendet.' : 'Antwort gesendet.';
+  clearParticipantActionBar();
   $('#participant-root').innerHTML = `<div class="participant-card"><h1>Danke!</h1><p>${modMsg} Warte auf die nächste Frage…</p></div>`;
 }
 

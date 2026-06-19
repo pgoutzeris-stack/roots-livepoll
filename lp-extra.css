@@ -1322,10 +1322,11 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .participant-card{
     padding-bottom:calc(72px + env(safe-area-inset-bottom))!important;
   }
-  /* Primärer Submit-Button als sticky Bottom-Action-Bar */
-  .participant-submit,
-  .participant-submit-lg,
-  #participant-root [id^="submit-"]{
+  /* Primärer Submit-Button als sticky Bottom-Action-Bar (nur im Scroll-Inhalt) */
+  .participant-card .participant-submit,
+  .participant-card .participant-submit-lg,
+  #participant-root .pslide-participant-content [id^="submit-"],
+  #participant-root .participant-card [id^="submit-"]{
     position:sticky;bottom:0;z-index:60;width:100%;
     margin:.75rem 0 0;
     /* Backdrop-Leiste hinter dem Button, respektiert iOS Safe-Area */
@@ -1333,9 +1334,10 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
     box-shadow:0 -8px 18px -8px rgba(15,23,42,.28),0 6px 16px rgba(32,110,251,.28);
   }
   /* Hintergrund-Streifen, damit Inhalt nicht „durchscheint" */
-  .participant-submit::before,
-  .participant-submit-lg::before,
-  #participant-root [id^="submit-"]::before{
+  .participant-card .participant-submit::before,
+  .participant-card .participant-submit-lg::before,
+  #participant-root .pslide-participant-content [id^="submit-"]::before,
+  #participant-root .participant-card [id^="submit-"]::before{
     content:'';position:absolute;left:-.85rem;right:-.85rem;
     bottom:calc(-1 * (env(safe-area-inset-bottom) + .75rem));
     top:-.75rem;z-index:-1;
@@ -3200,29 +3202,47 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 
 @media (max-width:768px){
-  .participant-collect-bar{
+  /* Feste Action-Bar direkt unter #screen-participant — außerhalb des Scroll-Containers,
+     damit iOS Safari Taps zuverlässig erhält (kein overflow/transform-Containing-Block). */
+  #participant-action-bar.participant-action-bar{
     position:fixed;
     left:0;right:0;bottom:0;
-    z-index:120;
+    z-index:10000;
     padding:.75rem .85rem calc(.75rem + env(safe-area-inset-bottom));
     background:#fff;
     border-top:1px solid var(--line);
-    box-shadow:0 -8px 24px rgba(15,23,42,.1);
+    box-shadow:0 -8px 24px rgba(15,23,42,.12);
     max-width:100%;
+    pointer-events:auto;
+    touch-action:manipulation;
+    -webkit-transform:translateZ(0);
+    transform:translateZ(0);
   }
-  .participant-collect-bar .participant-submit-lg{
-    position:static;
+  #participant-action-bar.participant-action-bar.hidden{
+    display:none!important;
+    pointer-events:none;
+  }
+  #participant-action-bar .participant-submit,
+  #participant-action-bar .participant-submit-lg,
+  #participant-action-bar [id^="submit-"]{
+    position:relative;
     width:100%;
     margin:0;
     min-height:52px;
     font-size:1.05rem;
     box-shadow:0 6px 16px rgba(32,110,251,.28);
+    touch-action:manipulation;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
   }
-  .participant-collect-bar .participant-submit-lg::before{display:none}
-  #participant-root.participant-root:has(.participant-collect-bar){
+  #participant-action-bar .participant-submit::before,
+  #participant-action-bar .participant-submit-lg::before,
+  #participant-action-bar [id^="submit-"]::before{display:none}
+  body.participant-has-action-bar #participant-root.participant-root,
+  body.participant-has-action-bar .participant-root{
     padding-bottom:calc(76px + env(safe-area-inset-bottom));
   }
-  .participant-ws-slide-wrap{
+  body.participant-has-action-bar .participant-ws-slide-wrap{
     padding-bottom:calc(80px + env(safe-area-inset-bottom));
   }
   .participant-collect-fields{margin-top:.35rem}
