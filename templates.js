@@ -1352,75 +1352,31 @@ function defineTemplate(meta, slides) {
 }
 
 window.LP_TEMPLATES = [
-  // ── Endausbaustufe / Go-To: beide SOPs parallel ──────────────────────────
   defineTemplate({
     key: 'roots-sop-dual-internal-consulting-parallel',
-    category: 'ROOTS · SOP & KI',
     name: 'Internal + Consulting · parallel',
-    desc: 'Empfohlen. Beide SOPs gleichzeitig · eine Sammel-Folie pro Track · Split-View mit voller SOP-Breite · Host-Zuweisung · konsolidierte Priorisierung + Matrix.',
+    tagline: 'Standard — beide SOPs gleichzeitig, Host-Zuweisung, Split-View',
+    recommended: true,
     group: '5–25',
-    tips: `Go-To-Vorlage. Pro Track nur eine Host-Folie (Sammeln mit SOP im Split). QR-Join → Host weist Internal/Consulting zu. Hinweis: Internal hat ${INTERNAL_SOP_TRACKS.length} Tracks, Consulting ${SOP_TOOL_TRACKS.length} — die letzten Paare sind einseitig (nur Internal), das ist beabsichtigt. Danach Pitch, Gesamt-Priorisierung, Matrix, Abschluss.`,
   }, buildDualSopParallelWorkshopSlides()),
-  // ── Fallback 1: beide SOPs, aber nacheinander ────────────────────────────
   defineTemplate({
     key: 'roots-sop-dual-internal-consulting-sequential',
-    category: 'ROOTS · SOP & KI',
     name: 'Internal + Consulting · nacheinander',
-    desc: 'Fallback ohne Split-View: erst Internal-SOP, dann Consulting-SOP · EINE konsolidierte Priorisierung + gemeinsame ICE-Matrix.',
+    tagline: 'Erst Internal, dann Consulting — ohne Split-View',
     group: '5–25',
-    tips: 'Wenn parallel nicht passt. Pro Track eine Sammel-Folie mit SOP-Board. Internal komplett durch, danach Consulting. Pitch Session, dann Gesamt-Priorisierung, Matrix und Abschluss.',
   }, buildDualSopSequentialWorkshopSlides()),
-  // ── Fallback 2: nur Consulting-SOP ───────────────────────────────────────
   defineTemplate({
     key: 'roots-sop-ki-workshop-track',
-    category: 'ROOTS · SOP & KI',
-    name: 'Nur Consulting SOP · Pro Track',
-    desc: 'Nur die Consulting-/Engagement-SOP. Alle Phasen auf einen Blick → Track-Brainstorm → Pitch Session → finale Priorisierung → ICE Matrix.',
+    name: 'Nur Consulting',
+    tagline: 'Nur Engagement-SOP — ein Brainstorm je Track',
     group: '6–25',
-    tips: 'Tempo-Format für ein reines Consulting-Team. 5 Min. / max. 2 Use Cases pro Track. Am Ende Pitch, dann Gesamt-Priorisierung.',
   }, buildSopKiWorkshopSlides('pro-track', { tracks: SOP_TOOL_TRACKS, exampleKey: 'consulting', title: 'Consulting SOP · KI Use-Case Workshop' })),
   defineTemplate({
-    key: 'roots-sop-ki-workshop-phase',
-    category: 'ROOTS · SOP & KI',
-    name: 'Nur Consulting SOP · Pro Phase',
-    desc: 'Nur die Consulting-/Engagement-SOP, höchste Tiefe. SOP-Kontext je Phase → Brainstorm → Track-Vote → Presentation Session → Pitch → Übersicht → ICE Matrix.',
-    group: '6–18',
-    tips: 'Tiefstes Format — nur für kleine Runden & genügend Zeit. SOP-Übersicht vor jedem Brainstorm. 5 Min. / max. 2 Use Cases je Phase; viele Phasen × 5 Min summieren sich, Zeitlimit ggf. senken.',
-  }, buildSopKiWorkshopSlides('pro-phase', { tracks: SOP_TOOL_TRACKS, exampleKey: 'consulting', title: 'Consulting SOP · KI Use-Case Workshop' })),
-  // ── Fallback 3: nur Internal-SOP ─────────────────────────────────────────
-  defineTemplate({
     key: 'roots-sop-ki-workshop-internal-track',
-    category: 'ROOTS · SOP & KI',
-    name: 'Nur Internal SOP · Pro Track',
-    desc: 'Nur die Internal-/Betriebs-SOP von ROOTS. Alle Phasen auf einen Blick → Track-Brainstorm → Pitch Session → finale Priorisierung → ICE Matrix.',
+    name: 'Nur Internal',
+    tagline: 'Nur Betriebs-SOP — ein Brainstorm je Track',
     group: '6–25',
-    tips: 'Tempo-Format für ein reines Internal-Team. 5 Min. / max. 2 Use Cases pro Track. Am Ende Pitch, dann Gesamt-Priorisierung.',
   }, buildSopKiWorkshopSlides('pro-track', { tracks: INTERNAL_SOP_TRACKS, exampleKey: 'internal', title: 'Internal SOP · KI Use-Case Workshop' })),
-  defineTemplate({
-    key: 'roots-sop-ki-workshop-internal-phase',
-    category: 'ROOTS · SOP & KI',
-    name: 'Nur Internal SOP · Pro Phase',
-    desc: 'Nur die Internal-/Betriebs-SOP von ROOTS, höchste Tiefe. SOP-Kontext je Phase → Brainstorm → Track-Vote → Presentation Session → Pitch → Übersicht → ICE Matrix.',
-    group: '6–15',
-    tips: `Tiefstes Internal-Format — nur für kleine Runden & viel Zeit (${INTERNAL_SOP_TRACKS.length} Tracks). SOP-Übersicht vor jedem Brainstorm. 5 Min. / max. 2 Use Cases je Phase; Zeitlimit ggf. senken.`,
-  }, buildSopKiWorkshopSlides('pro-phase', { tracks: INTERNAL_SOP_TRACKS, exampleKey: 'internal', title: 'Internal SOP · KI Use-Case Workshop' })),
-  // ── Spezial: Marketing-SOP ───────────────────────────────────────────────
-  defineTemplate({
-    key: 'roots-marketing-sop-workshop',
-    category: 'ROOTS · SOP & KI',
-    name: 'Marketing SOP · Pro Karte',
-    desc: 'Marketing-SOP (1 Track, alle Karten): je Karte sammeln · Top-3 priorisieren · Presentation Session · Pitch → ICE Matrix.',
-    group: '6–20',
-    tips: 'Höchste Tiefe pro Karte. 5 Min. · max. 2 Use Cases je Karte. Achtung: viele Karten × 5 Min summieren sich — Zeitlimit ggf. senken oder „Pro Phase"-Variante nutzen.',
-  }, buildMarketingSopWorkshopSlides('pro-card')),
-  defineTemplate({
-    key: 'roots-marketing-sop-workshop-phase',
-    category: 'ROOTS · SOP & KI',
-    name: 'Marketing SOP · Pro Phase',
-    desc: 'Kürzere Marketing-SOP-Variante: je Phase (statt je Karte) sammeln · Top-3 priorisieren · Presentation Session · Pitch → ICE Matrix.',
-    group: '6–20',
-    tips: 'Tempo-Variante für Marketing. Eine Sammel-Folie je Phase statt je Karte — deutlich kürzer. 5 Min. · max. 2 Use Cases pro Phase.',
-  }, buildMarketingSopWorkshopSlides('pro-phase')),
 ];
 
 // ─── DEBUG MOCK DATA ─────────────────────────────────────────────────────────

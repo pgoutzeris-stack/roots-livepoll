@@ -4592,12 +4592,14 @@ async function duplicatePresentation(id) {
 function renderTemplatesModal() {
   const grid = $('#templates-grid');
   grid.innerHTML = window.LP_TEMPLATES.map((t) => `
-    <button type="button" class="template-card" data-key="${t.key}">
-      <div class="template-cat">${esc(t.category)}</div>
+    <button type="button" class="template-card${t.recommended ? ' template-card--rec' : ''}" data-key="${t.key}">
+      ${t.recommended ? '<span class="template-rec">Empfohlen</span>' : ''}
       <h3>${esc(t.name)}</h3>
-      <p>${esc(t.desc)}</p>
-      <div class="template-meta"><span><i class="fa-solid fa-clock"></i> ${esc(t.duration)}</span><span><i class="fa-solid fa-users"></i> ${esc(t.group)}</span><span><i class="fa-solid fa-layer-group"></i> ${t.slides?.length || 0} Folien</span></div>
-      ${t.tips ? `<p class="template-tips"><i class="fa-solid fa-lightbulb"></i> ${esc(t.tips)}</p>` : ''}
+      <p class="template-tagline">${esc(t.tagline || t.desc || '')}</p>
+      <div class="template-meta">
+        <span><i class="fa-solid fa-clock"></i> ${esc(t.duration)}</span>
+        <span><i class="fa-solid fa-users"></i> ${esc(t.group)}</span>
+      </div>
     </button>`).join('');
   grid.querySelectorAll('.template-card').forEach((btn) => {
     btn.addEventListener('click', () => createPresentation(btn.dataset.key));
