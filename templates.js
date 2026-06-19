@@ -723,7 +723,8 @@ function sopIceMatrix() {
     yAxisHigh: 'hoch',
     quadrants: iceQuadrants(),
     sopKind: SK.FINAL_MATRIX,
-  }, { showResultsLive: true, sopAllTracksMatrix: true, sopMatrixCount: (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 10), workshopMode: 'decide' });
+    sopFairVote: true,
+  }, { showResultsLive: true, sopAllTracksMatrix: true, sopFairVote: true, sopMatrixCount: (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 10), workshopMode: 'decide' });
 }
 
 // Next Steps: Quick Wins aus der Matrix → Action Log (Host pflegt Verantwortliche & Deadlines).

@@ -272,11 +272,16 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-mxm-btn.lp-q-sb.is-active{background:#3b82f6;border-color:#3b82f6;color:#fff}
 .lp-mxm-btn.lp-q-ts.is-active{background:#64748b;border-color:#64748b;color:#fff}
 .lp-mxm-btn.lp-q-dr.is-active{background:#94a3b8;border-color:#94a3b8;color:#fff}
+.matrix-fair-hint{margin:0;font-size:.82rem;line-height:1.45;color:var(--muted)}
+.lp-mx-item--own,.lp-mxm-item--own{opacity:.88;background:var(--surface)!important;border-style:dashed!important;cursor:default!important}
+.lp-mx-own-section{margin-top:.15rem}
+.lp-mx-own-items .lp-mx-item{pointer-events:none}
+.lp-mxm-item--own .vote-own-badge{margin-top:.2rem;align-self:flex-start}
 
 /* Mobile — Drag-Grid + Pool aus, übersichtliche Liste an */
 @media (max-width:760px){
   .lp-mx-wrap{padding:.25rem;gap:.7rem}
-  .lp-mx-grid-wrap,.lp-mx-pool,.lp-mx-instructions{display:none}
+  .lp-mx-grid-wrap,.lp-mx-pool,.lp-mx-instructions,.lp-mx-own-section{display:none}
   .lp-mx-mobile{display:flex}
   .lp-mx-actions{position:sticky;bottom:0;background:linear-gradient(180deg,transparent,var(--bg) 35%);padding-top:.6rem;z-index:2}
   .lp-mx-actions .btn-primary{min-width:0}

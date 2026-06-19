@@ -992,12 +992,15 @@ function resolveFinalPriorityTopN(count, { allowTrackFallback = false } = {}) {
       .filter((item) => item?.id && item?.text && item.score > 0)
       .sort((a, b) => b.score - a.score || b.votes - a.votes || String(a.text).localeCompare(String(b.text), 'de'))
       .slice(0, n)
-      .map(({ id, text, phase, trackLabel, score, votes: v }) => ({ id, text, phase, trackLabel, score, votes: v }));
+      .map(({ id, text, phase, trackLabel, score, votes: v, participant_id }) => ({
+        id, text, phase, trackLabel, score, votes: v, participant_id: participant_id || null,
+      }));
   }
   if (allowTrackFallback) {
     return aggregateTopTrackVotedUseCases()
       .flatMap((trk) => trk.items.map((item) => ({
-        id: item.id, text: item.text, phase: item.phase, trackLabel: trk.trackLabel, score: item.score, votes: item.votes,
+        id: item.id, text: item.text, phase: item.phase, trackLabel: trk.trackLabel,
+        score: item.score, votes: item.votes, participant_id: item.participant_id || null,
       })))
       .sort((a, b) => (b.score || 0) - (a.score || 0) || (b.votes || 0) - (a.votes || 0))
       .slice(0, n)
@@ -1006,20 +1009,60 @@ function resolveFinalPriorityTopN(count, { allowTrackFallback = false } = {}) {
   return [];
 }
 
+// Teilnehmer: gebroadcastete Matrix-Items (Lookup über Folien-ID + Host-/Matrix-Fallback).
+function getPushedMatrixItems(slide) {
+  const store = State.matrixItemsBySlide || {};
+  if (Array.isArray(store[slide?.id]) && store[slide.id].length) return store[slide.id];
+  const hostSlide = State.slides?.[State.session?.current_slide_index || 0];
+  if (hostSlide?.id && hostSlide.id !== slide?.id && Array.isArray(store[hostSlide.id]) && store[hostSlide.id].length) {
+    return store[hostSlide.id];
+  }
+  const mx = getMatrixSlide();
+  if (mx?.id && mx.id !== slide?.id && Array.isArray(store[mx.id]) && store[mx.id].length) return store[mx.id];
+  return null;
+}
+
+function sanitizeMatrixItemsList(items, slide, { count } = {}) {
+  const n = count ?? getFinalMatrixItemCount(slide);
+  return (Array.isArray(items) ? items : [])
+    .filter((i) => i?.id && i?.text)
+    .slice(0, n);
+}
+
 function assertMatrixItemsIntegrity(items, slide, { count } = {}) {
   const n = count ?? getFinalMatrixItemCount(slide);
+  const actual = sanitizeMatrixItemsList(items, slide, { count: n });
+  if (!actual.length) return [];
+
+  const isParticipantView = Boolean(State.participant && !State.user);
   const expected = resolveFinalPriorityTopN(n, { allowTrackFallback: !getFinalAllTracksVoteSlide() });
+
+  // Teilnehmer ohne lokale Vote-Daten: gebroadcastete Items nicht verwerfen.
+  // (Sonst leere Matrix trotz gültigem Host-Broadcast — Hauptursache des Bugs.)
+  if (isParticipantView && !expected.length) return actual;
+
   const expectedIds = expected.map((i) => i.id);
-  const actual = Array.isArray(items) ? items : [];
-  const actualIds = actual.map((i) => i?.id).filter(Boolean);
+  const actualIds = actual.map((i) => i.id);
   const ok = actual.length <= n
-    && actual.every((i) => i?.id && i?.text && expectedIds.includes(i.id))
+    && actual.every((i) => expectedIds.includes(i.id))
     && actualIds.length === new Set(actualIds).size
     && (expected.length === 0 || actual.length === expected.length);
   if (!ok && typeof console !== 'undefined') {
     console.warn('[LP] Matrix-Integrität: Items weichen von Final-Vote Top-N ab', { expected: expectedIds, actual: actualIds });
   }
   return ok ? actual : expected;
+}
+
+function isMatrixFairVote(slide) {
+  if (!slide) return false;
+  if (slide.settings?.sopFairVote) return true;
+  const voteSlide = getFinalAllTracksVoteSlide();
+  return !!(slide.settings?.sopAllTracksMatrix && voteSlide?.settings?.sopFairVote);
+}
+
+function isOwnMatrixItem(item, slide) {
+  if (!isMatrixFairVote(slide) || !State.participant?.id) return false;
+  return item?.participant_id === State.participant.id;
 }
 
 function sanitizeMatrixPlacements(placements, allowedIds) {
@@ -1081,9 +1124,7 @@ function maybeRefreshMatrixBroadcastFromVote(response) {
   if (!voteSlide || response.slide_id !== voteSlide.id) return;
   invalidateMatrixItemsCache();
   const matrixSlide = getMatrixSlide();
-  if (!matrixSlide) return;
-  const cur = State.slides[State.session?.current_slide_index || 0];
-  if (cur?.id === matrixSlide.id || cur?.id === voteSlide.id) broadcastMatrixItems(matrixSlide);
+  if (matrixSlide) broadcastMatrixItems(matrixSlide);
 }
 
 function isSopVoteSlide(slide) {
@@ -7122,7 +7163,7 @@ function showSopAssignCelebration(group) {
 }
 
 // Presenter: aufgelöste Matrix-Items an Teilnehmer broadcasten (nur bei Änderung)
-function broadcastMatrixItems(slide) {
+function broadcastMatrixItems(slide, { force = false } = {}) {
   if (!slide) return;
   const isMatrix = slide.slide_type === 'priority_matrix' || slide.settings?.sopAllTracksMatrix;
   if (!isMatrix) return;
@@ -7131,7 +7172,7 @@ function broadcastMatrixItems(slide) {
   let items = resolveFinalPriorityTopN(count, { allowTrackFallback });
   items = assertMatrixItemsIntegrity(items, slide, { count });
   const sig = slide.id + ':' + items.map((i) => i.id).join(',');
-  if (State._lastMatrixSig === sig) return;
+  if (!force && State._lastMatrixSig === sig) return;
   State._lastMatrixSig = sig;
   if (!items.length) {
     invalidateMatrixItemsCache(slide.id);
@@ -7420,6 +7461,11 @@ function renderPresentNow() {
   // zeitversetzt drippen (nur einmal pro Slide via triggeredSlides-Set)
   if (window.LP_DebugSim?.active) window.LP_DebugSim.maybeDripCurrentSlide();
   // Matrix-Items an Teilnehmer broadcasten, damit sie dieselben Items ziehen können
+  const curIdx = State.session?.current_slide_index || 0;
+  if (State._matrixNavIdx !== curIdx) {
+    State._matrixNavIdx = curIdx;
+    State._lastMatrixSig = null;
+  }
   broadcastMatrixItems(slide);
   // Vote-Optionen an Teilnehmer broadcasten, damit sie alle Use Cases sehen + wählen können
   broadcastVoteOptions(slide);
@@ -8579,13 +8625,12 @@ function findPrecedingCollectSlide(matrixSlide) {
 
 function getMatrixItems(slide, { fresh = false } = {}) {
   // 0. Vom Presenter gebroadcastete Items (Teilnehmer sehen exakt dieselben
-  //    Items wie der Presenter — funktioniert auch im Simulationsmodus, wo die
-  //    zugrundeliegenden Antworten nur lokal beim Presenter liegen).
-  //    fresh=true erzwingt eine Neuberechnung (Presenter beim Broadcast), damit
-  //    spät eingehende Stimmen die Top-N noch aktualisieren.
+  //    Items wie der Presenter — funktioniert auch im Simulationsmodus).
   if (!fresh) {
-    const pushed = State.matrixItemsBySlide && State.matrixItemsBySlide[slide?.id];
-    if (Array.isArray(pushed) && pushed.length) {
+    const pushed = getPushedMatrixItems(slide);
+    if (pushed?.length) {
+      const isParticipantView = Boolean(State.participant && !State.user);
+      if (isParticipantView) return sanitizeMatrixItemsList(pushed, slide);
       return assertMatrixItemsIntegrity(pushed, slide);
     }
   }
@@ -8648,6 +8693,7 @@ function saveMatrixLocal(slideId, placements) {
 function renderParticipantMatrixHtml(slide) {
   const c = slide.content || {};
   const items = getMatrixItems(slide);
+  const fairVote = isMatrixFairVote(slide);
   const quadrants = c.quadrants || {
     qw: { label: 'Quick Win', icon: 'fa-rocket', desc: 'hoher Impact · niedriger Aufwand' },
     sb: { label: 'Strategic Bet', icon: 'fa-star', desc: 'hoher Impact · hoher Aufwand' },
@@ -8655,47 +8701,67 @@ function renderParticipantMatrixHtml(slide) {
     dr: { label: 'Drop', icon: 'fa-ban', desc: 'niedriger Impact · niedriger Aufwand' },
   };
   if (!items.length) {
-    return '<div class="participant-wait-block"><p class="participant-sop-wait"><i class="fa-solid fa-clock"></i> Noch keine Use Cases gesammelt. Bitte warte auf den Vortragenden.</p></div>';
+    const hasBroadcastPending = Boolean(State.participant && !State.user && getFinalAllTracksVoteSlide());
+    const msg = hasBroadcastPending
+      ? 'Die priorisierten Use Cases werden geladen… Bitte kurz warten.'
+      : 'Noch keine priorisierten Use Cases. Bitte warte, bis die finale Priorisierung abgeschlossen ist.';
+    return `<div class="participant-wait-block"><p class="participant-sop-wait"><i class="fa-solid fa-clock"></i> ${msg}</p></div>`;
   }
+  const placeableItems = fairVote ? items.filter((it) => !isOwnMatrixItem(it, slide)) : items;
+  const ownItems = fairVote ? items.filter((it) => isOwnMatrixItem(it, slide)) : [];
+  const fairHint = fairVote
+    ? `<p class="vote-mode-hint matrix-fair-hint"><i class="fa-solid fa-scale-balanced"></i> Ordne <strong>fremde Use Cases</strong> ein — eigene Beiträge (${ownItems.length}) werden vom Team eingeordnet.</p>`
+    : '';
   const placements = loadMatrixLocal(slide.id);
-  const inQuadrant = (q) => items.filter((it) => placements[it.id] === q);
-  const inPool = items.filter((it) => !placements[it.id]);
-  const itemCard = (it) => {
+  const inQuadrant = (q) => placeableItems.filter((it) => placements[it.id] === q);
+  const inPool = placeableItems.filter((it) => !placements[it.id]);
+  const itemCard = (it, { readonly = false } = {}) => {
     const origin = [it.trackLabel, it.phase].filter(Boolean).join(' · ');
-    return `<div class="lp-mx-item" data-item-id="${esc(it.id)}" data-text="${esc(it.text)}" title="${esc(useCaseCollectLabel(it.text))}${origin ? ' — ' + esc(origin) : ''}">
+    const ownCls = readonly ? ' lp-mx-item--own' : '';
+    const ownBadge = readonly ? '<span class="vote-own-badge">Mein Beitrag</span>' : '';
+    return `<div class="lp-mx-item${ownCls}" data-item-id="${esc(it.id)}" data-text="${esc(it.text)}"${readonly ? ' data-readonly="1"' : ''} title="${esc(useCaseCollectLabel(it.text))}${origin ? ' — ' + esc(origin) : ''}">
     <span class="lp-mx-item-text">${renderUseCaseDisplayHtml(it.text, 'collect')}</span>
     ${origin ? `<span class="lp-mx-item-origin">${esc(origin)}</span>` : ''}
+    ${ownBadge}
   </div>`;
   };
   const QICON = { qw: 'fa-rocket', sb: 'fa-star', ts: 'fa-screwdriver-wrench', dr: 'fa-ban' };
   const cellHead = (q) => `<div class="lp-mx-quad-head"><span class="lp-mx-quad-ico"><i class="fa-solid ${QICON[q]}"></i></span><strong>${esc(quadrants[q].label)}</strong></div>`;
-  const quad = (q) => `<div class="lp-mx-quad lp-q-${q} lp-mx-cell" data-drop="${q}">${cellHead(q)}<div class="lp-mx-quad-body lp-mx-cell-items">${inQuadrant(q).map(itemCard).join('')}</div></div>`;
+  const quad = (q) => `<div class="lp-mx-quad lp-q-${q} lp-mx-cell" data-drop="${q}">${cellHead(q)}<div class="lp-mx-quad-body lp-mx-cell-items">${inQuadrant(q).map((it) => itemCard(it)).join('')}</div></div>`;
   const gridHtml = `${quad('qw')}${quad('sb')}${quad('dr')}${quad('ts')}`;
   const frame = window.LPViz.renderMatrixFrame({
     yLabel: c.yAxisLabel || 'Impact',
     xLabel: c.xAxisLabel || 'Aufwand',
     gridHtml,
   });
-  return `<div class="lp-mx-wrap" data-slide-id="${esc(slide.id)}">
+  return `<div class="lp-mx-wrap" data-slide-id="${esc(slide.id)}" data-fair-vote="${fairVote ? '1' : '0'}">
+    ${fairHint}
     <div class="lp-mx-instructions ws-pill ws-pill--brand"><i class="fa-solid fa-hand-pointer"></i> Use Cases in die Matrix ziehen</div>
     ${frame}
     <div class="lp-mx-pool" data-drop="pool">
-      <div class="lp-mx-pool-head"><span class="ws-pill ws-pill--muted"><i class="fa-solid fa-layer-group"></i> Pool</span> <span class="lp-mx-pool-count" id="lp-mx-pool-count">${inPool.length} / ${items.length}</span></div>
-      <div class="lp-mx-pool-items">${inPool.map(itemCard).join('')}</div>
+      <div class="lp-mx-pool-head"><span class="ws-pill ws-pill--muted"><i class="fa-solid fa-layer-group"></i> Pool</span> <span class="lp-mx-pool-count" id="lp-mx-pool-count">${inPool.length} / ${placeableItems.length}</span></div>
+      <div class="lp-mx-pool-items">${inPool.map((it) => itemCard(it)).join('')}</div>
     </div>
+    ${ownItems.length ? `<div class="lp-mx-own-section"><div class="lp-mx-pool-head"><span class="ws-pill ws-pill--muted"><i class="fa-solid fa-user"></i> Eigene Beiträge</span></div><div class="lp-mx-pool-items lp-mx-own-items">${ownItems.map((it) => itemCard(it, { readonly: true })).join('')}</div></div>` : ''}
     <div class="lp-mx-mobile">
       <div class="lp-mx-mobile-hint"><i class="fa-solid fa-circle-info"></i> Wähle pro Use Case den passenden Quadranten.</div>
-      ${items.map((it) => {
+      ${placeableItems.map((it) => {
         const origin = [it.trackLabel, it.phase].filter(Boolean).join(' · ');
         return `<div class="lp-mxm-item" data-item-id="${esc(it.id)}">
           <div class="lp-mxm-text">${renderUseCaseDisplayHtml(it.text, 'collect')}${origin ? `<span class="lp-mxm-origin">${esc(origin)}</span>` : ''}</div>
           <div class="lp-mxm-choices">${['qw', 'sb', 'ts', 'dr'].map((q) => `<button type="button" class="lp-mxm-btn lp-q-${q}${placements[it.id] === q ? ' is-active' : ''}" data-item="${esc(it.id)}" data-q="${q}" aria-label="${esc(quadrants[q].label)}" title="${esc(quadrants[q].label)}"><i class="fa-solid ${QICON[q] || 'fa-square'}"></i></button>`).join('')}</div>
         </div>`;
       }).join('')}
+      ${ownItems.map((it) => {
+        const origin = [it.trackLabel, it.phase].filter(Boolean).join(' · ');
+        return `<div class="lp-mxm-item lp-mxm-item--own" data-item-id="${esc(it.id)}">
+          <div class="lp-mxm-text">${renderUseCaseDisplayHtml(it.text, 'collect')}${origin ? `<span class="lp-mxm-origin">${esc(origin)}</span>` : ''}<span class="vote-own-badge">Mein Beitrag</span></div>
+        </div>`;
+      }).join('')}
     </div>
     <div class="lp-mx-actions">
       <button type="button" class="btn-ghost" id="lp-mx-reset"><i class="fa-solid fa-rotate-left"></i> Zurücksetzen</button>
-      <button type="button" class="btn-primary participant-submit" id="lp-mx-submit"><i class="fa-solid fa-paper-plane"></i> Senden <span class="lp-mx-progress">(<span id="lp-mx-progress-n">${items.length - inPool.length}</span>/${items.length})</span></button>
+      <button type="button" class="btn-primary participant-submit" id="lp-mx-submit"><i class="fa-solid fa-paper-plane"></i> Senden <span class="lp-mx-progress">(<span id="lp-mx-progress-n">${Math.max(0, placeableItems.length - inPool.length)}</span>/${placeableItems.length})</span></button>
     </div>
   </div>`;
 }
@@ -8708,14 +8774,26 @@ function setupMatrixDragDrop(slide) {
   State._matrixDnDAbort = new AbortController();
   const matrixDnDSignal = State._matrixDnDAbort.signal;
   const items = getMatrixItems(slide);
+  const placeableItems = isMatrixFairVote(slide)
+    ? items.filter((it) => !isOwnMatrixItem(it, slide))
+    : items;
   const itemMeta = {};
   items.forEach((it) => { itemMeta[it.id] = { text: it.text, phase: it.phase, trackLabel: it.trackLabel }; });
 
   let placements = loadMatrixLocal(slide.id);
+  // Fair Vote: eigene Einordnungen aus lokalem Entwurf entfernen
+  if (isMatrixFairVote(slide)) {
+    items.filter((it) => isOwnMatrixItem(it, slide)).forEach((it) => { delete placements[it.id]; });
+    saveMatrixLocal(slide.id, placements);
+  }
+
+  function countPlaced() {
+    return placeableItems.filter((it) => placements[it.id] && placements[it.id] !== 'pool').length;
+  }
 
   function updateProgress() {
-    const placed = Object.keys(placements).filter((k) => placements[k]).length;
-    const total = items.length;
+    const placed = countPlaced();
+    const total = placeableItems.length;
     const n = document.getElementById('lp-mx-progress-n'); if (n) n.textContent = placed;
     const pool = document.getElementById('lp-mx-pool-count'); if (pool) pool.textContent = `${total - placed} / ${total}`;
     const submit = document.getElementById('lp-mx-submit');
@@ -8735,6 +8813,8 @@ function setupMatrixDragDrop(slide) {
   }
 
   function setPlacement(itemId, quadrant) {
+    const item = items.find((it) => it.id === itemId);
+    if (item && isOwnMatrixItem(item, slide)) return;
     if (quadrant === 'pool') {
       delete placements[itemId];
     } else {
@@ -8751,7 +8831,7 @@ function setupMatrixDragDrop(slide) {
   let longpressTimer = null;
 
   function startDrag(item, e) {
-    if (dragging) return;
+    if (dragging || item.dataset.readonly === '1') return;
     const rect = item.getBoundingClientRect();
     const ghost = item.cloneNode(true);
     ghost.classList.add('lp-mx-ghost');
@@ -8802,6 +8882,7 @@ function setupMatrixDragDrop(slide) {
 
   wrap.querySelectorAll('.lp-mx-item').forEach((item) => {
     item.addEventListener('pointerdown', (e) => {
+      if (item.dataset.readonly === '1') return;
       if (e.button !== 0 && e.pointerType === 'mouse') return;
       e.preventDefault();
       // On touch: small long-press to feel intentional; on mouse: immediate
@@ -8883,8 +8964,11 @@ function setupMatrixDragDrop(slide) {
 
   // Submit
   document.getElementById('lp-mx-submit')?.addEventListener('click', () => {
-    const placed = Object.keys(placements).filter((k) => placements[k]).length;
-    if (!placed) { toast('Bitte mindestens 1 Use Case einsortieren', 'warn'); return; }
+    const placed = countPlaced();
+    if (!placed) {
+      toast(isMatrixFairVote(slide) ? 'Bitte mindestens einen fremden Use Case einordnen' : 'Bitte mindestens 1 Use Case einsortieren', 'warn');
+      return;
+    }
     submitResponse({ matrix: placements, meta: itemMeta });
   });
 }
@@ -9161,9 +9245,20 @@ async function submitResponse(response) {
   if (isMatrixSlide && response?.matrix) {
     const allowedItems = getMatrixItems(slide);
     const allowedIds = new Set(allowedItems.map((i) => i.id));
-    const placements = sanitizeMatrixPlacements(response.matrix, allowedIds);
+    let placements = sanitizeMatrixPlacements(response.matrix, allowedIds);
+    // Fair Vote: eigene Use Cases dürfen nicht eingeordnet werden
+    if (isMatrixFairVote(slide) && State.participant?.id) {
+      allowedItems.filter((it) => isOwnMatrixItem(it, slide)).forEach((it) => { delete placements[it.id]; });
+    }
+    const placeable = isMatrixFairVote(slide)
+      ? allowedItems.filter((it) => !isOwnMatrixItem(it, slide))
+      : allowedItems;
     if (!Object.keys(placements).length) {
-      toast('Ungültige Matrix-Einordnung — nur priorisierte Use Cases erlaubt', 'warn');
+      toast(isMatrixFairVote(slide) ? 'Bitte mindestens einen fremden Use Case einordnen' : 'Bitte mindestens 1 Use Case einsortieren', 'warn');
+      return;
+    }
+    if (placeable.length && !Object.keys(placements).some((id) => placeable.some((p) => p.id === id))) {
+      toast('Eigene Beiträge können nicht eingeordnet werden — bitte fremde Use Cases wählen', 'warn');
       return;
     }
     const meta = {};
