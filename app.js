@@ -66,6 +66,10 @@ const State = {
   participantResponsesAt: 0,
   matrixItemsBySlide: {},
   voteOptionsBySlide: {},
+  pitchItems: [],
+  pitchSync: null,
+  quickWinItems: [],
+  participantPitchPoll: null,
   pitchTimers: {},
   sopAssignSeen: null,
   closingCelebrationSlideId: null,
@@ -5292,6 +5296,192 @@ function pitchFmt(s) {
   return `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
 }
 
+function buildPitchItemsList() {
+  const items = [];
+  const { byTrack } = aggregateAllTracksUseCases();
+  let n = 0;
+  byTrack.forEach((trk) => {
+    trk.phases.forEach((p) => {
+      p.items.forEach((item) => {
+        n += 1;
+        const author = getParticipantForDisplay(item.participant_id);
+        items.push({
+          n,
+          id: item.id,
+          text: item.text,
+          trackLabel: trk.trackLabel || '',
+          phase: p.phase || '',
+          participant_id: item.participant_id || null,
+          authorName: author?.display_name || item.authorName || 'Unbekannt',
+        });
+      });
+    });
+  });
+  return items;
+}
+
+function getParticipantPitchItems() {
+  if (State.participant && !State.user && Array.isArray(State.pitchItems) && State.pitchItems.length) {
+    return State.pitchItems;
+  }
+  return buildPitchItemsList();
+}
+
+function computePitchRemainingFromSync(sync) {
+  if (!sync) return 0;
+  const base = Math.max(0, Number(sync.remaining) || 0);
+  if (!sync.running) return base;
+  const elapsed = Math.max(0, (Date.now() - (Number(sync.at) || Date.now())) / 1000);
+  return Math.max(0, Math.floor(base - elapsed));
+}
+
+function broadcastPitchSessionData(slide) {
+  if (!slide) return;
+  const isPitch = slide.content?.sopKind === 'pitch-session' || slide.settings?.sopPitchSession;
+  if (!isPitch) return;
+  const items = buildPitchItemsList();
+  const sig = items.map((i) => i.id).join(',');
+  if (State._lastPitchItemsSig !== sig) State._lastPitchItemsSig = sig;
+  State.pitchItems = items;
+  const sync = State.pitchSync || null;
+  const syncSig = sync ? `${sync.activeKey}:${sync.running}:${sync.remaining}:${sync.at}` : 'idle';
+  const payloadSig = `${sig}|${syncSig}`;
+  if (State._lastPitchBroadcastSig === payloadSig) return;
+  State._lastPitchBroadcastSig = payloadSig;
+  try {
+    State.sessionChannel?.send({
+      type: 'broadcast',
+      event: 'session_sync',
+      payload: { pitchItems: items, pitchSync: sync },
+    });
+  } catch {}
+}
+
+function pushPitchTimerSync(key) {
+  const st = State.pitchTimers?.[key];
+  if (!st) return;
+  State.pitchSync = {
+    activeKey: st.running ? key : null,
+    remaining: Math.max(0, st.remaining ?? 0),
+    running: !!st.running,
+    total: st.total || 120,
+    at: Date.now(),
+  };
+  State._lastPitchBroadcastSig = null;
+  try {
+    State.sessionChannel?.send({
+      type: 'broadcast',
+      event: 'session_sync',
+      payload: { pitchSync: State.pitchSync },
+    });
+  } catch {}
+}
+
+function broadcastQuickWinItems(slide) {
+  if (slide?.content?.sopKind !== 'next-steps' && !slide?.settings?.sopNextSteps) return;
+  const items = getQuickWinMatrixUseCases();
+  const sig = items.map((i) => i.id).join(',');
+  if (State._lastQuickWinSig === sig) return;
+  State._lastQuickWinSig = sig;
+  State.quickWinItems = items;
+  try {
+    State.sessionChannel?.send({
+      type: 'broadcast',
+      event: 'session_sync',
+      payload: { quickWinItems: items },
+    });
+  } catch {}
+}
+
+function getParticipantQuickWinItems() {
+  if (State.participant && !State.user && Array.isArray(State.quickWinItems) && State.quickWinItems.length) {
+    return State.quickWinItems;
+  }
+  return getQuickWinMatrixUseCases();
+}
+
+function stopParticipantPitchClock() {
+  if (State.participantPitchPoll) {
+    clearInterval(State.participantPitchPoll);
+    State.participantPitchPoll = null;
+  }
+}
+
+function updateParticipantPitchTimerDom() {
+  const el = document.querySelector('.participant-pitch-focus-timer .participant-pitch-timer-val');
+  if (!el || !State.pitchSync?.running) return;
+  el.textContent = pitchFmt(computePitchRemainingFromSync(State.pitchSync));
+  if (computePitchRemainingFromSync(State.pitchSync) <= 0) {
+    el.closest('.participant-pitch-focus-timer')?.classList.add('is-done');
+  }
+}
+
+function startParticipantPitchClock() {
+  stopParticipantPitchClock();
+  if (!State.participant || State.user) return;
+  State.participantPitchPoll = setInterval(updateParticipantPitchTimerDom, 250);
+}
+
+function renderParticipantPitchCard(item, { focused = false, sync = null } = {}) {
+  const author = getParticipantForDisplay(item.participant_id) || { display_name: item.authorName };
+  const trackLine = [item.trackLabel, item.phase].filter(Boolean).join(' · ');
+  const timerHtml = focused && sync
+    ? `<div class="participant-pitch-focus-timer${sync.running ? ' is-running' : ''}${computePitchRemainingFromSync(sync) <= 0 && !sync.running ? ' is-done' : ''}" aria-live="polite">
+        <span class="participant-pitch-timer-label"><i class="fa-solid fa-stopwatch"></i> Pitch-Timer</span>
+        <span class="participant-pitch-timer-val">${pitchFmt(computePitchRemainingFromSync(sync))}</span>
+      </div>`
+    : '';
+  return `<article class="participant-pitch-card${focused ? ' participant-pitch-card--focus' : ''}" data-pitch-id="${esc(item.id)}">
+    <div class="participant-pitch-card-head">
+      <span class="participant-pitch-num">${item.n}</span>
+      ${trackLine ? `<span class="participant-pitch-track">${esc(trackLine)}</span>` : ''}
+    </div>
+    <div class="participant-pitch-text">${renderUseCaseDisplayHtml(item.text, 'full')}</div>
+    <div class="participant-pitch-author">
+      ${participantAvatarHtml(author, 'sm')}
+      <span>Eingebracht von <strong>${esc(item.authorName || author.display_name || 'Unbekannt')}</strong></span>
+    </div>
+    ${timerHtml}
+  </article>`;
+}
+
+function renderParticipantNextStepsHtml() {
+  const items = getParticipantQuickWinItems();
+  const actions = getNextStepActions();
+  if (!items.length) {
+    return `<div class="participant-nextsteps-empty"><i class="fa-solid fa-table-cells-large"></i><p>Quick Wins aus der Matrix erscheinen hier, sobald der Host sie pflegt.</p></div>`;
+  }
+  const statusLabel = (id) => NEXT_STEP_STATUSES.find((s) => s.id === id)?.label || 'Geplant';
+  const cards = items.map((it, i) => {
+    const a = { ...defaultNextStepAction(), ...(actions[it.id] || {}) };
+    const meta = [it.trackLabel, it.phase].filter(Boolean).join(' · ');
+    return `<article class="participant-ns-card">
+      <div class="participant-ns-card-head">
+        <span class="participant-ns-rank">${i + 1}</span>
+        <span class="participant-ns-status ns-status ns-status--${esc(a.status || 'planned')}">${esc(statusLabel(a.status))}</span>
+      </div>
+      <div class="participant-ns-uc">${renderUseCaseDisplayHtml(it.text, 'full')}</div>
+      ${meta ? `<div class="participant-ns-meta">${esc(meta)}</div>` : ''}
+      <dl class="participant-ns-fields">
+        <div class="participant-ns-field"><dt>Verantwortlich</dt><dd>${a.owner ? esc(a.owner) : '–'}</dd></div>
+        <div class="participant-ns-field"><dt>Bis wann</dt><dd>${a.dueDate ? esc(formatNextStepDate(a.dueDate)) : '–'}</dd></div>
+        <div class="participant-ns-field participant-ns-field--full"><dt>Nächster Schritt</dt><dd>${a.nextStep ? esc(a.nextStep) : '–'}</dd></div>
+        ${a.notes ? `<div class="participant-ns-field participant-ns-field--full"><dt>Notiz</dt><dd>${esc(a.notes)}</dd></div>` : ''}
+      </dl>
+    </article>`;
+  }).join('');
+  return `<div class="participant-nextsteps-list">${cards}</div>`;
+}
+
+function renderParticipantGoalMatrixHtml(slide) {
+  const c = slide?.content || {};
+  const bodyParts = String(c.body || '').split(/\n\n+/).filter(Boolean);
+  const bodyHtml = bodyParts.length
+    ? `<div class="participant-goal-copy">${bodyParts.map((p) => `<p>${esc(p.trim()).replace(/\n/g, '<br>')}</p>`).join('')}</div>`
+    : '';
+  return `${bodyHtml}<div class="participant-matrix-intro-preview">${renderGoalMatrixPreview()}</div>`;
+}
+
 function renderAllTracksUseCasesWithAuthors(timerSec = 120) {
   const { byTrack } = aggregateAllTracksUseCases();
   if (!byTrack.length) return '<div class="present-wait-msg">Noch keine Use Cases gesammelt.</div>';
@@ -5372,6 +5562,12 @@ function bindPitchTimers(stage) {
       paint();
     };
     const start = () => {
+      Object.entries(State.pitchTimers || {}).forEach(([k, o]) => {
+        if (k !== key && o?.running) {
+          if (o.interval) { clearInterval(o.interval); o.interval = null; }
+          o.running = false;
+        }
+      });
       if (st.remaining <= 0) {
         st.remaining = total;
         timerEl.classList.remove('is-done');
@@ -5385,12 +5581,16 @@ function bindPitchTimers(stage) {
           halt();
           timerEl.classList.add('is-done');
           setIcon('fa-rotate-left');
+          pushPitchTimerSync(key);
+        } else if (st.remaining % 3 === 0) {
+          pushPitchTimerSync(key);
         }
       }, 1000);
     };
     btn.onclick = () => {
       if (st.running) halt();
       else start();
+      pushPitchTimerSync(key);
     };
     if (st.running && !st.interval) {
       st.interval = setInterval(() => {
@@ -5400,41 +5600,35 @@ function bindPitchTimers(stage) {
           halt();
           timerEl.classList.add('is-done');
           setIcon('fa-rotate-left');
+          pushPitchTimerSync(key);
+        } else if (st.remaining % 3 === 0) {
+          pushPitchTimerSync(key);
         }
       }, 1000);
     }
+    paint();
   });
 }
 
 function renderParticipantPitchHtml() {
-  const { byTrack } = aggregateAllTracksUseCases();
-  if (!byTrack.length) {
+  const items = getParticipantPitchItems();
+  if (!items.length) {
     return `<div class="participant-pitch-empty"><p>Noch keine Use Cases gesammelt.</p></div>`;
   }
-  let n = 0;
-  let cards = '';
-  byTrack.forEach((trk) => {
-    trk.phases.forEach((p) => {
-      p.items.forEach((item) => {
-        n += 1;
-        const author = getParticipantForDisplay(item.participant_id);
-        const authorName = author?.display_name || item.authorName || 'Unbekannt';
-        cards += `<article class="participant-pitch-card">
-          <div class="participant-pitch-card-head">
-            <span class="participant-pitch-num">${n}</span>
-            ${trk.trackLabel || p.phase ? `<span class="participant-pitch-track">${esc([trk.trackLabel, p.phase].filter(Boolean).join(' · '))}</span>` : ''}
-          </div>
-          <div class="participant-pitch-text">${renderUseCaseDisplayHtml(item.text, 'full')}</div>
-          <div class="participant-pitch-author">
-            ${participantAvatarHtml(author || { display_name: authorName }, 'sm')}
-            <span>Eingebracht von <strong>${esc(authorName)}</strong></span>
-          </div>
-        </article>`;
-      });
-    });
-  });
+  const sync = State.pitchSync;
+  const activeId = sync?.running && sync.activeKey ? sync.activeKey : null;
+  if (activeId) {
+    const item = items.find((i) => i.id === activeId);
+    if (item) {
+      return `<div class="participant-pitch-list participant-pitch-list--focus">
+        <p class="participant-pitch-hint participant-pitch-hint--live"><i class="fa-solid fa-microphone"></i> Jetzt am Pitch: Use Case ${item.n}</p>
+        ${renderParticipantPitchCard(item, { focused: true, sync })}
+      </div>`;
+    }
+  }
+  const cards = items.map((item) => renderParticipantPitchCard(item)).join('');
   return `<div class="participant-pitch-list">
-    <p class="participant-pitch-hint"><i class="fa-solid fa-person-chalkboard"></i> Pitch-Runde — wer pitcht welchen Use Case?</p>
+    <p class="participant-pitch-hint"><i class="fa-solid fa-person-chalkboard"></i> Pitch-Runde — ${items.length} Use Cases · wer pitcht welchen?</p>
     ${cards}
   </div>`;
 }
@@ -7117,7 +7311,16 @@ function applySessionPatch(patch) {
   if (patch && patch.voteOptions && typeof patch.voteOptions === 'object') {
     State.voteOptionsBySlide = { ...(State.voteOptionsBySlide || {}), ...patch.voteOptions };
   }
-  const { matrixItems, voteOptions, ...rest } = patch || {};
+  if (patch && Array.isArray(patch.pitchItems)) {
+    State.pitchItems = patch.pitchItems;
+  }
+  if (patch && patch.pitchSync && typeof patch.pitchSync === 'object') {
+    State.pitchSync = patch.pitchSync;
+  }
+  if (patch && Array.isArray(patch.quickWinItems)) {
+    State.quickWinItems = patch.quickWinItems;
+  }
+  const { matrixItems, voteOptions, pitchItems, pitchSync, quickWinItems, ...rest } = patch || {};
   if (rest.settings) {
     rest.settings = { ...(State.session.settings || {}), ...rest.settings };
   }
@@ -7132,6 +7335,13 @@ function applySessionPatch(patch) {
   const slide = State.slides?.[State.session.current_slide_index || 0];
   if (patch?.settings?.nextStepActions && slide && (slide.content?.sopKind === 'next-steps' || slide.settings?.sopNextSteps)) {
     if (State.participant) void renderParticipantQuestion();
+  }
+  if (State.participant && slide && (
+    patch?.pitchItems || patch?.pitchSync || patch?.quickWinItems
+    || (slide.content?.sopKind === 'pitch-session' || slide.settings?.sopPitchSession)
+    || (slide.content?.sopKind === 'next-steps' || slide.settings?.sopNextSteps)
+  )) {
+    void renderParticipantQuestion();
   }
 }
 
@@ -7396,9 +7606,11 @@ function subscribeSessionChannel() {
         // Spät beigetretene Teilnehmer: aktuelle Vote-/Matrix-Daten erneut senden.
         const cur = currentSessionSlide();
         if (cur) {
-          State._lastVoteSig = null; State._lastMatrixSig = null;
+          State._lastVoteSig = null; State._lastMatrixSig = null; State._lastPitchBroadcastSig = null; State._lastQuickWinSig = null;
           try { broadcastVoteOptions(cur); } catch {}
           try { broadcastMatrixItems(cur); } catch {}
+          try { broadcastPitchSessionData(cur); } catch {}
+          try { broadcastQuickWinItems(cur); } catch {}
         }
       }
       updatePresentStats();
@@ -7469,6 +7681,8 @@ function renderPresentNow() {
   broadcastMatrixItems(slide);
   // Vote-Optionen an Teilnehmer broadcasten, damit sie alle Use Cases sehen + wählen können
   broadcastVoteOptions(slide);
+  broadcastPitchSessionData(slide);
+  broadcastQuickWinItems(slide);
   // #13 Track-Farb-Coding: propagiere SOP-Track-Class auf Stage-Wrapper,
   // damit CSS-Akzente (Header-Border, Badge-Farben) automatisch zur Geltung kommen.
   const trackClass = c.sopTrackClass || c.sopTrackKey || '';
@@ -8359,30 +8573,54 @@ async function renderParticipantQuestion() {
     return;
   }
   if (hostSlide?.content?.sopKind === 'pitch-session' || hostSlide?.settings?.sopPitchSession) {
+    startParticipantPitchClock();
+    const sync = State.pitchSync;
+    const inFocus = sync?.running && sync.activeKey;
     root.innerHTML = wrapParticipantSlide(`
-      <div class="participant-ws-slide-wrap participant-pitch-block">
+      <div class="participant-ws-slide-wrap participant-pitch-block${inFocus ? ' participant-pitch-block--focus' : ''}">
         ${renderWsSlideShell({
           ...getSlideShellMeta(hostSlide),
           title: getWsPresentTitle(hostSlide),
           chips: getWsPresentChips(hostSlide),
-          lead: getWsPresentLead(hostSlide) || 'Überblick: wer pitcht welchen Use Case?',
+          lead: inFocus ? 'Live-Pitch — Timer läuft' : (getWsPresentLead(hostSlide) || 'Überblick: wer pitcht welchen Use Case?'),
           main: renderParticipantPitchHtml(),
         })}
-        <p class="participant-sop-wait participant-sop-wait--compact"><i class="fa-solid fa-eye"></i> Bitte auf die Pitch Session auf dem Beamer achten…</p>
+        ${inFocus ? '' : '<p class="participant-sop-wait participant-sop-wait--compact"><i class="fa-solid fa-eye"></i> Der Host startet die Pitch-Timer — dann siehst du hier den aktiven Use Case live.</p>'}
+      </div>`, slideIndex);
+    finishParticipant();
+    return;
+  }
+  stopParticipantPitchClock();
+  if (hostSlide?.content?.sopKind === 'workshop-goal') {
+    root.innerHTML = wrapParticipantSlide(`
+      <div class="participant-ws-slide-wrap participant-matrix-intro-block">
+        ${renderWsSlideShell({
+          ...getSlideShellMeta(hostSlide),
+          title: getWsPresentTitle(hostSlide),
+          chips: getWsPresentChips(hostSlide),
+          lead: getWsPresentLead(hostSlide) || 'Impact vs. Aufwand — so priorisieren wir',
+          main: renderParticipantGoalMatrixHtml(hostSlide),
+        })}
       </div>`, slideIndex);
     finishParticipant();
     return;
   }
   if (hostSlide?.content?.sopKind === 'next-steps' || hostSlide?.settings?.sopNextSteps) {
     root.innerHTML = wrapParticipantSlide(`
-      <div class="participant-wait-block participant-nextsteps-block">
-        ${renderNextStepsActionLogHtml({ editable: false })}
-        <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Der Host pflegt das Action Log live — bitte auf den Beamer achten.</p>
+      <div class="participant-ws-slide-wrap participant-nextsteps-block">
+        ${renderWsSlideShell({
+          ...getSlideShellMeta(hostSlide),
+          title: getWsPresentTitle(hostSlide),
+          chips: getWsPresentChips(hostSlide),
+          lead: getWsPresentLead(hostSlide) || 'Quick Wins → konkrete Actions',
+          main: renderParticipantNextStepsHtml(),
+        })}
+        <p class="participant-sop-wait participant-sop-wait--compact"><i class="fa-solid fa-eye"></i> Der Host pflegt das Action Log live.</p>
       </div>`, slideIndex);
     finishParticipant();
     return;
   }
-  if (isWorkshopClosingSlide(hostSlide)) {
+  if (hostSlide?.content?.sopKind === 'workshop-close' || isWorkshopClosingSlide(hostSlide)) {
     root.innerHTML = wrapParticipantSlide(`
       <div class="participant-wait-block participant-closing-block">
         ${renderClosingSlideHtml(hostSlide.content || {}, false, { shellMode: true, presentFx: true })}
@@ -8537,6 +8775,7 @@ async function renderParticipantQuestion() {
   const isWorkshop = isSopWorkshopPresentation() || hasBrainstormChain(slide) || isBrainstormVoteSlide(slide) || isBrainstormResultsSlide(slide);
   const isCollect = isCollectSlide;
   const isDecide = shouldUseVoteWorkshopUi(slide);
+  const isMatrixInteract = type === 'priority_matrix' || !!slide?.settings?.sopAllTracksMatrix;
   const assignedGroup = isDualSopWorkshop() ? getParticipantSopGroup(State.participant?.id) : null;
   const teamBadge = assignedGroup && isCollect
     ? `<div class="participant-team-badge ws-pill ws-pill--orient"><i class="fa-solid ${getSopGroupMeta(assignedGroup).icon}"></i> Dein Team: ${esc(getSopGroupMeta(assignedGroup).label)}</div>`
@@ -8556,6 +8795,15 @@ async function renderParticipantQuestion() {
         chips: getWsPresentChips(slide),
         lead: getWsPresentLead(slide),
         main: `${teamBadge}${renderWorkshopCardCollectHtml(collectDisplayContent, false, { participantMode: true, shellWrapped: true })}${input}`,
+      })}
+    </div>` : isMatrixInteract ? `
+    <div class="participant-ws-slide-wrap participant-matrix-block">
+      ${renderWsSlideShell({
+        ...getSlideShellMeta(slide),
+        title: getWsPresentTitle(slide),
+        chips: getWsPresentChips(slide),
+        lead: getWsPresentLead(slide) || (c.prompt ? String(c.prompt).split('\n')[0] : 'Ordne Use Cases in die Matrix ein'),
+        main: input,
       })}
     </div>` : isDecide ? `
     <div class="participant-ws-slide-wrap">
