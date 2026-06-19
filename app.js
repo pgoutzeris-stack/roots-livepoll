@@ -2402,14 +2402,10 @@ function renderFinalVotePresentHtml(slide, visible) {
       const isMatrixTop = i < topN;
       const topClass = isMatrixTop ? ' ws-row--top' : '';
       const barPct = Math.round((r.votes / maxVotes) * 100);
-      const matrixBadge = isMatrixTop
-        ? `<span class="ws-matrix-badge"><i class="fa-solid fa-table-cells-large"></i> Matrix</span>`
-        : '';
       h += `<div class="ws-row${topClass}">
         <span class="ws-c-rank">${i + 1}</span>
         <span class="ws-c-uc">
-          <span class="ws-uc-text">${renderUseCaseDisplayHtml(r.text, 'full')}${matrixBadge}</span>
-          <span class="ws-uc-meta"><span class="ws-uc-track">${esc(r.trackLabel)}</span>${r.phase && r.phase !== r.trackLabel ? `<span class="ws-uc-phase">${esc(r.phase)}</span>` : ''}</span>
+          <span class="ws-uc-text">${renderUseCaseDisplayHtml(r.text, 'full')}</span>
         </span>
         <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
         <span class="ws-c-action ws-votes">
@@ -2449,13 +2445,13 @@ function renderTrackVotePresentHtml(slide, visible) {
   </div>`;
 }
 
-function renderTrackVoteGroupedListHtml(slide, { selectable = false, selectedIds = [], fairVote = false } = {}) {
+function renderTrackVoteGroupedListHtml(slide, { selectable = false, selectedIds = [], fairVote = false, hideGroupHeaders = false } = {}) {
   const groups = getTrackVoteOptionsGrouped(slide);
   if (!groups.length) return '<div class="present-wait-msg">Noch keine Use Cases gesammelt.</div>';
   const myId = fairVote ? (State.participant?.id) : null;
   return `<div class="track-vote-grouped">${groups.map((g) => `
     <div class="track-vote-group">
-      ${renderTrackVoteGroupHeadHtml(g)}
+      ${hideGroupHeaders ? '' : renderTrackVoteGroupHeadHtml(g)}
       <div class="track-vote-group-items">${g.options.map((o) => {
         const isOwn = myId && o.participant_id === myId;
         if (selectable && !isOwn) {
@@ -2785,7 +2781,7 @@ function renderParticipantTrackVoteHtml(slide) {
       ? `Wähle deine <strong>Top ${max} Use Cases</strong> aus allen Tracks · eigene Beiträge sind ausgeschlossen.`
       : `Wähle <strong>Top ${max} Use Cases</strong> aus allen Tracks.`;
     return `<p class="vote-mode-hint">${hint}</p>
-      ${renderTrackVoteGroupedListHtml(slide, { selectable: true, fairVote })}
+      ${renderTrackVoteGroupedListHtml(slide, { selectable: true, fairVote, hideGroupHeaders: true })}
       <div id="fav-counter" class="top3-counter">0 / ${max} gewählt</div>
       <button type="button" class="btn-primary participant-submit" id="submit-favorites">Priorisierung senden</button>`;
   }
@@ -5006,7 +5002,6 @@ function renderAllTracksUseCasesWithAuthors(timerSec = 120) {
           <span class="ws-c-rank">${n}</span>
           <span class="ws-c-uc">
             <span class="ws-uc-text">${renderUseCaseDisplayHtml(item.text, 'full')}</span>
-            <span class="ws-uc-meta"><span class="ws-uc-track">${esc(trk.trackLabel)}</span>${p.phase && p.phase !== trk.trackLabel ? `<span class="ws-uc-phase">${esc(p.phase)}</span>` : ''}</span>
           </span>
           <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
           <span class="ws-c-action ws-timer" data-pitch-key="${esc(item.id)}" data-total="${timerSec}">
@@ -5116,7 +5111,6 @@ function renderParticipantPitchHtml() {
         cards += `<article class="participant-pitch-card">
           <div class="participant-pitch-card-head">
             <span class="participant-pitch-num">${n}</span>
-            <span class="participant-pitch-track">${esc(trk.trackLabel)}</span>
           </div>
           <p class="participant-pitch-text">${renderUseCaseDisplayHtml(item.text, 'full')}</p>
           <div class="participant-pitch-author">
