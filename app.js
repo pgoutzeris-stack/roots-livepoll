@@ -273,15 +273,29 @@ function getUseCaseLabels() {
   };
 }
 
-function renderUseCaseGuideQuestionsHtml() {
-  const guides = getUseCaseLabels().guides || [];
-  if (!guides.length) return '';
-  return `<div class="wi-guides">${guides.map((g) => `
-    <div class="wi-guide-row">
-      <span class="wi-guide-label">${esc(g.label)}</span>
-      <span class="wi-guide-q">${esc(g.question)}</span>
-    </div>`).join('')}
-  </div>`;
+function getUseCasePhaseTagForSlide(slide) {
+  if (!slide) return null;
+  const c = slide.content || {};
+  if (c.sopKind === 'pitch-session' || slide.settings?.sopPitchSession) {
+    return { icon: 'fa-person-chalkboard', label: 'Pitch', tone: 'finale' };
+  }
+  if (slide.settings?.sopAllTracksVote || c.sopKind === 'final-vote') {
+    return { icon: 'fa-ranking-star', label: 'Priorisierung', tone: 'finale' };
+  }
+  if (slide.slide_type === 'priority_matrix' || slide.settings?.sopAllTracksMatrix || c.sopKind === 'final-matrix') {
+    return { icon: 'fa-table-cells-large', label: 'Matrix', tone: 'finale' };
+  }
+  return null;
+}
+
+const USE_CASE_PITCH_TAG = { icon: 'fa-person-chalkboard', label: 'Pitch', tone: 'finale' };
+
+function renderUseCasePhaseTagHtml(tag) {
+  if (!tag) return '';
+  const icon = tag.icon || tag.pillIcon || 'fa-circle';
+  const label = tag.label || tag.pillLabel || '';
+  const tone = tag.tone || tag.pillTone || 'finale';
+  return `<span class="uc-phase-tag ws-pill ws-pill--${tone}"><i class="fa-solid ${icon}"></i> ${esc(label)}</span>`;
 }
 
 function parseUseCaseParts(text) {
@@ -328,27 +342,33 @@ function useCaseFullPlain(text) {
   return bits.join(' · ');
 }
 
-function renderUseCasePillsHtml(text, mode = 'full') {
+function renderUseCasePillsHtml(text, mode = 'full', phaseTag = null) {
   const p = parseUseCaseParts(text);
   const L = getUseCaseLabels();
   const summaryOnly = mode === 'collect' || mode === 'summary';
+  let pillsHtml = '';
   if (summaryOnly) {
     const label = useCaseCollectLabel(text);
     if (!label) return '';
-    return `<span class="uc-pills uc-pills--summary"><span class="uc-pill uc-pill--idea">${esc(label)}</span></span>`;
-  }
-  if (!p.hasParts || (!p.feature && !p.dependencies)) {
-    return `<span class="uc-pills"><span class="uc-pill uc-pill--idea">${esc(p.full)}</span></span>`;
-  }
-  return `<span class="uc-pills uc-pills--full">
+    pillsHtml = `<span class="uc-pills uc-pills--summary"><span class="uc-pill uc-pill--idea">${esc(label)}</span></span>`;
+  } else if (!p.hasParts || (!p.feature && !p.dependencies)) {
+    pillsHtml = `<span class="uc-pills"><span class="uc-pill uc-pill--idea">${esc(p.full)}</span></span>`;
+  } else {
+    pillsHtml = `<span class="uc-pills uc-pills--full">
     ${p.summary ? `<span class="uc-pill uc-pill--idea"><span class="uc-pill-k">${esc(L.formula[0])}</span><span class="uc-pill-v">${esc(p.summary)}</span></span>` : ''}
     ${p.feature ? `<span class="uc-pill uc-pill--feature"><span class="uc-pill-k">${esc(L.formula[1])}</span><span class="uc-pill-v">${esc(p.feature)}</span></span>` : ''}
     ${p.dependencies ? `<span class="uc-pill uc-pill--deps"><span class="uc-pill-k">${esc(L.formula[2])}</span><span class="uc-pill-v">${esc(p.dependencies)}</span></span>` : ''}
   </span>`;
+  }
+  if (!phaseTag) return pillsHtml;
+  return `<span class="uc-pills-wrap">${renderUseCasePhaseTagHtml(phaseTag)}${pillsHtml}</span>`;
 }
 
-function renderUseCaseDisplayHtml(text, mode = 'full') {
-  return renderUseCasePillsHtml(text, mode);
+function renderUseCaseDisplayHtml(text, mode = 'full', slideOrTag = null) {
+  const tag = slideOrTag && (slideOrTag.icon || slideOrTag.pillIcon)
+    ? slideOrTag
+    : getUseCasePhaseTagForSlide(slideOrTag);
+  return renderUseCasePillsHtml(text, mode, tag);
 }
 
 function useCaseDisplayModeForSlide(slide) {
@@ -381,6 +401,7 @@ window.LPUseCase = {
   getUseCaseLabels,
   renderUseCasePillsHtml,
   renderUseCaseDisplayHtml,
+  getUseCasePhaseTagForSlide,
 };
 
 function aggregateTrackUseCases(trackKey) {
@@ -2261,9 +2282,10 @@ function getDualPairTrackLabel(slide) {
 
 function renderGoalMatrixPreview() {
   const qwInner = `<div class="lp-mx-qw-target" aria-hidden="true">
-    <div class="lp-mx-qw-file-badge">
-      <span class="lp-mx-qw-file-sheet"><i class="fa-solid fa-file-lines"></i></span>
-      <span class="lp-mx-qw-file-arrow"><i class="fa-solid fa-arrow-down-long"></i></span>
+    <div class="lp-mx-qw-aurora">
+      <span class="lp-mx-qw-aurora-blob lp-mx-qw-aurora-blob--a"></span>
+      <span class="lp-mx-qw-aurora-blob lp-mx-qw-aurora-blob--b"></span>
+      <span class="lp-mx-qw-aurora-blob lp-mx-qw-aurora-blob--c"></span>
     </div>
     <p class="lp-mx-qw-tagline">Hier wollen wir hin</p>
   </div>`;
@@ -2411,7 +2433,7 @@ function renderFinalVotePresentHtml(slide, visible) {
       h += `<div class="ws-row${topClass}">
         <span class="ws-c-rank">${i + 1}</span>
         <span class="ws-c-uc">
-          <span class="ws-uc-text">${renderUseCaseDisplayHtml(r.text, 'full')}${matrixBadge}</span>
+          <span class="ws-uc-text">${renderUseCaseDisplayHtml(r.text, 'full', slide)}${matrixBadge}</span>
           <span class="ws-uc-meta"><span class="ws-uc-track">${esc(r.trackLabel)}</span>${r.phase && r.phase !== r.trackLabel ? `<span class="ws-uc-phase">${esc(r.phase)}</span>` : ''}</span>
         </span>
         <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
@@ -2464,12 +2486,12 @@ function renderTrackVoteGroupedListHtml(slide, { selectable = false, selectedIds
         const isOwn = myId && o.participant_id === myId;
         if (selectable && !isOwn) {
           const checked = selectedIds.includes(o.id) ? ' checked' : '';
-          return `<label class="track-vote-option"><input type="checkbox" value="${esc(o.id)}"${checked} /><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span></label>`;
+          return `<label class="track-vote-option"><input type="checkbox" value="${esc(o.id)}"${checked} /><span>${renderUseCaseDisplayHtml(o.text, 'full', slide)}</span></label>`;
         }
         if (selectable && isOwn) {
-          return `<div class="track-vote-option track-vote-option--own"><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span><span class="vote-own-badge">Mein Beitrag</span></div>`;
+          return `<div class="track-vote-option track-vote-option--own"><span>${renderUseCaseDisplayHtml(o.text, 'full', slide)}</span><span class="vote-own-badge">Mein Beitrag</span></div>`;
         }
-        return `<div class="track-vote-option-read">${renderUseCaseDisplayHtml(o.text, 'full')}</div>`;
+        return `<div class="track-vote-option-read">${renderUseCaseDisplayHtml(o.text, 'full', slide)}</div>`;
       }).join('')}</div>
     </div>`).join('')}</div>`;
 }
@@ -2491,7 +2513,7 @@ function renderTrackVoteResultsHtml(slide, visible) {
       .forEach((o) => {
         const max = Math.max(1, ...g.options.map((x) => scoreFor(x.id)));
         const pct = Math.round((o.score / max) * 100);
-        html += `<div class="track-vote-result-row"><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span><div class="viz-bar-track"><div class="viz-bar-fill" style="width:${pct}%"></div></div><strong>${o.votes ? `${o.votes}× Top 3` : ''}${o.votes && o.points ? ' · ' : ''}${o.points ? `${Math.round(o.points)} Pkt` : ''}</strong></div>`;
+        html += `<div class="track-vote-result-row"><span>${renderUseCaseDisplayHtml(o.text, 'full', slide)}</span><div class="viz-bar-track"><div class="viz-bar-fill" style="width:${pct}%"></div></div><strong>${o.votes ? `${o.votes}× Top 3` : ''}${o.votes && o.points ? ' · ' : ''}${o.points ? `${Math.round(o.points)} Pkt` : ''}</strong></div>`;
       });
     html += '</div></div>';
   });
@@ -3518,7 +3540,8 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
           instrHtml += `<div class="wi-formula">${formula.map((p, i) =>
             `${i > 0 ? '<span class="wi-formula-plus">+</span>' : ''}<span class="wi-formula-part"><i class="fa-solid ${['fa-lightbulb', 'fa-gear', 'fa-link'][i] || 'fa-circle'}"></i> ${esc(p)}</span>`
           ).join('')}</div>`;
-          instrHtml += renderUseCaseGuideQuestionsHtml();
+        } else if (/^(Pro Eintrag|Je präziser)/i.test(t)) {
+          continue;
         } else if (t === 'Gute Use Cases:') {
           flushAvoid();
           mode = 'good';
@@ -4963,7 +4986,7 @@ function renderAllTracksUseCasesWithAuthors(timerSec = 120) {
         html += `<div class="ws-row" data-pitch-row="${esc(item.id)}">
           <span class="ws-c-rank">${n}</span>
           <span class="ws-c-uc">
-            <span class="ws-uc-text">${renderUseCaseDisplayHtml(item.text, 'full')}</span>
+            <span class="ws-uc-text">${renderUseCaseDisplayHtml(item.text, 'full', USE_CASE_PITCH_TAG)}</span>
             <span class="ws-uc-meta"><span class="ws-uc-track">${esc(trk.trackLabel)}</span>${p.phase && p.phase !== trk.trackLabel ? `<span class="ws-uc-phase">${esc(p.phase)}</span>` : ''}</span>
           </span>
           <span class="ws-c-author">${author ? participantAvatarHtml(author, 'xs') : ''}<span class="ws-author-name">${esc(authorName)}</span></span>
@@ -5076,7 +5099,7 @@ function renderParticipantPitchHtml() {
             <span class="participant-pitch-num">${n}</span>
             <span class="participant-pitch-track">${esc(trk.trackLabel)}</span>
           </div>
-          <p class="participant-pitch-text">${renderUseCaseDisplayHtml(item.text, 'full')}</p>
+          <p class="participant-pitch-text">${renderUseCaseDisplayHtml(item.text, 'full', USE_CASE_PITCH_TAG)}</p>
           <div class="participant-pitch-author">
             ${author ? participantAvatarHtml(author, 'sm') : '<span class="participant-pitch-avatar-fallback"><i class="fa-solid fa-user"></i></span>'}
             <span>Eingebracht von <strong>${esc(authorName)}</strong></span>
@@ -8045,7 +8068,7 @@ function renderParticipantMatrixHtml(slide) {
   const itemCard = (it) => {
     const origin = [it.trackLabel, it.phase].filter(Boolean).join(' · ');
     return `<div class="lp-mx-item" data-item-id="${esc(it.id)}" data-text="${esc(it.text)}" title="${esc(useCaseCollectLabel(it.text))}${origin ? ' — ' + esc(origin) : ''}">
-    <span class="lp-mx-item-text">${renderUseCasePillsHtml(it.text, 'collect')}</span>
+    <span class="lp-mx-item-text">${renderUseCaseDisplayHtml(it.text, 'collect', slide)}</span>
     ${origin ? `<span class="lp-mx-item-origin">${esc(origin)}</span>` : ''}
   </div>`;
   };
@@ -8070,7 +8093,7 @@ function renderParticipantMatrixHtml(slide) {
       ${items.map((it) => {
         const origin = [it.trackLabel, it.phase].filter(Boolean).join(' · ');
         return `<div class="lp-mxm-item" data-item-id="${esc(it.id)}">
-          <div class="lp-mxm-text">${renderUseCasePillsHtml(it.text, 'collect')}${origin ? `<span class="lp-mxm-origin">${esc(origin)}</span>` : ''}</div>
+          <div class="lp-mxm-text">${renderUseCaseDisplayHtml(it.text, 'collect', slide)}${origin ? `<span class="lp-mxm-origin">${esc(origin)}</span>` : ''}</div>
           <div class="lp-mxm-choices">${['qw', 'sb', 'ts', 'dr'].map((q) => `<button type="button" class="lp-mxm-btn lp-q-${q}${placements[it.id] === q ? ' is-active' : ''}" data-item="${esc(it.id)}" data-q="${q}" aria-label="${esc(quadrants[q].label)}" title="${esc(quadrants[q].label)}"><i class="fa-solid ${QICON[q] || 'fa-square'}"></i></button>`).join('')}</div>
         </div>`;
       }).join('')}

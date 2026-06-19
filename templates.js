@@ -558,15 +558,11 @@ function buildUseCaseInstructionBody(exampleKey = 'consulting') {
   return [
     `Format: ${L.formula.join(' | ')}`,
     '',
-    'Pro Eintrag genau drei Teile. In der Sammlung erscheint nur die Use Case Idee — ab Pitch, Priorisierung und Matrix der komplette Use Case.',
-    '',
     'Gute Use Cases:',
     ...examples,
     '',
     'Bitte vermeiden:',
     ...avoid,
-    '',
-    'Je präziser alle drei Teile, desto besser könnt ihr später priorisieren und in die Matrix einordnen.',
   ].join('\n');
 }
 
