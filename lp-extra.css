@@ -1897,13 +1897,24 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   line-height:1.1;
 }
 .lp-sop-workshop.present-mode .ws-lead,
-.lp-sop-workshop.present-mode .ws-sub-lead{
+.lp-sop-workshop.present-mode .ws-sub-lead,
+.lp-sop-workshop #screen-participant .ws-sub-lead{
   font-size:clamp(.95rem,1.6vw,1.05rem);
   font-weight:600;
-  color:var(--muted);
+  color:var(--ink);
   max-width:none;
   margin:0 0 .75rem;
-  padding-left:0;
+  padding:1rem 1.25rem;
+  background:var(--surface,#f8fafc);
+  border-left:4px solid var(--brand);
+  border-radius:0 12px 12px 0;
+  line-height:1.65;
+  white-space:pre-wrap;
+}
+.lp-sop-workshop.present-mode .ws-body .sop-pslide-sub,
+.lp-sop-workshop.present-mode .ws-body .pitch-hint,
+.lp-sop-workshop #screen-participant .workshop-collect-question{
+  display:none!important;
 }
 .lp-sop-workshop.present-mode .ws-body,
 .lp-sop-workshop.present-mode .ws-body-inner{

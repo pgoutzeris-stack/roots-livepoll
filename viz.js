@@ -287,7 +287,7 @@
           <div class="lp-mx-quad-body lp-matrix-cell-items">${renderItems(q)}</div>
         </div>`;
       const gridHtml = `${quad('qw')}${quad('sb')}${quad('dr')}${quad('ts')}`;
-      const foot = `<span class="ws-chip"><i class="fa-solid fa-users"></i> ${agg.total} TN</span><span class="ws-chip"><i class="fa-solid fa-layer-group"></i> ${Object.keys(itemPlacements).length} UC</span>`;
+      const foot = `<span class="ws-chip"><i class="fa-solid fa-users"></i> ${agg.total} Teilnehmer</span><span class="ws-chip"><i class="fa-solid fa-layer-group"></i> ${Object.keys(itemPlacements).length} Use Cases</span>`;
       return renderMatrixFrame({
         yLabel: slide.content.yAxisLabel || 'Impact',
         xLabel: slide.content.xAxisLabel || 'Aufwand',

@@ -2553,7 +2553,7 @@ function initSopBoardAutoScroll(root = document) {
   });
 }
 
-function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false, splitCol = false, hideBoard = false, participantMode = false } = {}) {
+function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false, splitCol = false, hideBoard = false, participantMode = false, shellWrapped = false } = {}) {
   const content = enrichSopContent(c);
   const titleEl = editable
     ? `<div class="canvas-editable pslide-q-title" contenteditable="true" data-field="title" data-placeholder="Titel der Folie…">${esc(content.title || '')}</div>`
@@ -2579,10 +2579,11 @@ function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false,
     ? `<div class="workshop-collect-board">${boardInner}</div>`
     : '';
   const { question, note } = parseCollectPrompt(content.prompt);
-  const questionEl = question
+  const showInlineQuestion = question && !(participantMode && shellWrapped);
+  const questionEl = showInlineQuestion
     ? `<p class="pslide-q-prompt workshop-collect-question${participantMode ? ' workshop-collect-question--plain' : ''}">${participantMode ? esc(question) : `<i class="fa-solid fa-circle-question workshop-q-icon"></i><span>${esc(question)}</span>`}</p>`
     : '';
-  const noteEl = note && !participantMode
+  const noteEl = note && !participantMode && !shellWrapped
     ? `<p class="workshop-collect-note"><i class="fa-solid fa-lightbulb"></i><span>${esc(note)}</span></p>`
     : '';
   if (participantMode) {
@@ -2797,8 +2798,8 @@ function getWsPresentLead(slide) {
   if (isWorkshopClosingSlide(slide)) return c.subtitle || 'Workshop abgeschlossen';
   if (isWorkshopOpeningSlide(slide)) return c.subtitle || '';
   if (isBrainstormCollectSlide(slide)) {
-    const { question } = parseCollectPrompt(c.prompt);
-    return question || c.subtitle || '';
+    const { question, note } = parseCollectPrompt(c.prompt);
+    return [question, note].filter(Boolean).join('\n') || c.subtitle || '';
   }
   if (slide.slide_type === 'section' && c.sopTrackClass && c.body) {
     return String(c.body).trim();
@@ -3455,7 +3456,7 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
       ? renderAllTracksUseCasesWithAuthors(timerSec)
       : '<div class="present-wait-msg">Use Cases mit Autornamen erscheinen in der Live-Session.</div>';
     if (shellMode && !editable) {
-      return `<div class="ws-sop-main ws-sop-main--pitch">${configEl}<div class="pitch-use-cases">${useCasesHtml}</div></div>`;
+      return `<div class="ws-sop-main ws-sop-main--pitch"><div class="pitch-use-cases">${useCasesHtml}</div></div>`;
     }
     return `
       <div class="sop-pslide-section sop-pitch-session">
@@ -6059,8 +6060,8 @@ const LP_DebugSim = {
           created_at: new Date(now + i * 100).toISOString(),
           updated_at: new Date(now + i * 100).toISOString(),
         };
-        // Drip-Delay: 600ms–2.4s zwischen Antworten
-        const delayMs = 800 + i * (1100 + Math.random() * 800);
+        // Drip-Delay (Collect wird ohnehin per flushCollectSlide fast eingespielt)
+        const delayMs = 250 + i * (180 + Math.random() * 120);
         queue.push({ response, delayMs });
         allCollected.push({
           slideId: slide.id,
@@ -6247,18 +6248,30 @@ const LP_DebugSim = {
     this.pushResponse(response);
   },
 
+  flushCollectSlide(slide) {
+    if (!slide || this.triggeredSlides.has(slide.id)) return;
+    const queue = this.responsesBySlide.get(slide.id);
+    if (!queue?.length) return;
+    this.triggeredSlides.add(slide.id);
+    const step = Math.max(12, 50 / this.speed);
+    queue.forEach((item, i) => {
+      if (!item.response) return;
+      this.schedule(() => this.pushResponse(item.response), i * step);
+    });
+  },
+
   startSlideDrip(slide, baseOffset = 0) {
     if (!slide || this.triggeredSlides.has(slide.id)) return baseOffset;
     const queue = this.responsesBySlide.get(slide.id);
     if (!queue?.length) return baseOffset;
     this.triggeredSlides.add(slide.id);
     let maxEnd = baseOffset;
-    queue.forEach((item) => {
-      const when = baseOffset + (item.delayMs || 0);
+    queue.forEach((item, i) => {
+      const when = baseOffset + (item.delayMs != null ? item.delayMs : i * 220);
       maxEnd = Math.max(maxEnd, when);
       this.schedule(() => this.ensureParticipantAndPush(item, slide), when);
     });
-    return maxEnd + Math.max(120, 400 / this.speed);
+    return maxEnd + Math.max(80, 250 / this.speed);
   },
 
   catchUpDripsThrough(index) {
@@ -6272,18 +6285,18 @@ const LP_DebugSim = {
       || s.settings?.sopCardVote || s.settings?.brainstormVote
     );
     const isMatrix = (s) => Boolean(s.settings?.sopAllTracksMatrix || s.slide_type === 'priority_matrix');
-    const waves = [
-      seen.filter(isCollect),
+    seen.filter(isCollect).forEach((slide) => this.flushCollectSlide(slide));
+    let offset = Math.max(40, 120 / this.speed);
+    const dripWaves = [
       seen.filter(isVote),
       seen.filter((s) => !isCollect(s) && !isVote(s) && !isMatrix(s)),
       seen.filter(isMatrix),
     ];
-    let offset = 0;
-    waves.forEach((wave) => {
+    dripWaves.forEach((wave) => {
       if (!wave.length) return;
       let waveEnd = offset;
       wave.forEach((slide) => { waveEnd = Math.max(waveEnd, this.startSlideDrip(slide, offset)); });
-      offset = waveEnd + Math.max(150, 350 / this.speed);
+      offset = waveEnd + Math.max(80, 200 / this.speed);
     });
   },
 
@@ -6320,10 +6333,10 @@ const LP_DebugSim = {
     this.responsesBySlide.forEach((queue, slideId) => {
       const slide = State.slides.find((sl) => sl.id === slideId);
       const allDone = queue.every((item) => {
-        const resp = this.resolveQueueItemResponse(item, slide);
+        const resp = item.response || this.resolveQueueItemResponse(item, slide);
         return resp && doneIds.has(resp.id);
       });
-      if (allDone) this.triggeredSlides.add(slideId);
+      if (allDone && queue.length) this.triggeredSlides.add(slideId);
     });
     this.catchUpDripsThrough(State.session?.current_slide_index || 0);
   },
@@ -7126,7 +7139,7 @@ function updatePresentStats() {
   const slide = currentSessionSlide();
   const count = getVisibleResponses(slide?.id).length;
   const pending = getPendingResponses(slide?.id).length;
-  $('#present-stats').textContent = `${State.participants.length} TN · ${count} Antw.${pending ? ` · ${pending} wartend` : ''}`;
+  $('#present-stats').textContent = `${State.participants.length} Teilnehmer · ${count} Antworten${pending ? ` · ${pending} wartend` : ''}`;
   updatePresentToolbarUi(slide);
 }
 
@@ -7461,10 +7474,7 @@ function collectLimitLabel(limit) {
 
 function collectLimitPillLabel(slide) {
   const n = getCollectResponseLimit(slide);
-  const words = { 1: 'einen', 2: 'zwei', 3: 'drei', 4: 'vier', 5: 'fünf', 6: 'sechs', 7: 'sieben', 8: 'acht', 9: 'neun', 10: 'zehn' };
-  if (n === 1) return 'maximal einen Use Case';
-  const w = words[n] || String(n);
-  return `maximal ${w} Use Cases`;
+  return `${n} Use Cases`;
 }
 
 function patchCollectPromptLimit(prompt, limit) {
@@ -7730,17 +7740,25 @@ async function renderParticipantQuestion() {
         title: getWsPresentTitle(slide),
         chips: getWsPresentChips(slide),
         lead: getWsPresentLead(slide),
-        main: `${teamBadge}${renderWorkshopCardCollectHtml(collectDisplayContent, false, { participantMode: true })}${input}`,
+        main: `${teamBadge}${renderWorkshopCardCollectHtml(collectDisplayContent, false, { participantMode: true, shellWrapped: true })}${input}`,
       })}
     </div>
-    <div class="participant-collect-bar"><button type="button" class="btn-primary participant-submit participant-submit-lg" id="submit-text">Use Case senden</button></div>` : `
+    <div class="participant-collect-bar"><button type="button" class="btn-primary participant-submit participant-submit-lg" id="submit-text">Use Case senden</button></div>` : isDecide ? `
+    <div class="participant-ws-slide-wrap">
+      ${renderWsSlideShell({
+        ...getSlideShellMeta(slide),
+        title: getWsPresentTitle(slide),
+        chips: getWsPresentChips(slide),
+        lead: getWsPresentLead(slide),
+        main: `${teamBadge}${input}`,
+      })}
+    </div>` : `
     <div class="${cardClass}">
       ${!isWorkshop ? `<div class="participant-header-row">
         ${participantAvatarHtml(State.participant, 'md')}
         <div><div class="participant-meta">Code ${esc(State.session.code)}${slide.settings?.anonymous ? ' · Anonym' : ''}</div><div class="participant-you">${esc(State.participant?.display_name || '')}</div></div>
       </div>` : ''}
       ${teamBadge}
-      ${isDecide ? `<h1 class="pslide-q-title">${esc(c.title || 'Priorisierung')}</h1><p class="pslide-q-prompt">${esc(c.prompt || '').replace(/\n/g, '<br>')}</p>` : ''}
       ${!isCollect && !isDecide ? `<h1 class="pslide-q-title">${esc(c.title || c.prompt || 'Frage')}</h1>` : ''}
       ${!isCollect && !isDecide && c.prompt && c.title ? `<p class="pslide-q-prompt">${esc(c.prompt).replace(/\n/g, '<br>')}</p>` : ''}
       ${timeLimit ? `<div id="p-timer" class="p-timer">${timeLimit}s</div>` : ''}
