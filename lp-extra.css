@@ -676,9 +676,40 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   max-width:none;
   margin:0;
 }
-/* Formel: Use Case + Feature + Abhängigkeiten als Label-Kette */
+/* Formel: Use Case Idee + KI-Feature + Abhängigkeiten als Label-Kette */
 .workshop-instructions-card .wi-formula{
-  display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .55rem;margin:.6rem 0 1rem;
+  display:flex;flex-wrap:wrap;align-items:center;gap:.45rem .6rem;
+  margin:.25rem 0 1.35rem;
+}
+.workshop-instructions-card .wi-guides{
+  display:flex;flex-direction:column;gap:.65rem;
+  margin:0 0 1.75rem;
+  padding:1rem 1.1rem;
+  background:var(--surface,#f8fafc);
+  border:1px solid var(--line,#e2e8f0);
+  border-radius:14px;
+}
+.workshop-instructions-card .wi-guide-row{
+  display:grid;grid-template-columns:minmax(7.5rem,9.5rem) minmax(0,1fr);
+  gap:.65rem 1rem;align-items:baseline;text-align:left;
+}
+.workshop-instructions-card .wi-guide-label{
+  font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--brand,#206efb);
+}
+.workshop-instructions-card .wi-guide-q{
+  font-size:.9rem;line-height:1.5;color:var(--ink,#0f172a);
+}
+.workshop-instructions-card .wi-section-head{
+  margin-top:1.35rem;
+}
+.workshop-instructions-card .wi-note{
+  margin:.85rem 0 0;
+  line-height:1.55;
+}
+.workshop-instructions-card .wi-note.wi-intro{
+  margin-top:0;
+  margin-bottom:.25rem;
 }
 .workshop-instructions-card .wi-formula-part{
   display:inline-flex;align-items:center;gap:.4rem;
@@ -689,35 +720,34 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .workshop-instructions-card .wi-formula-part i{font-size:.78rem;opacity:.85}
 .workshop-instructions-card .wi-formula-plus{color:var(--muted);font-weight:800;font-size:.9rem}
 
-/* Beispiel: Use Case (fett) + Feature/Abhängigkeiten als beschriftete Zeilen */
+/* Beispiel: drei gleich aufgebaute Zeilen, linksbündig */
 .workshop-instructions-card .wi-example{
-  display:flex;flex-direction:column;gap:.4rem;
-  padding:.8rem 1rem;
+  display:flex;flex-direction:column;gap:.55rem;
+  padding:1rem 1.1rem;
   background:var(--surface,#f8fafc);
   border:1px solid var(--line,#e2e8f0);
   border-left:3px solid var(--brand,#206efb);
-  border-radius:0 10px 10px 0;
-  margin:.5rem 0;
+  border-radius:0 12px 12px 0;
+  margin:.65rem 0 1rem;
+  text-align:left;
 }
-.workshop-instructions-card .wi-ex-uc{
-  font-size:.95rem;line-height:1.4;color:var(--ink,#0f172a);font-weight:700;
-  display:flex;align-items:flex-start;gap:.45rem;
-}
-.workshop-instructions-card .wi-ex-uc i{color:var(--brand,#206efb);margin-top:.15rem;flex-shrink:0}
-.workshop-instructions-card .wi-ex-part{
-  display:flex;align-items:baseline;gap:.55rem;padding-left:1.3rem;
+.workshop-instructions-card .wi-ex-row{
+  display:grid;grid-template-columns:minmax(7.5rem,9.5rem) minmax(0,1fr);
+  gap:.65rem 1rem;align-items:start;
 }
 .workshop-instructions-card .wi-ex-label{
-  flex-shrink:0;min-width:6.5rem;
-  font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;
-  color:var(--brand,#206efb);
+  font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--brand,#206efb);line-height:1.35;
 }
 .workshop-instructions-card .wi-ex-val{
-  font-size:.85rem;line-height:1.4;color:var(--muted,#475569);
+  font-size:.9rem;line-height:1.5;color:var(--ink,#0f172a);
 }
 @media (max-width:760px){
-  .workshop-instructions-card .wi-ex-part{flex-direction:column;gap:.1rem;padding-left:1.3rem}
-  .workshop-instructions-card .wi-ex-label{min-width:0}
+  .workshop-instructions-card .wi-guide-row,
+  .workshop-instructions-card .wi-ex-row{
+    grid-template-columns:1fr;
+    gap:.2rem;
+  }
 }
 
 /* Use-Case-Anzeige (Sammeln vs. vollständig) */
@@ -1722,45 +1752,62 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   color:var(--muted);
   font-weight:500;
 }
-.lp-mx-qw-hero{
+.lp-mx-quad--goal.lp-mx-quad--qw-focus{
+  position:relative;
+  z-index:1;
+  border-radius:14px;
+  animation:lp-mx-qw-cell-pulse 3s ease-in-out infinite;
+}
+.lp-mx-quad--goal.lp-mx-quad--qw-focus::before{
+  content:'';
+  position:absolute;
+  inset:-3px;
+  border-radius:17px;
+  padding:2px;
+  background:linear-gradient(120deg,#10b981,#34d399,#6ee7b7,#10b981);
+  background-size:220% 220%;
+  animation:lp-mx-qw-border-shift 2.8s linear infinite;
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  pointer-events:none;
+}
+.lp-mx-qw-target{
   margin-top:auto;
   display:flex;
   flex-direction:column;
   align-items:center;
   justify-content:center;
-  gap:.75rem;
+  gap:.85rem;
   text-align:center;
-  padding-top:.35rem;
+  padding:.35rem .25rem .15rem;
 }
-.lp-mx-qw-orbit{
+.lp-mx-qw-file-badge{
   position:relative;
-  width:5rem;
-  height:5rem;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:.35rem;
+}
+.lp-mx-qw-file-sheet{
+  width:3.25rem;
+  height:4rem;
+  border-radius:10px;
   display:flex;
   align-items:center;
   justify-content:center;
-}
-.lp-mx-qw-orbit-ring{
-  position:absolute;
-  inset:0;
-  border:2px dashed rgba(16,185,129,.42);
-  border-radius:50%;
-  animation:lp-mx-orbit-spin 14s linear infinite;
-}
-.lp-mx-qw-orbit-glow{
-  position:absolute;
-  inset:18%;
-  border-radius:50%;
-  background:radial-gradient(circle,rgba(16,185,129,.22),transparent 70%);
-  animation:lp-mx-orbit-pulse 2.6s ease-in-out infinite;
-}
-.lp-mx-qw-orbit-icon{
-  position:relative;
-  z-index:1;
-  font-size:1.85rem;
+  font-size:1.45rem;
   color:#10b981;
-  filter:drop-shadow(0 6px 14px rgba(16,185,129,.35));
-  animation:lp-mx-rocket-float 2.8s ease-in-out infinite;
+  background:linear-gradient(180deg,#fff,#ecfdf5);
+  border:1.5px solid rgba(16,185,129,.35);
+  box-shadow:0 10px 24px rgba(16,185,129,.18);
+  animation:lp-mx-qw-file-float 2.4s ease-in-out infinite;
+}
+.lp-mx-qw-file-arrow{
+  font-size:1.15rem;
+  color:#10b981;
+  opacity:.85;
+  animation:lp-mx-qw-arrow-nudge 2.4s ease-in-out infinite;
 }
 .lp-mx-qw-tagline{
   margin:0;
@@ -1770,9 +1817,22 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   letter-spacing:.08em;
   color:#10b981;
 }
-@keyframes lp-mx-orbit-spin{to{transform:rotate(360deg)}}
-@keyframes lp-mx-orbit-pulse{0%,100%{opacity:.55;transform:scale(.92)}50%{opacity:1;transform:scale(1.05)}}
-@keyframes lp-mx-rocket-float{0%,100%{transform:translateY(0) rotate(-10deg)}50%{transform:translateY(-10px) rotate(-4deg)}}
+@keyframes lp-mx-qw-border-shift{
+  0%{background-position:0% 50%}
+  100%{background-position:220% 50%}
+}
+@keyframes lp-mx-qw-cell-pulse{
+  0%,100%{box-shadow:0 0 0 rgba(16,185,129,0)}
+  50%{box-shadow:0 0 28px rgba(16,185,129,.16)}
+}
+@keyframes lp-mx-qw-file-float{
+  0%,100%{transform:translateY(0) rotate(-4deg)}
+  50%{transform:translateY(-8px) rotate(2deg)}
+}
+@keyframes lp-mx-qw-arrow-nudge{
+  0%,100%{transform:translateY(0);opacity:.55}
+  50%{transform:translateY(6px);opacity:1}
+}
 .lp-mx-quad,.lp-matrix-result-cell.lp-mx-quad{
   display:flex;
   flex-direction:column;
@@ -1840,8 +1900,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .lp-mx-quad-grid--chart .lp-mx-quad{padding:.75rem .85rem}
   .lp-mx-axis-label--y,.lp-mx-axis-label--x{font-size:.66rem}
   .lp-mx-axis-tip{font-size:.62rem}
-  .lp-mx-qw-orbit{width:4rem;height:4rem}
-  .lp-mx-qw-orbit-icon{font-size:1.45rem}
+  .lp-mx-qw-file-sheet{width:2.85rem;height:3.5rem;font-size:1.25rem}
   .ws-title{font-size:1.55rem}
 }
 
@@ -2215,10 +2274,16 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   font-weight:900;
   color:var(--ink);
 }
-.lp-sop-workshop.present-mode .workshop-instructions-card--present .wi-ex-uc,
-.lp-sop-workshop.present-mode .workshop-instructions-card--present .wi-ex-val{
-  font-weight:700;
+.lp-sop-workshop.present-mode .workshop-instructions-card--present .wi-guides,
+.lp-sop-workshop.present-mode .workshop-instructions-card--present .wi-example{
+  background:rgba(248,250,252,.72);
+}
+.lp-sop-workshop.present-mode .workshop-instructions-card--present .wi-ex-val,
+.lp-sop-workshop.present-mode .workshop-instructions-card--present .wi-guide-q{
   color:var(--ink);
+}
+.lp-sop-workshop.present-mode .workshop-instructions-card--present .wi-section-head{
+  margin-top:1.5rem;
 }
 .lp-sop-workshop.present-mode.sop-split-stage .ws-body,
 .lp-sop-workshop.present-mode.sop-split-stage .ws-body-inner{
@@ -2798,12 +2863,96 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .ws-hero-content{
   position:relative;
   z-index:1;
-  max-width:860px;
+  max-width:960px;
   text-align:center;
   display:flex;
   flex-direction:column;
   align-items:center;
   gap:1rem;
+}
+.ws-hero-content--join{
+  width:min(960px,100%);
+  flex-direction:row;
+  align-items:center;
+  justify-content:center;
+  gap:clamp(1.25rem,4vw,2.75rem);
+  text-align:left;
+}
+.ws-hero-copy{
+  flex:1 1 320px;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:1rem;
+  text-align:center;
+}
+.ws-hero-qr{
+  flex:0 0 auto;
+}
+.ws-hero-qr-card{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:.85rem;
+  padding:1.1rem 1.15rem 1rem;
+  border-radius:20px;
+  background:rgba(255,255,255,.88);
+  border:1px solid rgba(32,110,251,.16);
+  box-shadow:0 18px 44px rgba(15,23,42,.1),0 0 0 1px rgba(255,255,255,.65) inset;
+  backdrop-filter:blur(10px);
+}
+.ws-hero-qr-img{
+  display:block;
+  width:148px;
+  height:148px;
+  border-radius:14px;
+  background:#fff;
+  border:1px solid var(--line,#e2e8f0);
+}
+.ws-hero-qr-meta{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:.2rem;
+  text-align:center;
+}
+.ws-hero-qr-label{
+  font-size:.68rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:var(--muted);
+}
+.ws-hero-qr-code{
+  font-size:1.65rem;
+  font-weight:800;
+  letter-spacing:.18em;
+  color:var(--brand);
+}
+.ws-hero-qr-hint{
+  font-size:.78rem;
+  line-height:1.45;
+  color:var(--muted);
+  max-width:14rem;
+}
+.ws-hero-qr--placeholder .ws-hero-qr-card{
+  min-width:220px;
+  padding:1.35rem 1.1rem;
+}
+.ws-hero-qr-icon{
+  width:64px;height:64px;border-radius:16px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.65rem;color:var(--brand);
+  background:var(--brand-light);
+  border:1px dashed rgba(32,110,251,.28);
+}
+@media (max-width:860px){
+  .ws-hero-content--join{
+    flex-direction:column;
+    text-align:center;
+  }
+  .ws-hero-copy{align-items:center}
 }
 .ws-hero-icon-ring{
   width:88px;

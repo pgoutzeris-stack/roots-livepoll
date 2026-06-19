@@ -494,13 +494,14 @@ function sopWorkshopGoal() {
 // ─── Use-Case-Format (Instruktionen + Simulation) ───────────────────────────
 // Einheitliches Dreiteiler-Format: grob | KI-Feature | Abhängigkeiten (intern per | getrennt)
 window.LP_USE_CASE_LABELS = {
-  summary: 'Use Case grob formuliert',
-  feature: 'Konkretes KI-Feature',
+  summary: 'Use Case Idee',
+  feature: 'KI-Feature',
   dependencies: 'Abhängigkeiten',
-  formula: [
-    'Was ihr umsetzen wollt',
-    'Konkretes KI-Feature',
-    'Was im Team schon vorhanden sein muss',
+  formula: ['Use Case Idee', 'KI-Feature', 'Abhängigkeiten'],
+  guides: [
+    { label: 'Use Case Idee', question: 'Was wollt ihr konkret umsetzen oder verbessern?' },
+    { label: 'KI-Feature', question: 'Was soll die KI tun — Input, Output, welches Tool?' },
+    { label: 'Abhängigkeiten', question: 'Was muss im Team schon da sein (Daten, Zugänge, Vorlagen)?' },
   ],
 };
 
@@ -557,7 +558,7 @@ function buildUseCaseInstructionBody(exampleKey = 'consulting') {
   return [
     `Format: ${L.formula.join(' | ')}`,
     '',
-    'Pro Eintrag genau drei Teile: Use Case grob formuliert, konkretes KI-Feature, Abhängigkeiten. In der Sammlung erscheint nur der erste Teil — ab Pitch, Priorisierung und Matrix der komplette Use Case.',
+    'Pro Eintrag genau drei Teile. In der Sammlung erscheint nur die Use Case Idee — ab Pitch, Priorisierung und Matrix der komplette Use Case.',
     '',
     'Gute Use Cases:',
     ...examples,
@@ -570,13 +571,9 @@ function buildUseCaseInstructionBody(exampleKey = 'consulting') {
 }
 
 function sopWorkshopInstructions(exampleKey = 'consulting') {
-  const ws = window.LP_WORKSHOP_SETTINGS;
-  const timeMin = ws.brainstormTimeLimitSec > 0
-    ? `${Math.round(ws.brainstormTimeLimitSec / 60)} Minuten`
-    : 'offene Zeit';
   return tplSlide('content', {
     title: 'So formuliert ihr Use Cases',
-    subtitle: `${timeMin} pro Runde · max. ${ws.brainstormMaxResponses} Use Cases pro Person · Use Case grob + KI-Feature + Abhängigkeiten`,
+    subtitle: 'Zielsetzungen zur Erstellung der Use Cases',
     body: buildUseCaseInstructionBody(exampleKey),
     isHeroSlide: false,
     sopKind: SK.INSTRUCTIONS,

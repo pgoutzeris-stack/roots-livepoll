@@ -260,11 +260,27 @@ const USE_CASE_PART_SEP = ' | ';
 
 function getUseCaseLabels() {
   return window.LP_USE_CASE_LABELS || {
-    summary: 'Use Case grob formuliert',
-    feature: 'Konkretes KI-Feature',
+    summary: 'Use Case Idee',
+    feature: 'KI-Feature',
     dependencies: 'Abhängigkeiten',
-    formula: ['Was ihr umsetzen wollt', 'Konkretes KI-Feature', 'Was im Team schon vorhanden sein muss'],
+    formula: ['Use Case Idee', 'KI-Feature', 'Abhängigkeiten'],
+    guides: [
+      { label: 'Use Case Idee', question: 'Was wollt ihr konkret umsetzen oder verbessern?' },
+      { label: 'KI-Feature', question: 'Was soll die KI tun — Input, Output, welches Tool?' },
+      { label: 'Abhängigkeiten', question: 'Was muss im Team schon da sein (Daten, Zugänge, Vorlagen)?' },
+    ],
   };
+}
+
+function renderUseCaseGuideQuestionsHtml() {
+  const guides = getUseCaseLabels().guides || [];
+  if (!guides.length) return '';
+  return `<div class="wi-guides">${guides.map((g) => `
+    <div class="wi-guide-row">
+      <span class="wi-guide-label">${esc(g.label)}</span>
+      <span class="wi-guide-q">${esc(g.question)}</span>
+    </div>`).join('')}
+  </div>`;
 }
 
 function parseUseCaseParts(text) {
@@ -2223,20 +2239,19 @@ function getDualPairTrackLabel(slide) {
 }
 
 function renderGoalMatrixPreview() {
-  const qwHero = `<div class="lp-mx-qw-hero" aria-hidden="true">
-    <div class="lp-mx-qw-orbit">
-      <span class="lp-mx-qw-orbit-ring"></span>
-      <span class="lp-mx-qw-orbit-glow"></span>
-      <span class="lp-mx-qw-orbit-icon"><i class="fa-solid fa-rocket"></i></span>
+  const qwInner = `<div class="lp-mx-qw-target" aria-hidden="true">
+    <div class="lp-mx-qw-file-badge">
+      <span class="lp-mx-qw-file-sheet"><i class="fa-solid fa-file-lines"></i></span>
+      <span class="lp-mx-qw-file-arrow"><i class="fa-solid fa-arrow-down-long"></i></span>
     </div>
     <p class="lp-mx-qw-tagline">Hier wollen wir hin</p>
   </div>`;
-  const quad = (q, icon, label, hint, extra = '') => `<div class="lp-mx-quad lp-mx-quad--goal lp-q-${q}">
+  const quad = (q, icon, label, hint, extra = '', focus = false) => `<div class="lp-mx-quad lp-mx-quad--goal lp-q-${q}${focus ? ' lp-mx-quad--qw-focus' : ''}">
     <div class="lp-mx-quad-head"><span class="lp-mx-quad-ico"><i class="fa-solid ${icon}"></i></span><strong>${label}</strong></div>
     <div class="lp-mx-quad-body">${hint ? `<span class="lp-mx-quad-hint">${hint}</span>` : ''}${extra}</div>
   </div>`;
   const gridHtml = [
-    quad('qw', 'fa-rocket', 'Quick Win', '', qwHero),
+    quad('qw', 'fa-rocket', 'Quick Win', '', qwInner, true),
     quad('sb', 'fa-star', 'Strategic Bet', 'viel Wirkung · viel Aufwand'),
     quad('dr', 'fa-ban', 'Drop', 'wenig Wirkung · wenig Aufwand'),
     quad('ts', 'fa-screwdriver-wrench', 'Time Sink', 'wenig Wirkung · viel Aufwand'),
@@ -3471,7 +3486,6 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
       };
       // Formel: feste Komponenten-Labels (Was · KI-Feature · Voraussetzungen)
       const ucLabels = getUseCaseLabels();
-      const partLabels = [ucLabels.formula[1], ucLabels.formula[2]];
       for (const line of c.body.split('\n')) {
         const t = line.trim();
         if (!t) { flushAvoid(); mode = ''; continue; }
@@ -3482,6 +3496,7 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
           instrHtml += `<div class="wi-formula">${formula.map((p, i) =>
             `${i > 0 ? '<span class="wi-formula-plus">+</span>' : ''}<span class="wi-formula-part"><i class="fa-solid ${['fa-lightbulb', 'fa-gear', 'fa-link'][i] || 'fa-circle'}"></i> ${esc(p)}</span>`
           ).join('')}</div>`;
+          instrHtml += renderUseCaseGuideQuestionsHtml();
         } else if (t === 'Gute Use Cases:') {
           flushAvoid();
           mode = 'good';
@@ -3493,10 +3508,15 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
         } else if (mode === 'good' && (t.includes('|') || t.includes(' · '))) {
           const parts = t.split(/\s*\|\s*|\s·\s/).map((p) => p.trim());
           const uc = parts[0] || '';
-          const rest = parts.slice(1).map((val, i) => val
-            ? `<div class="wi-ex-part"><span class="wi-ex-label">${esc(partLabels[i + 1] || '')}</span><span class="wi-ex-val">${esc(val)}</span></div>`
-            : '').join('');
-          instrHtml += `<div class="wi-example"><div class="wi-ex-uc"><i class="fa-solid fa-lightbulb"></i> <span class="wi-ex-label">${esc(ucLabels.formula[0])}</span> ${esc(uc)}</div>${rest}</div>`;
+          const row = (label, val) => val
+            ? `<div class="wi-ex-row"><span class="wi-ex-label">${esc(label)}</span><span class="wi-ex-val">${esc(val)}</span></div>`
+            : '';
+          const rows = [
+            row(ucLabels.formula[0], uc),
+            row(ucLabels.formula[1], parts[1]),
+            row(ucLabels.formula[2], parts.slice(2).join(' | ')),
+          ].filter(Boolean).join('');
+          instrHtml += `<div class="wi-example">${rows}</div>`;
         } else if (mode === 'avoid') {
           avoidBuf.push(t);
         } else {
@@ -3778,6 +3798,28 @@ function maybeLaunchClosingCelebration(slide) {
   launchResultsConfetti(4800);
 }
 
+function renderHeroJoinQrHtml() {
+  const code = State.session?.code;
+  if (!code) {
+    return `<div class="ws-hero-qr ws-hero-qr--placeholder">
+      <div class="ws-hero-qr-card">
+        <span class="ws-hero-qr-icon"><i class="fa-solid fa-qrcode"></i></span>
+        <span class="ws-hero-qr-hint">QR-Code erscheint in der Live-Session</span>
+      </div>
+    </div>`;
+  }
+  return `<div class="ws-hero-qr">
+    <div class="ws-hero-qr-card">
+      <img class="ws-hero-qr-img" alt="Teilnahme-QR-Code" width="148" height="148" />
+      <div class="ws-hero-qr-meta">
+        <span class="ws-hero-qr-label">Mitmachen</span>
+        <strong class="ws-hero-qr-code">${esc(code)}</strong>
+        <span class="ws-hero-qr-hint">QR scannen · Name & Avatar wählen</span>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderHeroSlideHtml(c, editable = false, opts = {}) {
   const { shellMode = false, presentFx = false, hideChrome = false } = opts;
   const bodyEl = editable
@@ -3790,10 +3832,13 @@ function renderHeroSlideHtml(c, editable = false, opts = {}) {
         <div class="ws-hero-ai-grid" aria-hidden="true"></div>
         <div class="ws-hero-glow ws-hero-glow--a" aria-hidden="true"></div>
         <div class="ws-hero-glow ws-hero-glow--b" aria-hidden="true"></div>
-        <div class="ws-hero-content">
-          <div class="ws-hero-icon-ring"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
-          ${hideChrome ? '' : `<h1 class="ws-hero-title ws-hero-title--shimmer">${esc(c.title || '')}</h1>`}
-          ${bodyEl.replace('ws-hero-body', 'ws-hero-body ws-hero-lead')}
+        <div class="ws-hero-content ws-hero-content--join">
+          <div class="ws-hero-copy">
+            <div class="ws-hero-icon-ring"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+            ${hideChrome ? '' : `<h1 class="ws-hero-title ws-hero-title--shimmer">${esc(c.title || '')}</h1>`}
+            ${bodyEl.replace('ws-hero-body', 'ws-hero-body ws-hero-lead')}
+          </div>
+          ${renderHeroJoinQrHtml()}
         </div>
       </div>`;
   }
@@ -7243,20 +7288,24 @@ async function renderQrCode() {
   const codeEl = $('#present-code-text');
   if (urlEl) urlEl.textContent = url;
   if (codeEl) codeEl.textContent = State.session.code;
-  if (!img) return;
+  let dataUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(url)}`;
   try {
     if (typeof QRCode !== 'undefined' && QRCode.toDataURL) {
-      img.src = await QRCode.toDataURL(url, {
-        width: 140,
+      dataUrl = await QRCode.toDataURL(url, {
+        width: 280,
         margin: 1,
         color: { dark: '#0f172a', light: '#ffffff' },
       });
-      img.alt = `QR Code ${State.session.code}`;
-    } else {
-      img.src = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(url)}`;
     }
-  } catch {
-    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(url)}`;
+  } catch { /* fallback url above */ }
+  const targets = [...document.querySelectorAll('.ws-hero-qr-img, #present-qr')];
+  targets.forEach((el) => {
+    el.src = dataUrl;
+    el.alt = `QR Code ${State.session.code}`;
+  });
+  if (img && !targets.includes(img)) {
+    img.src = dataUrl;
+    img.alt = `QR Code ${State.session.code}`;
   }
 }
 
@@ -7775,7 +7824,7 @@ async function renderParticipantQuestion() {
       const ucL = getUseCaseLabels();
       input = `<div class="participant-collect-fields participant-collect-fields--structured">
         <label class="join-label" for="p-uc-summary">${esc(ucL.summary)}${collectLimit > 1 ? ` (${collectSubmitted + 1} von ${collectLimit})` : ''}</label>
-        <textarea id="p-uc-summary" rows="2" class="participant-textarea participant-textarea-lg"${maxAttr} placeholder="Was wollt ihr umsetzen?"></textarea>
+        <textarea id="p-uc-summary" rows="2" class="participant-textarea participant-textarea-lg"${maxAttr} placeholder="Was wollt ihr umsetzen oder verbessern?"></textarea>
         <label class="join-label" for="p-uc-feature">${esc(ucL.feature)}</label>
         <textarea id="p-uc-feature" rows="2" class="participant-textarea" placeholder="Was soll die KI konkret tun?"></textarea>
         <label class="join-label" for="p-uc-deps">${esc(ucL.dependencies)}</label>
@@ -8312,7 +8361,7 @@ function bindParticipantHandlers(slide) {
     const rawText = readParticipantUseCaseInput(slide);
     const text = filterProfanity(rawText, slide.settings?.profanityFilter !== false);
     if (!text && (slide.settings?.required || isCollect)) {
-      toast(isCollect ? 'Bitte Use Case grob formulieren' : 'Antwort erforderlich', 'warn');
+      toast(isCollect ? 'Bitte Use Case Idee eingeben' : 'Antwort erforderlich', 'warn');
       return;
     }
     const lim = Number(slide.content?.charLimit || 0);
