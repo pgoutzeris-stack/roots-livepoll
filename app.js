@@ -133,6 +133,7 @@ function lpConfirm({ title = 'Wirklich fortfahren?', desc = '', okLabel = 'BestÃ
       cancel.removeEventListener('click', onCancel);
       modal.removeEventListener('click', onBg);
       document.removeEventListener('keydown', onKey);
+      if (typeof updateParticipantBarVisibility === 'function') updateParticipantBarVisibility();
       resolve(val);
     };
     const onOk = () => done(true);
@@ -143,6 +144,7 @@ function lpConfirm({ title = 'Wirklich fortfahren?', desc = '', okLabel = 'BestÃ
     cancel.addEventListener('click', onCancel);
     modal.addEventListener('click', onBg);
     document.addEventListener('keydown', onKey);
+    if (typeof updateParticipantBarVisibility === 'function') updateParticipantBarVisibility();
   });
 }
 
@@ -169,6 +171,7 @@ function lpPrompt({ title = 'Eingabe', label = '', value = '', okLabel = 'Speich
       modal.removeEventListener('click', onBg);
       input.removeEventListener('keydown', onInputKey);
       document.removeEventListener('keydown', onKey);
+      if (typeof updateParticipantBarVisibility === 'function') updateParticipantBarVisibility();
       resolve(val);
     };
     const onOk = () => done(input.value);
@@ -181,6 +184,7 @@ function lpPrompt({ title = 'Eingabe', label = '', value = '', okLabel = 'Speich
     modal.addEventListener('click', onBg);
     input.addEventListener('keydown', onInputKey);
     document.addEventListener('keydown', onKey);
+    if (typeof updateParticipantBarVisibility === 'function') updateParticipantBarVisibility();
   });
 }
 
@@ -3108,12 +3112,88 @@ function ensureParticipantActionBarOnBody() {
   return bar;
 }
 
+function isParticipantJoinPage() {
+  return !State.participant || !!$('#participant-root')?.querySelector('.participant-join-page');
+}
+
+function getParticipantScrollRoot() {
+  return $('#participant-root');
+}
+
+function isParticipantScrollNearBottom(el, threshold = 56) {
+  if (!el) return true;
+  const { scrollTop, scrollHeight, clientHeight } = el;
+  if (scrollHeight <= clientHeight + 16) return true;
+  return scrollHeight - scrollTop - clientHeight <= threshold;
+}
+
+function shouldHideParticipantBarOverlay() {
+  if (document.body.classList.contains('participant-settings-open')) return true;
+  if ($('#lp-confirm-modal')?.classList.contains('visible')) return true;
+  if ($('#lp-prompt-modal')?.classList.contains('visible')) return true;
+  const screen = $('#screen-participant');
+  if (screen?.classList.contains('participant-hero-active') || screen?.classList.contains('participant-closing-active')) return true;
+  return false;
+}
+
+function updateParticipantBarVisibility() {
+  const bar = document.getElementById('participant-action-bar');
+  if (!bar || bar.classList.contains('hidden') || !isParticipantMobileLayout()) return;
+
+  bar.classList.remove('participant-bar-join', 'participant-bar-collapsed', 'participant-bar-revealed');
+  document.body.classList.remove('participant-has-action-bar', 'participant-join-mode', 'participant-bar-revealed');
+
+  if (shouldHideParticipantBarOverlay()) {
+    bar.classList.add('participant-bar-collapsed');
+    return;
+  }
+
+  if (document.body.classList.contains('participant-dock-open')) {
+    bar.classList.add('participant-bar-revealed');
+    document.body.classList.add('participant-has-action-bar', 'participant-bar-revealed');
+    return;
+  }
+
+  if (isParticipantJoinPage()) {
+    bar.classList.add('participant-bar-join', 'participant-bar-revealed');
+    document.body.classList.add('participant-join-mode', 'participant-has-action-bar', 'participant-bar-revealed');
+    return;
+  }
+
+  const scrollRoot = getParticipantScrollRoot();
+  if (isParticipantScrollNearBottom(scrollRoot)) {
+    bar.classList.add('participant-bar-revealed');
+    document.body.classList.add('participant-has-action-bar', 'participant-bar-revealed');
+  } else {
+    bar.classList.add('participant-bar-collapsed');
+  }
+}
+
+function bindParticipantBarScrollReveal() {
+  const root = getParticipantScrollRoot();
+  if (!root) return;
+  if (State._participantBarScrollEl !== root) {
+    State._participantBarScrollEl?.removeEventListener?.('scroll', State._participantBarScrollHandler);
+    State._participantBarScrollEl = root;
+    State._participantBarScrollHandler = () => {
+      window.requestAnimationFrame(() => updateParticipantBarVisibility());
+    };
+    root.addEventListener('scroll', State._participantBarScrollHandler, { passive: true });
+  }
+  if (!State._participantBarResizeObs && typeof ResizeObserver !== 'undefined') {
+    State._participantBarResizeObs = new ResizeObserver(() => updateParticipantBarVisibility());
+    State._participantBarResizeObs.observe(root);
+  }
+}
+
 function showParticipantActionBar() {
   const bar = ensureParticipantActionBarOnBody();
   if (!bar) return;
   bar.classList.remove('hidden');
   bar.setAttribute('aria-hidden', 'false');
-  document.body.classList.add('participant-has-action-bar');
+  document.body.classList.add('participant-mobile-bar-active');
+  bindParticipantBarScrollReveal();
+  updateParticipantBarVisibility();
 }
 
 function clearParticipantActionBar() {
@@ -3124,8 +3204,19 @@ function clearParticipantActionBar() {
   bar.replaceChildren();
   State._participantBarShellReady = false;
   State._participantDockBound = false;
-  document.body.classList.remove('participant-has-action-bar');
-  document.body.classList.remove('participant-dock-open');
+  State._participantBarScrollEl?.removeEventListener?.('scroll', State._participantBarScrollHandler);
+  State._participantBarScrollEl = null;
+  State._participantBarScrollHandler = null;
+  State._participantBarResizeObs?.disconnect?.();
+  State._participantBarResizeObs = null;
+  bar.classList.remove('participant-bar-join', 'participant-bar-collapsed', 'participant-bar-revealed');
+  document.body.classList.remove(
+    'participant-mobile-bar-active',
+    'participant-has-action-bar',
+    'participant-join-mode',
+    'participant-bar-revealed',
+    'participant-dock-open',
+  );
 }
 
 function ensureParticipantActionBarShell() {
@@ -3167,6 +3258,7 @@ function toggleParticipantDockPanel(forceOpen) {
     handle?.setAttribute('aria-expanded', 'false');
     document.body.classList.remove('participant-dock-open');
   }
+  updateParticipantBarVisibility();
 }
 
 function renderParticipantDockPanel() {
@@ -3264,6 +3356,8 @@ function syncParticipantMobileActionBar() {
     barPrimary.onclick = null;
     barWait.classList.remove('hidden');
   }
+  bindParticipantBarScrollReveal();
+  updateParticipantBarVisibility();
 }
 
 function closeParticipantSettingsSheet() {
@@ -3272,6 +3366,7 @@ function closeParticipantSettingsSheet() {
   sheet.classList.add('hidden');
   sheet.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('participant-settings-open');
+  updateParticipantBarVisibility();
 }
 
 function openParticipantSettingsSheet() {
@@ -3281,6 +3376,7 @@ function openParticipantSettingsSheet() {
   sheet.classList.remove('hidden');
   sheet.setAttribute('aria-hidden', 'false');
   document.body.classList.add('participant-settings-open');
+  updateParticipantBarVisibility();
   sheet.querySelector('.participant-settings-close')?.focus();
 }
 
@@ -4508,6 +4604,7 @@ function cleanupParticipantClosingFx() {
   const wrap = document.querySelector('#participant-root .ws-closing-stage');
   wrap?._closingAiCleanup?.();
   $('#screen-participant')?.classList.remove('participant-closing-active');
+  updateParticipantBarVisibility();
 }
 
 function participantClosingHeroKey(slide, slideIndex) {
@@ -4523,6 +4620,7 @@ function mountParticipantClosingHero(hostSlide, slideIndex, root, finishParticip
   const mobileFx = isParticipantMobileLayout();
   const screen = $('#screen-participant');
   screen?.classList.toggle('participant-closing-active', mobileFx);
+  updateParticipantBarVisibility();
 
   if (State._participantClosingMountKey === key && root.querySelector('.participant-closing-hero .ws-closing-stage')) {
     requestAnimationFrame(() => initClosingAiFx(root, { reuse: true }));
@@ -4682,6 +4780,7 @@ function cleanupParticipantHeroFx() {
   const wrap = document.querySelector('#participant-root .ws-hero-stage');
   wrap?._heroAiCleanup?.();
   $('#screen-participant')?.classList.remove('participant-hero-active');
+  updateParticipantBarVisibility();
 }
 
 function participantOpeningHeroKey(slide, slideIndex) {
@@ -4697,6 +4796,7 @@ function mountParticipantOpeningHero(hostSlide, slideIndex, root, finishParticip
   const mobileFx = isParticipantMobileLayout();
   const screen = $('#screen-participant');
   screen?.classList.toggle('participant-hero-active', mobileFx);
+  updateParticipantBarVisibility();
 
   if (State._participantHeroMountKey === key && root.querySelector('.participant-opening-hero .ws-hero-stage')) {
     requestAnimationFrame(() => initHeroAiFx(root, { reuse: true }));
