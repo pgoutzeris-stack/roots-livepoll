@@ -3123,7 +3123,9 @@ function clearParticipantActionBar() {
   bar.setAttribute('aria-hidden', 'true');
   bar.replaceChildren();
   State._participantBarShellReady = false;
+  State._participantDockBound = false;
   document.body.classList.remove('participant-has-action-bar');
+  document.body.classList.remove('participant-dock-open');
 }
 
 function ensureParticipantActionBarShell() {
@@ -3132,27 +3134,86 @@ function ensureParticipantActionBarShell() {
   if (!State._participantBarShellReady || !bar.querySelector('.participant-action-bar-dock')) {
     bar.innerHTML = `
       <div class="participant-action-bar-dock">
+        <button type="button" class="participant-dock-handle" id="participant-dock-handle" aria-label="Nach oben wischen für Infos">
+          <span class="participant-dock-notch" aria-hidden="true"></span>
+        </button>
+        <div class="participant-dock-panel hidden" id="participant-dock-panel" aria-hidden="true"></div>
         <div class="participant-action-bar-status" id="participant-bar-status" role="status" aria-live="polite"></div>
-        <div class="participant-action-bar-row">
-          <button type="button" class="participant-bar-settings-btn" id="participant-settings-open" aria-label="Einstellungen">
-            <i class="fa-solid fa-gear" aria-hidden="true"></i>
-          </button>
-          <div class="participant-action-bar-center">
-            <button type="button" class="participant-bar-primary hidden" id="participant-bar-primary"></button>
-          </div>
-          <div class="participant-action-bar-spacer" aria-hidden="true"></div>
+        <div class="participant-action-bar-main" id="participant-bar-main">
+          <button type="button" class="participant-bar-primary hidden" id="participant-bar-primary"></button>
+          <span class="participant-bar-wait-hint hidden" id="participant-bar-wait">Bitte auf die Präsentation achten…</span>
         </div>
       </div>`;
     State._participantBarShellReady = true;
-    bar.querySelector('#participant-settings-open')?.addEventListener('click', () => {
-      if (!State.participant && $('#join-name')) {
-        State.joinProfile.name = $('#join-name').value.trim();
-      }
-      hapticFeedback('light');
-      openParticipantSettingsSheet();
-    });
+    bindParticipantDockHandlers();
   }
   return bar;
+}
+
+function toggleParticipantDockPanel(forceOpen) {
+  const panel = document.getElementById('participant-dock-panel');
+  const handle = document.getElementById('participant-dock-handle');
+  if (!panel) return;
+  const open = forceOpen === true ? true : forceOpen === false ? false : panel.classList.contains('hidden');
+  if (open) {
+    renderParticipantDockPanel();
+    panel.classList.remove('hidden');
+    panel.setAttribute('aria-hidden', 'false');
+    handle?.setAttribute('aria-expanded', 'true');
+    document.body.classList.add('participant-dock-open');
+  } else {
+    panel.classList.add('hidden');
+    panel.setAttribute('aria-hidden', 'true');
+    handle?.setAttribute('aria-expanded', 'false');
+    document.body.classList.remove('participant-dock-open');
+  }
+}
+
+function renderParticipantDockPanel() {
+  const panel = document.getElementById('participant-dock-panel');
+  if (!panel) return;
+  if (!State.participant || !State.session) {
+    panel.innerHTML = '<p class="participant-dock-note">Code und Name auf der Startseite eingeben.</p>';
+    return;
+  }
+  const p = normalizeParticipantAvatar(State.participant);
+  const sopGroup = getParticipantSopGroup(State.participant.id);
+  const sopMeta = sopGroup ? getSopGroupMeta(sopGroup) : null;
+  panel.innerHTML = `
+    <div class="participant-dock-profile">
+      <span class="participant-dock-avatar" style="background:${esc(p.avatar_color)}">${p.avatar_emoji}</span>
+      <div><strong>${esc(p.display_name || 'Teilnehmer')}</strong><span>Session ${esc(State.session.code)}</span></div>
+    </div>
+    ${sopMeta ? `<p class="participant-dock-meta"><i class="fa-solid ${esc(sopMeta.icon || 'fa-users')}"></i> ${esc(sopMeta.label)}</p>` : ''}
+    <button type="button" class="btn-ghost participant-dock-profile-btn" id="participant-dock-edit-profile">Profil bearbeiten</button>`;
+  panel.querySelector('#participant-dock-edit-profile')?.addEventListener('click', () => {
+    toggleParticipantDockPanel(false);
+    openParticipantSettingsSheet();
+  }, { once: true });
+}
+
+function bindParticipantDockHandlers() {
+  if (State._participantDockBound) return;
+  State._participantDockBound = true;
+  const dock = document.getElementById('participant-action-bar');
+  let startY = 0;
+  let tracking = false;
+  dock?.addEventListener('touchstart', (e) => {
+    if (!e.target.closest('.participant-dock-handle, .participant-action-bar-dock')) return;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+  dock?.addEventListener('touchend', (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const dy = startY - e.changedTouches[0].clientY;
+    if (dy > 36) toggleParticipantDockPanel(true);
+    else if (dy < -36) toggleParticipantDockPanel(false);
+  }, { passive: true });
+  document.getElementById('participant-dock-handle')?.addEventListener('click', () => {
+    const panel = document.getElementById('participant-dock-panel');
+    toggleParticipantDockPanel(panel?.classList.contains('hidden'));
+  });
 }
 
 function findParticipantPrimarySubmit(root) {
@@ -3178,7 +3239,8 @@ function syncParticipantMobileActionBar() {
   const root = $('#participant-root');
   const statusSlot = bar?.querySelector('#participant-bar-status');
   const barPrimary = document.getElementById('participant-bar-primary');
-  if (!bar || !statusSlot || !barPrimary) return;
+  const barWait = document.getElementById('participant-bar-wait');
+  if (!bar || !statusSlot || !barPrimary || !barWait) return;
 
   const statusEl = root?.querySelector('#fav-counter, #split-total')
     || statusSlot.querySelector('#fav-counter, #split-total');
@@ -3186,20 +3248,21 @@ function syncParticipantMobileActionBar() {
 
   showParticipantActionBar();
   statusSlot.replaceChildren();
+  toggleParticipantDockPanel(false);
 
   if (statusEl) {
     statusEl.classList.add('participant-action-bar-status');
     statusSlot.appendChild(statusEl);
-  } else if (!primarySrc) {
-    statusSlot.innerHTML = '<span class="participant-bar-wait-hint">Bitte auf die Präsentation achten…</span>';
   }
 
   if (primarySrc) {
     barPrimary.classList.remove('hidden');
+    barWait.classList.add('hidden');
     wireParticipantBarPrimaryClick(barPrimary, primarySrc);
   } else {
     barPrimary.classList.add('hidden');
     barPrimary.onclick = null;
+    barWait.classList.remove('hidden');
   }
 }
 
@@ -3376,7 +3439,7 @@ function renderParticipantSettingsBody() {
     }).eq('id', State.participant.id).select().single();
     if (error) { toast(error.message, 'error'); return; }
     State.participant = normalizeParticipantAvatar(data);
-    localStorage.setItem('lp_join_profile', JSON.stringify({ name: draft.name, emoji: draft.emoji, color: draft.color }));
+    localStorage.setItem('lp_join_profile', JSON.stringify({ emoji: draft.emoji, color: draft.color }));
     hapticFeedback('success');
     toast('Profil gespeichert', 'success');
     closeParticipantSettingsSheet();
@@ -8862,24 +8925,19 @@ function renderParticipantEntry(codePrefill) {
   const saved = JSON.parse(localStorage.getItem('lp_join_profile') || 'null');
   const code = (codePrefill || parseJoinCodeFromHash() || '').trim().toUpperCase();
   const hasCode = Boolean(code);
+  // Name bewusst leer — nur Emoji/Farbe aus letztem Besuch (optional)
   State.joinProfile = {
-    name: saved?.name || '',
+    name: '',
     emoji: saved?.emoji || LP_AVATAR_EMOJIS()[0],
     color: saved?.color || LP_AVATAR_COLORS()[0],
   };
   const root = $('#participant-root');
   root.innerHTML = `
     <div class="participant-join-page">
-      <header class="participant-join-header">
-        <div class="participant-join-logo" aria-hidden="true"><i class="fa-solid fa-signal"></i></div>
-        <div class="participant-join-header-text">
-          <h1>Live teilnehmen</h1>
-          <p>${hasCode ? 'Session-Code ist hinterlegt — Name eingeben und los.' : 'Code eingeben und mitmachen.'}</p>
-        </div>
-      </header>
-      <div class="participant-join-form">
+      <div class="participant-join-top">
+        <h1>Live teilnehmen</h1>
         ${hasCode ? `
-          <div class="join-code-badge"><i class="fa-solid fa-qrcode"></i> Session <strong>${esc(code)}</strong></div>
+          <div class="join-code-badge join-code-badge--compact"><i class="fa-solid fa-qrcode"></i> <strong>${esc(code)}</strong></div>
           <input type="hidden" id="join-code" value="${esc(code)}" />`
         : `<div class="participant-join-field">
             <label class="join-label" for="join-code">Session-Code</label>
@@ -8887,18 +8945,45 @@ function renderParticipantEntry(codePrefill) {
           </div>`}
         <div class="participant-join-field">
           <label class="join-label" for="join-name">Dein Name <span class="req">*</span></label>
-          <input id="join-name" placeholder="Vorname oder Nickname" class="participant-name-input" value="${esc(State.joinProfile.name)}" required autocomplete="name" />
+          <input id="join-name" placeholder="Vorname oder Nickname" class="participant-name-input" value="" required autocomplete="off" autocorrect="off" />
         </div>
-        <p class="participant-join-avatar-hint"><i class="fa-solid fa-gear"></i> Emoji &amp; Farbe über <strong>Einstellungen</strong> unten links</p>
+      </div>
+      <div class="participant-join-avatar-block">
+        <label class="join-label">Dein Avatar <span class="req">*</span></label>
+        <div class="avatar-preview-wrap avatar-preview-wrap--compact">
+          <div id="avatar-preview" class="avatar-preview" style="background:${esc(State.joinProfile.color)}">${State.joinProfile.emoji}</div>
+          <div class="avatar-preview-name" id="avatar-preview-name">Wähle Emoji &amp; Farbe</div>
+        </div>
+        <div class="avatar-color-row avatar-color-row--compact">${LP_AVATAR_COLORS().map((c) => `<button type="button" class="avatar-color-btn ${c === State.joinProfile.color ? 'active' : ''}" data-color="${c}" style="background:${c}" aria-label="${esc(avatarColorAriaLabel(c))}"></button>`).join('')}</div>
+        <div class="avatar-emoji-grid avatar-emoji-grid--compact">${LP_AVATAR_EMOJIS().map((e) => `<button type="button" class="avatar-emoji-btn ${e === State.joinProfile.emoji ? 'active' : ''}" data-emoji="${e}" aria-pressed="${e === State.joinProfile.emoji}">${e}</button>`).join('')}</div>
       </div>
       <button type="button" class="btn-primary participant-submit participant-join-submit-hidden" id="join-submit"><i class="fa-solid fa-arrow-right"></i> Beitreten</button>
     </div>`;
 
   const updatePreview = () => {
-    State.joinProfile.name = $('#join-name')?.value.trim() || '';
+    const name = $('#join-name')?.value.trim() || '';
+    State.joinProfile.name = name;
+    $('#avatar-preview').textContent = State.joinProfile.emoji;
+    $('#avatar-preview').style.background = State.joinProfile.color;
+    $('#avatar-preview-name').textContent = name || 'Wähle Emoji & Farbe';
   };
 
   $('#join-name')?.addEventListener('input', updatePreview);
+  root.querySelectorAll('.avatar-emoji-btn').forEach((btn) => btn.addEventListener('click', () => {
+    State.joinProfile.emoji = btn.dataset.emoji;
+    hapticFeedback('select');
+    root.querySelectorAll('.avatar-emoji-btn').forEach((b) => {
+      b.classList.toggle('active', b.dataset.emoji === State.joinProfile.emoji);
+      b.setAttribute('aria-pressed', b.dataset.emoji === State.joinProfile.emoji ? 'true' : 'false');
+    });
+    updatePreview();
+  }));
+  root.querySelectorAll('.avatar-color-btn').forEach((btn) => btn.addEventListener('click', () => {
+    State.joinProfile.color = btn.dataset.color;
+    hapticFeedback('select');
+    root.querySelectorAll('.avatar-color-btn').forEach((b) => b.classList.toggle('active', b.dataset.color === State.joinProfile.color));
+    updatePreview();
+  }));
   $('#join-code')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#join-name')?.focus(); });
   syncParticipantMobileActionBar();
   bindParticipantConnectivityHandlers();
@@ -8910,7 +8995,7 @@ function renderParticipantEntry(codePrefill) {
     State.joinProfile.name = name;
     if (!State.joinProfile.emoji || !LP_AVATAR_EMOJIS().includes(State.joinProfile.emoji)) { toast('Bitte Avatar wählen', 'warn'); return; }
     if (!State.joinProfile.color || !LP_AVATAR_COLORS().includes(State.joinProfile.color)) { toast('Bitte Avatar-Farbe wählen', 'warn'); return; }
-    localStorage.setItem('lp_join_profile', JSON.stringify({ name, emoji: State.joinProfile.emoji, color: State.joinProfile.color }));
+    localStorage.setItem('lp_join_profile', JSON.stringify({ emoji: State.joinProfile.emoji, color: State.joinProfile.color }));
     void joinSession(joinCode, name, State.joinProfile.emoji, State.joinProfile.color);
   };
   const joinBtn = $('#join-submit');
