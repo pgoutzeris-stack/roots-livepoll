@@ -3134,13 +3134,13 @@ function ensureParticipantActionBarShell() {
       <div class="participant-action-bar-dock">
         <div class="participant-action-bar-status" id="participant-bar-status" role="status" aria-live="polite"></div>
         <div class="participant-action-bar-row">
-          <button type="button" class="participant-bar-avatar-btn" id="participant-settings-open" aria-label="Profil und Einstellungen">
-            <span class="participant-bar-avatar-face" id="participant-bar-avatar-face"></span>
+          <button type="button" class="participant-bar-settings-btn" id="participant-settings-open" aria-label="Einstellungen">
+            <i class="fa-solid fa-gear" aria-hidden="true"></i>
           </button>
-          <div class="participant-action-bar-actions" id="participant-bar-actions">
-            <button type="button" class="participant-bar-secondary hidden" id="participant-bar-secondary" aria-label="Zurücksetzen"></button>
+          <div class="participant-action-bar-center">
             <button type="button" class="participant-bar-primary hidden" id="participant-bar-primary"></button>
           </div>
+          <div class="participant-action-bar-spacer" aria-hidden="true"></div>
         </div>
       </div>`;
     State._participantBarShellReady = true;
@@ -3151,7 +3151,6 @@ function ensureParticipantActionBarShell() {
       hapticFeedback('light');
       openParticipantSettingsSheet();
     });
-    updateParticipantBarAvatar();
   }
   return bar;
 }
@@ -3179,15 +3178,11 @@ function syncParticipantMobileActionBar() {
   const root = $('#participant-root');
   const statusSlot = bar?.querySelector('#participant-bar-status');
   const barPrimary = document.getElementById('participant-bar-primary');
-  const barSecondary = document.getElementById('participant-bar-secondary');
   if (!bar || !statusSlot || !barPrimary) return;
-
-  updateParticipantBarAvatar();
 
   const statusEl = root?.querySelector('#fav-counter, #split-total')
     || statusSlot.querySelector('#fav-counter, #split-total');
   const primarySrc = findParticipantPrimarySubmit(root);
-  const resetSrc = root?.querySelector('#lp-mx-reset');
 
   showParticipantActionBar();
   statusSlot.replaceChildren();
@@ -3195,7 +3190,7 @@ function syncParticipantMobileActionBar() {
   if (statusEl) {
     statusEl.classList.add('participant-action-bar-status');
     statusSlot.appendChild(statusEl);
-  } else if (!primarySrc && !resetSrc) {
+  } else if (!primarySrc) {
     statusSlot.innerHTML = '<span class="participant-bar-wait-hint">Bitte auf die Präsentation achten…</span>';
   }
 
@@ -3205,17 +3200,6 @@ function syncParticipantMobileActionBar() {
   } else {
     barPrimary.classList.add('hidden');
     barPrimary.onclick = null;
-  }
-
-  if (barSecondary) {
-    if (resetSrc) {
-      barSecondary.classList.remove('hidden');
-      barSecondary.innerHTML = '<i class="fa-solid fa-rotate-left" aria-hidden="true"></i>';
-      barSecondary.onclick = (e) => { e.preventDefault(); resetSrc.click(); };
-    } else {
-      barSecondary.classList.add('hidden');
-      barSecondary.onclick = null;
-    }
   }
 }
 
@@ -3255,17 +3239,6 @@ function getParticipantSettingsProfile() {
   };
 }
 
-function syncJoinAvatarChipPreview() {
-  updateParticipantBarAvatar();
-}
-
-function updateParticipantBarAvatar() {
-  const face = document.getElementById('participant-bar-avatar-face');
-  if (!face) return;
-  const profile = getParticipantSettingsProfile();
-  face.textContent = profile.emoji || '👤';
-  face.style.background = profile.color || '#206efb';
-}
 
 const PARTICIPANT_SUBMIT_LABELS = {
   'join-submit': 'Beitreten',
@@ -3331,14 +3304,10 @@ function renderParticipantSettingsBody() {
           ${sopMeta ? `<div><dt>SOP</dt><dd>${esc(sopMeta.label)}</dd></div>` : ''}
         </dl>
       </div>` : ''}
-    ${profile.mode === 'session' ? `
-      <div class="participant-settings-section">
-        <label class="join-label" for="settings-name">Anzeigename</label>
-        <input id="settings-name" class="participant-name-input" value="${esc(profile.name)}" autocomplete="name" />
-      </div>` : `
-      <div class="participant-settings-section participant-settings-note">
-        <p>Name und Code legst du auf der Startseite fest. Hier wählst du Emoji und Farbe.</p>
-      </div>`}
+    <div class="participant-settings-section">
+      <label class="join-label" for="settings-name">${profile.mode === 'session' ? 'Anzeigename' : 'Dein Name'}</label>
+      <input id="settings-name" class="participant-name-input" value="${esc(profile.name)}" autocomplete="name" />
+    </div>
     <div class="participant-settings-section">
       <h3>Avatar-Farbe</h3>
       <div class="participant-settings-colors">${colors.map((c, i) => `<button type="button" class="avatar-color-btn participant-settings-color ${c === profile.color ? 'active' : ''}" data-color="${c}" style="background:${c}" aria-label="${esc(avatarColorAriaLabel(c))}" aria-pressed="${c === profile.color}"></button>`).join('')}</div>
@@ -3359,7 +3328,6 @@ function renderParticipantSettingsBody() {
       preview.style.background = draft.color;
     }
     if (namePreview) namePreview.textContent = draft.name || 'Dein Name';
-    syncJoinAvatarChipPreview();
   };
 
   body.querySelectorAll('.participant-settings-emoji').forEach((btn) => btn.addEventListener('click', () => {
@@ -3390,6 +3358,11 @@ function renderParticipantSettingsBody() {
 
   $('#settings-name')?.addEventListener('input', (e) => {
     draft.name = e.target.value.trim();
+    if (profile.mode === 'join') {
+      State.joinProfile.name = draft.name;
+      const joinName = $('#join-name');
+      if (joinName) joinName.value = draft.name;
+    }
     updateDraftPreview();
   });
 
@@ -3407,7 +3380,7 @@ function renderParticipantSettingsBody() {
     hapticFeedback('success');
     toast('Profil gespeichert', 'success');
     closeParticipantSettingsSheet();
-    syncJoinAvatarChipPreview();
+    syncParticipantMobileActionBar();
     const youEl = $('#participant-root')?.querySelector('.participant-you');
     if (youEl) youEl.textContent = draft.name;
   });
@@ -8916,14 +8889,13 @@ function renderParticipantEntry(codePrefill) {
           <label class="join-label" for="join-name">Dein Name <span class="req">*</span></label>
           <input id="join-name" placeholder="Vorname oder Nickname" class="participant-name-input" value="${esc(State.joinProfile.name)}" required autocomplete="name" />
         </div>
-        <p class="participant-join-avatar-hint"><i class="fa-solid fa-circle-user"></i> Avatar unten links anpassen</p>
+        <p class="participant-join-avatar-hint"><i class="fa-solid fa-gear"></i> Emoji &amp; Farbe über <strong>Einstellungen</strong> unten links</p>
       </div>
       <button type="button" class="btn-primary participant-submit participant-join-submit-hidden" id="join-submit"><i class="fa-solid fa-arrow-right"></i> Beitreten</button>
     </div>`;
 
   const updatePreview = () => {
     State.joinProfile.name = $('#join-name')?.value.trim() || '';
-    syncJoinAvatarChipPreview();
   };
 
   $('#join-name')?.addEventListener('input', updatePreview);
@@ -9665,8 +9637,7 @@ function renderParticipantMatrixHtml(slide) {
         </div>`;
       }).join('')}
     </div>
-    <div class="lp-mx-actions">
-      <button type="button" class="btn-ghost" id="lp-mx-reset"><i class="fa-solid fa-rotate-left"></i> Zurücksetzen</button>
+    <div class="lp-mx-actions participant-join-submit-hidden">
       <button type="button" class="btn-primary participant-submit" id="lp-mx-submit"><i class="fa-solid fa-paper-plane"></i> Senden <span class="lp-mx-progress">(<span id="lp-mx-progress-n">${Math.max(0, placeableItems.length - inPool.length)}</span>/${placeableItems.length})</span></button>
     </div>
   </div>`;
@@ -9854,18 +9825,6 @@ function setupMatrixDragDrop(slide) {
         || wrap.querySelector(`.lp-mx-pool .lp-mx-item[data-item-id="${cssEscapeLP(itemId)}"]`);
       if (gridItem) moveItemToDom(gridItem, next);
     });
-  });
-
-  // Reset
-  document.getElementById('lp-mx-reset')?.addEventListener('click', () => {
-    placements = {};
-    saveMatrixLocal(slide.id, placements);
-    // Move all items back to pool (Grid)
-    const pool = wrap.querySelector('.lp-mx-pool-items');
-    if (pool) wrap.querySelectorAll('.lp-mx-grid .lp-mx-item').forEach((it) => pool.appendChild(it));
-    // Mobile-Buttons zurücksetzen
-    wrap.querySelectorAll('.lp-mxm-btn.is-active').forEach((b) => b.classList.remove('is-active'));
-    updateProgress();
   });
 
   // Submit
