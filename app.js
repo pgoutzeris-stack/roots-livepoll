@@ -3084,20 +3084,6 @@ function bindParticipantConnectivityHandlers() {
   if (!navigator.onLine) setParticipantConnStatus(false);
 }
 
-function maybeShowPwaInstallHint() {
-  if (!isParticipantMobileLayout()) return;
-  if (localStorage.getItem('lp_pwa_hint_dismissed')) return;
-  if (window.matchMedia?.('(display-mode: standalone)')?.matches) return;
-  if (window.navigator.standalone) return;
-  const hint = document.getElementById('participant-pwa-hint');
-  if (!hint || !hint.classList.contains('hidden')) return;
-  hint.classList.remove('hidden');
-  hint.querySelector('.participant-pwa-hint-dismiss')?.addEventListener('click', () => {
-    hint.classList.add('hidden');
-    localStorage.setItem('lp_pwa_hint_dismissed', '1');
-  }, { once: true });
-}
-
 function ensureParticipantActionBarOnBody() {
   const bar = document.getElementById('participant-action-bar');
   if (bar && bar.parentElement !== document.body) document.body.appendChild(bar);
@@ -3146,17 +3132,20 @@ function ensureParticipantActionBarShell() {
 }
 
 function findParticipantPrimarySubmit(root) {
-  if (!root) return null;
+  const scopes = [root, document.getElementById('participant-bar-actions')].filter(Boolean);
   const ids = [
     'submit-text', 'submit-choice', 'submit-favorites', 'submit-split', 'submit-multi', 'submit-num',
     'submit-rank', 'submit-pin', 'lp-mx-submit', 'join-submit', 'submit-top3',
   ];
-  for (const id of ids) {
-    const el = root.querySelector(`#${id}`);
-    if (el?.matches?.('.btn-primary, .participant-submit')) return el;
+  for (const scope of scopes) {
+    for (const id of ids) {
+      const el = scope.querySelector(`#${id}`);
+      if (el?.matches?.('.btn-primary, .participant-submit')) return el;
+    }
+    const candidates = scope.querySelectorAll('.btn-primary.participant-submit, .participant-submit.btn-primary');
+    if (candidates.length) return candidates[candidates.length - 1];
   }
-  const candidates = root.querySelectorAll('.btn-primary.participant-submit, .participant-submit.btn-primary');
-  return candidates.length ? candidates[candidates.length - 1] : null;
+  return null;
 }
 
 function syncParticipantMobileActionBar() {
@@ -3170,24 +3159,26 @@ function syncParticipantMobileActionBar() {
   const statusSlot = bar?.querySelector('#participant-bar-status');
   if (!bar || !actions || !statusSlot) return;
 
-  showParticipantActionBar();
-  actions.replaceChildren();
-  statusSlot.replaceChildren();
+  // Vor dem Leeren referenzieren — Buttons können schon in der Bar hängen (Vote-Sync ohne Re-Render).
+  const statusEl = root?.querySelector('#fav-counter, #split-total')
+    || statusSlot.querySelector('#fav-counter, #split-total');
+  const secondary = root?.querySelector('#lp-mx-reset') || actions.querySelector('#lp-mx-reset');
+  const primary = findParticipantPrimarySubmit(root);
 
-  const statusEl = root?.querySelector('#fav-counter, #split-total');
+  showParticipantActionBar();
+  statusSlot.replaceChildren();
+  actions.replaceChildren();
+
   if (statusEl) {
     statusEl.classList.add('participant-action-bar-status');
     statusSlot.appendChild(statusEl);
   }
-
-  const secondary = root?.querySelector('#lp-mx-reset');
   if (secondary) {
     secondary.classList.add('participant-action-bar-secondary');
     actions.appendChild(secondary);
   }
-
-  const primary = findParticipantPrimarySubmit(root);
   if (primary) {
+    primary.classList.remove('participant-join-submit-hidden');
     primary.classList.add('participant-action-bar-btn');
     actions.appendChild(primary);
   }
@@ -8938,7 +8929,6 @@ async function joinSession(code, name, emoji, color) {
     subscribeParticipantChannel();
     hapticFeedback('success');
     await renderParticipantQuestion();
-    maybeShowPwaInstallHint();
   } finally {
     setButtonBusy(joinBtn, false);
   }
@@ -9136,6 +9126,7 @@ async function renderParticipantQuestion() {
   const finishParticipant = () => {
     syncSopWorkshopShell('participant', slideIndex);
     syncParticipantMobileActionBar();
+    requestAnimationFrame(() => syncParticipantMobileActionBar());
   };
   if (!hostSlide?.settings?.sopTrackVote) State.participantVoteExpert = false;
   if (!hostSlide) { root.innerHTML = '<div class="participant-card"><p>Warte auf Folie…</p></div>'; finishParticipant(); return; }
@@ -10378,6 +10369,7 @@ function exposeLpAppGlobals() {
   window.renderPresent = renderPresent;
   window.renderPresentNow = renderPresentNow;
   window.renderParticipantQuestion = renderParticipantQuestion;
+  window.syncParticipantMobileActionBar = syncParticipantMobileActionBar;
   window.broadcastSessionPatch = broadcastSessionPatch;
   window.applySessionPatch = applySessionPatch;
   window.routeFromHash = routeFromHash;

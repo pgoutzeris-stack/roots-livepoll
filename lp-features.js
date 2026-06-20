@@ -348,6 +348,9 @@
         QnaUpvotes.bindParticipant(document.getElementById('participant-root'));
       }
     } catch (e) { console.warn('[LP wrappedRenderParticipantQuestion]', e); }
+    if (typeof window.syncParticipantMobileActionBar === 'function') {
+      window.syncParticipantMobileActionBar();
+    }
     return result;
   }
 
