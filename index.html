@@ -267,6 +267,16 @@
   <span><i class="fa-solid fa-mobile-screen"></i> Tipp: „Zum Home-Bildschirm" für Vollbild-App</span>
   <button type="button" class="participant-pwa-hint-dismiss" aria-label="Hinweis schließen"><i class="fa-solid fa-xmark"></i></button>
 </div>
+<div id="participant-settings-sheet" class="participant-settings-sheet hidden" aria-hidden="true">
+  <button type="button" class="participant-settings-backdrop" aria-label="Einstellungen schließen"></button>
+  <div class="participant-settings-panel" role="dialog" aria-modal="true" aria-labelledby="participant-settings-title">
+    <div class="participant-settings-head">
+      <h2 id="participant-settings-title">Teilnehmer</h2>
+      <button type="button" class="participant-settings-close" aria-label="Schließen"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="participant-settings-body" class="participant-settings-body"></div>
+  </div>
+</div>
 <div id="participant-action-bar" class="participant-action-bar hidden" aria-label="Aktion" role="region"></div>
 
 <script src="https://pgoutzeris-stack.github.io/ROOTS_Intranet/roots-user-bridge.js?v=__BUILD__"></script>

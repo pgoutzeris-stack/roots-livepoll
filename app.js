@@ -13,6 +13,13 @@ const PROFANITY = ['arsch', 'scheiße', 'scheisse', 'fuck', 'shit', 'damn', 'idi
 const OPTION_TYPES = new Set(['mc_single', 'mc_multi', 'quiz', 'ranking', 'percent_split']);
 const LP_AVATAR_EMOJIS = () => window.LP_AVATAR_EMOJIS || ['🦊', '🐼', '🦁', '🦄', '🐸', '🐙', '🌟', '🔥'];
 const LP_AVATAR_COLORS = () => window.LP_AVATAR_COLORS || ['#206efb', '#10b981', '#06b6d4', '#dc2626', '#6366f1'];
+const LP_AVATAR_COLOR_NAMES = ['Blau', 'Grün', 'Türkis', 'Rot', 'Indigo', 'Himmelblau', 'Teal', 'Cyan', 'Royalblau', 'Schiefer'];
+
+function avatarColorAriaLabel(hex) {
+  const colors = LP_AVATAR_COLORS();
+  const idx = colors.indexOf(hex);
+  return `Avatar-Farbe ${LP_AVATAR_COLOR_NAMES[idx >= 0 ? idx : 0] || 'Auswahl'}`;
+}
 
 try {
   if (window.self !== window.top) document.documentElement.classList.add('in-iframe');
@@ -181,6 +188,12 @@ function showScreen(name) {
   $$('.screen').forEach((s) => s.classList.remove('active'));
   const el = $(`#screen-${name}`);
   if (el) el.classList.add('active');
+  if (name !== 'participant') {
+    closeParticipantSettingsSheet();
+    clearParticipantActionBar();
+  } else {
+    syncParticipantMobileActionBar();
+  }
 }
 
 function isJoinRoute() {
@@ -3105,7 +3118,31 @@ function clearParticipantActionBar() {
   bar.classList.add('hidden');
   bar.setAttribute('aria-hidden', 'true');
   bar.replaceChildren();
+  State._participantBarShellReady = false;
   document.body.classList.remove('participant-has-action-bar');
+}
+
+function ensureParticipantActionBarShell() {
+  const bar = ensureParticipantActionBarOnBody();
+  if (!bar) return null;
+  if (!State._participantBarShellReady || !bar.querySelector('.participant-action-bar-shell')) {
+    bar.innerHTML = `
+      <div class="participant-action-bar-shell">
+        <div class="participant-action-bar-status" id="participant-bar-status" role="status" aria-live="polite"></div>
+        <div class="participant-action-bar-row">
+          <button type="button" class="participant-bar-settings-btn" id="participant-settings-open" aria-label="Teilnehmer-Einstellungen">
+            <i class="fa-solid fa-gear" aria-hidden="true"></i>
+          </button>
+          <div class="participant-action-bar-actions" id="participant-bar-actions"></div>
+        </div>
+      </div>`;
+    State._participantBarShellReady = true;
+    bar.querySelector('#participant-settings-open')?.addEventListener('click', () => {
+      hapticFeedback('light');
+      openParticipantSettingsSheet();
+    });
+  }
+  return bar;
 }
 
 function findParticipantPrimarySubmit(root) {
@@ -3122,44 +3159,221 @@ function findParticipantPrimarySubmit(root) {
   return candidates.length ? candidates[candidates.length - 1] : null;
 }
 
-function relocateParticipantSubmitToActionBar() {
-  if (!isParticipantMobileLayout()) return;
-  const bar = ensureParticipantActionBarOnBody();
-  const root = $('#participant-root');
-  if (!bar || !root) return;
-  const existing = bar.querySelector('.btn-primary, .participant-submit, [id^="submit-"], #join-submit, #lp-mx-submit');
-  if (existing) {
-    showParticipantActionBar();
-    return;
-  }
-  const btn = findParticipantPrimarySubmit(root);
-  if (!btn) return;
-  showParticipantActionBar();
-  btn.classList.add('participant-action-bar-btn');
-  // Live-Status (Vote-Zähler / Punkte-Summe) mit nach unten nehmen, damit er beim
-  // Tippen sichtbar bleibt (Button verdeckt sonst den Zähler im Scroll-Inhalt).
-  const status = root.querySelector('#fav-counter, #split-total');
-  if (status) {
-    status.classList.add('participant-action-bar-status');
-    bar.replaceChildren(status, btn);
-  } else {
-    bar.replaceChildren(btn);
-  }
-}
-
 function syncParticipantMobileActionBar() {
-  if (!isParticipantMobileLayout()) {
+  if (!isParticipantMobileLayout() || !$('#screen-participant')?.classList.contains('active')) {
     clearParticipantActionBar();
     return;
   }
-  relocateParticipantSubmitToActionBar();
+  const bar = ensureParticipantActionBarShell();
+  const root = $('#participant-root');
+  const actions = bar?.querySelector('#participant-bar-actions');
+  const statusSlot = bar?.querySelector('#participant-bar-status');
+  if (!bar || !actions || !statusSlot) return;
+
+  showParticipantActionBar();
+  actions.replaceChildren();
+  statusSlot.replaceChildren();
+
+  const statusEl = root?.querySelector('#fav-counter, #split-total');
+  if (statusEl) {
+    statusEl.classList.add('participant-action-bar-status');
+    statusSlot.appendChild(statusEl);
+  }
+
+  const secondary = root?.querySelector('#lp-mx-reset');
+  if (secondary) {
+    secondary.classList.add('participant-action-bar-secondary');
+    actions.appendChild(secondary);
+  }
+
+  const primary = findParticipantPrimarySubmit(root);
+  if (primary) {
+    primary.classList.add('participant-action-bar-btn');
+    actions.appendChild(primary);
+  }
+
+  if (!primary && !secondary && !statusEl) {
+    actions.innerHTML = '<span class="participant-bar-wait-hint">Bitte auf die Präsentation achten…</span>';
+  }
+}
+
+function closeParticipantSettingsSheet() {
+  const sheet = document.getElementById('participant-settings-sheet');
+  if (!sheet) return;
+  sheet.classList.add('hidden');
+  sheet.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('participant-settings-open');
+}
+
+function openParticipantSettingsSheet() {
+  const sheet = document.getElementById('participant-settings-sheet');
+  if (!sheet) return;
+  renderParticipantSettingsBody();
+  sheet.classList.remove('hidden');
+  sheet.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('participant-settings-open');
+  sheet.querySelector('.participant-settings-close')?.focus();
+}
+
+function getParticipantSettingsProfile() {
+  if (State.participant) {
+    const p = normalizeParticipantAvatar(State.participant);
+    return {
+      name: p.display_name || '',
+      emoji: p.avatar_emoji,
+      color: p.avatar_color,
+      mode: 'session',
+    };
+  }
+  return {
+    name: State.joinProfile?.name || $('#join-name')?.value?.trim() || '',
+    emoji: State.joinProfile?.emoji || LP_AVATAR_EMOJIS()[0],
+    color: State.joinProfile?.color || LP_AVATAR_COLORS()[0],
+    mode: 'join',
+  };
+}
+
+function syncJoinAvatarChipPreview() {
+  const profile = getParticipantSettingsProfile();
+  const face = $('#join-avatar-chip-face');
+  const nameEl = $('#join-avatar-chip-name');
+  if (face) {
+    face.textContent = profile.emoji;
+    face.style.background = profile.color;
+  }
+  if (nameEl) nameEl.textContent = profile.name || 'Avatar wählen';
+}
+
+function renderParticipantSettingsBody() {
+  const body = document.getElementById('participant-settings-body');
+  if (!body) return;
+  const profile = getParticipantSettingsProfile();
+  const emojis = LP_AVATAR_EMOJIS();
+  const colors = LP_AVATAR_COLORS();
+  const sopGroup = State.participant ? getParticipantSopGroup(State.participant.id) : null;
+  const sopMeta = sopGroup ? getSopGroupMeta(sopGroup) : null;
+  const sessionCode = State.session?.code || $('#join-code')?.value?.trim().toUpperCase() || '';
+
+  body.innerHTML = `
+    <div class="participant-settings-preview">
+      <div class="participant-settings-avatar" id="settings-avatar-preview" style="background:${esc(profile.color)}">${profile.emoji}</div>
+      <div class="participant-settings-preview-text">
+        <strong id="settings-avatar-name">${esc(profile.name || 'Dein Name')}</strong>
+        <span>${profile.mode === 'session' ? 'Dein Profil in dieser Session' : 'Avatar für den Beitritt'}</span>
+      </div>
+    </div>
+    ${profile.mode === 'session' ? `
+      <div class="participant-settings-section">
+        <h3>Session</h3>
+        <dl class="participant-settings-meta">
+          <div><dt>Code</dt><dd>${esc(sessionCode || '—')}</dd></div>
+          ${sopMeta ? `<div><dt>SOP</dt><dd>${esc(sopMeta.label)}</dd></div>` : ''}
+        </dl>
+      </div>` : ''}
+    ${profile.mode === 'session' ? `
+      <div class="participant-settings-section">
+        <label class="join-label" for="settings-name">Anzeigename</label>
+        <input id="settings-name" class="participant-name-input" value="${esc(profile.name)}" autocomplete="name" />
+      </div>` : `
+      <div class="participant-settings-section participant-settings-note">
+        <p>Name und Code legst du auf der Startseite fest. Hier wählst du Emoji und Farbe.</p>
+      </div>`}
+    <div class="participant-settings-section">
+      <h3>Avatar-Farbe</h3>
+      <div class="participant-settings-colors">${colors.map((c, i) => `<button type="button" class="avatar-color-btn participant-settings-color ${c === profile.color ? 'active' : ''}" data-color="${c}" style="background:${c}" aria-label="${esc(avatarColorAriaLabel(c))}" aria-pressed="${c === profile.color}"></button>`).join('')}</div>
+    </div>
+    <div class="participant-settings-section">
+      <h3>Emoji</h3>
+      <div class="participant-settings-emoji-grid">${emojis.map((e) => `<button type="button" class="avatar-emoji-btn participant-settings-emoji ${e === profile.emoji ? 'active' : ''}" data-emoji="${e}" aria-pressed="${e === profile.emoji}">${e}</button>`).join('')}</div>
+    </div>
+    ${profile.mode === 'session' ? `<button type="button" class="btn-primary participant-settings-save" id="participant-settings-save">Profil speichern</button>` : ''}`;
+
+  let draft = { ...profile };
+
+  const updateDraftPreview = () => {
+    const preview = $('#settings-avatar-preview');
+    const namePreview = $('#settings-avatar-name');
+    if (preview) {
+      preview.textContent = draft.emoji;
+      preview.style.background = draft.color;
+    }
+    if (namePreview) namePreview.textContent = draft.name || 'Dein Name';
+    syncJoinAvatarChipPreview();
+  };
+
+  body.querySelectorAll('.participant-settings-emoji').forEach((btn) => btn.addEventListener('click', () => {
+    draft.emoji = btn.dataset.emoji;
+    hapticFeedback('select');
+    body.querySelectorAll('.participant-settings-emoji').forEach((b) => {
+      b.classList.toggle('active', b.dataset.emoji === draft.emoji);
+      b.setAttribute('aria-pressed', b.dataset.emoji === draft.emoji ? 'true' : 'false');
+    });
+    if (profile.mode === 'join') {
+      State.joinProfile = { ...State.joinProfile, emoji: draft.emoji, color: draft.color };
+    }
+    updateDraftPreview();
+  }));
+
+  body.querySelectorAll('.participant-settings-color').forEach((btn) => btn.addEventListener('click', () => {
+    draft.color = btn.dataset.color;
+    hapticFeedback('select');
+    body.querySelectorAll('.participant-settings-color').forEach((b) => {
+      b.classList.toggle('active', b.dataset.color === draft.color);
+      b.setAttribute('aria-pressed', b.dataset.color === draft.color ? 'true' : 'false');
+    });
+    if (profile.mode === 'join') {
+      State.joinProfile = { ...State.joinProfile, emoji: draft.emoji, color: draft.color };
+    }
+    updateDraftPreview();
+  }));
+
+  $('#settings-name')?.addEventListener('input', (e) => {
+    draft.name = e.target.value.trim();
+    updateDraftPreview();
+  });
+
+  $('#participant-settings-save')?.addEventListener('click', async () => {
+    if (!State.participant?.id) return;
+    if (!draft.name) { toast('Bitte Name eingeben', 'warn'); return; }
+    const { data, error } = await sb.from('lp_participants').update({
+      display_name: draft.name,
+      avatar_emoji: draft.emoji,
+      avatar_color: draft.color,
+    }).eq('id', State.participant.id).select().single();
+    if (error) { toast(error.message, 'error'); return; }
+    State.participant = normalizeParticipantAvatar(data);
+    localStorage.setItem('lp_join_profile', JSON.stringify({ name: draft.name, emoji: draft.emoji, color: draft.color }));
+    hapticFeedback('success');
+    toast('Profil gespeichert', 'success');
+    closeParticipantSettingsSheet();
+    syncJoinAvatarChipPreview();
+    const youEl = $('#participant-root')?.querySelector('.participant-you');
+    if (youEl) youEl.textContent = draft.name;
+  });
+}
+
+function bindParticipantSettingsSheet() {
+  if (State._participantSettingsBound) return;
+  State._participantSettingsBound = true;
+  document.getElementById('participant-settings-sheet')?.addEventListener('click', (e) => {
+    if (e.target.closest('.participant-settings-close, .participant-settings-backdrop')) {
+      closeParticipantSettingsSheet();
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.body.classList.contains('participant-settings-open')) {
+      closeParticipantSettingsSheet();
+    }
+  });
 }
 
 function mountParticipantActionBar(label, { id = 'submit-text', extraClass = 'participant-submit-lg' } = {}) {
-  const bar = ensureParticipantActionBarOnBody();
-  if (!bar) return;
-  showParticipantActionBar();
-  bar.innerHTML = `<button type="button" class="btn-primary participant-submit participant-action-bar-btn ${extraClass}" id="${esc(id)}">${esc(label)}</button>`;
+  ensureParticipantActionBarShell();
+  const root = $('#participant-root');
+  if (root && !root.querySelector(`#${id}`)) {
+    root.insertAdjacentHTML('beforeend', `<button type="button" class="btn-primary participant-submit ${extraClass}" id="${esc(id)}" hidden>${esc(label)}</button>`);
+  }
+  syncParticipantMobileActionBar();
 }
 
 function renderParticipantTrackVoteHtml(slide) {
@@ -7782,8 +7996,8 @@ function broadcastSessionPatch(patch) {
 
 function handleParticipantSessionEnd() {
   stopParticipantSync();
-  clearParticipantActionBar();
   $('#participant-root').innerHTML = '<div class="participant-card"><h1>Session beendet</h1><p>Vielen Dank für deine Teilnahme.</p></div>';
+  syncParticipantMobileActionBar();
 }
 
 function stopParticipantSync() {
@@ -8610,75 +8824,72 @@ function markAnswered(slideId) {
 }
 
 function renderParticipantEntry(codePrefill) {
+  bindParticipantSettingsSheet();
   const saved = JSON.parse(localStorage.getItem('lp_join_profile') || 'null');
   const code = (codePrefill || parseJoinCodeFromHash() || '').trim().toUpperCase();
   const hasCode = Boolean(code);
   State.joinProfile = {
-    name: '',
-    emoji: LP_AVATAR_EMOJIS()[0],
-    color: LP_AVATAR_COLORS()[0],
+    name: saved?.name || '',
+    emoji: saved?.emoji || LP_AVATAR_EMOJIS()[0],
+    color: saved?.color || LP_AVATAR_COLORS()[0],
   };
-  if (!hasCode && saved?.name) State.joinProfile.name = saved.name;
-  if (!hasCode && saved?.emoji) State.joinProfile.emoji = saved.emoji;
-  if (!hasCode && saved?.color) State.joinProfile.color = saved.color;
   const root = $('#participant-root');
-  clearParticipantActionBar();
   root.innerHTML = `
-    <div class="participant-card participant-join-card">
-      <h1>Live teilnehmen</h1>
-      <p>${hasCode ? 'Willkommen! Wähle Name und Avatar – der Code ist bereits hinterlegt.' : 'Code, Name und Avatar – dann bist du dabei.'}</p>
-      ${hasCode ? `
-        <div class="join-code-badge"><i class="fa-solid fa-qrcode"></i> Session <strong>${esc(code)}</strong></div>
-        <input type="hidden" id="join-code" value="${esc(code)}" />`
-      : `<label class="join-label">Session-Code</label>
-        <input class="participant-code-input" id="join-code" maxlength="8" placeholder="CODE" autocomplete="one-time-code" />`}
-      <label class="join-label">Dein Name <span class="req">*</span></label>
-      <input id="join-name" placeholder="Vorname oder Nickname" class="participant-name-input" value="${esc(State.joinProfile.name)}" required autocomplete="name" />
-      <label class="join-label">Dein Avatar <span class="req">*</span></label>
-      <div class="avatar-preview-wrap">
-        <div id="avatar-preview" class="avatar-preview" style="background:${esc(State.joinProfile.color)}">${State.joinProfile.emoji}</div>
-        <div class="avatar-preview-name" id="avatar-preview-name">${esc(State.joinProfile.name || 'Dein Name')}</div>
+    <div class="participant-join-page">
+      <header class="participant-join-header">
+        <div class="participant-join-logo" aria-hidden="true"><i class="fa-solid fa-signal"></i></div>
+        <div class="participant-join-header-text">
+          <h1>Live teilnehmen</h1>
+          <p>${hasCode ? 'Session-Code ist hinterlegt — Name eingeben und los.' : 'Code eingeben und mitmachen.'}</p>
+        </div>
+      </header>
+      <div class="participant-join-form">
+        ${hasCode ? `
+          <div class="join-code-badge"><i class="fa-solid fa-qrcode"></i> Session <strong>${esc(code)}</strong></div>
+          <input type="hidden" id="join-code" value="${esc(code)}" />`
+        : `<div class="participant-join-field">
+            <label class="join-label" for="join-code">Session-Code</label>
+            <input class="participant-code-input" id="join-code" maxlength="8" placeholder="CODE" autocomplete="one-time-code" value="${esc(code)}" />
+          </div>`}
+        <div class="participant-join-field">
+          <label class="join-label" for="join-name">Dein Name <span class="req">*</span></label>
+          <input id="join-name" placeholder="Vorname oder Nickname" class="participant-name-input" value="${esc(State.joinProfile.name)}" required autocomplete="name" />
+        </div>
+        <button type="button" class="participant-join-avatar-chip" id="join-avatar-chip" aria-label="Avatar anpassen">
+          <span class="participant-join-avatar-chip-face" id="join-avatar-chip-face" style="background:${esc(State.joinProfile.color)}">${State.joinProfile.emoji}</span>
+          <span class="participant-join-avatar-chip-text">
+            <strong id="join-avatar-chip-name">${esc(State.joinProfile.name || 'Avatar wählen')}</strong>
+            <span>Emoji &amp; Farbe in Einstellungen</span>
+          </span>
+          <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+        </button>
       </div>
-      <div class="avatar-color-row">${LP_AVATAR_COLORS().map((c) => `<button type="button" class="avatar-color-btn ${c === State.joinProfile.color ? 'active' : ''}" data-color="${c}" style="background:${c}" aria-label="Farbe"></button>`).join('')}</div>
-      <div class="avatar-emoji-grid">${LP_AVATAR_EMOJIS().map((e) => `<button type="button" class="avatar-emoji-btn ${e === State.joinProfile.emoji ? 'active' : ''}" data-emoji="${e}" aria-pressed="${e === State.joinProfile.emoji}">${e}</button>`).join('')}</div>
-      <button type="button" class="btn-primary participant-submit" id="join-submit"><i class="fa-solid fa-arrow-right"></i> Beitreten</button>
+      <button type="button" class="btn-primary participant-submit participant-join-submit-hidden" id="join-submit"><i class="fa-solid fa-arrow-right"></i> Beitreten</button>
     </div>`;
 
   const updatePreview = () => {
-    const name = $('#join-name').value.trim() || 'Dein Name';
-    $('#avatar-preview').textContent = State.joinProfile.emoji;
-    $('#avatar-preview').style.background = State.joinProfile.color;
-    $('#avatar-preview-name').textContent = name;
+    State.joinProfile.name = $('#join-name')?.value.trim() || '';
+    syncJoinAvatarChipPreview();
   };
 
-  $('#join-name').addEventListener('input', updatePreview);
-  root.querySelectorAll('.avatar-emoji-btn').forEach((btn) => btn.addEventListener('click', () => {
-    State.joinProfile.emoji = btn.dataset.emoji;
-    hapticFeedback('select');
-    root.querySelectorAll('.avatar-emoji-btn').forEach((b) => {
-      b.classList.toggle('active', b.dataset.emoji === State.joinProfile.emoji);
-      b.setAttribute('aria-pressed', b.dataset.emoji === State.joinProfile.emoji ? 'true' : 'false');
-    });
-    updatePreview();
-  }));
-  root.querySelectorAll('.avatar-color-btn').forEach((btn) => btn.addEventListener('click', () => {
-    State.joinProfile.color = btn.dataset.color;
-    hapticFeedback('select');
-    root.querySelectorAll('.avatar-color-btn').forEach((b) => b.classList.toggle('active', b.dataset.color === State.joinProfile.color));
-    updatePreview();
-  }));
+  $('#join-name')?.addEventListener('input', updatePreview);
+  $('#join-avatar-chip')?.addEventListener('click', () => {
+    State.joinProfile.name = $('#join-name')?.value.trim() || State.joinProfile.name;
+    openParticipantSettingsSheet();
+  });
   $('#join-code')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#join-name')?.focus(); });
   syncParticipantMobileActionBar();
   bindParticipantConnectivityHandlers();
   const submitJoin = () => {
-    const code = $('#join-code').value.trim().toUpperCase();
+    const joinCode = $('#join-code').value.trim().toUpperCase();
     const name = $('#join-name').value.trim();
-    if (!code) { toast('Bitte Code eingeben', 'warn'); return; }
+    if (!joinCode) { toast('Bitte Code eingeben', 'warn'); return; }
     if (!name) { toast('Bitte Name eingeben', 'warn'); return; }
+    State.joinProfile.name = name;
     if (!State.joinProfile.emoji || !LP_AVATAR_EMOJIS().includes(State.joinProfile.emoji)) { toast('Bitte Avatar wählen', 'warn'); return; }
     if (!State.joinProfile.color || !LP_AVATAR_COLORS().includes(State.joinProfile.color)) { toast('Bitte Avatar-Farbe wählen', 'warn'); return; }
     localStorage.setItem('lp_join_profile', JSON.stringify({ name, emoji: State.joinProfile.emoji, color: State.joinProfile.color }));
-    void joinSession(code, name, State.joinProfile.emoji, State.joinProfile.color);
+    void joinSession(joinCode, name, State.joinProfile.emoji, State.joinProfile.color);
   };
   const joinBtn = $('#join-submit');
   if (joinBtn) {
@@ -8693,6 +8904,7 @@ function renderParticipantEntry(codePrefill) {
       submitJoin();
     });
   }
+  updatePreview();
   setTimeout(() => $('#join-name')?.focus(), 120);
 }
 
@@ -8921,8 +9133,10 @@ async function renderParticipantQuestion() {
   if (isBrainstormCollectSlide(slide) || (COLLECT_CHAIN_TYPES.has(slide?.slide_type) && getCollectResponseLimit(slide) > 0)) {
     await ensureParticipantResponses(true);
   }
-  clearParticipantActionBar();
-  const finishParticipant = () => syncSopWorkshopShell('participant', slideIndex);
+  const finishParticipant = () => {
+    syncSopWorkshopShell('participant', slideIndex);
+    syncParticipantMobileActionBar();
+  };
   if (!hostSlide?.settings?.sopTrackVote) State.participantVoteExpert = false;
   if (!hostSlide) { root.innerHTML = '<div class="participant-card"><p>Warte auf Folie…</p></div>'; finishParticipant(); return; }
   if (!State.session.question_open) {
@@ -9061,7 +9275,7 @@ async function renderParticipantQuestion() {
         return;
       }
     }
-    root.innerHTML = `<div class="participant-card"><h1>${esc(slide.content?.title || 'Folie')}</h1><p>${esc(slide.content?.body || slide.content?.prompt || '')}</p><p style="color:var(--muted);margin-top:1rem">Bitte auf die Präsentation achten…</p></div>`;
+    root.innerHTML = `<div class="participant-card"><h1>${esc(slide.content?.title || 'Folie')}</h1><p>${esc(slide.content?.body || slide.content?.prompt || '')}</p><p class="participant-sop-wait participant-sop-wait--compact"><i class="fa-solid fa-eye"></i> Bitte auf die Präsentation achten…</p></div>`;
     finishParticipant();
     return;
   }
@@ -9247,8 +9461,8 @@ function startQuestionTimer(sec) {
     if (el) el.textContent = `${left}s`;
     if (left <= 0) {
       clearInterval(State.questionTimer);
-      clearParticipantActionBar();
       $('#participant-root').innerHTML = '<div class="participant-card"><h1>Zeit abgelaufen</h1><p>Bitte warte auf die nächste Karte…</p></div>';
+      syncParticipantMobileActionBar();
     }
   }, 1000);
 }
@@ -9643,7 +9857,7 @@ function bindParticipantHandlers(slide) {
     if (rankOrder.includes(btn.dataset.id)) return;
     hapticFeedback('select');
     rankOrder.push(btn.dataset.id);
-    btn.classList.add('selected');
+    btn.classList.add('is-selected');
     $('#rank-order').textContent = rankOrder.map((id, i) => `${i + 1}. ${(c.options || []).find((o) => o.id === id)?.text || id}`).join(' · ');
   }));
   $('#submit-rank')?.addEventListener('click', () => {
@@ -9842,7 +10056,6 @@ async function renderQaList(slide) {
 // Einheitlicher „Antwort gesendet"-Zustand (gleiches Design wie hasAnsweredSlide).
 function showParticipantSentState(message) {
   const slideIndex = State.session?.current_slide_index || 0;
-  clearParticipantActionBar();
   const root = $('#participant-root');
   if (!root) return;
   root.innerHTML = wrapParticipantSlide(`
@@ -9851,6 +10064,7 @@ function showParticipantSentState(message) {
       <h1 class="pslide-q-title">Antwort gesendet</h1>
       <p class="pslide-q-prompt">${esc(message || 'Danke! Bitte warte auf die nächste Karte…')}</p>
     </div>`, slideIndex);
+  syncParticipantMobileActionBar();
 }
 
 async function submitResponse(response) {
@@ -10209,6 +10423,8 @@ if (document.documentElement.classList.contains('in-iframe')) {
   if (loginCard) loginCard.innerHTML = '<p style="text-align:center;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> Anmeldung über Intranet…</p>';
   void window.RootsUserBridge?.syncAuthFromParentStorage?.();
 }
+
+bindParticipantSettingsSheet();
 
 // ─── EXPLIZITER INITIAL-AUTH-CHECK ───────────────────────────────
 // onAuthStateChange feuert INITIAL_SESSION nicht immer zuverlaessig

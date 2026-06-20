@@ -315,7 +315,8 @@ html.lp-join-route #screen-participant{display:flex!important}
 .participant-card p{color:var(--muted);font-size:.92rem;margin-bottom:1rem}
 .participant-code-input{font-size:2rem;text-align:center;letter-spacing:.25em;font-weight:800;padding:1rem;border:2px solid var(--line);border-radius:12px;width:100%;margin-bottom:1rem}
 .participant-option{display:block;width:100%;text-align:left;padding:.85rem 1.25rem;border:1.5px solid var(--line);border-radius:var(--radius-pill);background:var(--bg);margin-bottom:.65rem;cursor:pointer;font-size:1rem;font-weight:600;transition:border-color .15s,background .15s,color .15s,box-shadow .15s}
-.participant-option:hover,.participant-option.selected{border-color:var(--brand);background:var(--brand-light);color:var(--brand)}
+.participant-option:hover,.participant-option.selected,.participant-option.is-selected{border-color:var(--brand);background:var(--brand-light);color:var(--brand)}
+.rank-opt.is-selected{border-color:var(--brand)!important;background:var(--brand-light)!important;color:var(--brand)}
 .participant-option.is-selected{border-color:var(--brand);background:var(--brand-light);color:var(--brand);box-shadow:0 0 0 2px rgba(32,110,251,.18)}
 .participant-option:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(32,110,251,.1)}
 .participant-choice-wrap{display:flex;flex-direction:column}
@@ -455,6 +456,8 @@ html.lp-join-route #screen-participant{display:flex!important}
 .join-code-badge{display:flex;align-items:center;justify-content:center;gap:.5rem;padding:.85rem 1rem;margin-bottom:1rem;background:var(--brand-light);border:2px solid var(--brand);border-radius:12px;font-size:1.1rem;color:var(--brand);font-weight:600}
 .join-code-badge strong{font-size:1.35rem;letter-spacing:.15em}
 .participant-join-card{max-width:420px}
+.participant-join-page{max-width:480px;margin:0 auto;width:100%}
+.participant-join-form .participant-code-input,.participant-join-form .participant-name-input{margin-bottom:0}
 .avatar-preview-wrap{display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;padding:.75rem;background:var(--surface);border-radius:12px;border:1px solid var(--line)}
 .avatar-preview{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.75rem;border:3px solid var(--bg);box-shadow:var(--shadow)}
 .avatar-preview-name{font-weight:700;font-size:1rem}
