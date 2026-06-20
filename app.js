@@ -92,10 +92,14 @@ const defaultStyle = () => ({ ...(window.LP_DEFAULT_STYLE || {}) });
 
 function toast(msg, type = 'info') {
   const c = $('#toast-container');
+  if (!c) return;
   const el = document.createElement('div');
   el.className = `toast ${type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warn' ? 'warn' : ''}`;
   el.textContent = msg;
   c.appendChild(el);
+  if (type === 'error') hapticFeedback('error');
+  else if (type === 'warn') hapticFeedback('medium');
+  else if (type === 'success') hapticFeedback('success');
   setTimeout(() => el.remove(), 3200);
 }
 
@@ -3018,6 +3022,67 @@ const PARTICIPANT_MOBILE_MQ = typeof window !== 'undefined' && window.matchMedia
 
 function isParticipantMobileLayout() {
   return PARTICIPANT_MOBILE_MQ ? PARTICIPANT_MOBILE_MQ.matches : window.innerWidth <= 768;
+}
+
+function hapticFeedback(kind = 'light') {
+  if (!navigator.vibrate) return;
+  const patterns = {
+    light: 8,
+    medium: 18,
+    select: 12,
+    success: [10, 36, 14],
+    error: [22, 48, 22, 48, 22],
+  };
+  try { navigator.vibrate(patterns[kind] || patterns.light); } catch { /* noop */ }
+}
+
+function setButtonBusy(btn, busy, busyLabel = 'Bitte warten…') {
+  if (!btn) return;
+  if (busy) {
+    if (!btn.dataset.lpOrigHtml) btn.dataset.lpOrigHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    btn.classList.add('is-busy');
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> ${esc(busyLabel)}`;
+  } else {
+    btn.disabled = false;
+    btn.removeAttribute('aria-busy');
+    btn.classList.remove('is-busy');
+    if (btn.dataset.lpOrigHtml) {
+      btn.innerHTML = btn.dataset.lpOrigHtml;
+      delete btn.dataset.lpOrigHtml;
+    }
+  }
+}
+
+function setParticipantConnStatus(online) {
+  const banner = document.getElementById('participant-conn-banner');
+  if (!banner) return;
+  banner.classList.toggle('hidden', !!online);
+  banner.classList.toggle('is-offline', !online);
+  document.body.classList.toggle('participant-conn-offline', !online);
+}
+
+function bindParticipantConnectivityHandlers() {
+  if (State._participantConnBound) return;
+  State._participantConnBound = true;
+  window.addEventListener('online', () => setParticipantConnStatus(true));
+  window.addEventListener('offline', () => setParticipantConnStatus(false));
+  if (!navigator.onLine) setParticipantConnStatus(false);
+}
+
+function maybeShowPwaInstallHint() {
+  if (!isParticipantMobileLayout()) return;
+  if (localStorage.getItem('lp_pwa_hint_dismissed')) return;
+  if (window.matchMedia?.('(display-mode: standalone)')?.matches) return;
+  if (window.navigator.standalone) return;
+  const hint = document.getElementById('participant-pwa-hint');
+  if (!hint || !hint.classList.contains('hidden')) return;
+  hint.classList.remove('hidden');
+  hint.querySelector('.participant-pwa-hint-dismiss')?.addEventListener('click', () => {
+    hint.classList.add('hidden');
+    localStorage.setItem('lp_pwa_hint_dismissed', '1');
+  }, { once: true });
 }
 
 function ensureParticipantActionBarOnBody() {
@@ -8589,6 +8654,7 @@ function renderParticipantEntry(codePrefill) {
   $('#join-name').addEventListener('input', updatePreview);
   root.querySelectorAll('.avatar-emoji-btn').forEach((btn) => btn.addEventListener('click', () => {
     State.joinProfile.emoji = btn.dataset.emoji;
+    hapticFeedback('select');
     root.querySelectorAll('.avatar-emoji-btn').forEach((b) => {
       b.classList.toggle('active', b.dataset.emoji === State.joinProfile.emoji);
       b.setAttribute('aria-pressed', b.dataset.emoji === State.joinProfile.emoji ? 'true' : 'false');
@@ -8597,11 +8663,13 @@ function renderParticipantEntry(codePrefill) {
   }));
   root.querySelectorAll('.avatar-color-btn').forEach((btn) => btn.addEventListener('click', () => {
     State.joinProfile.color = btn.dataset.color;
+    hapticFeedback('select');
     root.querySelectorAll('.avatar-color-btn').forEach((b) => b.classList.toggle('active', b.dataset.color === State.joinProfile.color));
     updatePreview();
   }));
   $('#join-code')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#join-name')?.focus(); });
   syncParticipantMobileActionBar();
+  bindParticipantConnectivityHandlers();
   const submitJoin = () => {
     const code = $('#join-code').value.trim().toUpperCase();
     const name = $('#join-name').value.trim();
@@ -8629,30 +8697,39 @@ function renderParticipantEntry(codePrefill) {
 }
 
 async function joinSession(code, name, emoji, color) {
+  const joinBtn = document.getElementById('join-submit');
+  setButtonBusy(joinBtn, true, 'Beitreten…');
   const emojis = LP_AVATAR_EMOJIS();
   const colors = LP_AVATAR_COLORS();
-  if (!emoji || !emojis.includes(emoji)) { toast('Bitte Avatar wählen', 'error'); return; }
-  if (!color || !colors.includes(color)) { toast('Bitte Avatar-Farbe wählen', 'error'); return; }
-  const { data: session, error } = await sb.from('lp_sessions').select('*').eq('code', code.toUpperCase()).in('status', ['live', 'paused']).maybeSingle();
-  if (error || !session) { toast('Code ungültig oder Session beendet', 'error'); return; }
-  if (session.join_locked) { toast('Beitritt gesperrt', 'error'); return; }
-  const { data: part, error: pErr } = await sb.from('lp_participants').upsert({
-    session_id: session.id,
-    device_id: State.deviceId,
-    display_name: name,
-    avatar_emoji: emoji,
-    avatar_color: color,
-  }, { onConflict: 'session_id,device_id' }).select().single();
-  if (pErr) { toast(pErr.message, 'error'); return; }
-  State.session = session;
-  State.participant = normalizeParticipantAvatar(part);
-  State.sopAssignSeen = getParticipantSopGroup(part.id);
-  State.responses = [];
-  loadAnsweredSlides(session.id);
-  const { data: slides } = await sb.from('lp_slides').select('*').eq('presentation_id', session.presentation_id).order('sort_order');
-  State.slides = normalizeSlides(slides);
-  subscribeParticipantChannel();
-  await renderParticipantQuestion();
+  if (!emoji || !emojis.includes(emoji)) { toast('Bitte Avatar wählen', 'error'); setButtonBusy(joinBtn, false); return; }
+  if (!color || !colors.includes(color)) { toast('Bitte Avatar-Farbe wählen', 'error'); setButtonBusy(joinBtn, false); return; }
+  try {
+    const { data: session, error } = await sb.from('lp_sessions').select('*').eq('code', code.toUpperCase()).in('status', ['live', 'paused']).maybeSingle();
+    if (error || !session) { toast('Code ungültig oder Session beendet', 'error'); return; }
+    if (session.join_locked) { toast('Beitritt gesperrt', 'error'); return; }
+    const { data: part, error: pErr } = await sb.from('lp_participants').upsert({
+      session_id: session.id,
+      device_id: State.deviceId,
+      display_name: name,
+      avatar_emoji: emoji,
+      avatar_color: color,
+    }, { onConflict: 'session_id,device_id' }).select().single();
+    if (pErr) { toast(pErr.message, 'error'); return; }
+    State.session = session;
+    State.participant = normalizeParticipantAvatar(part);
+    State.sopAssignSeen = getParticipantSopGroup(part.id);
+    State.responses = [];
+    loadAnsweredSlides(session.id);
+    const { data: slides } = await sb.from('lp_slides').select('*').eq('presentation_id', session.presentation_id).order('sort_order');
+    State.slides = normalizeSlides(slides);
+    bindParticipantConnectivityHandlers();
+    subscribeParticipantChannel();
+    hapticFeedback('success');
+    await renderParticipantQuestion();
+    maybeShowPwaInstallHint();
+  } finally {
+    setButtonBusy(joinBtn, false);
+  }
 }
 
 // Hat der Teilnehmer gerade eine laufende Eingabe/Auswahl, die ein Re-Render
@@ -8722,7 +8799,14 @@ function subscribeParticipantChannel() {
         if (slide?.settings?.sopTrackVote || slide?.settings?.sopPhaseVote || slide?.settings?.sopCardVote || slide?.settings?.brainstormVote || slide?.slide_type === 'qa') await renderParticipantQuestion();
       })();
     })
-    .subscribe((status) => { if (status === 'SUBSCRIBED') window.LP?.channelHeartbeat(chName); });
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        window.LP?.channelHeartbeat(chName);
+        setParticipantConnStatus(true);
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        setParticipantConnStatus(false);
+      }
+    });
   window.LP?.registerChannel(chName, () => subscribeParticipantChannel());
   startParticipantSync();
 }
@@ -9557,6 +9641,7 @@ function bindParticipantHandlers(slide) {
   const rankOrder = [];
   $$('.rank-opt').forEach((btn) => btn.addEventListener('click', () => {
     if (rankOrder.includes(btn.dataset.id)) return;
+    hapticFeedback('select');
     rankOrder.push(btn.dataset.id);
     btn.classList.add('selected');
     $('#rank-order').textContent = rankOrder.map((id, i) => `${i + 1}. ${(c.options || []).find((o) => o.id === id)?.text || id}`).join(' · ');
@@ -9592,6 +9677,7 @@ function bindParticipantHandlers(slide) {
   $$('.track-vote-option--pick').forEach((btn) => btn.addEventListener('click', () => {
     const on = btn.classList.toggle('is-selected');
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    hapticFeedback('select');
     if ($$('.track-vote-option--pick.is-selected').length > favMax) {
       btn.classList.remove('is-selected');
       btn.setAttribute('aria-pressed', 'false');
@@ -9622,6 +9708,7 @@ function bindParticipantHandlers(slide) {
     const submitChoiceBtn = $('#submit-choice');
     choiceWrap.querySelectorAll('.participant-option[data-val]').forEach((btn) => {
       btn.onclick = () => {
+        hapticFeedback('select');
         selectedVal = btn.dataset.val;
         choiceWrap.querySelectorAll('.participant-option').forEach((b) => {
           const on = b === btn;
@@ -9845,12 +9932,14 @@ async function submitResponse(response) {
   };
 
   State._submitting = true;
+  const submitBtn = document.querySelector('#participant-action-bar .participant-action-bar-btn, #participant-action-bar [id^="submit-"]');
+  setButtonBusy(submitBtn, true, 'Senden…');
+  try {
   const { data, error } = await sb.from('lp_responses').insert(row).select().single();
   if (error) {
     State.pendingQueue.push(row);
     localStorage.setItem('lp_pending_queue', JSON.stringify(State.pendingQueue));
     toast('Offline gespeichert – wird nachgereicht', 'warn');
-    State._submitting = false;
     // View sperren, damit kein versehentliches Doppel-Senden passiert.
     markAnswered(slide.id);
     showParticipantSentState('Offline gespeichert – wird automatisch nachgereicht.');
@@ -9863,7 +9952,6 @@ async function submitResponse(response) {
     maybeRefreshMatrixBroadcastFromVote(data);
   }
 
-  State._submitting = false;
   const submittedCount = isCollectText ? countParticipantTextResponses(slide.id, State.participant?.id) : 0;
   const canSubmitMore = isCollectText && collectLimit > 1 && submittedCount < collectLimit;
   if (canSubmitMore) {
@@ -9872,10 +9960,15 @@ async function submitResponse(response) {
     return;
   }
   markAnswered(slide.id);
+  hapticFeedback('success');
   const modMsg = slide.settings?.moderation
     ? 'Zur Freigabe gesendet. Bitte warte auf die nächste Karte…'
     : 'Danke! Bitte warte auf die nächste Karte…';
   showParticipantSentState(modMsg);
+  } finally {
+    State._submitting = false;
+    setButtonBusy(submitBtn, false);
+  }
 }
 
 async function flushPendingQueue() {

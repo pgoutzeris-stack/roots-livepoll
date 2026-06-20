@@ -1400,27 +1400,26 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .avatar-color-row{gap:.3rem;margin-bottom:.55rem}
   .avatar-color-btn{width:28px;height:28px}
   .avatar-emoji-grid{
-    grid-template-columns:repeat(8,minmax(0,1fr));
-    gap:.22rem;width:100%;max-width:100%;margin-bottom:.45rem;
+    grid-template-columns:repeat(6,minmax(0,1fr));
+    gap:.35rem;width:100%;max-width:100%;margin-bottom:.55rem;
   }
   .avatar-emoji-btn{
-    height:32px;min-height:32px;max-height:32px;
-    aspect-ratio:unset;font-size:.78rem;padding:0;
-    min-width:0;width:100%;border-radius:7px;line-height:1;
+    height:44px;min-height:44px;max-height:44px;
+    aspect-ratio:unset;font-size:1.05rem;padding:0;
+    min-width:44px;width:100%;border-radius:10px;line-height:1;
   }
   .participant-join-card > .participant-submit{display:none}
   .participant-code-input,.participant-name-input{font-size:16px}
 }
 @media (max-width:400px){
-  .avatar-emoji-grid{gap:.18rem}
-  .avatar-emoji-btn{height:30px;min-height:30px;max-height:30px;font-size:.72rem}
+  .avatar-emoji-grid{gap:.28rem}
 }
 
 /* — Tap-Ziele: interaktive Buttons ≥44px auf dem Handy — */
 @media (max-width:768px){
   .present-btn{min-width:44px;min-height:44px}
   .avatar-color-btn{width:40px;height:40px}
-  .participant-join-card .avatar-emoji-btn{min-height:0;min-width:0}
+  .participant-join-card .avatar-emoji-btn{min-height:44px;min-width:44px}
   .participant-option,.track-vote-option,.track-vote-option--pick,.lp-mxm-btn{min-height:44px}
   .track-vote-option--pick{
     display:block;width:100%;text-align:left;
@@ -3684,4 +3683,68 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .lp-sop-workshop.participant-mode .ws-hero-stage{
     background:linear-gradient(165deg,rgba(32,110,251,.08) 0%,rgba(99,102,241,.05) 45%,rgba(16,185,129,.03) 100%);
   }
+}
+
+/* ═══════ MOBILE PARTICIPANT UX AUDIT (P0–P2) ═══════ */
+::selection{background:rgba(32,110,251,.22);color:inherit}
+
+@media (max-width:768px){
+  body.participant-has-action-bar,
+  #screen-participant.active,
+  #screen-participant .participant-root{
+    overscroll-behavior-y:contain;
+  }
+  .toast-container{
+    bottom:calc(72px + env(safe-area-inset-bottom));
+    left:12px;right:12px;
+    z-index:100001;
+  }
+  .toast{animation:toastInMobile .28s ease}
+  @keyframes toastInMobile{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  #screen-participant .participant-textarea,
+  #screen-participant .participant-textarea-lg,
+  #screen-participant .participant-num-input,
+  #screen-participant .split-input,
+  #screen-participant .participant-name-input,
+  #screen-participant .participant-code-input,
+  .participant-collect-fields--structured .participant-textarea{
+    font-size:16px!important;
+  }
+  #participant-root > .pslide-participant-slide,
+  #participant-root > .participant-card,
+  #participant-root > .participant-opening-hero,
+  #participant-root > .participant-closing-hero{
+    animation:participantSlideIn .28s cubic-bezier(.22,.61,.36,1) both;
+  }
+  @keyframes participantSlideIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  .participant-conn-banner{
+    position:fixed;top:0;left:0;right:0;z-index:100002;
+    display:flex;align-items:center;justify-content:center;gap:.5rem;
+    padding:calc(.45rem + env(safe-area-inset-top)) .85rem .45rem;
+    background:#fef3c7;color:#92400e;
+    font-size:.82rem;font-weight:600;
+    box-shadow:0 2px 12px rgba(15,23,42,.12);
+  }
+  .participant-conn-banner.hidden{display:none!important}
+  .participant-conn-banner.is-offline i{color:#dc2626}
+  .participant-pwa-hint{
+    position:fixed;left:12px;right:12px;
+    bottom:calc(60px + env(safe-area-inset-bottom));
+    z-index:99998;
+    display:flex;align-items:center;justify-content:space-between;gap:.65rem;
+    padding:.65rem .85rem;
+    background:#0f172a;color:#fff;border-radius:12px;
+    font-size:.82rem;line-height:1.35;
+    box-shadow:0 12px 40px rgba(15,23,42,.22);
+  }
+  .participant-pwa-hint.hidden{display:none!important}
+  .participant-pwa-hint-dismiss{
+    flex-shrink:0;background:transparent;border:none;color:rgba(255,255,255,.75);
+    min-width:44px;min-height:44px;padding:.35rem;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  body.participant-conn-offline #participant-action-bar .participant-action-bar-btn:not(.is-busy){
+    opacity:.55;pointer-events:none;
+  }
+  #participant-action-bar .is-busy{opacity:.85!important;pointer-events:none!important}
 }

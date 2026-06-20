@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta name="theme-color" content="#206efb" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -259,6 +259,14 @@
   </div>
 </div>
 
+<div id="participant-conn-banner" class="participant-conn-banner hidden" role="status" aria-live="polite">
+  <i class="fa-solid fa-wifi" aria-hidden="true"></i>
+  <span>Verbindung unterbrochen — wird neu verbunden…</span>
+</div>
+<div id="participant-pwa-hint" class="participant-pwa-hint hidden" role="note">
+  <span><i class="fa-solid fa-mobile-screen"></i> Tipp: „Zum Home-Bildschirm" für Vollbild-App</span>
+  <button type="button" class="participant-pwa-hint-dismiss" aria-label="Hinweis schließen"><i class="fa-solid fa-xmark"></i></button>
+</div>
 <div id="participant-action-bar" class="participant-action-bar hidden" aria-label="Aktion" role="region"></div>
 
 <script src="https://pgoutzeris-stack.github.io/ROOTS_Intranet/roots-user-bridge.js?v=__BUILD__"></script>
