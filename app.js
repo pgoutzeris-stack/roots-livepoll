@@ -1842,6 +1842,24 @@ function renderWorkshopProgressHtml(slideIndex) {
   return `<div class="pslide-slide-counter">Folie ${slideIndex + 1} / ${State.slides.length}</div>`;
 }
 
+function renderParticipantWorkshopProgressHtml(slideIndex) {
+  const total = Math.max(1, State.slides?.length || 1);
+  const current = slideIndex + 1;
+  const pct = Math.round((current / total) * 100);
+  const slide = State.slides?.[slideIndex];
+  const meta = slide ? getSlideShellMeta(slide) : null;
+  const pillLabel = meta?.pillLabel || 'Workshop';
+  const pillIcon = meta?.pillIcon || 'fa-layer-group';
+  const pillTone = meta?.pillTone || 'brand';
+  return `<div class="participant-progress-card" role="status" aria-label="Folie ${current} von ${total}">
+    <div class="participant-progress-row">
+      <span class="participant-progress-pill ws-pill ws-pill--${esc(pillTone)}"><i class="fa-solid ${esc(pillIcon)}"></i> ${esc(pillLabel)}</span>
+      <span class="participant-progress-count"><strong>${current}</strong><span class="participant-progress-of"> / ${total}</span></span>
+    </div>
+    <div class="participant-progress-track" aria-hidden="true"><div class="participant-progress-fill" style="width:${pct}%"></div></div>
+  </div>`;
+}
+
 function wrapSlide(bodyHtml, slideIndex) {
   const ws = isSopWorkshopPresentation();
   return `<div class="pslide-slide${ws ? ' pslide-slide--ws' : ''}">
@@ -3021,7 +3039,7 @@ function renderWorkshopCardCollectHtml(c, editable = false, { shellMode = false,
 
 function renderParticipantWorkshopHeader(slideIndex) {
   if (!isSopWorkshopPresentation()) return '';
-  return renderWorkshopProgressHtml(slideIndex);
+  return renderParticipantWorkshopProgressHtml(slideIndex);
 }
 
 function wrapParticipantSlide(bodyHtml, slideIndex) {
@@ -3111,41 +3129,45 @@ function clearParticipantActionBar() {
 function ensureParticipantActionBarShell() {
   const bar = ensureParticipantActionBarOnBody();
   if (!bar) return null;
-  if (!State._participantBarShellReady || !bar.querySelector('.participant-action-bar-shell')) {
+  if (!State._participantBarShellReady || !bar.querySelector('.participant-action-bar-dock')) {
     bar.innerHTML = `
-      <div class="participant-action-bar-shell">
+      <div class="participant-action-bar-dock">
         <div class="participant-action-bar-status" id="participant-bar-status" role="status" aria-live="polite"></div>
         <div class="participant-action-bar-row">
-          <button type="button" class="participant-bar-settings-btn" id="participant-settings-open" aria-label="Teilnehmer-Einstellungen">
-            <i class="fa-solid fa-gear" aria-hidden="true"></i>
+          <button type="button" class="participant-bar-avatar-btn" id="participant-settings-open" aria-label="Profil und Einstellungen">
+            <span class="participant-bar-avatar-face" id="participant-bar-avatar-face"></span>
           </button>
-          <div class="participant-action-bar-actions" id="participant-bar-actions"></div>
+          <div class="participant-action-bar-actions" id="participant-bar-actions">
+            <button type="button" class="participant-bar-secondary hidden" id="participant-bar-secondary" aria-label="Zurücksetzen"></button>
+            <button type="button" class="participant-bar-primary hidden" id="participant-bar-primary"></button>
+          </div>
         </div>
       </div>`;
     State._participantBarShellReady = true;
     bar.querySelector('#participant-settings-open')?.addEventListener('click', () => {
+      if (!State.participant && $('#join-name')) {
+        State.joinProfile.name = $('#join-name').value.trim();
+      }
       hapticFeedback('light');
       openParticipantSettingsSheet();
     });
+    updateParticipantBarAvatar();
   }
   return bar;
 }
 
 function findParticipantPrimarySubmit(root) {
-  const scopes = [root, document.getElementById('participant-bar-actions')].filter(Boolean);
+  if (!root) return null;
   const ids = [
     'submit-text', 'submit-choice', 'submit-favorites', 'submit-split', 'submit-multi', 'submit-num',
     'submit-rank', 'submit-pin', 'lp-mx-submit', 'join-submit', 'submit-top3',
   ];
-  for (const scope of scopes) {
-    for (const id of ids) {
-      const el = scope.querySelector(`#${id}`);
-      if (el?.matches?.('.btn-primary, .participant-submit')) return el;
-    }
-    const candidates = scope.querySelectorAll('.btn-primary.participant-submit, .participant-submit.btn-primary');
-    if (candidates.length) return candidates[candidates.length - 1];
+  for (const id of ids) {
+    const el = root.querySelector(`#${id}`);
+    if (el?.matches?.('.btn-primary, .participant-submit')) return el;
   }
-  return null;
+  const candidates = root.querySelectorAll('.btn-primary.participant-submit, .participant-submit.btn-primary');
+  return candidates.length ? candidates[candidates.length - 1] : null;
 }
 
 function syncParticipantMobileActionBar() {
@@ -3155,36 +3177,45 @@ function syncParticipantMobileActionBar() {
   }
   const bar = ensureParticipantActionBarShell();
   const root = $('#participant-root');
-  const actions = bar?.querySelector('#participant-bar-actions');
   const statusSlot = bar?.querySelector('#participant-bar-status');
-  if (!bar || !actions || !statusSlot) return;
+  const barPrimary = document.getElementById('participant-bar-primary');
+  const barSecondary = document.getElementById('participant-bar-secondary');
+  if (!bar || !statusSlot || !barPrimary) return;
 
-  // Vor dem Leeren referenzieren — Buttons können schon in der Bar hängen (Vote-Sync ohne Re-Render).
+  updateParticipantBarAvatar();
+
   const statusEl = root?.querySelector('#fav-counter, #split-total')
     || statusSlot.querySelector('#fav-counter, #split-total');
-  const secondary = root?.querySelector('#lp-mx-reset') || actions.querySelector('#lp-mx-reset');
-  const primary = findParticipantPrimarySubmit(root);
+  const primarySrc = findParticipantPrimarySubmit(root);
+  const resetSrc = root?.querySelector('#lp-mx-reset');
 
   showParticipantActionBar();
   statusSlot.replaceChildren();
-  actions.replaceChildren();
 
   if (statusEl) {
     statusEl.classList.add('participant-action-bar-status');
     statusSlot.appendChild(statusEl);
-  }
-  if (secondary) {
-    secondary.classList.add('participant-action-bar-secondary');
-    actions.appendChild(secondary);
-  }
-  if (primary) {
-    primary.classList.remove('participant-join-submit-hidden');
-    primary.classList.add('participant-action-bar-btn');
-    actions.appendChild(primary);
+  } else if (!primarySrc && !resetSrc) {
+    statusSlot.innerHTML = '<span class="participant-bar-wait-hint">Bitte auf die Präsentation achten…</span>';
   }
 
-  if (!primary && !secondary && !statusEl) {
-    actions.innerHTML = '<span class="participant-bar-wait-hint">Bitte auf die Präsentation achten…</span>';
+  if (primarySrc) {
+    barPrimary.classList.remove('hidden');
+    wireParticipantBarPrimaryClick(barPrimary, primarySrc);
+  } else {
+    barPrimary.classList.add('hidden');
+    barPrimary.onclick = null;
+  }
+
+  if (barSecondary) {
+    if (resetSrc) {
+      barSecondary.classList.remove('hidden');
+      barSecondary.innerHTML = '<i class="fa-solid fa-rotate-left" aria-hidden="true"></i>';
+      barSecondary.onclick = (e) => { e.preventDefault(); resetSrc.click(); };
+    } else {
+      barSecondary.classList.add('hidden');
+      barSecondary.onclick = null;
+    }
   }
 }
 
@@ -3225,14 +3256,53 @@ function getParticipantSettingsProfile() {
 }
 
 function syncJoinAvatarChipPreview() {
+  updateParticipantBarAvatar();
+}
+
+function updateParticipantBarAvatar() {
+  const face = document.getElementById('participant-bar-avatar-face');
+  if (!face) return;
   const profile = getParticipantSettingsProfile();
-  const face = $('#join-avatar-chip-face');
-  const nameEl = $('#join-avatar-chip-name');
-  if (face) {
-    face.textContent = profile.emoji;
-    face.style.background = profile.color;
-  }
-  if (nameEl) nameEl.textContent = profile.name || 'Avatar wählen';
+  face.textContent = profile.emoji || '👤';
+  face.style.background = profile.color || '#206efb';
+}
+
+const PARTICIPANT_SUBMIT_LABELS = {
+  'join-submit': 'Beitreten',
+  'submit-text': 'Senden',
+  'submit-choice': 'Senden',
+  'submit-favorites': 'Senden',
+  'submit-top3': 'Senden',
+  'submit-split': 'Punkte senden',
+  'submit-multi': 'Senden',
+  'submit-num': 'Senden',
+  'submit-rank': 'Senden',
+  'submit-pin': 'Senden',
+  'lp-mx-submit': 'Senden',
+};
+
+function getParticipantSubmitLabel(sourceBtn) {
+  if (!sourceBtn) return 'Senden';
+  const text = String(sourceBtn.textContent || '').replace(/\s+/g, ' ').trim();
+  if (text) return text;
+  return PARTICIPANT_SUBMIT_LABELS[sourceBtn.id] || 'Senden';
+}
+
+function getVisibleParticipantSubmitBtn() {
+  const barBtn = document.getElementById('participant-bar-primary');
+  if (barBtn && !barBtn.classList.contains('hidden') && isParticipantMobileLayout()) return barBtn;
+  return findParticipantPrimarySubmit($('#participant-root'));
+}
+
+function wireParticipantBarPrimaryClick(barBtn, sourceBtn) {
+  if (!barBtn || !sourceBtn) return;
+  barBtn.disabled = sourceBtn.disabled;
+  if (!barBtn.dataset.lpOrigHtml) barBtn.dataset.lpOrigHtml = barBtn.innerHTML;
+  barBtn.innerHTML = sourceBtn.innerHTML?.trim() ? sourceBtn.innerHTML : getParticipantSubmitLabel(sourceBtn);
+  barBtn.onclick = (e) => {
+    e.preventDefault();
+    sourceBtn.click();
+  };
 }
 
 function renderParticipantSettingsBody() {
@@ -3362,7 +3432,7 @@ function mountParticipantActionBar(label, { id = 'submit-text', extraClass = 'pa
   ensureParticipantActionBarShell();
   const root = $('#participant-root');
   if (root && !root.querySelector(`#${id}`)) {
-    root.insertAdjacentHTML('beforeend', `<button type="button" class="btn-primary participant-submit ${extraClass}" id="${esc(id)}" hidden>${esc(label)}</button>`);
+    root.insertAdjacentHTML('beforeend', `<button type="button" class="btn-primary participant-submit ${extraClass} participant-join-submit-hidden" id="${esc(id)}">${esc(label)}</button>`);
   }
   syncParticipantMobileActionBar();
 }
@@ -8846,14 +8916,7 @@ function renderParticipantEntry(codePrefill) {
           <label class="join-label" for="join-name">Dein Name <span class="req">*</span></label>
           <input id="join-name" placeholder="Vorname oder Nickname" class="participant-name-input" value="${esc(State.joinProfile.name)}" required autocomplete="name" />
         </div>
-        <button type="button" class="participant-join-avatar-chip" id="join-avatar-chip" aria-label="Avatar anpassen">
-          <span class="participant-join-avatar-chip-face" id="join-avatar-chip-face" style="background:${esc(State.joinProfile.color)}">${State.joinProfile.emoji}</span>
-          <span class="participant-join-avatar-chip-text">
-            <strong id="join-avatar-chip-name">${esc(State.joinProfile.name || 'Avatar wählen')}</strong>
-            <span>Emoji &amp; Farbe in Einstellungen</span>
-          </span>
-          <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
-        </button>
+        <p class="participant-join-avatar-hint"><i class="fa-solid fa-circle-user"></i> Avatar unten links anpassen</p>
       </div>
       <button type="button" class="btn-primary participant-submit participant-join-submit-hidden" id="join-submit"><i class="fa-solid fa-arrow-right"></i> Beitreten</button>
     </div>`;
@@ -8864,10 +8927,6 @@ function renderParticipantEntry(codePrefill) {
   };
 
   $('#join-name')?.addEventListener('input', updatePreview);
-  $('#join-avatar-chip')?.addEventListener('click', () => {
-    State.joinProfile.name = $('#join-name')?.value.trim() || State.joinProfile.name;
-    openParticipantSettingsSheet();
-  });
   $('#join-code')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#join-name')?.focus(); });
   syncParticipantMobileActionBar();
   bindParticipantConnectivityHandlers();
@@ -8900,7 +8959,7 @@ function renderParticipantEntry(codePrefill) {
 }
 
 async function joinSession(code, name, emoji, color) {
-  const joinBtn = document.getElementById('join-submit');
+  const joinBtn = getVisibleParticipantSubmitBtn() || document.getElementById('join-submit');
   setButtonBusy(joinBtn, true, 'Beitreten…');
   const emojis = LP_AVATAR_EMOJIS();
   const colors = LP_AVATAR_COLORS();
@@ -9836,6 +9895,7 @@ function bindParticipantHandlers(slide) {
     img.dataset.pinX = x;
     img.dataset.pinY = y;
     $('#submit-pin').disabled = false;
+    syncParticipantMobileActionBar();
   });
 
   $('#submit-pin')?.addEventListener('click', () => {
@@ -9921,6 +9981,7 @@ function bindParticipantHandlers(slide) {
           b.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
         if (submitChoiceBtn) submitChoiceBtn.disabled = false;
+        syncParticipantMobileActionBar();
       };
     });
     const sendChoice = () => {
@@ -10137,7 +10198,7 @@ async function submitResponse(response) {
   };
 
   State._submitting = true;
-  const submitBtn = document.querySelector('#participant-action-bar .participant-action-bar-btn, #participant-action-bar [id^="submit-"]');
+  const submitBtn = getVisibleParticipantSubmitBtn();
   setButtonBusy(submitBtn, true, 'Senden…');
   try {
   const { data, error } = await sb.from('lp_responses').insert(row).select().single();
