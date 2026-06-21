@@ -3059,6 +3059,12 @@ function isParticipantMobileLayout() {
   return PARTICIPANT_MOBILE_MQ ? PARTICIPANT_MOBILE_MQ.matches : window.innerWidth <= 768;
 }
 
+function participantPresentationWaitHtml(extraClass = '') {
+  if (isParticipantMobileLayout()) return '';
+  const cls = ['participant-sop-wait', extraClass].filter(Boolean).join(' ');
+  return `<p class="${cls}"><i class="fa-solid fa-eye"></i> Bitte auf die Präsentation achten…</p>`;
+}
+
 function hapticFeedback(kind = 'light') {
   if (!navigator.vibrate) return;
   const patterns = {
@@ -3116,17 +3122,6 @@ function isParticipantJoinPage() {
   return !State.participant || !!$('#participant-root')?.querySelector('.participant-join-page');
 }
 
-function getParticipantScrollRoot() {
-  return $('#participant-root');
-}
-
-function isParticipantScrollNearBottom(el, threshold = 56) {
-  if (!el) return true;
-  const { scrollTop, scrollHeight, clientHeight } = el;
-  if (scrollHeight <= clientHeight + 16) return true;
-  return scrollHeight - scrollTop - clientHeight <= threshold;
-}
-
 function shouldHideParticipantBarOverlay() {
   if (document.body.classList.contains('participant-settings-open')) return true;
   if ($('#lp-confirm-modal')?.classList.contains('visible')) return true;
@@ -3140,50 +3135,26 @@ function updateParticipantBarVisibility() {
   const bar = document.getElementById('participant-action-bar');
   if (!bar || bar.classList.contains('hidden') || !isParticipantMobileLayout()) return;
 
-  bar.classList.remove('participant-bar-join', 'participant-bar-collapsed', 'participant-bar-revealed');
-  document.body.classList.remove('participant-has-action-bar', 'participant-join-mode', 'participant-bar-revealed');
+  bar.classList.remove('participant-bar-join', 'participant-bar-overlay-hidden');
+  document.body.classList.remove('participant-join-mode');
 
   if (shouldHideParticipantBarOverlay()) {
-    bar.classList.add('participant-bar-collapsed');
-    return;
-  }
-
-  if (document.body.classList.contains('participant-dock-open')) {
-    bar.classList.add('participant-bar-revealed');
-    document.body.classList.add('participant-has-action-bar', 'participant-bar-revealed');
+    bar.classList.add('participant-bar-overlay-hidden');
     return;
   }
 
   if (isParticipantJoinPage()) {
-    bar.classList.add('participant-bar-join', 'participant-bar-revealed');
-    document.body.classList.add('participant-join-mode', 'participant-has-action-bar', 'participant-bar-revealed');
-    return;
-  }
-
-  const scrollRoot = getParticipantScrollRoot();
-  if (isParticipantScrollNearBottom(scrollRoot)) {
-    bar.classList.add('participant-bar-revealed');
-    document.body.classList.add('participant-has-action-bar', 'participant-bar-revealed');
-  } else {
-    bar.classList.add('participant-bar-collapsed');
+    bar.classList.add('participant-bar-join');
+    document.body.classList.add('participant-join-mode');
   }
 }
 
-function bindParticipantBarScrollReveal() {
-  const root = getParticipantScrollRoot();
-  if (!root) return;
-  if (State._participantBarScrollEl !== root) {
-    State._participantBarScrollEl?.removeEventListener?.('scroll', State._participantBarScrollHandler);
-    State._participantBarScrollEl = root;
-    State._participantBarScrollHandler = () => {
-      window.requestAnimationFrame(() => updateParticipantBarVisibility());
-    };
-    root.addEventListener('scroll', State._participantBarScrollHandler, { passive: true });
-  }
-  if (!State._participantBarResizeObs && typeof ResizeObserver !== 'undefined') {
-    State._participantBarResizeObs = new ResizeObserver(() => updateParticipantBarVisibility());
-    State._participantBarResizeObs.observe(root);
-  }
+function syncParticipantDockAvatarChip() {
+  const chip = document.getElementById('participant-dock-avatar-chip');
+  if (!chip) return;
+  const profile = getParticipantSettingsProfile();
+  chip.textContent = profile.emoji;
+  chip.style.background = profile.color;
 }
 
 function showParticipantActionBar() {
@@ -3192,7 +3163,6 @@ function showParticipantActionBar() {
   bar.classList.remove('hidden');
   bar.setAttribute('aria-hidden', 'false');
   document.body.classList.add('participant-mobile-bar-active');
-  bindParticipantBarScrollReveal();
   updateParticipantBarVisibility();
 }
 
@@ -3204,19 +3174,8 @@ function clearParticipantActionBar() {
   bar.replaceChildren();
   State._participantBarShellReady = false;
   State._participantDockBound = false;
-  State._participantBarScrollEl?.removeEventListener?.('scroll', State._participantBarScrollHandler);
-  State._participantBarScrollEl = null;
-  State._participantBarScrollHandler = null;
-  State._participantBarResizeObs?.disconnect?.();
-  State._participantBarResizeObs = null;
-  bar.classList.remove('participant-bar-join', 'participant-bar-collapsed', 'participant-bar-revealed');
-  document.body.classList.remove(
-    'participant-mobile-bar-active',
-    'participant-has-action-bar',
-    'participant-join-mode',
-    'participant-bar-revealed',
-    'participant-dock-open',
-  );
+  bar.classList.remove('participant-bar-join', 'participant-bar-overlay-hidden');
+  document.body.classList.remove('participant-mobile-bar-active', 'participant-join-mode');
 }
 
 function ensureParticipantActionBarShell() {
@@ -3225,14 +3184,22 @@ function ensureParticipantActionBarShell() {
   if (!State._participantBarShellReady || !bar.querySelector('.participant-action-bar-dock')) {
     bar.innerHTML = `
       <div class="participant-action-bar-dock">
-        <button type="button" class="participant-dock-handle" id="participant-dock-handle" aria-label="Nach oben wischen für Infos">
+        <button type="button" class="participant-dock-handle" id="participant-dock-handle" aria-label="Profil öffnen">
           <span class="participant-dock-notch" aria-hidden="true"></span>
         </button>
-        <div class="participant-dock-panel hidden" id="participant-dock-panel" aria-hidden="true"></div>
-        <div class="participant-action-bar-status" id="participant-bar-status" role="status" aria-live="polite"></div>
-        <div class="participant-action-bar-main" id="participant-bar-main">
-          <button type="button" class="participant-bar-primary hidden" id="participant-bar-primary"></button>
-          <span class="participant-bar-wait-hint hidden" id="participant-bar-wait">Bitte auf die Präsentation achten…</span>
+        <div class="participant-dock-row">
+          <button type="button" class="participant-dock-avatar-btn" id="participant-dock-avatar-btn" aria-label="Profil bearbeiten">
+            <span class="participant-dock-avatar-chip" id="participant-dock-avatar-chip"></span>
+          </button>
+          <div class="participant-dock-center">
+            <div class="participant-action-bar-status" id="participant-bar-status" role="status" aria-live="polite"></div>
+            <div class="participant-action-bar-main" id="participant-bar-main">
+              <button type="button" class="participant-bar-primary hidden" id="participant-bar-primary"></button>
+              <span class="participant-bar-presenting hidden" id="participant-bar-presenting" aria-hidden="true">
+                <span class="participant-bar-presenting-dot" aria-hidden="true"></span> Präsentation
+              </span>
+            </div>
+          </div>
         </div>
       </div>`;
     State._participantBarShellReady = true;
@@ -3241,71 +3208,30 @@ function ensureParticipantActionBarShell() {
   return bar;
 }
 
-function toggleParticipantDockPanel(forceOpen) {
-  const panel = document.getElementById('participant-dock-panel');
-  const handle = document.getElementById('participant-dock-handle');
-  if (!panel) return;
-  const open = forceOpen === true ? true : forceOpen === false ? false : panel.classList.contains('hidden');
-  if (open) {
-    renderParticipantDockPanel();
-    panel.classList.remove('hidden');
-    panel.setAttribute('aria-hidden', 'false');
-    handle?.setAttribute('aria-expanded', 'true');
-    document.body.classList.add('participant-dock-open');
-  } else {
-    panel.classList.add('hidden');
-    panel.setAttribute('aria-hidden', 'true');
-    handle?.setAttribute('aria-expanded', 'false');
-    document.body.classList.remove('participant-dock-open');
-  }
-  updateParticipantBarVisibility();
-}
-
-function renderParticipantDockPanel() {
-  const panel = document.getElementById('participant-dock-panel');
-  if (!panel) return;
-  if (!State.participant || !State.session) {
-    panel.innerHTML = '<p class="participant-dock-note">Code und Name auf der Startseite eingeben.</p>';
-    return;
-  }
-  const p = normalizeParticipantAvatar(State.participant);
-  const sopGroup = getParticipantSopGroup(State.participant.id);
-  const sopMeta = sopGroup ? getSopGroupMeta(sopGroup) : null;
-  panel.innerHTML = `
-    <div class="participant-dock-profile">
-      <span class="participant-dock-avatar" style="background:${esc(p.avatar_color)}">${p.avatar_emoji}</span>
-      <div><strong>${esc(p.display_name || 'Teilnehmer')}</strong><span>Session ${esc(State.session.code)}</span></div>
-    </div>
-    ${sopMeta ? `<p class="participant-dock-meta"><i class="fa-solid ${esc(sopMeta.icon || 'fa-users')}"></i> ${esc(sopMeta.label)}</p>` : ''}
-    <button type="button" class="btn-ghost participant-dock-profile-btn" id="participant-dock-edit-profile">Profil bearbeiten</button>`;
-  panel.querySelector('#participant-dock-edit-profile')?.addEventListener('click', () => {
-    toggleParticipantDockPanel(false);
-    openParticipantSettingsSheet();
-  }, { once: true });
-}
-
 function bindParticipantDockHandlers() {
   if (State._participantDockBound) return;
   State._participantDockBound = true;
-  const dock = document.getElementById('participant-action-bar');
+  const bar = document.getElementById('participant-action-bar');
   let startY = 0;
   let tracking = false;
-  dock?.addEventListener('touchstart', (e) => {
-    if (!e.target.closest('.participant-dock-handle, .participant-action-bar-dock')) return;
+  bar?.addEventListener('click', (e) => {
+    if (e.target.closest('#participant-dock-handle, #participant-dock-avatar-btn, #join-open-profile')) {
+      openParticipantSettingsSheet();
+    }
+  });
+  bar?.addEventListener('touchstart', (e) => {
+    if (!e.target.closest('.participant-action-bar-dock')) return;
+    if (e.target.closest('#participant-bar-primary')) return;
     startY = e.touches[0].clientY;
     tracking = true;
   }, { passive: true });
-  dock?.addEventListener('touchend', (e) => {
+  bar?.addEventListener('touchend', (e) => {
     if (!tracking) return;
     tracking = false;
+    if (e.target.closest('#participant-bar-primary')) return;
     const dy = startY - e.changedTouches[0].clientY;
-    if (dy > 36) toggleParticipantDockPanel(true);
-    else if (dy < -36) toggleParticipantDockPanel(false);
+    if (dy > 32) openParticipantSettingsSheet();
   }, { passive: true });
-  document.getElementById('participant-dock-handle')?.addEventListener('click', () => {
-    const panel = document.getElementById('participant-dock-panel');
-    toggleParticipantDockPanel(panel?.classList.contains('hidden'));
-  });
 }
 
 function findParticipantPrimarySubmit(root) {
@@ -3331,8 +3257,8 @@ function syncParticipantMobileActionBar() {
   const root = $('#participant-root');
   const statusSlot = bar?.querySelector('#participant-bar-status');
   const barPrimary = document.getElementById('participant-bar-primary');
-  const barWait = document.getElementById('participant-bar-wait');
-  if (!bar || !statusSlot || !barPrimary || !barWait) return;
+  const barPresenting = document.getElementById('participant-bar-presenting');
+  if (!bar || !statusSlot || !barPrimary || !barPresenting) return;
 
   const statusEl = root?.querySelector('#fav-counter, #split-total')
     || statusSlot.querySelector('#fav-counter, #split-total');
@@ -3340,7 +3266,7 @@ function syncParticipantMobileActionBar() {
 
   showParticipantActionBar();
   statusSlot.replaceChildren();
-  toggleParticipantDockPanel(false);
+  syncParticipantDockAvatarChip();
 
   if (statusEl) {
     statusEl.classList.add('participant-action-bar-status');
@@ -3349,14 +3275,15 @@ function syncParticipantMobileActionBar() {
 
   if (primarySrc) {
     barPrimary.classList.remove('hidden');
-    barWait.classList.add('hidden');
+    barPresenting.classList.add('hidden');
+    barPresenting.setAttribute('aria-hidden', 'true');
     wireParticipantBarPrimaryClick(barPrimary, primarySrc);
   } else {
     barPrimary.classList.add('hidden');
     barPrimary.onclick = null;
-    barWait.classList.remove('hidden');
+    barPresenting.classList.remove('hidden');
+    barPresenting.setAttribute('aria-hidden', 'false');
   }
-  bindParticipantBarScrollReveal();
   updateParticipantBarVisibility();
 }
 
@@ -3372,6 +3299,9 @@ function closeParticipantSettingsSheet() {
 function openParticipantSettingsSheet() {
   const sheet = document.getElementById('participant-settings-sheet');
   if (!sheet) return;
+  const profile = getParticipantSettingsProfile();
+  const titleEl = document.getElementById('participant-settings-title');
+  if (titleEl) titleEl.textContent = profile.mode === 'join' ? 'Dein Profil' : 'Teilnehmer';
   renderParticipantSettingsBody();
   sheet.classList.remove('hidden');
   sheet.setAttribute('aria-hidden', 'false');
@@ -3475,7 +3405,9 @@ function renderParticipantSettingsBody() {
       <h3>Emoji</h3>
       <div class="participant-settings-emoji-grid">${emojis.map((e) => `<button type="button" class="avatar-emoji-btn participant-settings-emoji ${e === profile.emoji ? 'active' : ''}" data-emoji="${e}" aria-pressed="${e === profile.emoji}">${e}</button>`).join('')}</div>
     </div>
-    ${profile.mode === 'session' ? `<button type="button" class="btn-primary participant-settings-save" id="participant-settings-save">Profil speichern</button>` : ''}`;
+    ${profile.mode === 'session'
+      ? `<button type="button" class="btn-primary participant-settings-save" id="participant-settings-save">Profil speichern</button>`
+      : `<button type="button" class="btn-primary participant-settings-done" id="participant-settings-done">Fertig</button>`}`;
 
   let draft = { ...profile };
 
@@ -3498,6 +3430,7 @@ function renderParticipantSettingsBody() {
     });
     if (profile.mode === 'join') {
       State.joinProfile = { ...State.joinProfile, emoji: draft.emoji, color: draft.color };
+      syncJoinProfilePreview();
     }
     updateDraftPreview();
   }));
@@ -3511,6 +3444,7 @@ function renderParticipantSettingsBody() {
     });
     if (profile.mode === 'join') {
       State.joinProfile = { ...State.joinProfile, emoji: draft.emoji, color: draft.color };
+      syncJoinProfilePreview();
     }
     updateDraftPreview();
   }));
@@ -3543,6 +3477,38 @@ function renderParticipantSettingsBody() {
     const youEl = $('#participant-root')?.querySelector('.participant-you');
     if (youEl) youEl.textContent = draft.name;
   });
+
+  $('#participant-settings-done')?.addEventListener('click', () => {
+    State.joinProfile = {
+      ...State.joinProfile,
+      name: draft.name || State.joinProfile?.name || '',
+      emoji: draft.emoji,
+      color: draft.color,
+    };
+    localStorage.setItem('lp_join_profile', JSON.stringify({ emoji: draft.emoji, color: draft.color }));
+    const joinName = $('#join-name');
+    if (joinName && draft.name) joinName.value = draft.name;
+    syncJoinProfilePreview();
+    closeParticipantSettingsSheet();
+    syncParticipantMobileActionBar();
+    hapticFeedback('select');
+  });
+}
+
+function syncJoinProfilePreview() {
+  const chip = document.getElementById('join-profile-chip');
+  const label = document.getElementById('join-profile-label');
+  if (!State.joinProfile) return;
+  if (chip) {
+    chip.textContent = State.joinProfile.emoji;
+    chip.style.background = State.joinProfile.color;
+  }
+  if (label) {
+    label.textContent = State.joinProfile.name
+      ? `${State.joinProfile.name} · Avatar anpassen`
+      : 'Avatar & Farbe wählen';
+  }
+  syncParticipantDockAvatarChip();
 }
 
 function bindParticipantSettingsSheet() {
@@ -4636,7 +4602,7 @@ function mountParticipantClosingHero(hostSlide, slideIndex, root, finishParticip
   root.innerHTML = wrapParticipantSlide(`
     <div class="participant-wait-block participant-closing-block participant-closing-hero${fullscreenClass}">
       ${closingHtml}
-      <p class="participant-sop-wait participant-sop-wait--closing"><i class="fa-solid fa-eye"></i> Bitte auf die Präsentation achten…</p>
+      ${participantPresentationWaitHtml('participant-sop-wait--closing')}
     </div>`, slideIndex);
 
   requestAnimationFrame(() => initClosingAiFx(root));
@@ -4812,7 +4778,7 @@ function mountParticipantOpeningHero(hostSlide, slideIndex, root, finishParticip
   root.innerHTML = wrapParticipantSlide(`
     <div class="participant-wait-block participant-opening-hero${fullscreenClass}">
       ${heroHtml}
-      <p class="participant-sop-wait participant-sop-wait--hero"><i class="fa-solid fa-eye"></i> Bitte auf die Präsentation achten…</p>
+      ${participantPresentationWaitHtml('participant-sop-wait--hero')}
     </div>`, slideIndex);
 
   requestAnimationFrame(() => initHeroAiFx(root));
@@ -9032,6 +8998,7 @@ function renderParticipantEntry(codePrefill) {
     color: saved?.color || LP_AVATAR_COLORS()[0],
   };
   const root = $('#participant-root');
+  const mobileJoin = isParticipantMobileLayout();
   root.innerHTML = `
     <div class="participant-join-page">
       <div class="participant-join-top">
@@ -9048,6 +9015,15 @@ function renderParticipantEntry(codePrefill) {
           <input id="join-name" placeholder="Vorname oder Nickname" class="participant-name-input" value="" required autocomplete="off" autocorrect="off" />
         </div>
       </div>
+      ${mobileJoin ? `
+      <button type="button" class="participant-join-open-profile" id="join-open-profile">
+        <span class="participant-join-open-avatar" id="join-profile-chip" style="background:${esc(State.joinProfile.color)}">${State.joinProfile.emoji}</span>
+        <span class="participant-join-open-text">
+          <strong id="join-profile-label">Avatar &amp; Farbe wählen</strong>
+          <small>Nach oben wischen oder tippen</small>
+        </span>
+        <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
+      </button>` : `
       <div class="participant-join-avatar-block">
         <label class="join-label">Dein Avatar <span class="req">*</span></label>
         <div class="avatar-preview-wrap avatar-preview-wrap--compact">
@@ -9056,34 +9032,41 @@ function renderParticipantEntry(codePrefill) {
         </div>
         <div class="avatar-color-row avatar-color-row--compact">${LP_AVATAR_COLORS().map((c) => `<button type="button" class="avatar-color-btn ${c === State.joinProfile.color ? 'active' : ''}" data-color="${c}" style="background:${c}" aria-label="${esc(avatarColorAriaLabel(c))}"></button>`).join('')}</div>
         <div class="avatar-emoji-grid avatar-emoji-grid--compact">${LP_AVATAR_EMOJIS().map((e) => `<button type="button" class="avatar-emoji-btn ${e === State.joinProfile.emoji ? 'active' : ''}" data-emoji="${e}" aria-pressed="${e === State.joinProfile.emoji}">${e}</button>`).join('')}</div>
-      </div>
+      </div>`}
       <button type="button" class="btn-primary participant-submit participant-join-submit-hidden" id="join-submit"><i class="fa-solid fa-arrow-right"></i> Beitreten</button>
     </div>`;
 
   const updatePreview = () => {
     const name = $('#join-name')?.value.trim() || '';
     State.joinProfile.name = name;
+    if (mobileJoin) {
+      syncJoinProfilePreview();
+      return;
+    }
     $('#avatar-preview').textContent = State.joinProfile.emoji;
     $('#avatar-preview').style.background = State.joinProfile.color;
     $('#avatar-preview-name').textContent = name || 'Wähle Emoji & Farbe';
   };
 
   $('#join-name')?.addEventListener('input', updatePreview);
-  root.querySelectorAll('.avatar-emoji-btn').forEach((btn) => btn.addEventListener('click', () => {
-    State.joinProfile.emoji = btn.dataset.emoji;
-    hapticFeedback('select');
-    root.querySelectorAll('.avatar-emoji-btn').forEach((b) => {
-      b.classList.toggle('active', b.dataset.emoji === State.joinProfile.emoji);
-      b.setAttribute('aria-pressed', b.dataset.emoji === State.joinProfile.emoji ? 'true' : 'false');
-    });
-    updatePreview();
-  }));
-  root.querySelectorAll('.avatar-color-btn').forEach((btn) => btn.addEventListener('click', () => {
-    State.joinProfile.color = btn.dataset.color;
-    hapticFeedback('select');
-    root.querySelectorAll('.avatar-color-btn').forEach((b) => b.classList.toggle('active', b.dataset.color === State.joinProfile.color));
-    updatePreview();
-  }));
+  if (!mobileJoin) {
+    root.querySelectorAll('.avatar-emoji-btn').forEach((btn) => btn.addEventListener('click', () => {
+      State.joinProfile.emoji = btn.dataset.emoji;
+      hapticFeedback('select');
+      root.querySelectorAll('.avatar-emoji-btn').forEach((b) => {
+        b.classList.toggle('active', b.dataset.emoji === State.joinProfile.emoji);
+        b.setAttribute('aria-pressed', b.dataset.emoji === State.joinProfile.emoji ? 'true' : 'false');
+      });
+      updatePreview();
+    }));
+    root.querySelectorAll('.avatar-color-btn').forEach((btn) => btn.addEventListener('click', () => {
+      State.joinProfile.color = btn.dataset.color;
+      hapticFeedback('select');
+      root.querySelectorAll('.avatar-color-btn').forEach((b) => b.classList.toggle('active', b.dataset.color === State.joinProfile.color));
+      updatePreview();
+    }));
+  }
+  $('#join-open-profile')?.addEventListener('click', () => openParticipantSettingsSheet());
   $('#join-code')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#join-name')?.focus(); });
   syncParticipantMobileActionBar();
   bindParticipantConnectivityHandlers();
@@ -9444,7 +9427,7 @@ async function renderParticipantQuestion() {
       <div class="participant-wait-block ws-slide ws-slide--orient">
         <header class="ws-slide-head"><span class="ws-pill ws-pill--orient"><i class="fa-solid fa-map"></i> Track</span></header>
         <h1 class="ws-title">${esc(hostSlide.content?.title || 'Überblick')}</h1>
-        <p class="ws-lead"><i class="fa-solid fa-eye"></i> Bitte auf die Präsentation achten…</p>
+        <p class="ws-lead">${isParticipantMobileLayout() ? 'Folge der Präsentation auf dem Beamer.' : '<i class="fa-solid fa-eye"></i> Bitte auf die Präsentation achten…'}</p>
       </div>`, slideIndex);
     finishParticipant();
     return;
@@ -9453,7 +9436,7 @@ async function renderParticipantQuestion() {
     root.innerHTML = wrapParticipantSlide(`
       <div class="participant-wait-block">
         ${renderGroupTransitionHtml(hostSlide.content || {}, false)}
-        <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf die Präsentation achten…</p>
+        ${participantPresentationWaitHtml()}
       </div>`, slideIndex);
     finishParticipant();
     return;
@@ -9463,7 +9446,7 @@ async function renderParticipantQuestion() {
       root.innerHTML = wrapParticipantSlide(`
         <div class="participant-wait-block">
           ${renderSopSectionHtml(slide.content, false, { participantCompact: true })}
-          <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf die Präsentation achten…</p>
+          ${participantPresentationWaitHtml()}
         </div>`, slideIndex);
       finishParticipant();
       return;
@@ -9477,12 +9460,12 @@ async function renderParticipantQuestion() {
       if (html || isSopCardResultsSlide(slide)) {
         root.innerHTML = wrapParticipantSlide(`
           <div class="participant-wait-block">${html || `<h1 class="pslide-q-title">${esc(slide.content?.title || 'Ergebnis')}</h1><p class="pslide-q-prompt">${esc(slide.content?.body || '')}</p>`}
-          <p class="participant-sop-wait"><i class="fa-solid fa-eye"></i> Bitte auf die Präsentation achten…</p></div>`, slideIndex);
+          ${participantPresentationWaitHtml()}</div>`, slideIndex);
         finishParticipant();
         return;
       }
     }
-    root.innerHTML = `<div class="participant-card"><h1>${esc(slide.content?.title || 'Folie')}</h1><p>${esc(slide.content?.body || slide.content?.prompt || '')}</p><p class="participant-sop-wait participant-sop-wait--compact"><i class="fa-solid fa-eye"></i> Bitte auf die Präsentation achten…</p></div>`;
+    root.innerHTML = `<div class="participant-card"><h1>${esc(slide.content?.title || 'Folie')}</h1><p>${esc(slide.content?.body || slide.content?.prompt || '')}</p>${participantPresentationWaitHtml('participant-sop-wait--compact')}</div>`;
     finishParticipant();
     return;
   }
