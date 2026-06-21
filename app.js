@@ -1846,15 +1846,41 @@ function renderWorkshopProgressHtml(slideIndex) {
   return `<div class="pslide-slide-counter">Folie ${slideIndex + 1} / ${State.slides.length}</div>`;
 }
 
+const PARTICIPANT_TYPE_PILL = {
+  mc_single: { label: 'Auswahl', icon: 'fa-circle-dot' },
+  mc_multi: { label: 'Mehrfachauswahl', icon: 'fa-square-check' },
+  yesno: { label: 'Ja / Nein', icon: 'fa-toggle-on' },
+  wordcloud: { label: 'Wortwolke', icon: 'fa-cloud' },
+  open: { label: 'Offene Frage', icon: 'fa-comment' },
+  scale: { label: 'Skala', icon: 'fa-sliders' },
+  ranking: { label: 'Ranking', icon: 'fa-arrow-down-wide-short' },
+  quiz: { label: 'Quiz', icon: 'fa-bolt' },
+  qa: { label: 'Q&A', icon: 'fa-circle-question' },
+  brainstorm: { label: 'Brainstorming', icon: 'fa-lightbulb' },
+  reaction: { label: 'Reaktion', icon: 'fa-face-smile' },
+  number_guess: { label: 'Schätzung', icon: 'fa-hashtag' },
+  percent_split: { label: '100 Punkte', icon: 'fa-chart-pie' },
+  pin_image: { label: 'Pin', icon: 'fa-location-dot' },
+  priority_matrix: { label: 'Matrix', icon: 'fa-table-cells-large' },
+};
+
 function renderParticipantWorkshopProgressHtml(slideIndex) {
   const total = Math.max(1, State.slides?.length || 1);
   const current = slideIndex + 1;
   const pct = Math.round((current / total) * 100);
   const slide = State.slides?.[slideIndex];
-  const meta = slide ? getSlideShellMeta(slide) : null;
-  const pillLabel = meta?.pillLabel || 'Workshop';
-  const pillIcon = meta?.pillIcon || 'fa-layer-group';
-  const pillTone = meta?.pillTone || 'brand';
+  let pillLabel = 'Live';
+  let pillIcon = 'fa-circle-play';
+  let pillTone = 'brand';
+  if (isSopWorkshopPresentation()) {
+    const meta = slide ? getSlideShellMeta(slide) : null;
+    pillLabel = meta?.pillLabel || 'Workshop';
+    pillIcon = meta?.pillIcon || 'fa-layer-group';
+    pillTone = meta?.pillTone || 'brand';
+  } else if (slide) {
+    const typeMeta = PARTICIPANT_TYPE_PILL[slide.slide_type];
+    if (typeMeta) { pillLabel = typeMeta.label; pillIcon = typeMeta.icon; }
+  }
   return `<div class="participant-progress-card" role="status" aria-label="Folie ${current} von ${total}">
     <div class="participant-progress-row">
       <span class="participant-progress-pill ws-pill ws-pill--${esc(pillTone)}"><i class="fa-solid ${esc(pillIcon)}"></i> ${esc(pillLabel)}</span>
@@ -3047,7 +3073,7 @@ function renderParticipantWorkshopHeader(slideIndex) {
 }
 
 function wrapParticipantSlide(bodyHtml, slideIndex) {
-  const header = isSopWorkshopPresentation() ? renderParticipantWorkshopHeader(slideIndex) : '';
+  const header = renderParticipantWorkshopProgressHtml(slideIndex);
   return `<div class="pslide-participant-slide">${header}<div class="pslide-participant-content">${bodyHtml}</div></div>`;
 }
 
@@ -3131,6 +3157,27 @@ function shouldHideParticipantBarOverlay() {
   return false;
 }
 
+function measureParticipantDockHeight() {
+  const dock = document.querySelector('#participant-action-bar .participant-action-bar-dock');
+  const bar = document.getElementById('participant-action-bar');
+  const hidden = !bar || bar.classList.contains('hidden')
+    || bar.classList.contains('participant-bar-overlay-hidden')
+    || !isParticipantMobileLayout();
+  const h = hidden || !dock ? 0 : Math.round(dock.getBoundingClientRect().height);
+  document.body.style.setProperty('--participant-dock-h', `${h}px`);
+}
+
+function bindParticipantDockResize() {
+  const dock = document.querySelector('#participant-action-bar .participant-action-bar-dock');
+  if (!dock || State._participantDockResizeEl === dock) return;
+  State._participantDockResizeObs?.disconnect?.();
+  State._participantDockResizeEl = dock;
+  if (typeof ResizeObserver !== 'undefined') {
+    State._participantDockResizeObs = new ResizeObserver(() => measureParticipantDockHeight());
+    State._participantDockResizeObs.observe(dock);
+  }
+}
+
 function updateParticipantBarVisibility() {
   const bar = document.getElementById('participant-action-bar');
   if (!bar || bar.classList.contains('hidden') || !isParticipantMobileLayout()) return;
@@ -3140,6 +3187,7 @@ function updateParticipantBarVisibility() {
 
   if (shouldHideParticipantBarOverlay()) {
     bar.classList.add('participant-bar-overlay-hidden');
+    measureParticipantDockHeight();
     return;
   }
 
@@ -3147,6 +3195,7 @@ function updateParticipantBarVisibility() {
     bar.classList.add('participant-bar-join');
     document.body.classList.add('participant-join-mode');
   }
+  requestAnimationFrame(() => measureParticipantDockHeight());
 }
 
 function syncParticipantDockAvatarChip() {
@@ -3164,6 +3213,7 @@ function showParticipantActionBar() {
   bar.setAttribute('aria-hidden', 'false');
   document.body.classList.add('participant-mobile-bar-active');
   updateParticipantBarVisibility();
+  bindParticipantDockResize();
 }
 
 function clearParticipantActionBar() {
@@ -3174,8 +3224,12 @@ function clearParticipantActionBar() {
   bar.replaceChildren();
   State._participantBarShellReady = false;
   State._participantDockBound = false;
+  State._participantDockResizeObs?.disconnect?.();
+  State._participantDockResizeObs = null;
+  State._participantDockResizeEl = null;
   bar.classList.remove('participant-bar-join', 'participant-bar-overlay-hidden');
   document.body.classList.remove('participant-mobile-bar-active', 'participant-join-mode');
+  document.body.style.setProperty('--participant-dock-h', '0px');
 }
 
 function ensureParticipantActionBarShell() {
@@ -3547,7 +3601,7 @@ function renderParticipantTrackVoteHtml(slide) {
       const opts = getTrackVoteOptions(slide);
       return `<p class="vote-mode-hint">Expertenmodus: Verteile genau <strong>100 Punkte</strong>.</p>
         ${opts.map((o) => `<div class="split-row"><span>${renderUseCaseDisplayHtml(o.text, 'full')}</span><input type="number" min="0" max="100" value="0" data-split="${esc(o.id)}" class="split-input" /></div>`).join('')}
-        <div id="split-total" style="font-weight:700;margin:.5rem 0" role="status" aria-live="polite">Summe: 0 / 100</div>
+        <div id="split-total" class="participant-split-total" role="status" aria-live="polite">Summe: 0 / 100</div>
         <button type="button" class="btn-ghost vote-mode-toggle" id="vote-mode-toggle">← Zurück zu Top ${n}</button>
         <button type="button" class="btn-primary participant-submit" id="submit-split">Punkte senden</button>`;
     }
@@ -9328,11 +9382,23 @@ async function renderParticipantQuestion() {
     requestAnimationFrame(() => syncParticipantMobileActionBar());
   };
   if (!hostSlide?.settings?.sopTrackVote) State.participantVoteExpert = false;
-  if (!hostSlide) { root.innerHTML = '<div class="participant-card"><p>Warte auf Folie…</p></div>'; finishParticipant(); return; }
+  if (!hostSlide) {
+    root.innerHTML = `<div class="participant-card participant-skeleton-card" aria-busy="true" aria-label="Lädt…">
+      <div class="participant-skeleton-line participant-skeleton-line--lg"></div>
+      <div class="participant-skeleton-line participant-skeleton-line--md"></div>
+      <div class="participant-skeleton-block"></div>
+    </div>`;
+    finishParticipant();
+    return;
+  }
   if (!State.session.question_open) {
     cleanupParticipantHeroFx();
     cleanupParticipantClosingFx();
-    root.innerHTML = `<div class="participant-card"><h1>${esc(hostSlide.content?.title || 'Warte…')}</h1><p>Die Frage ist geschlossen. Bitte warte auf die nächste Karte…</p></div>`;
+    root.innerHTML = `<div class="participant-state-card">
+      <div class="participant-state-icon"><i class="fa-solid fa-hourglass-half"></i></div>
+      <h1 class="participant-state-title">${esc(hostSlide.content?.title || 'Einen Moment…')}</h1>
+      <p class="participant-state-text">Die Frage ist geschlossen. Bitte warte auf die nächste Karte.</p>
+    </div>`;
     finishParticipant();
     return;
   }
@@ -9537,30 +9603,31 @@ async function renderParticipantQuestion() {
   } else if (type === 'scale') {
     input = `<div class="scale-labels"><span>${esc(c.minLabel || c.min || 1)}</span><span>${esc(c.maxLabel || c.max || 10)}</span></div>
       <input id="p-range" type="range" min="${c.min ?? 1}" max="${c.max ?? 10}" value="${Math.round(((c.min ?? 1) + (c.max ?? 10)) / 2)}" class="participant-range" aria-label="${esc(c.title || c.prompt || 'Skala')}" aria-valuetext="${Math.round(((c.min ?? 1) + (c.max ?? 10)) / 2)}" />
-      <div id="p-range-val" style="text-align:center;font-size:1.5rem;font-weight:700;margin:.5rem 0" aria-hidden="true">${Math.round(((c.min ?? 1) + (c.max ?? 10)) / 2)}</div>
+      <div id="p-range-val" class="participant-range-value" aria-hidden="true">${Math.round(((c.min ?? 1) + (c.max ?? 10)) / 2)}</div>
       <button type="button" class="btn-primary participant-submit" id="submit-num">Senden</button>`;
   } else if (type === 'number_guess') {
-    input = `<input id="p-num" type="number" class="participant-num-input" placeholder="Deine Schätzung"><button type="button" class="btn-primary participant-submit" id="submit-num" style="margin-top:.75rem">Senden</button>`;
+    input = `<input id="p-num" type="number" class="participant-num-input" placeholder="Deine Schätzung"><button type="button" class="btn-primary participant-submit" id="submit-num">Senden</button>`;
   } else if (type === 'reaction') {
-    input = `<div class="participant-reaction-grid">${['👍', '👎', '❤️', '😂', '😮', '👏'].map((e) => `<button type="button" class="participant-emoji" data-emoji="${e}" aria-label="Reaktion ${e}">${e}</button>`).join('')}</div>`;
+    input = `<div class="participant-reaction-grid">${['👍', '👎', '❤️', '😂', '😮', '👏'].map((e) => `<button type="button" class="participant-emoji" data-emoji="${e}" aria-pressed="false" aria-label="Reaktion ${e}">${e}</button>`).join('')}</div>`;
   } else if (type === 'ranking') {
-    input = `<p style="font-size:.85rem;color:var(--muted);margin-bottom:.5rem">Tippe Optionen in Reihenfolge (1 = wichtigste)</p>
-      <div id="rank-list">${(c.options || []).map((o) => `<button type="button" class="participant-option rank-opt" data-id="${esc(o.id)}">${esc(o.text)}</button>`).join('')}</div>
-      <div id="rank-order" class="rank-order"></div>
+    input = `<p class="participant-hint">Tippe Optionen in Reihenfolge (1 = wichtigste)</p>
+      <div id="rank-list" class="participant-rank-list">${(c.options || []).map((o) => `<button type="button" class="participant-option rank-opt" data-id="${esc(o.id)}"><span class="rank-badge" aria-hidden="true"></span><span class="rank-opt-text">${esc(o.text)}</span></button>`).join('')}</div>
+      <div id="rank-order" class="rank-order" role="status" aria-live="polite"></div>
       <button type="button" class="btn-primary participant-submit" id="submit-rank">Senden</button>`;
   } else if (type === 'percent_split') {
     if (slide.settings?.sopTrackVote) {
       input = renderParticipantTrackVoteHtml(slide);
     } else {
-      input = `<p style="font-size:.85rem;color:var(--muted)">Verteile 100 Punkte</p>
+      input = `<p class="participant-hint">Verteile 100 Punkte</p>
         ${(c.options || []).map((o) => `<div class="split-row"><span>${esc(o.text)}</span><input type="number" min="0" max="100" value="0" data-split="${esc(o.id)}" class="split-input" /></div>`).join('')}
-        <div id="split-total" style="font-weight:700;margin:.5rem 0" role="status" aria-live="polite">Summe: 0 / 100</div>
+        <div id="split-total" class="participant-split-total" role="status" aria-live="polite">Summe: 0 / 100</div>
         <button type="button" class="btn-primary participant-submit" id="submit-split">Senden</button>`;
     }
   } else if (type === 'pin_image') {
     input = c.imageUrl
-      ? `<div class="pin-wrap" id="pin-wrap"><img src="${esc(c.imageUrl)}" alt="" id="pin-img" /><div id="pin-marker" class="pin-marker hidden">📍</div></div><button type="button" class="btn-primary participant-submit" id="submit-pin" disabled>Pin setzen & senden</button>`
-      : `<p style="color:var(--muted)">Kein Bild konfiguriert.</p>`;
+      ? `<p class="participant-hint"><i class="fa-solid fa-hand-pointer"></i> Tippe auf das Bild, um deinen Pin zu setzen</p>
+        <div class="pin-wrap" id="pin-wrap"><img src="${esc(c.imageUrl)}" alt="" id="pin-img" /><div id="pin-marker" class="pin-marker hidden">📍</div></div><button type="button" class="btn-primary participant-submit" id="submit-pin" disabled>Pin setzen & senden</button>`
+      : `<p class="participant-hint">Kein Bild konfiguriert.</p>`;
   } else if (type === 'priority_matrix') {
     input = renderParticipantMatrixHtml(slide);
   }
@@ -10031,23 +10098,44 @@ function bindParticipantHandlers(slide) {
   });
 
   const rankOrder = [];
+  const refreshRankBadges = () => {
+    $$('.rank-opt').forEach((b) => {
+      const pos = rankOrder.indexOf(b.dataset.id);
+      const badge = b.querySelector('.rank-badge');
+      b.classList.toggle('is-selected', pos >= 0);
+      b.setAttribute('aria-pressed', pos >= 0 ? 'true' : 'false');
+      if (badge) badge.textContent = pos >= 0 ? String(pos + 1) : '';
+    });
+    const orderEl = $('#rank-order');
+    if (orderEl) {
+      orderEl.textContent = rankOrder.length
+        ? rankOrder.map((id, i) => `${i + 1}. ${(c.options || []).find((o) => o.id === id)?.text || id}`).join(' · ')
+        : '';
+    }
+  };
   $$('.rank-opt').forEach((btn) => btn.addEventListener('click', () => {
-    if (rankOrder.includes(btn.dataset.id)) return;
     hapticFeedback('select');
-    rankOrder.push(btn.dataset.id);
-    btn.classList.add('is-selected');
-    $('#rank-order').textContent = rankOrder.map((id, i) => `${i + 1}. ${(c.options || []).find((o) => o.id === id)?.text || id}`).join(' · ');
+    const idx = rankOrder.indexOf(btn.dataset.id);
+    if (idx >= 0) rankOrder.splice(idx, 1);
+    else rankOrder.push(btn.dataset.id);
+    refreshRankBadges();
   }));
   $('#submit-rank')?.addEventListener('click', () => {
     if (!rankOrder.length) { toast('Bitte mindestens eine Option wählen', 'warn'); return; }
     submitResponse({ order: rankOrder });
   });
 
-  $$('.split-input').forEach((inp) => inp.addEventListener('input', () => {
+  const refreshSplitTotal = () => {
     const sum = $$('.split-input').reduce((a, el) => a + Number(el.value || 0), 0);
     const el = $('#split-total');
-    if (el) { el.textContent = `Summe: ${sum} / 100`; el.style.color = sum === 100 ? 'var(--success)' : 'var(--danger)'; }
-  }));
+    if (el) {
+      el.textContent = `Summe: ${sum} / 100`;
+      el.classList.toggle('is-valid', sum === 100);
+      el.classList.toggle('is-invalid', sum !== 100);
+    }
+  };
+  $$('.split-input').forEach((inp) => inp.addEventListener('input', refreshSplitTotal));
+  if ($$('.split-input').length) refreshSplitTotal();
   $('#submit-split')?.addEventListener('click', () => {
     const points = {};
     let sum = 0;
@@ -10120,7 +10208,18 @@ function bindParticipantHandlers(slide) {
     }
   }
   $('#participant-root').querySelectorAll('.participant-reaction-grid [data-emoji]').forEach((btn) => {
-    btn.onclick = () => submitResponse({ emoji: btn.dataset.emoji });
+    btn.onclick = () => {
+      const grid = btn.closest('.participant-reaction-grid');
+      grid?.querySelectorAll('[data-emoji]').forEach((b) => {
+        b.classList.toggle('is-selected', b === btn);
+        b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+      });
+      btn.classList.remove('is-confirming');
+      void btn.offsetWidth;
+      btn.classList.add('is-confirming');
+      hapticFeedback('select');
+      submitResponse({ emoji: btn.dataset.emoji });
+    };
   });
   // Zeichen-Counter aktualisieren
   const charN = $('#p-char-n');
