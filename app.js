@@ -6361,6 +6361,54 @@ function finalizePresentUi(slide) {
   if (isWorkshopClosingSlide(slide)) initClosingAiFx($('#present-stage'));
   else stopClosingAiFx();
   initSopBoardAutoScroll($('#present-stage'));
+  scheduleFitPresentStage();
+}
+
+let _fitPresentRaf = 0;
+function scheduleFitPresentStage() {
+  if (_fitPresentRaf) cancelAnimationFrame(_fitPresentRaf);
+  // Doppeltes rAF: warten bis Layout + Webfonts gesetzt sind, dann skalieren.
+  _fitPresentRaf = requestAnimationFrame(() => {
+    _fitPresentRaf = requestAnimationFrame(() => {
+      _fitPresentRaf = 0;
+      fitPresentStage();
+    });
+  });
+}
+
+// Skaliert die Präsentations-Folie so, dass sie ohne Scrollen in die Bühne
+// passt. CSS `zoom` schrumpft die echte Layout-Box (anders als transform),
+// daher bleibt die Flex-Zentrierung korrekt und Text gestochen scharf.
+function fitPresentStage() {
+  const stage = document.getElementById('present-stage');
+  if (!stage) return;
+  const content = stage.querySelector(':scope > .pslide-slide');
+  if (!content) return;
+  // Vollflächige Hero-/Closing-Folien sind bewusst bildschirmfüllend.
+  if (stage.classList.contains('ws-hero-present-stage')
+    || stage.classList.contains('ws-closing-present-stage')) {
+    content.style.zoom = '';
+    return;
+  }
+  content.style.zoom = '';
+  const cs = getComputedStyle(stage);
+  const availW = stage.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0');
+  const availH = stage.clientHeight - parseFloat(cs.paddingTop || '0') - parseFloat(cs.paddingBottom || '0');
+  const cw = content.offsetWidth;
+  const ch = content.offsetHeight;
+  if (cw <= 0 || ch <= 0 || availW <= 0 || availH <= 0) return;
+  const scale = Math.min(1, availW / cw, availH / ch);
+  // Erst ab spürbarem Überlauf skalieren; nie unter 0.5 (sonst unleserlich).
+  content.style.zoom = scale < 0.995 ? String(Math.max(0.5, scale)) : '';
+}
+
+if (typeof window !== 'undefined' && !window._fitPresentResizeBound) {
+  window._fitPresentResizeBound = true;
+  let _fitResizeT = 0;
+  window.addEventListener('resize', () => {
+    clearTimeout(_fitResizeT);
+    _fitResizeT = setTimeout(scheduleFitPresentStage, 120);
+  });
 }
 
 async function deleteSlide(id) {
