@@ -1677,7 +1677,14 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .sop-empty-state-text{font-size:.88rem;color:var(--muted);margin:0;max-width:360px;line-height:1.45}
 .sop-empty-state i{font-size:1.35rem;color:var(--brand);opacity:.55;margin-bottom:.15rem}
 @keyframes ws-pill-in{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
-.lp-sop-workshop.present-mode .present-stage .pslide-slide{width:100%;max-width:min(1240px,96vw);text-align:left}
+/* Inhalt füllt die ECHTE Bühne (zwischen Intranet-Toolbar links und Folien-Navi
+   rechts) — nicht 96vw (= Viewport), sonst skaliert fitPresentStage breitengetrieben
+   uneinheitlich runter. So bleibt der Zoom über alle Folien gleich. */
+.lp-sop-workshop.present-mode .present-stage .pslide-slide{width:100%;max-width:min(1240px,100%);text-align:left}
+/* Vertikal kompakter: doppelte Bottom-Paddings im Present-Modus reduzieren,
+   damit Folien ohne Scrollen passen (einheitliche Höhe). */
+.lp-sop-workshop.present-mode .pslide-slide{padding-bottom:.5rem}
+.lp-sop-workshop.present-mode .pslide-slide-content{padding:.35rem 0 .5rem}
 .ws-slide{width:100%;display:flex;flex-direction:column;gap:.85rem;animation:ws-title-in .45s cubic-bezier(.22,1,.36,1)}
 .ws-slide-head{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .65rem}
 .ws-title{font-size:clamp(1.85rem,4.2vw,2.85rem);font-weight:900;line-height:1.08;letter-spacing:-.03em;color:var(--ink);margin:0;animation:ws-title-in .55s cubic-bezier(.22,1,.36,1) .05s backwards}
@@ -2102,10 +2109,12 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   margin-bottom:.1rem;
 }
 .lp-sop-workshop.present-mode .ws-title{
-  font-size:clamp(2rem,4vw,3.25rem);
+  /* Kompakter, enger Clamp → über alle Folien & Fenstergrößen einheitlich groß
+     (vorher 2–3.25rem bei 4vw → wirkte zu groß und sprang je Viewport). */
+  font-size:clamp(1.6rem,2.2vw,2.1rem);
   font-weight:700;
   letter-spacing:-.025em;
-  line-height:1.1;
+  line-height:1.12;
 }
 .lp-sop-workshop.present-mode .ws-lead,
 .lp-sop-workshop.present-mode .ws-sub-lead,
