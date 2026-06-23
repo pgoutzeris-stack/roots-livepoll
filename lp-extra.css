@@ -686,32 +686,42 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   }
 }
 
-/* ─── Desktop-Teilnehmeransicht: Breite sinnvoll nutzen ───────────────────────
-   Vorher: SOP-Panel (280px) ganz links + Inhaltsspalte nur 560px, die mit ~300px
-   Leerraum je Seite rechts-der-Mitte floatete → Breite ungenutzt, unbalanciert.
-   Jetzt: Panel + breitere Inhaltsspalte als EINE zentrierte Gruppe. */
+/* ─── Desktop-Teilnehmeransicht: festes BREITES Layout ────────────────────────
+   Vorher: Inhalt war auf Desktop so schmal wie auf Mobile (560/640px) und
+   floatete mit viel Leerraum. Jetzt: Inhalt füllt die Breite (bis 1040px),
+   Panel + Inhalt füllen den Bereich. Hart per !important, kein Auto-Sizing. */
 @media(min-width:901px){
   .lp-sop-workshop.participant-mode .participant-main-wrap{
     justify-content:center;
-    gap:1.75rem;
-    padding:0 1.5rem;
+    gap:1.5rem;
+    padding:0 2rem;
   }
   .lp-sop-workshop.participant-mode #participant-root.participant-root{
-    flex:0 1 820px;          /* nicht mehr greedy (flex:1) → kein toter Seitenraum */
+    flex:1 1 auto;           /* füllt die Restbreite neben dem Panel */
     align-items:stretch;
   }
   .lp-sop-workshop.participant-mode .workshop-slide-sop{
-    align-self:flex-start;   /* Panel oben bündig, border-left als Trenner */
+    align-self:flex-start;
     border-left:none;
     border-right:1px solid var(--line);
   }
-  /* Inhaltsspalte auf Desktop deutlich breiter (war 560/640px) */
+  /* Inhaltsspalte hart breit (war 560/640px → bis 1040px) */
   #screen-participant .pslide-participant-slide,
   #screen-participant .participant-card,
   #screen-participant .participant-card-pslide,
   #screen-participant .participant-workshop-header,
-  #screen-participant .workshop-collect-shell{
-    max-width:760px;
+  #screen-participant .pslide-question-block,
+  #screen-participant .workshop-collect-shell,
+  #screen-participant .workshop-collect-prompt,
+  #screen-participant .workshop-progress{
+    max-width:1040px!important;
+  }
+  /* Frage- und Prompt-Text dürfen ebenfalls breiter laufen */
+  #screen-participant .pslide-q-prompt,
+  #screen-participant .pslide-q-sub,
+  #screen-participant .sop-pslide-body,
+  #screen-participant .sop-card-body{
+    max-width:900px!important;
   }
 }
 
