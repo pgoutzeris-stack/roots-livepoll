@@ -1827,6 +1827,35 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-sop-workshop .present-stage .viz-wrap-present{margin-top:.5rem}
 .lp-sop-workshop .present-stage .finale-vote{margin-top:.25rem}
 
+/* Finale-Pipeline: Top N → Matrix → Quick Wins → Next Steps */
+.ws-finale-pipeline{
+  width:100%;margin:0 0 1rem;padding:.65rem .85rem;
+  background:linear-gradient(135deg,rgba(32,110,251,.06),rgba(99,102,241,.04));
+  border:1px solid rgba(32,110,251,.14);border-radius:14px;
+}
+.ws-finale-pipeline-label{
+  display:block;font-size:.72rem;font-weight:800;text-transform:uppercase;
+  letter-spacing:.05em;color:var(--brand);margin-bottom:.45rem;
+}
+.ws-finale-pipeline-trail{
+  display:flex;flex-wrap:wrap;align-items:center;gap:.35rem .25rem;
+}
+.ws-pipeline-node{
+  font-size:.74rem;font-weight:700;padding:.28rem .6rem;border-radius:999px;
+  background:var(--surface);color:var(--muted);border:1px solid var(--line);
+}
+.ws-pipeline-node.is-active{background:var(--brand-light);color:var(--brand);border-color:rgba(32,110,251,.35)}
+.ws-pipeline-node.is-done{background:rgba(16,185,129,.1);color:#059669;border-color:rgba(16,185,129,.25)}
+.ws-pipeline-node.is-preview{background:rgba(245,158,11,.1);color:#b45309;border-color:rgba(245,158,11,.3)}
+.ws-pipeline-arrow{font-size:.7rem;color:var(--muted);opacity:.65;padding:0 .05rem}
+.ws-vote-matrix-hint{
+  display:flex;align-items:flex-start;gap:.45rem;font-size:.82rem;line-height:1.45;
+  color:var(--muted);padding:.55rem .75rem;margin-bottom:.65rem;
+  background:var(--brand-light);border-radius:12px;border:1px solid rgba(32,110,251,.15);
+}
+.ws-vote-matrix-hint i{color:var(--brand);margin-top:.12rem;flex-shrink:0}
+.ws-vote-matrix-hint strong{color:var(--ink);font-weight:800}
+
 /* ═══════ Matrix-Frame v3 · Achsen mit Linien + Chart-Grid ═══════ */
 .lp-mx-frame{width:100%;max-width:min(1200px,100%);margin:0 auto}
 .lp-mx-chart{

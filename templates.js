@@ -711,10 +711,11 @@ function sopAllTracksSummary() {
 // Erscheint am Ende ALLER Vorlagen. Enthält vollständige Priorisierungs-Anleitung.
 
 function sopIceMatrix() {
+  const n = window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 10;
   return tplSlide('priority_matrix', {
     title: 'Impact/Effort-Matrix',
-    prompt: 'Ordnet die priorisierten KI Use Cases gemeinsam in die Matrix ein.\n\nImpact: Wie stark verbessert dieser Use Case unsere Arbeit / unsere Qualität?\nEffort: Wie hoch ist der Aufwand für Einführung, Lernkurve und laufende Nutzung?\n\nQuick Wins sofort angehen · Strategic Bets langfristig einplanen\nTime Sinks kritisch hinterfragen · Drop weglassen',
-    subtitle: 'Impact vs. Effort · finale Priorisierung',
+    prompt: `Ordnet die ${n} priorisierten KI Use Cases gemeinsam in die Matrix ein.\n\nImpact: Wie stark verbessert dieser Use Case unsere Arbeit / unsere Qualität?\nEffort: Wie hoch ist der Aufwand für Einführung, Lernkurve und laufende Nutzung?\n\nQuick Wins → Next Steps · Strategic Bets langfristig · Time Sinks kritisch prüfen · Drop weglassen`,
+    subtitle: `Top ${n} aus Gesamt-Priorisierung · Impact vs. Effort`,
     xAxisLabel: 'Aufwand (Effort)',
     xAxisLow: 'niedrig',
     xAxisHigh: 'hoch',
@@ -724,15 +725,15 @@ function sopIceMatrix() {
     quadrants: iceQuadrants(),
     sopKind: SK.FINAL_MATRIX,
     sopFairVote: true,
-  }, { showResultsLive: true, sopAllTracksMatrix: true, sopFairVote: true, sopMatrixCount: (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 10), workshopMode: 'decide' });
+  }, { showResultsLive: true, sopAllTracksMatrix: true, sopFairVote: true, sopMatrixCount: n, workshopMode: 'decide' });
 }
 
-// Next Steps: Quick Wins aus der Matrix → Action Log (Host pflegt Verantwortliche & Deadlines).
+// Next Steps: nur Quick Wins aus der Matrix → Action Log (Host pflegt Verantwortliche & Deadlines).
 function sopWorkshopNextSteps() {
   return tplSlide('content', {
     title: 'Next Steps',
-    subtitle: '',
-    body: 'Was sind die nächsten Schritte für unsere Quick Wins? Pro Use Case legen wir Verantwortliche, Deadlines und konkrete Actions fest.',
+    subtitle: 'Nur Quick Wins aus der Matrix',
+    body: 'Use Cases im Quick-Win-Quadrant (hoher Impact, niedriger Aufwand) landen hier. Pro Quick Win legen wir Verantwortliche, Deadlines und konkrete Actions fest.',
     sopKind: SK.NEXT_STEPS,
     isHeroSlide: false,
   }, { workshopMode: 'decide', sopNextSteps: true });
@@ -771,9 +772,9 @@ function sopFinalAllTracksVote() {
   const ws = window.LP_WORKSHOP_SETTINGS;
   const count = ws?.finalPriorityCount || 10;
   return tplSlide('mc_multi', {
-    title: 'Finale Priorisierung',
+    title: 'Gesamt-Priorisierung',
     subtitle: `Alle Use Cases · wähle deine Top ${count} (keine eigenen)`,
-    prompt: `Welche ${count} Use Cases haben den größten Impact für euer Team?\nHinweis: Eigene Beiträge können nicht gewählt werden.`,
+    prompt: `Welche ${count} Use Cases haben den größten Impact für euer Team?\nDie Top ${count} wandern in die Impact/Effort-Matrix. Nur Quick Wins nach der Matrix-Abstimmung kommen in die Next Steps.\nHinweis: Eigene Beiträge können nicht gewählt werden.`,
     isQuestionSlide: true,
     options: [],
     maxSelections: count,
@@ -1154,14 +1155,14 @@ function dualCombinedVote() {
   return tplSlide('mc_multi', {
     title: 'Gesamt-Priorisierung über beide SOPs',
     subtitle: `Wählt die Top ${n} KI Use Cases aus Internal und Consulting`,
-    prompt: `Welche ${n} Use Cases haben über beide SOPs hinweg den größten Hebel für ROOTS?\nHinweis: Eigene Beiträge können nicht gewählt werden.`,
+    prompt: `Welche ${n} Use Cases haben über beide SOPs hinweg den größten Hebel für ROOTS?\nDie Top ${n} → Matrix → nur Quick Wins → Next Steps.\nHinweis: Eigene Beiträge können nicht gewählt werden.`,
     isQuestionSlide: true,
     options: [],
     maxSelections: n,
     sopKind: SK.GROUP_VOTE,
     sopFairVote: true,
     ...dualBothGroupsFields(),
-    sopDualProgress: { mode: 'finale', label: 'Finale Priorisierung' },
+    sopDualProgress: { mode: 'finale', label: 'Gesamt-Priorisierung' },
   }, { showResultsLive: true, sopAllTracksVote: true, sopFairVote: true, sopVoteMax: n, workshopMode: 'decide' });
 }
 

@@ -784,7 +784,8 @@ function aggregateMatrixQuadrantItems(slide, quadrant = 'qw') {
   const itemMeta = {};
   items.forEach((it) => { itemMeta[it.id] = { text: it.text, phase: it.phase, trackLabel: it.trackLabel }; });
   const itemPlacements = {};
-  getVisibleResponses(slide.id).forEach((r) => {
+  const matrixResponses = getVisibleResponses(slide.id).filter((r) => r.response?.matrix && Object.keys(r.response.matrix).length);
+  matrixResponses.forEach((r) => {
     const m = r.response?.matrix || {};
     const meta = r.response?.meta || {};
     Object.entries(m).forEach(([itemId, q]) => {
@@ -810,6 +811,10 @@ function aggregateMatrixQuadrantItems(slide, quadrant = 'qw') {
       total: counts.qw + counts.sb + counts.ts + counts.dr,
     });
   });
+  // Live-Workshop: Quick Wins nur nach Team-Abstimmung — kein Host-Local-Fallback.
+  if (!result.length && slide?.settings?.sopAllTracksMatrix && State.session) {
+    return [];
+  }
   if (!result.length) {
     const placements = loadMatrixLocal(slide.id);
     items.filter((it) => placements[it.id] === quadrant).forEach((it) => {
@@ -817,6 +822,24 @@ function aggregateMatrixQuadrantItems(slide, quadrant = 'qw') {
     });
   }
   return result.sort((a, b) => (b.votes || 0) - (a.votes || 0) || String(a.text).localeCompare(String(b.text), 'de'));
+}
+
+function getNextStepsSlide() {
+  return (State.slides || []).find((s) => s.settings?.sopNextSteps || s.content?.sopKind === 'next-steps') || null;
+}
+
+function maybeRefreshQuickWinFromMatrixResponse(response) {
+  if (!response?.slide_id || !response.response?.matrix) return;
+  const matrixSlide = getMatrixSlide();
+  if (!matrixSlide || response.slide_id !== matrixSlide.id) return;
+  State._lastQuickWinSig = null;
+  const ns = getNextStepsSlide();
+  if (ns) broadcastQuickWinItems(ns);
+  const cur = currentSessionSlide();
+  if (cur && (cur.settings?.sopNextSteps || cur.content?.sopKind === 'next-steps')) {
+    try { syncParticipantNextStepsDom(); } catch {}
+    try { renderPresent(); } catch {}
+  }
 }
 
 function getQuickWinMatrixUseCases() {
@@ -849,7 +872,7 @@ function renderNextStepsActionLogHtml({ editable = false } = {}) {
   const participants = State.participants || [];
   if (!items.length) {
     return `<div class="ws-board ws-action-log">
-      <div class="present-wait-msg"><i class="fa-solid fa-table-cells-large"></i> Die Quick Wins aus der Impact/Effort-Matrix erscheinen hier, sobald Use Cases im Quick-Win-Quadrant liegen.</div>
+      <div class="present-wait-msg"><i class="fa-solid fa-table-cells-large"></i> Quick Wins aus der Matrix-Abstimmung erscheinen hier — nur Use Cases im Quick-Win-Quadrant (hoher Impact, niedriger Aufwand) landen in den Next Steps.</div>
     </div>`;
   }
   const filled = items.filter((it) => {
@@ -1191,7 +1214,7 @@ function maybeRefreshMatrixBroadcastFromVote(response) {
   if (!voteSlide || response.slide_id !== voteSlide.id) return;
   invalidateMatrixItemsCache();
   const matrixSlide = getMatrixSlide();
-  if (matrixSlide) broadcastMatrixItems(matrixSlide);
+  if (matrixSlide) broadcastMatrixItems(matrixSlide, { force: true });
 }
 
 function isSopVoteSlide(slide) {
@@ -2719,6 +2742,7 @@ function renderFinalVotePresentHtml(slide, visible) {
   const { voteCounts, totalVotes } = aggregateVoteResponses(slide, visible);
   const { votedCount, totalCount } = getCardVoteParticipation(slide);
   const partPct = totalCount ? Math.round((votedCount / totalCount) * 100) : 0;
+  const pipelineHint = `<div class="ws-vote-matrix-hint"><i class="fa-solid fa-route"></i> Top <strong>${topN}</strong> Use Cases → <strong>Matrix</strong> → nur <strong>Quick Wins</strong> → <strong>Next Steps</strong></div>`;
   const decorate = (items) => items
     .map((item) => ({ ...item, votes: voteCounts[`resp-${item.id}`] || 0 }))
     .sort((a, b) => b.votes - a.votes || String(a.text).localeCompare(String(b.text), 'de'));
@@ -2762,7 +2786,7 @@ function renderFinalVotePresentHtml(slide, visible) {
     return h;
   };
   // Konsolidierte Priorisierung — EINE Liste über beide SOPs, kein Split.
-  return `<div class="ws-board finale-vote">${head}${tableFor(decorate(allItems))}</div>`;
+  return `<div class="ws-board finale-vote">${pipelineHint}${head}${tableFor(decorate(allItems))}</div>`;
 }
 
 function renderTrackVotePresentHtml(slide, visible) {
@@ -3658,7 +3682,38 @@ function renderFinalePillHtml() {
 }
 
 function renderNextStepsPillHtml() {
-  return `<span class="ws-pill ws-pill--finale"><i class="fa-solid fa-list-check"></i> Next Steps · Actions</span>`;
+  return `<span class="ws-pill ws-pill--finale"><i class="fa-solid fa-list-check"></i> Next Steps · Quick Wins</span>`;
+}
+
+function getFinalePriorityCount() {
+  return Math.max(1, Number(getWorkshopSettings().finalPriorityCount) || 10);
+}
+
+/** Visueller Ablauf: Top N → Matrix → Quick Wins → Next Steps */
+function renderFinalePipelineBanner(slide) {
+  if (!slide || !isFinaleSlide(slide)) return '';
+  const n = getFinalePriorityCount();
+  const c = slide.content || {};
+  const st = slide.settings || {};
+  let label = '';
+  let trail = '';
+  if (st.sopAllTracksVote || c.sopKind === 'final-vote' || c.sopKind === 'group-vote') {
+    label = `Schritt 1 · Top ${n} priorisieren`;
+    trail = `<span class="ws-pipeline-node is-active">Top ${n}</span><span class="ws-pipeline-arrow" aria-hidden="true">→</span><span class="ws-pipeline-node">Matrix</span><span class="ws-pipeline-arrow" aria-hidden="true">→</span><span class="ws-pipeline-node">Quick Wins</span><span class="ws-pipeline-arrow" aria-hidden="true">→</span><span class="ws-pipeline-node">Next Steps</span>`;
+  } else if (st.sopAllTracksMatrix || c.sopKind === 'final-matrix' || slide.slide_type === 'priority_matrix') {
+    const items = getMatrixItems(slide);
+    const qw = getQuickWinMatrixUseCases().length;
+    const cnt = items.length || n;
+    label = `Schritt 2 · ${cnt} Use Cases einordnen`;
+    trail = `<span class="ws-pipeline-node is-done">Top ${n}</span><span class="ws-pipeline-arrow" aria-hidden="true">→</span><span class="ws-pipeline-node is-active">Matrix (${cnt})</span><span class="ws-pipeline-arrow" aria-hidden="true">→</span><span class="ws-pipeline-node${qw ? ' is-preview' : ''}">Quick Wins${qw ? ` (${qw})` : ''}</span><span class="ws-pipeline-arrow" aria-hidden="true">→</span><span class="ws-pipeline-node">Next Steps</span>`;
+  } else if (c.sopKind === 'next-steps' || st.sopNextSteps) {
+    const qw = getQuickWinMatrixUseCases().length;
+    label = qw ? `Schritt 3 · ${qw} Quick Win${qw === 1 ? '' : 's'} umsetzen` : 'Schritt 3 · Next Steps';
+    trail = `<span class="ws-pipeline-node is-done">Top ${n}</span><span class="ws-pipeline-arrow" aria-hidden="true">→</span><span class="ws-pipeline-node is-done">Matrix</span><span class="ws-pipeline-arrow" aria-hidden="true">→</span><span class="ws-pipeline-node is-active">Quick Wins (${qw})</span><span class="ws-pipeline-arrow" aria-hidden="true">→</span><span class="ws-pipeline-node is-active">Actions</span>`;
+  } else {
+    return '';
+  }
+  return `<div class="ws-finale-pipeline" role="status"><span class="ws-finale-pipeline-label">${label}</span><div class="ws-finale-pipeline-trail">${trail}</div></div>`;
 }
 
 function getWorkshopModePill(workshopMode) {
@@ -3743,8 +3798,13 @@ function getWsPresentChips(slide) {
     chips.push({ icon: 'fa-table-columns', label: 'Parallel' });
   }
   if (c.sopKind === 'next-steps' || slide?.settings?.sopNextSteps) {
-    chips.push({ icon: 'fa-list-check', label: 'Next Steps' });
-  } else   if (isFinaleSlide(slide) && !chips.length) {
+    chips.push({ icon: 'fa-rocket', label: 'Nur Quick Wins' });
+  } else if (slide?.settings?.sopAllTracksMatrix || c.sopKind === 'final-matrix') {
+    const cnt = getMatrixItems(slide).length || getFinalePriorityCount();
+    chips.push({ icon: 'fa-layer-group', label: `${cnt} aus Priorisierung` });
+  } else if (slide?.settings?.sopAllTracksVote || c.sopKind === 'final-vote' || c.sopKind === 'group-vote') {
+    chips.push({ icon: 'fa-arrow-right', label: `Top ${getFinalePriorityCount()} → Matrix` });
+  } else if (isFinaleSlide(slide) && !chips.length) {
     chips.push({ icon: 'fa-flag-checkered', label: 'Finale' });
   }
   if (slide?.slide_type === 'open' && slide?.settings?.anonymous && c.subtitle) {
@@ -3778,8 +3838,23 @@ function getWsPresentLead(slide) {
   if (c.sopKind === 'group-transition' || (slide.slide_type === 'section' && c.body && !c.subtitle)) {
     return String(c.body).trim();
   }
+  const st = slide.settings || {};
+  if (st.sopAllTracksVote || c.sopKind === 'final-vote' || c.sopKind === 'group-vote') {
+    const n = finalPriorityCount(slide);
+    return `Wählt gemeinsam die Top ${n} Use Cases. Diese ${n} wandern in die Impact/Effort-Matrix — nur Quick Wins nach der Team-Abstimmung kommen in die Next Steps.`;
+  }
+  if (st.sopAllTracksMatrix || c.sopKind === 'final-matrix' || slide.slide_type === 'priority_matrix') {
+    const n = getFinalMatrixItemCount(slide);
+    const cnt = getMatrixItems(slide).length || n;
+    return `Ordnet ${cnt} priorisierte Use Cases in die Matrix ein. Nach der Abstimmung fließen ausschließlich Quick Wins in die Next Steps.`;
+  }
+  if (c.sopKind === 'next-steps' || st.sopNextSteps) {
+    const qw = getQuickWinMatrixUseCases().length;
+    return qw
+      ? `${qw} Quick Win${qw === 1 ? '' : 's'} aus der Matrix — Verantwortliche, Deadlines und Actions festlegen.`
+      : 'Quick Wins aus der Matrix-Abstimmung erscheinen hier automatisch.';
+  }
   if (c.subtitle) return getPatchedWorkshopSubtitle(c.subtitle);
-  if (c.sopKind === 'next-steps' && c.body) return String(c.body).trim();
   if (shouldUseVoteWorkshopUi(slide) && c.prompt) {
     return String(c.prompt).split('\n').map((l) => l.trim()).filter(Boolean)[0] || '';
   }
@@ -3802,12 +3877,14 @@ function renderWsSubLead(text, { allowHtml = false } = {}) {
 
 function mountPresentWsSlide(stage, slide, slideIdx, { main = '', splitOn = false, title = null, lead = null } = {}) {
   const meta = getSlideShellMeta(slide);
+  const pipeline = renderFinalePipelineBanner(slide);
+  const mainBody = pipeline ? `${pipeline}${main}` : main;
   stage.innerHTML = wrapSlide(renderWsSlideShell({
     ...meta,
     title: title ?? getWsPresentTitle(slide),
     chips: getWsPresentChips(slide),
     lead: lead ?? getWsPresentLead(slide),
-    main,
+    main: mainBody,
   }), slideIdx);
   applyPresentStageLayout(stage, slide, { splitOn });
   updatePresentHeader();
@@ -6109,7 +6186,7 @@ function renderParticipantNextStepsHtml() {
   const items = getParticipantQuickWinItems();
   const actions = getNextStepActions();
   if (!items.length) {
-    return `<div class="participant-nextsteps-empty"><i class="fa-solid fa-table-cells-large"></i><p>Quick Wins aus der Matrix erscheinen hier, sobald der Host sie pflegt.</p></div>`;
+    return `<div class="participant-nextsteps-empty"><i class="fa-solid fa-rocket"></i><p>Nur Quick Wins aus der Matrix-Abstimmung erscheinen hier. Sobald das Team Use Cases im Quick-Win-Quadrant platziert hat, könnt ihr Actions festlegen.</p></div>`;
   }
   const statusLabel = (id) => NEXT_STEP_STATUSES.find((s) => s.id === id)?.label || 'Geplant';
   const cards = items.map((it, i) => {
@@ -7805,6 +7882,7 @@ const LP_DebugSim = {
     State.responses.push(response);
     try { maybeRefreshMatrixBroadcastFromVote(response); } catch {}
     try { maybeRefreshVoteBroadcastFromResponse(response); } catch {}
+    try { maybeRefreshQuickWinFromMatrixResponse(response); } catch {}
     try { if (response.participant_id) pushPresentActivity(response.participant_id); } catch {}
     try {
       const p = State.participants.find((x) => x.id === response.participant_id);
@@ -7846,6 +7924,7 @@ const LP_DebugSim = {
           State.responses.push(response);
           try { maybeRefreshMatrixBroadcastFromVote(response); } catch {}
           try { maybeRefreshVoteBroadcastFromResponse(response); } catch {}
+          try { maybeRefreshQuickWinFromMatrixResponse(response); } catch {}
         }
       });
     });
@@ -8448,6 +8527,7 @@ function subscribeSessionChannel() {
       liveDebugLog('ok', `${esc(p?.display_name || 'Teilnehmer')} → ${responseSummary(payload.new)} gespeichert`);
       maybeRefreshMatrixBroadcastFromVote(payload.new);
       maybeRefreshVoteBroadcastFromResponse(payload.new);
+      maybeRefreshQuickWinFromMatrixResponse(payload.new);
       renderPresent();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lp_responses', filter: `session_id=eq.${State.session.id}` }, (payload) => {
@@ -8458,6 +8538,7 @@ function subscribeSessionChannel() {
       liveDebugLog('info', `Antwort aktualisiert (${payload.new.is_hidden ? 'verborgen' : 'freigegeben'})`);
       maybeRefreshMatrixBroadcastFromVote(payload.new);
       maybeRefreshVoteBroadcastFromResponse(payload.new);
+      maybeRefreshQuickWinFromMatrixResponse(payload.new);
       renderPresent();
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lp_participants', filter: `session_id=eq.${State.session.id}` }, (payload) => {
@@ -10583,6 +10664,7 @@ async function submitResponse(response) {
     if (idx >= 0) State.responses[idx] = data;
     else State.responses.push(data);
     maybeRefreshMatrixBroadcastFromVote(data);
+    maybeRefreshQuickWinFromMatrixResponse(data);
   }
 
   const submittedCount = isCollectText ? countParticipantTextResponses(slide.id, State.participant?.id) : 0;
