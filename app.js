@@ -9935,7 +9935,7 @@ function renderParticipantMatrixHtml(slide) {
         const origin = [it.trackLabel, it.phase].filter(Boolean).join(' · ');
         return `<div class="lp-mxm-item" data-item-id="${esc(it.id)}">
           <div class="lp-mxm-text">${renderUseCaseDisplayHtml(it.text, 'collect')}${origin ? `<span class="lp-mxm-origin">${esc(origin)}</span>` : ''}</div>
-          <div class="lp-mxm-choices">${['qw', 'sb', 'ts', 'dr'].map((q) => `<button type="button" class="lp-mxm-btn lp-q-${q}${placements[it.id] === q ? ' is-active' : ''}" data-item="${esc(it.id)}" data-q="${q}" aria-label="${esc(quadrants[q].label)}" title="${esc(quadrants[q].label)}"><i class="fa-solid ${QICON[q] || 'fa-square'}"></i></button>`).join('')}</div>
+          <div class="lp-mxm-choices">${['qw', 'sb', 'ts', 'dr'].map((q) => `<button type="button" class="lp-mxm-btn lp-q-${q}${placements[it.id] === q ? ' is-active' : ''}" data-item="${esc(it.id)}" data-q="${q}" aria-label="${esc(quadrants[q].label)}" title="${esc(quadrants[q].label)}"><i class="fa-solid ${QICON[q] || 'fa-square'}"></i><span class="lp-mxm-btn-label">${esc(quadrants[q].label)}</span></button>`).join('')}</div>
         </div>`;
       }).join('')}
       ${ownItems.map((it) => {

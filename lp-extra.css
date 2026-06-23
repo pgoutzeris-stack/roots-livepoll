@@ -3254,18 +3254,30 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   padding:.25rem 0 .5rem;
 }
 .participant-matrix-intro-preview .lp-mx-frame{
-  width:100%;max-width:min(420px,100%);margin:0 auto;
+  width:100%;max-width:min(var(--participant-workshop-slide-max, 980px),100%);margin:0 auto;
 }
 
 /* Matrix-Priorisierung — mobile state of the art */
 .participant-matrix-block .lp-mx-wrap{
-  width:100%;max-width:min(480px,100%);margin:0 auto;
+  width:100%;max-width:min(var(--participant-workshop-slide-max, 980px),100%);margin:0 auto;
   padding:.15rem 0 .25rem;
 }
 .participant-matrix-block .lp-mx-mobile-hint{text-align:left}
 .participant-matrix-block .lp-mxm-item{text-align:left}
 .participant-matrix-block .lp-mxm-text{align-items:flex-start;text-align:left}
 .participant-matrix-block .matrix-fair-hint{text-align:left}
+.participant-matrix-block .lp-mxm-btn{
+  gap:.45rem;
+  justify-content:flex-start;
+  padding:.6rem .7rem;
+  font-size:.92rem;
+  font-weight:700;
+}
+.participant-matrix-block .lp-mxm-btn-label{
+  font-size:.76rem;
+  line-height:1.15;
+  text-align:left;
+}
 
 /* Next Steps — Karten statt Tabelle */
 .participant-nextsteps-block .ws-body,
@@ -3317,8 +3329,18 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .participant-matrix-block .lp-mx-wrap{
     max-width:100%;padding:0;
   }
-  .participant-matrix-block .lp-mxm-choices{gap:.35rem}
-  .participant-matrix-block .lp-mxm-btn{min-height:44px;height:44px;border-radius:10px}
+  .participant-matrix-block .lp-mxm-choices{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:.45rem;
+  }
+  .participant-matrix-block .lp-mxm-btn{
+    min-height:52px;height:auto;border-radius:12px;
+    justify-content:flex-start;
+    padding:.7rem .75rem;
+  }
+  .participant-matrix-block .lp-mxm-btn-label{
+    font-size:.78rem;
+  }
   .participant-matrix-block .lp-mx-actions{
     position:static;background:none;padding-top:.35rem;
   }
@@ -4016,6 +4038,42 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .lp-sop-workshop.participant-mode #screen-participant .participant-ws-slide-wrap .ws-slide,
   .lp-dual-sop-workshop.participant-mode #screen-participant .participant-ws-slide-wrap .ws-slide{
     max-width: min(var(--participant-workshop-slide-max, 960px), 100%);
+  }
+  .lp-sop-workshop.participant-mode #screen-participant .ws-lead,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .ws-lead,
+  .lp-sop-workshop.participant-mode #screen-participant .ws-sub-lead,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .ws-sub-lead,
+  .lp-sop-workshop.participant-mode #screen-participant .ws-body .sop-pslide-body,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .ws-body .sop-pslide-body,
+  .lp-sop-workshop.participant-mode #screen-participant .track-vote-grouped,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .track-vote-grouped,
+  .lp-sop-workshop.participant-mode #screen-participant .track-vote-results,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .track-vote-results,
+  .lp-sop-workshop.participant-mode #screen-participant .track-vote-present,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .track-vote-present,
+  .lp-sop-workshop.participant-mode #screen-participant .track-vote-sop-context,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .track-vote-sop-context,
+  .lp-sop-workshop.participant-mode #screen-participant .participant-matrix-intro-preview .lp-mx-frame,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .participant-matrix-intro-preview .lp-mx-frame,
+  .lp-sop-workshop.participant-mode #screen-participant .participant-matrix-block .lp-mx-wrap,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .participant-matrix-block .lp-mx-wrap{
+    width:100%;
+    max-width:100%;
+  }
+  .lp-sop-workshop.participant-mode #screen-participant .participant-matrix-block .lp-mx-quad-grid--chart,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .participant-matrix-block .lp-mx-quad-grid--chart{
+    min-height:min(54vh,520px);
+  }
+  .lp-sop-workshop.participant-mode #screen-participant .participant-matrix-block .lp-mx-cell,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .participant-matrix-block .lp-mx-cell{
+    min-height:145px;
+    padding:.7rem;
+  }
+  .lp-sop-workshop.participant-mode #screen-participant .participant-matrix-block .lp-mx-item,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .participant-matrix-block .lp-mx-item{
+    font-size:.78rem;
+    line-height:1.28;
+    padding:.4rem .55rem;
   }
   .participant-mode-decide .participant-card{ max-width: 620px; }
 }
