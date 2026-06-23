@@ -3945,3 +3945,9 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .participant-settings-done{width:100%;min-height:48px;margin-top:.25rem}
   body.participant-settings-open{overflow:hidden}
 }
+/* Desktop-Teilnehmeransicht: ruhige, einheitlich breite, mittig gesetzte Spalte */
+@media (min-width: 900px){
+  .lp-sop-workshop.participant-mode .participant-root{ padding: 1.75rem 1.5rem 2.5rem; }
+  #screen-participant .pslide-participant-slide,
+  .participant-mode-decide .participant-card{ max-width: 600px; }
+}
