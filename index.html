@@ -167,10 +167,13 @@
       <div class="present-code-label">Teilnahme-Code</div>
       <div id="present-code-text" class="present-code-text"></div>
       <img id="present-qr" class="present-qr-img" alt="QR Code" width="140" height="140" />
-      <button type="button" class="present-code-url" id="present-join-url" title="Link kopieren" aria-label="Teilnahme-Link kopieren">
-        <span class="present-code-url-text"></span>
-        <i class="fa-solid fa-copy present-code-url-ico" aria-hidden="true"></i>
-      </button>
+      <div class="present-join" id="present-join">
+        <button type="button" class="present-join-copy" id="present-join-url" title="Teilnahme-Link kopieren" aria-label="Teilnahme-Link kopieren">
+          <i class="fa-solid fa-copy" aria-hidden="true"></i>
+          <span class="present-join-copy-label">Link kopieren</span>
+        </button>
+        <span class="present-join-link" id="present-join-link-text" aria-hidden="true"></span>
+      </div>
     </div>
   </div>
   <div id="present-toolbar" class="present-toolbar hidden">
