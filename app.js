@@ -6394,8 +6394,10 @@ function fitPresentStage() {
   const cs = getComputedStyle(stage);
   const availW = stage.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0');
   const availH = stage.clientHeight - parseFloat(cs.paddingTop || '0') - parseFloat(cs.paddingBottom || '0');
-  const cw = content.offsetWidth;
-  const ch = content.offsetHeight;
+  // scrollWidth/Height = tatsächlicher Inhalt. offsetWidth/Height wäre auf die
+  // (flex-begrenzte) Bühnengröße geklemmt → Überlauf würde nie erkannt.
+  const cw = content.scrollWidth;
+  const ch = content.scrollHeight;
   if (cw <= 0 || ch <= 0 || availW <= 0 || availH <= 0) return;
   const scale = Math.min(1, availW / cw, availH / ch);
   // Erst ab spürbarem Überlauf skalieren; nie unter 0.5 (sonst unleserlich).
