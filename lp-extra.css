@@ -3551,7 +3551,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-sop-workshop.participant-mode .participant-ws-slide-wrap,
 .lp-sop-workshop.participant-mode .participant-ws-slide-wrap .ws-slide{
   width:100%;
-  max-width:min(640px,100%);
+  max-width:min(var(--participant-workshop-slide-max, 640px),100%);
   margin-left:auto;
   margin-right:auto;
   box-sizing:border-box;
@@ -3559,7 +3559,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-dual-sop-workshop.participant-mode .pslide-participant-content,
 .lp-dual-sop-workshop.participant-mode .participant-ws-slide-wrap,
 .lp-dual-sop-workshop.participant-mode .participant-ws-slide-wrap .ws-slide{
-  max-width:min(640px,100%);
+  max-width:min(var(--participant-workshop-slide-max, 640px),100%);
   width:100%;
 }
 .lp-sop-workshop.participant-mode .workshop-collect-shell--participant,
@@ -3997,7 +3997,25 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
    ruhige Gruppe (statt links angeschlagen mit großer Lücke). */
 @media (min-width: 900px){
   .lp-sop-workshop.participant-mode .participant-main-wrap{ justify-content: center; gap: 1.75rem; }
-  .lp-sop-workshop.participant-mode .participant-root{ flex: 0 1 640px; min-width: 0; padding: 1.75rem 1.25rem 2.5rem; }
-  #screen-participant .pslide-participant-slide,
+  .lp-sop-workshop.participant-mode .participant-root,
+  .lp-dual-sop-workshop.participant-mode .participant-root{
+    --participant-workshop-slide-max: 960px;
+    flex: 1 1 960px;
+    max-width: min(960px, 100%);
+    min-width: 0;
+    padding: 1.75rem 1.25rem 2.5rem;
+  }
+  .lp-sop-workshop.participant-mode #screen-participant .pslide-participant-slide,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .pslide-participant-slide,
+  .lp-sop-workshop.participant-mode #screen-participant .participant-progress-card,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .participant-progress-card,
+  .lp-sop-workshop.participant-mode #screen-participant .participant-card-pslide,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .participant-card-pslide,
+  .lp-sop-workshop.participant-mode #screen-participant .participant-ws-slide-wrap,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .participant-ws-slide-wrap,
+  .lp-sop-workshop.participant-mode #screen-participant .participant-ws-slide-wrap .ws-slide,
+  .lp-dual-sop-workshop.participant-mode #screen-participant .participant-ws-slide-wrap .ws-slide{
+    max-width: min(var(--participant-workshop-slide-max, 960px), 100%);
+  }
   .participant-mode-decide .participant-card{ max-width: 620px; }
 }
