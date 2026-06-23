@@ -686,6 +686,35 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   }
 }
 
+/* ─── Desktop-Teilnehmeransicht: Breite sinnvoll nutzen ───────────────────────
+   Vorher: SOP-Panel (280px) ganz links + Inhaltsspalte nur 560px, die mit ~300px
+   Leerraum je Seite rechts-der-Mitte floatete → Breite ungenutzt, unbalanciert.
+   Jetzt: Panel + breitere Inhaltsspalte als EINE zentrierte Gruppe. */
+@media(min-width:901px){
+  .lp-sop-workshop.participant-mode .participant-main-wrap{
+    justify-content:center;
+    gap:1.75rem;
+    padding:0 1.5rem;
+  }
+  .lp-sop-workshop.participant-mode #participant-root.participant-root{
+    flex:0 1 820px;          /* nicht mehr greedy (flex:1) → kein toter Seitenraum */
+    align-items:stretch;
+  }
+  .lp-sop-workshop.participant-mode .workshop-slide-sop{
+    align-self:flex-start;   /* Panel oben bündig, border-left als Trenner */
+    border-left:none;
+    border-right:1px solid var(--line);
+  }
+  /* Inhaltsspalte auf Desktop deutlich breiter (war 560/640px) */
+  #screen-participant .pslide-participant-slide,
+  #screen-participant .participant-card,
+  #screen-participant .participant-card-pslide,
+  #screen-participant .participant-workshop-header,
+  #screen-participant .workshop-collect-shell{
+    max-width:760px;
+  }
+}
+
 /* ─── Workshop Instructions Slide (content type) ─────────────── */
 .workshop-instructions-card{
   max-width:none;
