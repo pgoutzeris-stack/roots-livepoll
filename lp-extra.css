@@ -440,6 +440,34 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-debug-body{display:flex;flex-direction:column;gap:.55rem;padding:.75rem .8rem;transition:max-height .25s ease,opacity .2s ease,padding .2s ease;max-height:500px;overflow:hidden}
 .lp-debug-row{display:flex;align-items:center;gap:.4rem;font-size:.74rem;color:var(--muted,#64748b)}
 .lp-debug-row strong{color:var(--ink,#0f172a);font-weight:700}
+.lp-debug-row--pcount,.lp-debug-row--speed{justify-content:space-between;gap:.55rem}
+.lp-dbg-pcount-pills,.lp-debug-speed-pills{display:inline-flex;align-items:center;gap:2px;padding:2px;background:var(--surface,#f8fafc);border:1px solid var(--line,#e2e8f0);border-radius:999px}
+.lp-dbg-pcount-btn,.lp-debug-speed-btn{
+  border:none;background:transparent;color:var(--muted,#64748b);
+  min-width:28px;height:28px;padding:0 .45rem;border-radius:999px;
+  font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;
+  transition:background .15s,color .15s,box-shadow .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.lp-dbg-pcount-btn:hover,.lp-debug-speed-btn:hover{background:rgba(147,51,234,.08);color:#9333ea}
+.lp-dbg-pcount-val{
+  min-width:1.65rem;text-align:center;font-size:.78rem;font-weight:800;color:var(--ink,#0f172a);
+  font-variant-numeric:tabular-nums;padding:0 .15rem;
+}
+.lp-debug-speed-btn.active,.lp-dbg-pcount-btn:active{background:#9333ea;color:#fff}
+.lp-debug-speed-btn.active{background:#9333ea;color:#fff;box-shadow:0 1px 4px rgba(147,51,234,.35)}
+.lp-debug-actions{display:flex;gap:.4rem;margin-top:.15rem}
+.lp-debug-action-btn{
+  flex:1;min-height:34px;border-radius:999px;border:1px solid var(--line,#e2e8f0);
+  background:var(--surface,#f8fafc);color:var(--ink,#0f172a);
+  font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;
+  display:inline-flex;align-items:center;justify-content:center;gap:.35rem;
+  transition:all .15s;
+}
+.lp-debug-action-btn--flush{border-color:#bfdbfe;background:var(--brand-light,#eff6ff);color:var(--brand,#206efb)}
+.lp-debug-action-btn--flush:hover{background:#dbeafe}
+.lp-debug-action-btn--reset{border-color:#fca5a5;background:#fef2f2;color:#dc2626}
+.lp-debug-action-btn--reset:hover{background:#fee2e2}
 .lp-debug-btn-grp{display:flex;gap:5px;flex-wrap:wrap}
 .lp-debug-btn{background:var(--surface,#f8fafc);color:var(--ink,#0f172a);border:1px solid var(--line,#e2e8f0);border-radius:8px;padding:5px 11px;font-size:.72rem;cursor:pointer;font-weight:600;transition:all .15s;font-family:inherit}
 .lp-debug-btn:hover{border-color:#a855f7;color:#9333ea;background:#faf5ff}

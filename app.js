@@ -424,7 +424,7 @@ function syncWorkshopFinalCountToSlides(count) {
 // Aktive simulierte Teilnehmer = erste N aus dem Pool (N = LP_SIM_PARTICIPANT_COUNT).
 function simParticipantDefs() {
   const all = window.LP_DEBUG_PARTICIPANTS || [];
-  const n = Math.max(1, Math.min(all.length, Number(window.LP_SIM_PARTICIPANT_COUNT) || all.length));
+  const n = Math.max(1, Math.min(all.length, Number(window.LP_SIM_PARTICIPANT_COUNT) || 6));
   return all.slice(0, n);
 }
 
@@ -7375,6 +7375,43 @@ function pickUniqueSimUseCases(slide, usedKeys, globalPool, targetCount, context
   return chosen;
 }
 
+// Parallel-SOP: sichtbare dual-pair-collect-Anker haben versteckte Brainstorm-Buckets
+// (sopDualHiddenNav). Deren Antworten müssen mitdrippen, sobald der Anker erreicht ist.
+function getHiddenCollectSlidesForAnchor(anchorSlide) {
+  if (anchorSlide?.content?.sopKind !== 'dual-pair-collect') return [];
+  const pairIdx = anchorSlide.content.sopDualPairIndex ?? 0;
+  const linked = [];
+  for (const group of ['internal', 'consulting']) {
+    const bs = brainstormSlideForDualPair(group, pairIdx);
+    if (bs && !linked.some((s) => s.id === bs.id)) linked.push(bs);
+  }
+  return linked;
+}
+
+function getSimCollectSlidesToFlush(throughIndex) {
+  const slides = State.slides || [];
+  const end = Math.max(0, Math.min(throughIndex, slides.length - 1));
+  const seen = new Map();
+  for (let i = 0; i <= end; i++) {
+    const s = slides[i];
+    if (!s) continue;
+    seen.set(s.id, s);
+    if (s.content?.sopKind === 'dual-pair-collect') {
+      getHiddenCollectSlidesForAnchor(s).forEach((hs) => seen.set(hs.id, hs));
+    }
+  }
+  return [...seen.values()].filter((s) => (
+    ['brainstorm', 'open', 'wordcloud'].includes(s.slide_type)
+    && s.content?.sopKind !== 'dual-pair-collect'
+  ));
+}
+
+function simDebugResponseIds() {
+  return new Set(
+    (State.responses || []).filter((r) => String(r.id).startsWith('debug-r-')).map((r) => r.id),
+  );
+}
+
 const LP_DebugSim = {
   active: false,
   joinIdx: 0,
@@ -7448,7 +7485,7 @@ const LP_DebugSim = {
     this.joinIdx++;
     if (this.joinIdx < defs.length) {
       const next = 700 + Math.random() * 1300; // 0.7–2.0s
-      this.joinTimer = setTimeout(() => this.dripNextParticipant(), next / this.speed);
+      this.schedule(() => this.dripNextParticipant(), next);
     }
   },
 
@@ -7699,10 +7736,13 @@ const LP_DebugSim = {
     const queue = this.responsesBySlide.get(slide.id);
     if (!queue?.length) return;
     this.triggeredSlides.add(slide.id);
-    const step = Math.max(12, 50 / this.speed);
-    queue.forEach((item, i) => {
-      if (!item.response) return;
-      this.schedule(() => this.pushResponse(item.response), i * step);
+    const doneIds = simDebugResponseIds();
+    const step = Math.max(6, 50 / this.speed);
+    let schedIdx = 0;
+    queue.forEach((item) => {
+      if (!item.response || doneIds.has(item.response.id)) return;
+      this.schedule(() => this.pushResponse(item.response), schedIdx * step);
+      schedIdx += 1;
     });
   },
 
@@ -7711,11 +7751,16 @@ const LP_DebugSim = {
     const queue = this.responsesBySlide.get(slide.id);
     if (!queue?.length) return baseOffset;
     this.triggeredSlides.add(slide.id);
+    const doneIds = simDebugResponseIds();
     let maxEnd = baseOffset;
-    queue.forEach((item, i) => {
-      const when = baseOffset + (item.delayMs != null ? item.delayMs : i * 220);
+    let schedIdx = 0;
+    queue.forEach((item) => {
+      const resp = item.response || this.resolveQueueItemResponse(item, slide);
+      if (!resp || doneIds.has(resp.id)) return;
+      const when = baseOffset + (item.delayMs != null ? item.delayMs : schedIdx * 220);
       maxEnd = Math.max(maxEnd, when);
       this.schedule(() => this.ensureParticipantAndPush(item, slide), when);
+      schedIdx += 1;
     });
     return maxEnd + Math.max(80, 250 / this.speed);
   },
@@ -7725,13 +7770,15 @@ const LP_DebugSim = {
     const end = Math.max(0, Math.min(index, State.slides.length - 1));
     const seen = [];
     for (let i = 0; i <= end; i++) seen.push(State.slides[i]);
-    const isCollect = (s) => ['brainstorm', 'open', 'wordcloud'].includes(s.slide_type);
+    const isCollect = (s) => ['brainstorm', 'open', 'wordcloud'].includes(s.slide_type)
+      && s.content?.sopKind !== 'dual-pair-collect';
     const isVote = (s) => Boolean(
       s.settings?.sopAllTracksVote || s.settings?.sopTrackVote || s.settings?.sopPhaseVote
       || s.settings?.sopCardVote || s.settings?.brainstormVote
     );
     const isMatrix = (s) => Boolean(s.settings?.sopAllTracksMatrix || s.slide_type === 'priority_matrix');
-    seen.filter(isCollect).forEach((slide) => this.flushCollectSlide(slide));
+    // Collect inkl. versteckter Parallel-Buckets (dual-pair-collect → hidden brainstorm)
+    getSimCollectSlidesToFlush(end).forEach((slide) => this.flushCollectSlide(slide));
     let offset = Math.max(40, 120 / this.speed);
     const dripWaves = [
       seen.filter(isVote),
@@ -7771,11 +7818,10 @@ const LP_DebugSim = {
     this.speed = Math.max(0.25, Math.min(10, Number(s) || 1));
     console.info(`[DebugSim] Speed = ${this.speed}x`);
     if (!this.active) return;
+    if (this.joinTimer) { clearTimeout(this.joinTimer); this.joinTimer = null; }
     this.pendingTimers.forEach((t) => clearTimeout(t));
     this.pendingTimers = [];
-    const doneIds = new Set(
-      (State.responses || []).filter((r) => String(r.id).startsWith('debug-r-')).map((r) => r.id)
-    );
+    const doneIds = simDebugResponseIds();
     this.triggeredSlides = new Set();
     this.responsesBySlide.forEach((queue, slideId) => {
       const slide = State.slides.find((sl) => sl.id === slideId);
@@ -7809,6 +7855,7 @@ const LP_DebugSim = {
     this.joinIdx = defs.length;
     if (this.joinTimer) { clearTimeout(this.joinTimer); this.joinTimer = null; }
     try { renderPresentParticipants(); updatePresentStats(); renderPresent(); } catch {}
+    State._lastVoteSig = null;
     const matrixSlide = getMatrixSlide();
     if (matrixSlide) broadcastMatrixItems(matrixSlide);
     const curVoteSlide = currentSessionSlide();
@@ -7834,21 +7881,26 @@ function ensureDebugPanel() {
     <div class="lp-debug-body">
       <div class="lp-debug-row"><span>Status:</span><strong id="lp-dbg-status">aktiv</strong></div>
       <div class="lp-debug-row"><span>Teilnehmer:</span><strong id="lp-dbg-participants">0</strong></div>
-      <div class="lp-debug-row" style="gap:.4rem"><span>Sim-Anzahl:</span>
-        <input id="lp-dbg-pcount" type="number" min="1" max="${(window.LP_DEBUG_PARTICIPANTS || []).length || 12}" value="${Math.max(1, Math.min((window.LP_DEBUG_PARTICIPANTS || []).length || 12, Number(window.LP_SIM_PARTICIPANT_COUNT) || 6))}" style="width:3.4rem" />
-      </div>
-      <div class="lp-debug-row"><span>Antworten:</span><strong id="lp-dbg-responses">0</strong></div>
-      <div class="lp-debug-row" style="gap:.4rem"><span>Speed:</span>
-        <div class="lp-debug-btn-grp">
-          <button class="lp-debug-btn" data-speed="0.5">0.5x</button>
-          <button class="lp-debug-btn active" data-speed="1">1x</button>
-          <button class="lp-debug-btn" data-speed="2">2x</button>
-          <button class="lp-debug-btn" data-speed="5">5x</button>
+      <div class="lp-debug-row lp-debug-row--pcount">
+        <span>Sim-Anzahl:</span>
+        <div class="lp-dbg-pcount-pills" role="group" aria-label="Simulierte Teilnehmer">
+          <button type="button" class="lp-dbg-pcount-btn" id="lp-dbg-pcount-dec" aria-label="Weniger Teilnehmer">−</button>
+          <span class="lp-dbg-pcount-val" id="lp-dbg-pcount-val">${Math.max(1, Math.min((window.LP_DEBUG_PARTICIPANTS || []).length || 12, Number(window.LP_SIM_PARTICIPANT_COUNT) || 6))}</span>
+          <button type="button" class="lp-dbg-pcount-btn" id="lp-dbg-pcount-inc" aria-label="Mehr Teilnehmer">+</button>
         </div>
       </div>
-      <div class="lp-debug-btn-grp">
-        <button class="lp-debug-btn warn" id="lp-dbg-flush">⚡ Alles sofort</button>
-        <button class="lp-debug-btn danger" id="lp-dbg-reset">Reset</button>
+      <div class="lp-debug-row"><span>Antworten:</span><strong id="lp-dbg-responses">0</strong></div>
+      <div class="lp-debug-row lp-debug-row--speed"><span>Speed:</span>
+        <div class="lp-debug-speed-pills">
+          <button type="button" class="lp-debug-speed-btn" data-speed="0.5">0.5×</button>
+          <button type="button" class="lp-debug-speed-btn active" data-speed="1">1×</button>
+          <button type="button" class="lp-debug-speed-btn" data-speed="2">2×</button>
+          <button type="button" class="lp-debug-speed-btn" data-speed="5">5×</button>
+        </div>
+      </div>
+      <div class="lp-debug-actions">
+        <button type="button" class="lp-debug-action-btn lp-debug-action-btn--flush" id="lp-dbg-flush"><i class="fa-solid fa-bolt"></i> Alles sofort</button>
+        <button type="button" class="lp-debug-action-btn lp-debug-action-btn--reset" id="lp-dbg-reset">Reset</button>
       </div>
       <div class="lp-debug-status" id="lp-dbg-current">Slide: 1</div>
     </div>
@@ -7862,18 +7914,23 @@ function ensureDebugPanel() {
   });
   panel.querySelector('#lp-dbg-flush').onclick = () => LP_DebugSim.flushAll();
   panel.querySelector('#lp-dbg-reset').onclick = () => window.LP_resetDebug?.();
-  // Sim-Teilnehmerzahl live ändern → Simulation neu starten (sauberer Reset).
-  const pCountEl = panel.querySelector('#lp-dbg-pcount');
-  if (pCountEl) {
-    pCountEl.onchange = () => {
-      const max = (window.LP_DEBUG_PARTICIPANTS || []).length || 12;
-      const n = Math.max(1, Math.min(max, Number(pCountEl.value) || 6));
-      pCountEl.value = n;
-      window.LP_SIM_PARTICIPANT_COUNT = n;
-      window.LP_resetDebug?.();
-      window.LP_seedDebug?.();
-    };
-  }
+  const applySimParticipantCount = (n) => {
+    const max = (window.LP_DEBUG_PARTICIPANTS || []).length || 12;
+    const val = Math.max(1, Math.min(max, n));
+    window.LP_SIM_PARTICIPANT_COUNT = val;
+    const valEl = panel.querySelector('#lp-dbg-pcount-val');
+    if (valEl) valEl.textContent = String(val);
+    return val;
+  };
+  const bumpSimParticipantCount = (delta) => {
+    const cur = Number(window.LP_SIM_PARTICIPANT_COUNT) || 6;
+    applySimParticipantCount(cur + delta);
+    window.LP_resetDebug?.();
+    window.LP_seedDebug?.();
+  };
+  panel.querySelector('#lp-dbg-pcount-dec')?.addEventListener('click', () => bumpSimParticipantCount(-1));
+  panel.querySelector('#lp-dbg-pcount-inc')?.addEventListener('click', () => bumpSimParticipantCount(1));
+  applySimParticipantCount(Number(window.LP_SIM_PARTICIPANT_COUNT) || 6);
   // Collapse-Toggle: speichert Status in localStorage
   const applyCollapse = (collapsed) => {
     panel.classList.toggle('collapsed', collapsed);
@@ -7956,6 +8013,7 @@ function seedDebugSession() {
     return;
   }
   State._debugSeeded = true;
+  window.LP_SIM_PARTICIPANT_COUNT = Number(window.LP_SIM_PARTICIPANT_COUNT) || 6;
   ensureDebugPanel();
   LP_DebugSim.start();
 }
@@ -8220,6 +8278,16 @@ function maybeRefreshVoteBroadcastFromResponse(response) {
   if (!response) return;
   const cur = currentSessionSlide();
   if (cur && isVoteBroadcastSlide(cur)) broadcastVoteOptions(cur);
+  // Collect-Antworten füttern spätere Vote-Folien — Broadcast neu anstoßen.
+  const src = State.slides?.find((s) => s.id === response.slide_id);
+  if (src?.slide_type === 'brainstorm' && cur && (
+    isVoteBroadcastSlide(cur)
+    || cur.settings?.sopAllTracksResults
+    || cur.content?.sopAllTracksResults
+  )) {
+    State._lastVoteSig = null;
+    if (isVoteBroadcastSlide(cur)) broadcastVoteOptions(cur);
+  }
 }
 
 function broadcastSessionPatch(patch) {
