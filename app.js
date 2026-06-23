@@ -303,7 +303,7 @@ function getWorkshopSettings() {
     brainstormTimeLimitSec: presWs.brainstormTimeLimitSec ?? global.brainstormTimeLimitSec ?? 300,
     brainstormMaxResponses: presWs.brainstormMaxResponses ?? global.brainstormMaxResponses ?? 2,
     trackVoteCount: presWs.trackVoteCount ?? global.trackVoteCount ?? 3,
-    finalPriorityCount: presWs.finalPriorityCount ?? global.finalPriorityCount ?? 10,
+    finalPriorityCount: presWs.finalPriorityCount ?? global.finalPriorityCount ?? 5,
     pitchTimerSec: presWs.pitchTimerSec ?? global.pitchTimerSec ?? 120,
   };
 }
@@ -381,7 +381,10 @@ function syncWorkshopSettingsToSlides({ finalPriorityCount, trackVoteCount, pitc
       st.sopVoteMax = fin;
       c.maxSelections = fin;
       if (c.subtitle && /Top \d+/i.test(String(c.subtitle))) c.subtitle = String(c.subtitle).replace(/Top \d+/i, `Top ${fin}`);
+      if (c.subtitle && /Genau \d+ Use Cases/i.test(String(c.subtitle))) c.subtitle = String(c.subtitle).replace(/Genau \d+ Use Cases/i, `Genau ${fin} Use Cases`);
       if (c.prompt && /Welche \d+ Use Cases/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/Welche \d+ Use Cases/i, `Welche ${fin} Use Cases`);
+      if (c.prompt && /genau \d+ fremde Use Cases/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/genau \d+ fremde Use Cases/i, `genau ${fin} fremde Use Cases`);
+      if (c.prompt && /Die \d+ meistgewählten/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/Die \d+ meistgewählten/i, `Die ${fin} meistgewählten`);
       mark(s);
     }
     // Matrix
@@ -1010,7 +1013,7 @@ function getVoteSlideScope(slide) {
 function finalPriorityCount(slide) {
   const st = slide?.settings || {};
   const ws = getWorkshopSettings();
-  return Number(st.sopVoteMax || st.sopFinalCount || ws.finalPriorityCount || 10);
+  return Number(st.sopVoteMax || st.sopFinalCount || ws.finalPriorityCount || 5);
 }
 
 // ─── Finale Priorisierung & Matrix: strikte Integrität ───────────────────────
@@ -1021,7 +1024,7 @@ function getFinalAllTracksVoteSlide() {
 function getFinalMatrixItemCount(matrixSlide) {
   const voteSlide = getFinalAllTracksVoteSlide();
   if (voteSlide) return finalPriorityCount(voteSlide);
-  return Number(matrixSlide?.settings?.sopMatrixCount || getWorkshopSettings().finalPriorityCount || 10);
+  return Number(matrixSlide?.settings?.sopMatrixCount || getWorkshopSettings().finalPriorityCount || 5);
 }
 
 function getAllTracksVoteOptionMap() {
@@ -1073,7 +1076,7 @@ function computeFinalVoteTotals(voteSlide) {
 }
 
 function resolveFinalPriorityTopN(count, { allowTrackFallback = false } = {}) {
-  const n = Math.max(1, Number(count) || getWorkshopSettings().finalPriorityCount || 10);
+  const n = Math.max(1, Number(count) || getWorkshopSettings().finalPriorityCount || 5);
   const voteSlide = getFinalAllTracksVoteSlide();
   if (voteSlide) {
     const { totals, votes, itemByVoteId } = computeFinalVoteTotals(voteSlide);
@@ -1169,8 +1172,17 @@ function validateVoteValues(slide, values) {
   if (!scope) return { ok: true, values: values || [] };
   const vals = Array.isArray(values) ? values.filter(Boolean) : [];
   const max = scope.maxSelections || 3;
-  if (!vals.length) return { ok: false, error: 'Mindestens 1 Use Case wählen' };
-  if (vals.length > max) return { ok: false, error: `Maximal ${max} Use Cases` };
+  const exactFinalVote = scope.kind === 'all-tracks';
+  if (exactFinalVote) {
+    if (vals.length !== max) {
+      return { ok: false, error: vals.length < max
+        ? `Bitte genau ${max} Use Cases wählen (${vals.length}/${max}) — keine eigenen Beiträge`
+        : `Maximal ${max} Use Cases — bitte genau ${max} wählen` };
+    }
+  } else {
+    if (!vals.length) return { ok: false, error: 'Mindestens 1 Use Case wählen' };
+    if (vals.length > max) return { ok: false, error: `Maximal ${max} Use Cases` };
+  }
   const validIds = scope.kind === 'all-tracks'
     ? getAllTracksVoteOptionIds(slide)
     : new Set(getVoteOptions(slide).map((o) => o.id).filter((id) => id !== 'none'));
@@ -2742,7 +2754,7 @@ function renderFinalVotePresentHtml(slide, visible) {
   const { voteCounts, totalVotes } = aggregateVoteResponses(slide, visible);
   const { votedCount, totalCount } = getCardVoteParticipation(slide);
   const partPct = totalCount ? Math.round((votedCount / totalCount) * 100) : 0;
-  const pipelineHint = `<div class="ws-vote-matrix-hint"><i class="fa-solid fa-route"></i> Top <strong>${topN}</strong> Use Cases → <strong>Matrix</strong> → nur <strong>Quick Wins</strong> → <strong>Next Steps</strong></div>`;
+  const pipelineHint = `<div class="ws-vote-matrix-hint"><i class="fa-solid fa-route"></i> Jede Person wählt <strong>genau ${topN}</strong> fremde Use Cases → Top <strong>${topN}</strong> gesamt → <strong>Matrix</strong> → <strong>Quick Wins</strong> → <strong>Next Steps</strong></div>`;
   const decorate = (items) => items
     .map((item) => ({ ...item, votes: voteCounts[`resp-${item.id}`] || 0 }))
     .sort((a, b) => b.votes - a.votes || String(a.text).localeCompare(String(b.text), 'de'));
@@ -3644,12 +3656,12 @@ function renderParticipantTrackVoteHtml(slide) {
   if (scope?.kind === 'all-tracks') {
     const fairVote = !!slide.settings?.sopFairVote;
     const hint = fairVote
-      ? `Wähle deine <strong>Top ${max} Use Cases</strong> aus allen Tracks · eigene Beiträge sind ausgeschlossen.`
-      : `Wähle <strong>Top ${max} Use Cases</strong> aus allen Tracks.`;
+      ? `Wähle <strong>genau ${max} fremde Use Cases</strong> aus allen Tracks — eigene Beiträge sind ausgeschlossen. Absenden erst möglich bei ${max}/${max}.`
+      : `Wähle <strong>genau ${max} Use Cases</strong> aus allen Tracks. Absenden erst möglich bei ${max}/${max}.`;
     return `<p class="vote-mode-hint">${hint}</p>
       ${renderTrackVoteGroupedListHtml(slide, { selectable: true, fairVote, hideGroupHeaders: true })}
       <div id="fav-counter" class="top3-counter" role="status" aria-live="polite">0 / ${max} gewählt</div>
-      <button type="button" class="btn-primary participant-submit" id="submit-favorites">Priorisierung senden</button>`;
+      <button type="button" class="btn-primary participant-submit" id="submit-favorites" disabled>Priorisierung senden (${max}/${max})</button>`;
   }
   return `<p class="vote-mode-hint">Wähle <strong>maximal ${max} Lieblings-Use-Cases</strong> aus dem Brainstorming.</p>
     ${renderTrackVoteGroupedListHtml(slide, { selectable: true, fairVote: !!slide.settings?.sopFairVote })}
@@ -3686,7 +3698,7 @@ function renderNextStepsPillHtml() {
 }
 
 function getFinalePriorityCount() {
-  return Math.max(1, Number(getWorkshopSettings().finalPriorityCount) || 10);
+  return Math.max(1, Number(getWorkshopSettings().finalPriorityCount) || 5);
 }
 
 /** Visueller Ablauf: Top N → Matrix → Quick Wins → Next Steps */
@@ -3841,7 +3853,7 @@ function getWsPresentLead(slide) {
   const st = slide.settings || {};
   if (st.sopAllTracksVote || c.sopKind === 'final-vote' || c.sopKind === 'group-vote') {
     const n = finalPriorityCount(slide);
-    return `Wählt gemeinsam die Top ${n} Use Cases. Diese ${n} wandern in die Impact/Effort-Matrix — nur Quick Wins nach der Team-Abstimmung kommen in die Next Steps.`;
+    return `Jede Person wählt verbindlich genau ${n} fremde Use Cases. Die ${n} meistgewählten landen in der Impact/Effort-Matrix — nur Quick Wins nach der Team-Abstimmung kommen in die Next Steps.`;
   }
   if (st.sopAllTracksMatrix || c.sopKind === 'final-matrix' || slide.slide_type === 'priority_matrix') {
     const n = getFinalMatrixItemCount(slide);
@@ -6742,7 +6754,7 @@ function renderEditorProps() {
       const voteMaxLabel = isAllTracks
         ? 'Anzahl Top Use Cases (→ Matrix)'
         : 'Max. Auswahl pro Person';
-      const wsFinal = getWorkshopSettings().finalPriorityCount || 10;
+      const wsFinal = getWorkshopSettings().finalPriorityCount || 5;
       optionsHtml = `
       <div class="props-section">Antwortoptionen · importiert</div>
       <p class="props-hint"><i class="fa-solid fa-link"></i> Auswahloptionen werden automatisch aus den Brainstorming-Folien ${scopeLabel} übernommen. Mit <strong>„Live-Ergebnisse"</strong> erscheint nach dem Ausfüllen das Leaderboard.</p>
@@ -6806,7 +6818,7 @@ function renderEditorProps() {
     const manualText = (c.manualItems || []).map((t) => (typeof t === 'string' ? t : (t.text || ''))).join('\n');
     const q = (k, fb) => esc((c.quadrants && c.quadrants[k] && c.quadrants[k].label) || fb);
     const hasFinalVote = (State.slides || []).some((sl) => sl.settings?.sopAllTracksVote);
-    const mxCount = s.sopMatrixCount || getWorkshopSettings().finalPriorityCount || 10;
+    const mxCount = s.sopMatrixCount || getWorkshopSettings().finalPriorityCount || 5;
     matrixPropsHtml = `
     <div class="props-section">Priorisierungs-Matrix</div>
     ${isSopMatrix ? `
@@ -6857,9 +6869,9 @@ function renderEditorProps() {
     workshopSettingsHtml = `
     <div class="props-section">Workshop-Einstellungen</div>
     <p class="props-hint" style="margin-top:0">Gilt für finale Priorisierung, Impact/Effort-Matrix und Next Steps dieser Vorlage.</p>
-    <div class="props-label">Use Cases in finale Priorisierung & Matrix</div>
-    <input id="prop-ws-final-count" type="number" min="1" max="30" value="${ws.finalPriorityCount || 10}" />
-    <p class="props-hint"><i class="fa-solid fa-circle-info"></i> So viele Use Cases werden am Ende priorisiert und in die Matrix übernommen. Aus der Matrix gehen nur Quick Wins in die Next Steps.</p>
+    <div class="props-label">Pflicht-Stimmen Gesamt-Priorisierung & Matrix-Größe</div>
+    <input id="prop-ws-final-count" type="number" min="1" max="30" value="${ws.finalPriorityCount || 5}" />
+    <p class="props-hint"><i class="fa-solid fa-circle-info"></i> Jede Person muss genau so viele fremde Use Cases wählen. Die Top N nach Stimmenzahl landen in der Matrix. Aus der Matrix gehen nur Quick Wins in die Next Steps.</p>
     <div class="props-row-2">
       <div><div class="props-label">Top N je Track (Zwischen-Vote)</div><input id="prop-ws-track-count" type="number" min="1" max="15" value="${ws.trackVoteCount || 3}" /></div>
       <div><div class="props-label">Pitch-Timer (Sek.)</div><input id="prop-ws-pitch-sec" type="number" min="15" max="600" step="15" value="${ws.pitchTimerSec || 120}" /></div>
@@ -6935,7 +6947,7 @@ function renderEditorProps() {
     };
     // ── Priorisierungs-Matrix-Felder ──
     if (slideObj.slide_type === 'priority_matrix') {
-      if ($('#prop-mx-count')) slideObj.settings.sopMatrixCount = Number($('#prop-mx-count').value || getWorkshopSettings().finalPriorityCount || 10);
+      if ($('#prop-mx-count')) slideObj.settings.sopMatrixCount = Number($('#prop-mx-count').value || getWorkshopSettings().finalPriorityCount || 5);
       if ($('#prop-mx-source')) slideObj.content.matrixSource = $('#prop-mx-source').value;
       if ($('#prop-mx-srcid')) slideObj.content.brainstormSourceId = $('#prop-mx-srcid').value || null;
       if ($('#prop-mx-items')) {
@@ -7038,7 +7050,7 @@ function renderEditorProps() {
       brainstormTimeLimitSec: Math.max(0, Number($('#prop-ws-time-limit')?.value ?? ws.brainstormTimeLimitSec ?? 300)),
       brainstormMaxResponses: Math.max(1, Number($('#prop-ws-max-responses')?.value ?? ws.brainstormMaxResponses ?? 2)),
       trackVoteCount: Math.min(15, Math.max(1, Number($('#prop-ws-track-count')?.value ?? ws.trackVoteCount ?? 3))),
-      finalPriorityCount: Math.min(30, Math.max(1, Number($('#prop-ws-final-count')?.value ?? ws.finalPriorityCount ?? 10))),
+      finalPriorityCount: Math.min(30, Math.max(1, Number($('#prop-ws-final-count')?.value ?? ws.finalPriorityCount ?? 5))),
       pitchTimerSec: Math.max(15, Number($('#prop-ws-pitch-sec')?.value ?? ws.pitchTimerSec ?? 120)),
     };
     await persistPresentationSettings({ workshop: next });
@@ -10368,12 +10380,24 @@ function bindParticipantHandlers(slide) {
 
   const voteScope = getVoteSlideScope(slide);
   const favMax = voteScope?.maxSelections || 3;
+  const exactFinalVote = voteScope?.kind === 'all-tracks';
   const updateFavCounter = () => {
     const n = $$('.track-vote-option--pick.is-selected').length;
     const el = $('#fav-counter') || $('#top3-counter');
     if (el) {
-      el.textContent = `${n} / ${favMax} gewählt`;
-      el.style.color = n > favMax ? 'var(--danger)' : n >= 1 && n <= favMax ? 'var(--success)' : 'var(--muted)';
+      el.textContent = exactFinalVote && n < favMax
+        ? `${n} / ${favMax} gewählt · noch ${favMax - n}`
+        : `${n} / ${favMax} gewählt`;
+      el.style.color = n > favMax ? 'var(--danger)'
+        : exactFinalVote ? (n === favMax ? 'var(--success)' : 'var(--muted)')
+        : (n >= 1 && n <= favMax ? 'var(--success)' : 'var(--muted)');
+    }
+    const submitBtn = $('#submit-favorites');
+    if (submitBtn && exactFinalVote) {
+      submitBtn.disabled = n !== favMax;
+      submitBtn.textContent = n === favMax
+        ? `Priorisierung senden (${favMax}/${favMax})`
+        : `Priorisierung senden (${n}/${favMax})`;
     }
   };
   $$('.track-vote-option--pick').forEach((btn) => btn.addEventListener('click', () => {

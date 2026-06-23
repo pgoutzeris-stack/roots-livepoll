@@ -123,7 +123,7 @@ window.LP_WORKSHOP_SETTINGS = {
   brainstormTimeLimitSec: 300,   // Sammelzeit pro Folie in Sekunden (0 = kein Limit)
   brainstormMaxResponses: 2,     // Maximale Use Cases pro Teilnehmer pro Folie
   trackVoteCount: 3,             // Anzahl je Track priorisierter Use Cases (Zwischen-Vote)
-  finalPriorityCount: 10,        // Anzahl final priorisierter Use Cases → wandern in die Matrix
+  finalPriorityCount: 5,         // Pflicht-Stimmen pro Person in Gesamt-Priorisierung → Top N in Matrix
   pitchTimerSec: 120,            // Pitch-Timer pro Person (Sekunden)
 };
 
@@ -711,7 +711,7 @@ function sopAllTracksSummary() {
 // Erscheint am Ende ALLER Vorlagen. Enthält vollständige Priorisierungs-Anleitung.
 
 function sopIceMatrix() {
-  const n = window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 10;
+  const n = window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5;
   return tplSlide('priority_matrix', {
     title: 'Impact/Effort-Matrix',
     prompt: `Ordnet die ${n} priorisierten KI Use Cases gemeinsam in die Matrix ein.\n\nImpact: Wie stark verbessert dieser Use Case unsere Arbeit / unsere Qualität?\nEffort: Wie hoch ist der Aufwand für Einführung, Lernkurve und laufende Nutzung?\n\nQuick Wins → Next Steps · Strategic Bets langfristig · Time Sinks kritisch prüfen · Drop weglassen`,
@@ -770,11 +770,11 @@ function sopPitchSession() {
 
 function sopFinalAllTracksVote() {
   const ws = window.LP_WORKSHOP_SETTINGS;
-  const count = ws?.finalPriorityCount || 10;
+  const count = ws?.finalPriorityCount || 5;
   return tplSlide('mc_multi', {
     title: 'Gesamt-Priorisierung',
-    subtitle: `Alle Use Cases · wähle deine Top ${count} (keine eigenen)`,
-    prompt: `Welche ${count} Use Cases haben den größten Impact für euer Team?\nDie Top ${count} wandern in die Impact/Effort-Matrix. Nur Quick Wins nach der Matrix-Abstimmung kommen in die Next Steps.\nHinweis: Eigene Beiträge können nicht gewählt werden.`,
+    subtitle: `Genau ${count} Use Cases wählen · keine eigenen Beiträge`,
+    prompt: `Welche ${count} Use Cases haben den größten Impact für euer Team?\nWähle verbindlich genau ${count} fremde Use Cases — eigene Beiträge sind ausgeschlossen.\nDie ${count} meistgewählten Use Cases wandern in die Impact/Effort-Matrix. Nur Quick Wins nach der Matrix-Abstimmung kommen in die Next Steps.`,
     isQuestionSlide: true,
     options: [],
     maxSelections: count,
@@ -1151,11 +1151,11 @@ function buildMarketingSopWorkshopSlides(mode = 'pro-card') {
 // Gesamt-Priorisierung über beide SOPs. Faire Abstimmung: eigene Beiträge sind
 // nicht wählbar (sopFairVote) — konsistent mit der Single-SOP-Finalabstimmung.
 function dualCombinedVote() {
-  const n = (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 10);
+  const n = (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
   return tplSlide('mc_multi', {
     title: 'Gesamt-Priorisierung über beide SOPs',
-    subtitle: `Wählt die Top ${n} KI Use Cases aus Internal und Consulting`,
-    prompt: `Welche ${n} Use Cases haben über beide SOPs hinweg den größten Hebel für ROOTS?\nDie Top ${n} → Matrix → nur Quick Wins → Next Steps.\nHinweis: Eigene Beiträge können nicht gewählt werden.`,
+    subtitle: `Genau ${n} Use Cases wählen · Internal & Consulting · keine eigenen`,
+    prompt: `Welche ${n} Use Cases haben über beide SOPs hinweg den größten Hebel für ROOTS?\nWähle verbindlich genau ${n} fremde Use Cases — eigene Beiträge sind ausgeschlossen.\nDie ${n} meistgewählten → Matrix → nur Quick Wins → Next Steps.`,
     isQuestionSlide: true,
     options: [],
     maxSelections: n,
