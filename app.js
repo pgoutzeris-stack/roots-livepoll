@@ -8914,13 +8914,65 @@ function updatePresentStats() {
   updatePresentToolbarUi(slide);
 }
 
+// Teilnahme-Link in die Zwischenablage kopieren (mit Fallback für ältere Browser).
+async function copyTextToClipboard(text) {
+  if (!text) return false;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* Fallback unten */ }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-9999px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch { return false; }
+}
+
+// Klick auf den Join-Link (unter dem QR) kopiert ihn — einmalig gebunden.
+function bindJoinUrlCopy(el) {
+  if (!el || el.dataset.copyBound) return;
+  el.dataset.copyBound = '1';
+  el.addEventListener('click', async () => {
+    const url = el.dataset.url || el.textContent || '';
+    const ok = await copyTextToClipboard(url);
+    const ico = el.querySelector('.present-code-url-ico');
+    if (ok) {
+      el.classList.add('is-copied');
+      if (ico) ico.className = 'fa-solid fa-check present-code-url-ico';
+      toast('Link kopiert ✓', 'success');
+      clearTimeout(el._copyT);
+      el._copyT = setTimeout(() => {
+        el.classList.remove('is-copied');
+        if (ico) ico.className = 'fa-solid fa-copy present-code-url-ico';
+      }, 1600);
+    } else {
+      toast('Kopieren nicht möglich', 'error');
+    }
+  });
+}
+
 async function renderQrCode() {
   if (!State.session) return;
   const url = buildJoinUrl(State.session.code);
   const img = $('#present-qr');
   const urlEl = $('#present-join-url');
   const codeEl = $('#present-code-text');
-  if (urlEl) urlEl.textContent = url;
+  if (urlEl) {
+    const textEl = urlEl.querySelector('.present-code-url-text') || urlEl;
+    textEl.textContent = url;
+    urlEl.dataset.url = url;
+    bindJoinUrlCopy(urlEl);
+  }
   if (codeEl) codeEl.textContent = State.session.code;
   let dataUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(url)}`;
   try {
