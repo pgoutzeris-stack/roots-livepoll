@@ -1856,6 +1856,43 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .ws-vote-matrix-hint i{color:var(--brand);margin-top:.12rem;flex-shrink:0}
 .ws-vote-matrix-hint strong{color:var(--ink);font-weight:800}
 
+/* Gesamt-Priorisierung: Schritt 2 Punktevergabe */
+.final-rank-panel{
+  width:100%;margin:.85rem 0 1rem;padding:.75rem;border-radius:14px;
+  background:var(--surface);border:1px solid var(--line);
+}
+.final-rank-panel.is-hidden{display:none}
+.final-rank-panel-head{
+  font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--brand);margin-bottom:.65rem;display:flex;align-items:center;gap:.4rem;
+}
+.final-rank-row{
+  display:flex;flex-direction:column;gap:.45rem;padding:.55rem 0;
+  border-bottom:1px solid var(--line);
+}
+.final-rank-row:last-child{border-bottom:0;padding-bottom:0}
+.final-rank-row-label{font-size:.88rem;line-height:1.35;color:var(--ink)}
+.final-rank-pts{display:flex;flex-wrap:wrap;gap:.35rem}
+.final-rank-pt{
+  min-width:2.35rem;height:2.35rem;padding:0 .55rem;border-radius:10px;
+  border:1px solid var(--line);background:var(--bg);color:var(--ink);
+  font-weight:800;font-size:.9rem;cursor:pointer;
+}
+.final-rank-pt.is-active{background:var(--brand);border-color:var(--brand);color:#fff}
+.ws-vote-sub{display:block;font-size:.65rem;color:var(--muted);font-weight:600;margin-top:.1rem}
+
+/* Presenter: Workshop-Einstellungen während Live-Session */
+.present-ws-settings-pill{
+  margin-right:.65rem;border:none;cursor:pointer;font:inherit;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.present-ws-settings-pill:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(32,110,251,.18)}
+.present-ws-settings-pill.hidden{display:none!important}
+.lp-ws-settings-card{max-width:420px}
+.lp-ws-settings-field{display:flex;flex-direction:column;gap:.35rem;margin:.75rem 0;text-align:left}
+.lp-ws-settings-label{font-size:.78rem;font-weight:700;color:var(--muted)}
+.lp-ws-settings-hint{margin:.5rem 0 0;font-size:.78rem;text-align:left}
+
 /* ═══════ Matrix-Frame v3 · Achsen mit Linien + Chart-Grid ═══════ */
 .lp-mx-frame{width:100%;max-width:min(1200px,100%);margin:0 auto}
 .lp-mx-chart{

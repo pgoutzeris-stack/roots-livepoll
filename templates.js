@@ -773,8 +773,8 @@ function sopFinalAllTracksVote() {
   const count = ws?.finalPriorityCount || 5;
   return tplSlide('mc_multi', {
     title: 'Gesamt-Priorisierung',
-    subtitle: `Genau ${count} Use Cases wählen · keine eigenen Beiträge`,
-    prompt: `Welche ${count} Use Cases haben den größten Impact für euer Team?\nWähle verbindlich genau ${count} fremde Use Cases — eigene Beiträge sind ausgeschlossen.\nDie ${count} meistgewählten Use Cases wandern in die Impact/Effort-Matrix. Nur Quick Wins nach der Matrix-Abstimmung kommen in die Next Steps.`,
+    subtitle: `Genau ${count} wählen + Punkte vergeben · keine eigenen Beiträge`,
+    prompt: `Schritt 1: Wähle genau ${count} fremde Use Cases.\nSchritt 2: Vergib jedem 1–${count} Punkte (${count} = höchste Priorität, jeder Wert genau einmal).\nDie ${count} Use Cases mit den meisten Gesamtpunkten wandern in die Impact/Effort-Matrix. Nur Quick Wins nach der Matrix-Abstimmung kommen in die Next Steps.`,
     isQuestionSlide: true,
     options: [],
     maxSelections: count,
@@ -1154,8 +1154,8 @@ function dualCombinedVote() {
   const n = (window.LP_WORKSHOP_SETTINGS?.finalPriorityCount || 5);
   return tplSlide('mc_multi', {
     title: 'Gesamt-Priorisierung über beide SOPs',
-    subtitle: `Genau ${n} Use Cases wählen · Internal & Consulting · keine eigenen`,
-    prompt: `Welche ${n} Use Cases haben über beide SOPs hinweg den größten Hebel für ROOTS?\nWähle verbindlich genau ${n} fremde Use Cases — eigene Beiträge sind ausgeschlossen.\nDie ${n} meistgewählten → Matrix → nur Quick Wins → Next Steps.`,
+    subtitle: `Genau ${n} wählen + Punkte · Internal & Consulting · keine eigenen`,
+    prompt: `Schritt 1: Wähle genau ${n} fremde Use Cases aus Internal und Consulting.\nSchritt 2: Vergib jedem 1–${n} Punkte (${n} = höchste Priorität, jeder Wert genau einmal).\nDie ${n} Use Cases mit den meisten Gesamtpunkten → Matrix → nur Quick Wins → Next Steps.`,
     isQuestionSlide: true,
     options: [],
     maxSelections: n,

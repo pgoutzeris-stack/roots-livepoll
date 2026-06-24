@@ -366,7 +366,7 @@ function applyCollectLimitToSlide(slide, limit) {
 }
 
 function syncWorkshopSettingsToSlides({ finalPriorityCount, trackVoteCount, pitchTimerSec, brainstormMaxResponses } = {}) {
-  const fin = finalPriorityCount != null ? Math.min(30, Math.max(1, Number(finalPriorityCount) || 10)) : null;
+  const fin = finalPriorityCount != null ? Math.min(30, Math.max(1, Number(finalPriorityCount) || 5)) : null;
   const tvc = trackVoteCount != null ? Math.min(15, Math.max(1, Number(trackVoteCount) || 3)) : null;
   const pit = pitchTimerSec != null ? Math.max(15, Number(pitchTimerSec) || 120) : null;
   const bmr = brainstormMaxResponses != null ? Math.min(10, Math.max(1, Number(brainstormMaxResponses) || 1)) : null;
@@ -385,11 +385,17 @@ function syncWorkshopSettingsToSlides({ finalPriorityCount, trackVoteCount, pitc
       if (c.prompt && /Welche \d+ Use Cases/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/Welche \d+ Use Cases/i, `Welche ${fin} Use Cases`);
       if (c.prompt && /genau \d+ fremde Use Cases/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/genau \d+ fremde Use Cases/i, `genau ${fin} fremde Use Cases`);
       if (c.prompt && /Die \d+ meistgewählten/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/Die \d+ meistgewählten/i, `Die ${fin} meistgewählten`);
+      if (c.prompt && /Die \d+ Use Cases mit den meisten/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/Die \d+ Use Cases mit den meisten/i, `Die ${fin} Use Cases mit den meisten`);
+      if (c.prompt && /Schritt 1: Wähle genau \d+/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/Schritt 1: Wähle genau \d+/i, `Schritt 1: Wähle genau ${fin}`);
+      if (c.prompt && /1–\d+ Punkte/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/1–\d+ Punkte/gi, `1–${fin} Punkte`);
+      if (c.subtitle && /Top \d+ aus Gesamt/i.test(String(c.subtitle))) c.subtitle = String(c.subtitle).replace(/Top \d+ aus Gesamt/i, `Top ${fin} aus Gesamt`);
       mark(s);
     }
     // Matrix
     if (fin != null && (st.sopAllTracksMatrix || c.sopKind === 'final-matrix')) {
       st.sopMatrixCount = fin;
+      if (c.subtitle && /Top \d+ aus Gesamt/i.test(String(c.subtitle))) c.subtitle = String(c.subtitle).replace(/Top \d+ aus Gesamt/i, `Top ${fin} aus Gesamt`);
+      if (c.prompt && /Ordnet die \d+ priorisierten/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/Ordnet die \d+ priorisierten/i, `Ordnet die ${fin} priorisierten`);
       mark(s);
     }
     // Track-Zwischen-Vote
@@ -417,6 +423,188 @@ function syncWorkshopSettingsToSlides({ finalPriorityCount, trackVoteCount, pitc
     if (bmr != null && applyCollectLimitToSlide(s, bmr)) mark(s);
   });
   return Promise.all(jobs);
+}
+
+function clampFinalPriorityCount(n) {
+  return Math.min(30, Math.max(1, Number(n) || 5));
+}
+
+function getFinalPriorityWorkflowState() {
+  const voteSlide = getFinalAllTracksVoteSlide();
+  const matrixSlide = getMatrixSlide();
+  const voteResponses = voteSlide
+    ? (State.responses || []).filter((r) => r.slide_id === voteSlide.id && !r.is_hidden).length
+    : 0;
+  const matrixResponses = matrixSlide
+    ? (State.responses || []).filter((r) => r.slide_id === matrixSlide.id && !r.is_hidden).length
+    : 0;
+  return {
+    voteSlide,
+    matrixSlide,
+    voteResponses,
+    matrixResponses,
+    hasPrioritizationData: voteResponses > 0 || matrixResponses > 0,
+  };
+}
+
+function applyWorkshopSettingsToLocalSlides(workshop) {
+  const fin = clampFinalPriorityCount(workshop?.finalPriorityCount);
+  (State.slides || []).forEach((s) => {
+    const c = s.content || {};
+    const st = s.settings || {};
+    if (st.sopAllTracksVote || c.sopKind === 'final-vote' || c.sopKind === 'group-vote') {
+      st.sopVoteMax = fin;
+      c.maxSelections = fin;
+    }
+    if (st.sopAllTracksMatrix || c.sopKind === 'final-matrix') {
+      st.sopMatrixCount = fin;
+    }
+  });
+}
+
+function broadcastWorkshopSettingsLive(payload) {
+  if (!State.sessionChannel || !payload) return;
+  try {
+    State.sessionChannel.send({ type: 'broadcast', event: 'session_sync', payload });
+  } catch { /* channel may not be ready */ }
+}
+
+async function deleteSessionResponsesForSlides(slideIds) {
+  const ids = [...new Set((slideIds || []).filter(Boolean))];
+  if (!State.session?.id || !ids.length) return;
+  for (const slideId of ids) {
+    await sb.from('lp_responses').delete().eq('session_id', State.session.id).eq('slide_id', slideId);
+  }
+  State.responses = (State.responses || []).filter((r) => !ids.includes(r.slide_id));
+}
+
+async function applyFinalPriorityCountChange(newCount, { resetPrioritization = false } = {}) {
+  const count = clampFinalPriorityCount(newCount);
+  const ws = getWorkshopSettings();
+  const { voteSlide, matrixSlide, hasPrioritizationData } = getFinalPriorityWorkflowState();
+
+  if (hasPrioritizationData && !resetPrioritization) {
+    return { ok: false, needsReset: true, count };
+  }
+
+  const slideIdsToReset = resetPrioritization
+    ? [voteSlide?.id, matrixSlide?.id].filter(Boolean)
+    : [];
+
+  if (slideIdsToReset.length) {
+    await deleteSessionResponsesForSlides(slideIdsToReset);
+    invalidateMatrixItemsCache();
+    State._lastMatrixSig = null;
+    State._lastQuickWinSig = null;
+    State._lastVoteSig = null;
+    State.quickWinItems = [];
+    slideIdsToReset.forEach((id) => {
+      try { saveMatrixLocal(id, {}); } catch {}
+    });
+  }
+
+  const nextWorkshop = { ...ws, finalPriorityCount: count };
+  await persistPresentationSettings({ workshop: { finalPriorityCount: count } });
+  await syncWorkshopSettingsToSlides({ finalPriorityCount: count });
+  State.presentation.settings = {
+    ...(State.presentation.settings || {}),
+    workshop: { ...(State.presentation.settings?.workshop || {}), finalPriorityCount: count },
+  };
+  applyWorkshopSettingsToLocalSlides(nextWorkshop);
+
+  broadcastWorkshopSettingsLive({
+    workshopSettings: { finalPriorityCount: count },
+    prioritizationReset: resetPrioritization && slideIdsToReset.length > 0,
+    finalVoteSlideId: voteSlide?.id || null,
+    matrixSlideId: matrixSlide?.id || null,
+  });
+
+  if (matrixSlide) broadcastMatrixItems(matrixSlide, { force: true });
+  if (voteSlide) broadcastVoteOptions(voteSlide);
+  const ns = getNextStepsSlide();
+  if (ns) broadcastQuickWinItems(ns);
+
+  if (typeof renderPresent === 'function') renderPresent();
+  if (typeof renderEditorCanvas === 'function') renderEditorCanvas();
+  return { ok: true, changed: count !== ws.finalPriorityCount || resetPrioritization, count };
+}
+
+async function tryChangeFinalPriorityCount(newCount) {
+  const count = clampFinalPriorityCount(newCount);
+  const current = clampFinalPriorityCount(getWorkshopSettings().finalPriorityCount);
+  if (count === current) return { ok: true, noop: true, count };
+
+  const { voteResponses, matrixResponses, hasPrioritizationData } = getFinalPriorityWorkflowState();
+  if (!hasPrioritizationData) {
+    const result = await applyFinalPriorityCountChange(count, { resetPrioritization: false });
+    return { ...result, noop: false };
+  }
+
+  let desc = `Es liegen bereits Priorisierungsdaten vor`;
+  if (voteResponses) desc += ` (${voteResponses} in der Gesamt-Priorisierung`;
+  if (matrixResponses) desc += `${voteResponses ? ', ' : ' ('}${matrixResponses} in der Matrix`;
+  if (voteResponses || matrixResponses) desc += ').';
+  desc += ` Soll die Priorisierung zurückgesetzt und mit ${count} Use Cases neu gestartet werden? Teilnehmer müssen erneut abstimmen.`;
+
+  const ok = await lpConfirm({
+    title: 'Priorisierung zurücksetzen?',
+    desc,
+    okLabel: `Zurücksetzen · ${count} Use Cases`,
+    variant: 'warning',
+    icon: 'fa-arrow-rotate-left',
+  });
+  if (!ok) return { ok: false, cancelled: true, count };
+
+  const result = await applyFinalPriorityCountChange(count, { resetPrioritization: true });
+  toast(`Priorisierung zurückgesetzt · ${count} Use Cases`, 'success');
+  return { ...result, noop: false, reset: true };
+}
+
+function openPresentWorkshopSettingsModal() {
+  if (!State.user || !presentationHasWorkshopFlow()) return;
+  const modal = $('#lp-workshop-settings-modal');
+  const input = $('#lp-ws-settings-count');
+  const hint = $('#lp-ws-settings-hint');
+  if (!modal || !input) return;
+
+  const ws = getWorkshopSettings();
+  const { voteResponses, matrixResponses, hasPrioritizationData } = getFinalPriorityWorkflowState();
+  input.value = String(clampFinalPriorityCount(ws.finalPriorityCount));
+  if (hint) {
+    hint.innerHTML = hasPrioritizationData
+      ? `<i class="fa-solid fa-circle-info"></i> Bereits ${voteResponses} Priorisierungs-Stimme${voteResponses === 1 ? '' : 'n'}${matrixResponses ? ` und ${matrixResponses} Matrix-Abstimmung${matrixResponses === 1 ? '' : 'en'}` : ''}. Eine Änderung erfordert ein Zurücksetzen.`
+      : '<i class="fa-solid fa-circle-info"></i> Änderung gilt sofort für Gesamt-Priorisierung und Matrix.';
+  }
+
+  modal.classList.add('visible');
+  setTimeout(() => { input.focus(); input.select(); }, 50);
+
+  const close = () => {
+    modal.classList.remove('visible');
+    saveBtn.removeEventListener('click', onSave);
+    cancelBtn.removeEventListener('click', onCancel);
+    modal.removeEventListener('click', onBg);
+    document.removeEventListener('keydown', onKey);
+  };
+
+  const onSave = async () => {
+    const val = clampFinalPriorityCount(input.value);
+    close();
+    const result = await tryChangeFinalPriorityCount(val);
+    if (result.ok && !result.noop) {
+      if (!result.reset) toast(`Gesamt-Priorisierung: ${val} Use Cases`, 'success');
+    }
+  };
+  const onCancel = () => close();
+  const onBg = (e) => { if (e.target === modal) close(); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+
+  const saveBtn = $('#lp-ws-settings-save');
+  const cancelBtn = $('#lp-ws-settings-cancel');
+  saveBtn.addEventListener('click', onSave);
+  cancelBtn.addEventListener('click', onCancel);
+  modal.addEventListener('click', onBg);
+  document.addEventListener('keydown', onKey);
 }
 
 // Rückwärtskompatibler Alias (nur finale Anzahl).
@@ -1059,18 +1247,23 @@ function computeFinalVoteTotals(voteSlide) {
   const totals = {};
   const votes = {};
   if (!voteSlide) return { totals, votes, itemByVoteId };
+  const rankFinal = !!voteSlide.settings?.sopAllTracksVote;
   (State.responses || [])
     .filter((r) => r.slide_id === voteSlide.id && !r.is_hidden)
     .forEach((r) => {
+      const pointMap = r.response?.points || {};
+      const hasRankPoints = rankFinal && Object.keys(pointMap).length > 0;
       (r.response?.values || []).forEach((id) => {
         if (!itemByVoteId[id]) return;
         votes[id] = (votes[id] || 0) + 1;
-        totals[id] = (totals[id] || 0) + 10;
+        if (!hasRankPoints) totals[id] = (totals[id] || 0) + 10;
       });
-      Object.entries(r.response?.points || {}).forEach(([id, val]) => {
-        if (!itemByVoteId[id]) return;
-        totals[id] = (totals[id] || 0) + Number(val || 0);
-      });
+      if (hasRankPoints) {
+        Object.entries(pointMap).forEach(([id, val]) => {
+          if (!itemByVoteId[id]) return;
+          totals[id] = (totals[id] || 0) + Number(val || 0);
+        });
+      }
     });
   return { totals, votes, itemByVoteId };
 }
@@ -1165,6 +1358,41 @@ function sanitizeMatrixPlacements(placements, allowedIds) {
     if (['qw', 'sb', 'ts', 'dr'].includes(q)) out[id] = q;
   });
   return out;
+}
+
+function isFinalAllTracksRankVote(slide) {
+  return !!slide?.settings?.sopAllTracksVote;
+}
+
+function getFinalRankPointScale(count = 5) {
+  const n = Math.max(1, Number(count) || 5);
+  return Array.from({ length: n }, (_, i) => n - i);
+}
+
+function validateFinalRankPoints(slide, values, points) {
+  if (!isFinalAllTracksRankVote(slide)) return { ok: true, points: points || {} };
+  const max = finalPriorityCount(slide);
+  const vals = Array.isArray(values) ? values.filter(Boolean) : [];
+  const pts = points && typeof points === 'object' ? points : {};
+  if (vals.length !== max) return { ok: false, error: `Bitte genau ${max} Use Cases wählen` };
+  for (const id of vals) {
+    if (pts[id] == null || pts[id] === '') {
+      return { ok: false, error: `Allen ${max} Use Cases Punkte zuweisen (1–${max})` };
+    }
+  }
+  const assigned = vals.map((id) => Number(pts[id]));
+  if (assigned.some((n) => !Number.isFinite(n) || n < 1 || n > max)) {
+    return { ok: false, error: `Punkte müssen zwischen 1 und ${max} liegen` };
+  }
+  const expected = getFinalRankPointScale(max);
+  const sorted = [...assigned].sort((a, b) => b - a);
+  const permutationOk = sorted.length === expected.length && sorted.every((v, i) => v === expected[i]);
+  if (!permutationOk) {
+    return { ok: false, error: `Jeder Punktwert 1–${max} genau einmal — keine Doppelung, keine Lücke` };
+  }
+  const out = {};
+  vals.forEach((id) => { out[id] = Number(pts[id]); });
+  return { ok: true, points: out };
 }
 
 function validateVoteValues(slide, values) {
@@ -2754,34 +2982,39 @@ function renderFinalVotePresentHtml(slide, visible) {
   const { voteCounts, totalVotes } = aggregateVoteResponses(slide, visible);
   const { votedCount, totalCount } = getCardVoteParticipation(slide);
   const partPct = totalCount ? Math.round((votedCount / totalCount) * 100) : 0;
-  const pipelineHint = `<div class="ws-vote-matrix-hint"><i class="fa-solid fa-route"></i> Jede Person wählt <strong>genau ${topN}</strong> fremde Use Cases → Top <strong>${topN}</strong> gesamt → <strong>Matrix</strong> → <strong>Quick Wins</strong> → <strong>Next Steps</strong></div>`;
+  const pipelineHint = `<div class="ws-vote-matrix-hint"><i class="fa-solid fa-route"></i> Jede Person: <strong>${topN} wählen + Punkte 1–${topN}</strong> → Top <strong>${topN}</strong> nach Gesamtpunkten → <strong>Matrix</strong> → <strong>Quick Wins</strong> → <strong>Next Steps</strong></div>`;
+  const voteSlide = slide;
+  const { totals: scoreTotals } = computeFinalVoteTotals(voteSlide);
   const decorate = (items) => items
-    .map((item) => ({ ...item, votes: voteCounts[`resp-${item.id}`] || 0 }))
-    .sort((a, b) => b.votes - a.votes || String(a.text).localeCompare(String(b.text), 'de'));
+    .map((item) => ({
+      ...item,
+      votes: voteCounts[`resp-${item.id}`] || 0,
+      score: scoreTotals[`resp-${item.id}`] || 0,
+    }))
+    .sort((a, b) => b.score - a.score || b.votes - a.votes || String(a.text).localeCompare(String(b.text), 'de'));
   const head = `<div class="ws-board-head">
       <span class="ws-board-stat"><i class="fa-solid fa-list-check"></i> ${allItems.length} Use Cases</span>
       <span class="ws-board-stat"><i class="fa-solid fa-users"></i> ${votedCount} / ${totalCount} abgestimmt</span>
-      <span class="ws-board-stat ws-board-stat--accent"><i class="fa-solid fa-check-to-slot"></i> ${totalVotes} Stimmen</span>
+      <span class="ws-board-stat ws-board-stat--accent"><i class="fa-solid fa-check-to-slot"></i> ${totalVotes} Nennungen</span>
       <span class="ws-board-stat ws-board-stat--matrix"><i class="fa-solid fa-table-cells-large"></i> Top ${topN} → Matrix</span>
       <span class="ws-board-progress"><span class="ws-board-progress-fill" style="width:${partPct}%"></span></span>
     </div>`;
   const tableFor = (rows) => {
     if (!rows.length) return '<div class="present-wait-msg">Keine Use Cases in dieser Gruppe.</div>';
-    const maxVotes = Math.max(1, ...rows.map((r) => r.votes));
+    const maxScore = Math.max(1, ...rows.map((r) => r.score));
     let h = `<div class="ws-table">
       <div class="ws-row ws-row--head">
         <span class="ws-c-rank">#</span>
         <span class="ws-c-uc">Use Case</span>
         <span class="ws-c-author">Eingebracht von</span>
-        <span class="ws-c-action">Stimmen</span>
+        <span class="ws-c-action">Punkte</span>
       </div>`;
     rows.forEach((r, i) => {
       const author = getParticipantForDisplay(r.participant_id);
       const authorName = author?.display_name || r.authorName || '–';
-      const ranked = r.votes > 0;
       const isMatrixTop = i < topN;
       const topClass = isMatrixTop ? ' ws-row--top' : '';
-      const barPct = Math.round((r.votes / maxVotes) * 100);
+      const barPct = Math.round((r.score / maxScore) * 100);
       h += `<div class="ws-row${topClass}">
         <span class="ws-c-rank">${i + 1}</span>
         <span class="ws-c-uc">
@@ -2790,7 +3023,8 @@ function renderFinalVotePresentHtml(slide, visible) {
         <span class="ws-c-author">${participantAvatarHtml(author || { display_name: authorName }, 'xs')}<span class="ws-author-name">${esc(authorName)}</span></span>
         <span class="ws-c-action ws-votes">
           <span class="ws-votebar"><span class="ws-votebar-fill" style="width:${barPct}%"></span></span>
-          <strong class="ws-votenum">${r.votes}</strong>
+          <strong class="ws-votenum">${r.score || 0}</strong>
+          ${r.votes ? `<small class="ws-vote-sub">${r.votes}× genannt</small>` : ''}
         </span>
       </div>`;
     });
@@ -3656,12 +3890,13 @@ function renderParticipantTrackVoteHtml(slide) {
   if (scope?.kind === 'all-tracks') {
     const fairVote = !!slide.settings?.sopFairVote;
     const hint = fairVote
-      ? `Wähle <strong>genau ${max} fremde Use Cases</strong> aus allen Tracks — eigene Beiträge sind ausgeschlossen. Absenden erst möglich bei ${max}/${max}.`
-      : `Wähle <strong>genau ${max} Use Cases</strong> aus allen Tracks. Absenden erst möglich bei ${max}/${max}.`;
+      ? `<strong>Schritt 1:</strong> Wähle <strong>genau ${max} fremde Use Cases</strong>. <strong>Schritt 2:</strong> Vergib jedem <strong>1–${max} Punkte</strong> (${max} = höchste Priorität, jeder Wert genau einmal).`
+      : `<strong>Schritt 1:</strong> Wähle <strong>genau ${max} Use Cases</strong>. <strong>Schritt 2:</strong> Vergib jedem <strong>1–${max} Punkte</strong> (${max} = höchste Priorität).`;
     return `<p class="vote-mode-hint">${hint}</p>
       ${renderTrackVoteGroupedListHtml(slide, { selectable: true, fairVote, hideGroupHeaders: true })}
       <div id="fav-counter" class="top3-counter" role="status" aria-live="polite">0 / ${max} gewählt</div>
-      <button type="button" class="btn-primary participant-submit" id="submit-favorites" disabled>Priorisierung senden (${max}/${max})</button>`;
+      <div id="final-rank-panel" class="final-rank-panel is-hidden" aria-live="polite"></div>
+      <button type="button" class="btn-primary participant-submit" id="submit-favorites" disabled>Priorisierung senden</button>`;
   }
   return `<p class="vote-mode-hint">Wähle <strong>maximal ${max} Lieblings-Use-Cases</strong> aus dem Brainstorming.</p>
     ${renderTrackVoteGroupedListHtml(slide, { selectable: true, fairVote: !!slide.settings?.sopFairVote })}
@@ -3853,7 +4088,7 @@ function getWsPresentLead(slide) {
   const st = slide.settings || {};
   if (st.sopAllTracksVote || c.sopKind === 'final-vote' || c.sopKind === 'group-vote') {
     const n = finalPriorityCount(slide);
-    return `Jede Person wählt verbindlich genau ${n} fremde Use Cases. Die ${n} meistgewählten landen in der Impact/Effort-Matrix — nur Quick Wins nach der Team-Abstimmung kommen in die Next Steps.`;
+    return `Jede Person wählt genau ${n} fremde Use Cases und vergibt jedem 1–${n} Punkte (${n} = höchste Priorität). Die ${n} Use Cases mit den meisten Gesamtpunkten landen in der Matrix.`;
   }
   if (st.sopAllTracksMatrix || c.sopKind === 'final-matrix' || slide.slide_type === 'priority_matrix') {
     const n = getFinalMatrixItemCount(slide);
@@ -6871,7 +7106,7 @@ function renderEditorProps() {
     <p class="props-hint" style="margin-top:0">Gilt für finale Priorisierung, Impact/Effort-Matrix und Next Steps dieser Vorlage.</p>
     <div class="props-label">Pflicht-Stimmen Gesamt-Priorisierung & Matrix-Größe</div>
     <input id="prop-ws-final-count" type="number" min="1" max="30" value="${ws.finalPriorityCount || 5}" />
-    <p class="props-hint"><i class="fa-solid fa-circle-info"></i> Jede Person muss genau so viele fremde Use Cases wählen. Die Top N nach Stimmenzahl landen in der Matrix. Aus der Matrix gehen nur Quick Wins in die Next Steps.</p>
+    <p class="props-hint"><i class="fa-solid fa-circle-info"></i> Jede Person wählt genau N fremde Use Cases und vergibt 1–N Punkte. Während der Live-Präsentation: <strong>Einstellungen</strong>-Pille oben rechts (nur Host).</p>
     <div class="props-row-2">
       <div><div class="props-label">Top N je Track (Zwischen-Vote)</div><input id="prop-ws-track-count" type="number" min="1" max="15" value="${ws.trackVoteCount || 3}" /></div>
       <div><div class="props-label">Pitch-Timer (Sek.)</div><input id="prop-ws-pitch-sec" type="number" min="15" max="600" step="15" value="${ws.pitchTimerSec || 120}" /></div>
@@ -7046,13 +7281,27 @@ function renderEditorProps() {
   const saveWorkshopSettings = debounce(async () => {
     if (!State.presentation || !$('#prop-ws-final-count')) return;
     const ws = getWorkshopSettings();
+    const nextCount = clampFinalPriorityCount($('#prop-ws-final-count')?.value ?? ws.finalPriorityCount ?? 5);
     const next = {
       brainstormTimeLimitSec: Math.max(0, Number($('#prop-ws-time-limit')?.value ?? ws.brainstormTimeLimitSec ?? 300)),
       brainstormMaxResponses: Math.max(1, Number($('#prop-ws-max-responses')?.value ?? ws.brainstormMaxResponses ?? 2)),
       trackVoteCount: Math.min(15, Math.max(1, Number($('#prop-ws-track-count')?.value ?? ws.trackVoteCount ?? 3))),
-      finalPriorityCount: Math.min(30, Math.max(1, Number($('#prop-ws-final-count')?.value ?? ws.finalPriorityCount ?? 5))),
+      finalPriorityCount: nextCount,
       pitchTimerSec: Math.max(15, Number($('#prop-ws-pitch-sec')?.value ?? ws.pitchTimerSec ?? 120)),
     };
+    const countChanged = nextCount !== clampFinalPriorityCount(ws.finalPriorityCount);
+    if (countChanged) {
+      if (State.session?.status === 'live' && getFinalPriorityWorkflowState().hasPrioritizationData) {
+        $('#prop-ws-final-count').value = String(ws.finalPriorityCount);
+        toast('Während laufender Priorisierung: Einstellungen-Pille in der Präsentation nutzen.', 'warn');
+        return;
+      }
+      const result = await tryChangeFinalPriorityCount(nextCount);
+      if (!result.ok) {
+        if (result.cancelled) $('#prop-ws-final-count').value = String(ws.finalPriorityCount);
+        return;
+      }
+    }
     await persistPresentationSettings({ workshop: next });
     await syncWorkshopSettingsToSlides({
       finalPriorityCount: next.finalPriorityCount,
@@ -7682,7 +7931,16 @@ const LP_DebugSim = {
             if (st.sopFairVote) scopedCollected = scopedCollected.filter((it) => it.participantId !== fakeP);
             if (scopedCollected.length) {
               const picked = [...scopedCollected].sort(() => pseudoRandom(idx + slide.id.length) - 0.5).slice(0, max);
-              response = { values: picked.map((it) => `resp-${it.respId}`) };
+              const values = picked.map((it) => `resp-${it.respId}`);
+              if (st.sopAllTracksVote && values.length === max) {
+                const scale = getFinalRankPointScale(max);
+                const shuffledPts = [...scale].sort(() => pseudoRandom(idx + slide.id.length + 7) - 0.5);
+                const points = {};
+                values.forEach((id, i) => { points[id] = shuffledPts[i]; });
+                response = { values, points };
+              } else {
+                response = { values };
+              }
             }
           } else {
             const opts = c.options || [];
@@ -8127,6 +8385,32 @@ function applySessionPatch(patch) {
   const prevAssign = State.participant?.id
     ? State.session.settings?.dualSopAssignments?.[State.participant.id]
     : null;
+  // Presenter→Teilnehmer: Workshop-Einstellungen (Gesamt-Priorisierung N)
+  if (patch?.workshopSettings?.finalPriorityCount != null) {
+    State.presentation = State.presentation || {};
+    State.presentation.settings = {
+      ...(State.presentation.settings || {}),
+      workshop: {
+        ...(State.presentation.settings?.workshop || {}),
+        finalPriorityCount: clampFinalPriorityCount(patch.workshopSettings.finalPriorityCount),
+      },
+    };
+    applyWorkshopSettingsToLocalSlides(State.presentation.settings.workshop);
+  }
+  if (patch?.prioritizationReset) {
+    if (patch.finalVoteSlideId) clearAnswered(patch.finalVoteSlideId);
+    if (patch.matrixSlideId) {
+      clearAnswered(patch.matrixSlideId);
+      try { saveMatrixLocal(patch.matrixSlideId, {}); } catch {}
+    }
+    if (patch.matrixSlideId && State.matrixItemsBySlide) {
+      const next = { ...State.matrixItemsBySlide };
+      delete next[patch.matrixSlideId];
+      State.matrixItemsBySlide = next;
+    }
+    State._lastMatrixSig = null;
+    State.quickWinItems = [];
+  }
   // Presenter→Teilnehmer: aufgelöste Matrix-Items übernehmen
   if (patch && patch.matrixItems && typeof patch.matrixItems === 'object') {
     State.matrixItemsBySlide = { ...(State.matrixItemsBySlide || {}), ...patch.matrixItems };
@@ -8279,6 +8563,10 @@ function handleParticipantBroadcastPayload(payload, { prevIndex, prevOpen } = {}
   applySessionPatch(payload);
   if (State.session.status === 'ended') {
     handleParticipantSessionEnd();
+    return;
+  }
+  if (payload.workshopSettings || payload.prioritizationReset) {
+    void renderParticipantQuestion();
     return;
   }
   if (shouldSkipParticipantBroadcastRender(payload, prevIndex, prevOpen)) {
@@ -8956,6 +9244,10 @@ function updatePresentToolbarUi(slide) {
     codeBtn.classList.toggle('is-active', !!State.showPresentCode);
     codeBtn.title = State.showPresentCode ? 'Teilnahme-Code ausblenden' : 'Teilnahme-Code anzeigen';
   }
+
+  const showWsSettings = presentationHasWorkshopFlow() && !!State.user;
+  $('#present-workshop-settings')?.classList.toggle('hidden', !showWsSettings);
+  $('#present-workshop-settings-pill')?.classList.toggle('hidden', !showWsSettings);
 }
 
 function syncPresentCodeBar(visible = State.showPresentCode) {
@@ -9172,6 +9464,9 @@ function bindPresentToolbar() {
     document.body.classList.toggle('lp-sop-panels', State.showPresentPanels);
     toast(State.showPresentPanels ? 'Teilnehmer-Leiste eingeblendet' : 'Teilnehmer-Leiste ausgeblendet', 'success');
   });
+  const openWsSettings = () => openPresentWorkshopSettingsModal();
+  $('#present-workshop-settings')?.addEventListener('click', openWsSettings);
+  $('#present-workshop-settings-pill')?.addEventListener('click', openWsSettings);
   $('#present-reset').onclick = async () => {
     if (!await lpConfirm({ title: 'Antworten zurücksetzen?', desc: 'Alle Antworten dieser Folie werden gelöscht.', okLabel: 'Zurücksetzen', variant: 'warning', icon: 'fa-arrow-rotate-left' })) return;
     const slide = currentSessionSlide();
@@ -9271,6 +9566,12 @@ function loadAnsweredSlides(sessionId) {
 
 function markAnswered(slideId) {
   State.answeredSlides.add(slideId);
+  localStorage.setItem(`lp_answered_${State.session.id}`, JSON.stringify([...State.answeredSlides]));
+}
+
+function clearAnswered(slideId) {
+  if (!slideId || !State.session?.id) return;
+  State.answeredSlides.delete(slideId);
   localStorage.setItem(`lp_answered_${State.session.id}`, JSON.stringify([...State.answeredSlides]));
 }
 
@@ -10381,23 +10682,90 @@ function bindParticipantHandlers(slide) {
   const voteScope = getVoteSlideScope(slide);
   const favMax = voteScope?.maxSelections || 3;
   const exactFinalVote = voteScope?.kind === 'all-tracks';
+
+  const getFinalRankPointsFromDom = () => {
+    const out = {};
+    $$('.final-rank-row').forEach((row) => {
+      const id = row.dataset.voteId;
+      const active = row.querySelector('.final-rank-pt.is-active');
+      if (id && active) out[id] = Number(active.dataset.pts);
+    });
+    return out;
+  };
+
+  const bindFinalRankPointButtons = () => {
+    $$('.final-rank-pt').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const pts = btn.dataset.pts;
+        const row = btn.closest('.final-rank-row');
+        $$('.final-rank-pt.is-active').forEach((other) => {
+          if (other.dataset.pts === pts && other !== btn) {
+            other.classList.remove('is-active');
+            other.setAttribute('aria-pressed', 'false');
+          }
+        });
+        row?.querySelectorAll('.final-rank-pt').forEach((b) => {
+          b.classList.remove('is-active');
+          b.setAttribute('aria-pressed', 'false');
+        });
+        btn.classList.add('is-active');
+        btn.setAttribute('aria-pressed', 'true');
+        hapticFeedback('select');
+        updateFavCounter();
+      });
+    });
+  };
+
+  const rebuildFinalRankPanel = () => {
+    const panel = $('#final-rank-panel');
+    if (!panel || !exactFinalVote) return;
+    const selected = $$('.track-vote-option--pick.is-selected');
+    const prevPts = getFinalRankPointsFromDom();
+    if (selected.length !== favMax) {
+      panel.classList.add('is-hidden');
+      panel.innerHTML = '';
+      return;
+    }
+    panel.classList.remove('is-hidden');
+    const ptValues = getFinalRankPointScale(favMax);
+    panel.innerHTML = `<div class="final-rank-panel-head"><i class="fa-solid fa-ranking-star"></i> Schritt 2 · Punkte vergeben</div>
+      ${selected.map((btn) => {
+        const id = btn.dataset.voteId;
+        const cur = prevPts[id];
+        return `<div class="final-rank-row" data-vote-id="${esc(id)}">
+          <div class="final-rank-row-label">${btn.innerHTML}</div>
+          <div class="final-rank-pts" role="group" aria-label="Punkte für diesen Use Case">
+            ${ptValues.map((p) => `<button type="button" class="final-rank-pt${cur === p ? ' is-active' : ''}" data-pts="${p}" aria-pressed="${cur === p ? 'true' : 'false'}" aria-label="${p} Punkte">${p}</button>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}`;
+    bindFinalRankPointButtons();
+  };
+
   const updateFavCounter = () => {
     const n = $$('.track-vote-option--pick.is-selected').length;
     const el = $('#fav-counter') || $('#top3-counter');
     if (el) {
       el.textContent = exactFinalVote && n < favMax
-        ? `${n} / ${favMax} gewählt · noch ${favMax - n}`
-        : `${n} / ${favMax} gewählt`;
+        ? `Schritt 1: ${n} / ${favMax} gewählt · noch ${favMax - n}`
+        : exactFinalVote && n === favMax
+          ? `Schritt 1: ${favMax} / ${favMax} gewählt`
+          : `${n} / ${favMax} gewählt`;
       el.style.color = n > favMax ? 'var(--danger)'
         : exactFinalVote ? (n === favMax ? 'var(--success)' : 'var(--muted)')
         : (n >= 1 && n <= favMax ? 'var(--success)' : 'var(--muted)');
     }
+    if (exactFinalVote) rebuildFinalRankPanel();
+    const rankPts = exactFinalVote ? getFinalRankPointsFromDom() : {};
+    const rankComplete = !exactFinalVote || Object.keys(rankPts).length === favMax;
     const submitBtn = $('#submit-favorites');
     if (submitBtn && exactFinalVote) {
-      submitBtn.disabled = n !== favMax;
-      submitBtn.textContent = n === favMax
-        ? `Priorisierung senden (${favMax}/${favMax})`
-        : `Priorisierung senden (${n}/${favMax})`;
+      submitBtn.disabled = n !== favMax || !rankComplete;
+      submitBtn.textContent = n !== favMax
+        ? `Schritt 1 abschließen (${n}/${favMax})`
+        : !rankComplete
+          ? `Schritt 2: Punkte vergeben (${Object.keys(rankPts).length}/${favMax})`
+          : 'Priorisierung senden';
     }
   };
   $$('.track-vote-option--pick').forEach((btn) => btn.addEventListener('click', () => {
@@ -10417,7 +10785,13 @@ function bindParticipantHandlers(slide) {
     const values = $$('.track-vote-option--pick.is-selected').map((b) => b.dataset.voteId).filter(Boolean);
     const check = validateVoteValues(slide, values);
     if (!check.ok) { toast(check.error, 'warn'); return; }
-    submitResponse({ values: check.values });
+    const payload = { values: check.values };
+    if (exactFinalVote) {
+      const ptsCheck = validateFinalRankPoints(slide, check.values, getFinalRankPointsFromDom());
+      if (!ptsCheck.ok) { toast(ptsCheck.error, 'warn'); return; }
+      payload.points = ptsCheck.points;
+    }
+    submitResponse(payload);
   };
   $('#submit-favorites')?.addEventListener('click', submitFavorites);
   $('#submit-top3')?.addEventListener('click', submitFavorites);
@@ -10625,6 +10999,11 @@ async function submitResponse(response) {
     const voteCheck = validateVoteValues(slide, response.values);
     if (!voteCheck.ok) { toast(voteCheck.error, 'warn'); return; }
     response = { ...response, values: voteCheck.values };
+    if (isFinalAllTracksRankVote(slide)) {
+      const ptsCheck = validateFinalRankPoints(slide, voteCheck.values, response.points);
+      if (!ptsCheck.ok) { toast(ptsCheck.error, 'warn'); return; }
+      response = { ...response, points: ptsCheck.points };
+    }
   }
 
   const isMatrixSlide = slide.slide_type === 'priority_matrix' || slide.settings?.sopAllTracksMatrix;

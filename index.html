@@ -145,6 +145,9 @@
         <span class="header-sub" id="present-title">Präsentation</span>
       </div>
       <div class="header-right">
+        <button type="button" class="present-ws-settings-pill ws-pill ws-pill--brand hidden" id="present-workshop-settings-pill" title="Workshop-Einstellungen">
+          <i class="fa-solid fa-sliders"></i> Einstellungen
+        </button>
         <div class="present-live-wrap">
           <span class="present-live-badge" title="Live-Status — Maus drüber für das Supabase-Debug-Terminal"><i class="fa-solid fa-circle"></i> Live</span>
           <div id="present-live-terminal" class="present-live-terminal" aria-label="Supabase Live-Debug"></div>
@@ -187,6 +190,7 @@
     <button type="button" class="present-btn" id="present-show-code" title="Teilnahme-Code ein-/ausblenden"><i class="fa-solid fa-qrcode"></i></button>
     <button type="button" class="present-btn" id="present-focus-toggle" title="Fokusmodus (Vollbild)"><i class="fa-solid fa-expand"></i></button>
     <button type="button" class="present-btn" id="present-toggle-panels" title="Teilnehmer- und Aktivitäts-Panel"><i class="fa-solid fa-users"></i></button>
+    <button type="button" class="present-btn hidden" id="present-workshop-settings" title="Workshop-Einstellungen (Gesamt-Priorisierung)"><i class="fa-solid fa-sliders"></i></button>
     <span id="present-stats" class="present-stats" title="Teilnehmer und Antworten">0 Teilnehmer · 0 Antworten</span>
     <button type="button" class="present-btn danger" id="present-end" title="Session beenden"><i class="fa-solid fa-stop"></i></button>
   </div>
@@ -252,6 +256,23 @@
 </div>
 
 <!-- ── ROOTS Prompt Modal (Text-Eingabe) ── -->
+<div id="lp-workshop-settings-modal" class="modal lp-confirm">
+  <div class="modal-card lp-confirm-card lp-ws-settings-card">
+    <div class="lp-confirm-icon info"><i class="fa-solid fa-sliders"></i></div>
+    <h2 class="lp-confirm-title" id="lp-ws-settings-title">Workshop-Einstellungen</h2>
+    <p class="lp-confirm-desc" id="lp-ws-settings-desc">Gesamt-Priorisierung: Jede Person wählt N fremde Use Cases und vergibt jedem 1–N Punkte. Top N landen in der Matrix.</p>
+    <label class="lp-ws-settings-field">
+      <span class="lp-ws-settings-label">Use Cases · Gesamt-Priorisierung & Matrix</span>
+      <input type="number" id="lp-ws-settings-count" class="lp-prompt-input" min="1" max="30" step="1" />
+    </label>
+    <p class="props-hint lp-ws-settings-hint" id="lp-ws-settings-hint"></p>
+    <div class="lp-confirm-actions">
+      <button type="button" class="lp-confirm-cancel" id="lp-ws-settings-cancel">Abbrechen</button>
+      <button type="button" class="lp-confirm-ok info" id="lp-ws-settings-save">Speichern</button>
+    </div>
+  </div>
+</div>
+
 <div id="lp-prompt-modal" class="modal lp-confirm">
   <div class="modal-card lp-confirm-card">
     <div class="lp-confirm-icon info" id="lp-prompt-icon"><i class="fa-solid fa-pen"></i></div>
