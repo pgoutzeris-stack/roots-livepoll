@@ -574,19 +574,9 @@ function buildUseCaseInstructionBody(exampleKey = 'consulting') {
   const good = {
     consulting: [
       simUseCase(
-        'Discovery-Calls auswerten',
-        'Transkript → Themen, Zitate und Action Items werden nach Notion exportiert',
-        'MS Teams-Aufzeichnung + Notion-Projektseite',
-      ),
-      simUseCase(
-        'Rechnungsentwürfe aus Zeiterfassung',
-        'Harvest-Zeiten → Positionen, USt-Prüfung und EN-16931-Konformität in Vorlage',
-        'Zeiterfassung in Harvest + Rechnungsvorlage in SharePoint',
-      ),
-      simUseCase(
-        'Erstes Angebot aus Kundenbriefing',
-        'Briefing → Workplan, Meilensteine und grobe Aufwandsschätzung',
-        'Briefing in Google Docs + interne Angebots-Templates',
+        'On-Brand Bildgenerierungstool',
+        'Google Gemini inkl. KI-Promptinghilfe',
+        'On-Brand Logos & CI (Sharepoint)',
       ),
     ],
     marketing: [
