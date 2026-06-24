@@ -2239,6 +2239,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   text-align:left;
   padding:clamp(.85rem,2vw,1.35rem) clamp(.85rem,2.5vw,2rem) 5.25rem;
   background:var(--bg);
+  overflow:hidden;
 }
 .lp-sop-workshop.present-mode .present-stage h1{margin-bottom:0}
 .lp-sop-workshop.present-mode .pslide-slide{
@@ -2727,11 +2728,14 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   scrollbar-width:none;
 }
 .lp-sop-workshop.present-mode .ws-table{
-  max-height:none;
-  overflow:visible;
-  scrollbar-width:none;
+  max-height:min(52vh,540px);
+  overflow-y:auto;
+  overflow-x:hidden;
+  scrollbar-width:thin;
+  scrollbar-color:var(--line) transparent;
 }
-.lp-sop-workshop.present-mode .ws-table::-webkit-scrollbar,
+.lp-sop-workshop.present-mode .ws-table::-webkit-scrollbar{width:5px}
+.lp-sop-workshop.present-mode .ws-table::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
 .lp-sop-workshop.present-mode .ws-split-sop-board::-webkit-scrollbar,
 .lp-sop-workshop.present-mode .ws-split-collect-viz::-webkit-scrollbar,
 .lp-sop-workshop.present-mode .sop-split-col-body::-webkit-scrollbar,

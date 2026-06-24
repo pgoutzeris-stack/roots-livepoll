@@ -3032,12 +3032,10 @@ function renderFinalVotePresentHtml(slide, visible) {
   const { voteCounts, totalVotes } = aggregateVoteResponses(slide, visible);
   const { votedCount, totalCount } = getCardVoteParticipation(slide);
   const partPct = totalCount ? Math.round((votedCount / totalCount) * 100) : 0;
-  const pipelineHint = `<div class="ws-vote-matrix-hint"><i class="fa-solid fa-route"></i> Jede Person: <strong>${topN} wählen + Punkte 1–${topN}</strong> → Top <strong>${topN}</strong> nach Gesamtpunkten → <strong>Matrix</strong> → <strong>Quick Wins</strong> → <strong>Next Steps</strong></div>`;
   const voteSlide = slide;
   const { totals: scoreTotals } = computeFinalVoteTotals(voteSlide);
-  const { breakdown: pointBreakdown, recent: recentPoints, assignmentCount } = aggregateFinalRankPoints(voteSlide);
-  const currentTop = resolveFinalPriorityTopN(topN);
-  const topVoteIds = new Set(currentTop.map((item) => `resp-${item.id}`));
+  const { breakdown: pointBreakdown } = aggregateFinalRankPoints(voteSlide);
+  const topVoteIds = new Set(resolveFinalPriorityTopN(topN).map((item) => `resp-${item.id}`));
   const decorate = (items) => items
     .map((item) => {
       const voteId = `resp-${item.id}`;
@@ -3048,74 +3046,35 @@ function renderFinalVotePresentHtml(slide, visible) {
         votes: voteCounts[voteId] || 0,
         score: scoreTotals[voteId] || 0,
         pointValues: bd?.values || [],
-        pointVoters: bd?.voters || 0,
       };
     })
     .sort((a, b) => b.score - a.score || b.votes - a.votes || String(a.text).localeCompare(String(b.text), 'de'));
-  const totalPointsAssigned = Object.values(pointBreakdown).reduce((sum, b) => sum + (b.total || 0), 0);
-  const topPreview = currentTop.length
-    ? `<div class="finale-vote-top-preview" aria-label="Aktuelle Top ${topN}">
-        <span class="finale-vote-top-preview-label"><i class="fa-solid fa-trophy"></i> Aktuelle Top ${topN}</span>
-        <ol class="finale-vote-top-preview-list">
-          ${currentTop.map((item, i) => `<li class="finale-vote-top-preview-item${item.score > 0 ? ' is-live' : ''}">
-            <span class="finale-vote-top-preview-rank">${i + 1}</span>
-            <span class="finale-vote-top-preview-text">${renderUseCaseDisplayHtml(item.text, 'summary')}</span>
-            <span class="finale-vote-top-preview-pts">${item.score > 0 ? `${item.score} Pkt.` : '–'}</span>
-          </li>`).join('')}
-        </ol>
-      </div>`
-    : '';
-  const recentHtml = recentPoints.length
-    ? `<div class="finale-vote-activity" aria-live="polite">
-        <span class="finale-vote-activity-label"><i class="fa-solid fa-bolt"></i> Live · Punktevergabe</span>
-        <ul class="finale-vote-activity-list">
-          ${recentPoints.slice(0, 8).map((ev) => `<li class="finale-vote-activity-item ws-live-in">
-            ${participantAvatarHtml({ display_name: ev.who }, 'xs')}
-            <span class="finale-vote-activity-who">${esc(ev.who)}</span>
-            <span class="finale-vote-activity-pts">${ev.points} Pkt.</span>
-            <span class="finale-vote-activity-uc">→ ${renderUseCaseDisplayHtml(ev.text, 'summary')}</span>
-          </li>`).join('')}
-        </ul>
-      </div>`
-    : '';
   const head = `<div class="ws-board-head">
       <span class="ws-board-stat"><i class="fa-solid fa-list-check"></i> ${allItems.length} Use Cases</span>
-      <span class="ws-board-stat"><i class="fa-solid fa-users"></i> ${votedCount} / ${totalCount} abgestimmt</span>
-      <span class="ws-board-stat ws-board-stat--accent"><i class="fa-solid fa-star"></i> ${assignmentCount} Punkte vergeben</span>
-      <span class="ws-board-stat"><i class="fa-solid fa-check-to-slot"></i> ${totalPointsAssigned} Gesamtpunkte</span>
+      <span class="ws-board-stat"><i class="fa-solid fa-users"></i> ${votedCount}/${totalCount} abgestimmt</span>
       <span class="ws-board-stat ws-board-stat--matrix"><i class="fa-solid fa-table-cells-large"></i> Top ${topN} → Matrix</span>
       <span class="ws-board-progress"><span class="ws-board-progress-fill" style="width:${partPct}%"></span></span>
     </div>`;
-  const renderPointDetail = (r) => {
-    if (r.pointValues.length) {
-      const chips = [...r.pointValues].sort((a, b) => b - a).map((p) => `<span class="ws-point-chip">${p}</span>`).join('');
-      return `<span class="ws-point-chips" title="Vergebene Punkte je Person">${chips}</span>
-        <strong class="ws-votenum">${r.score}</strong>
-        ${r.pointVoters ? `<small class="ws-vote-sub">${r.pointVoters}× bewertet</small>` : ''}`;
-    }
-    if (r.votes) {
-      return `<strong class="ws-votenum ws-votenum--pending">–</strong>
-        <small class="ws-vote-sub">${r.votes}× genannt · Punkte fehlen</small>`;
-    }
-    return `<strong class="ws-votenum">0</strong>`;
-  };
   const tableFor = (rows) => {
-    if (!rows.length) return '<div class="present-wait-msg">Keine Use Cases in dieser Gruppe.</div>';
+    if (!rows.length) return '<div class="present-wait-msg">Keine Use Cases gesammelt.</div>';
     const maxScore = Math.max(1, ...rows.map((r) => r.score));
     let h = `<div class="ws-table">
       <div class="ws-row ws-row--head">
         <span class="ws-c-rank">#</span>
         <span class="ws-c-uc">Use Case</span>
-        <span class="ws-c-author">Eingebracht von</span>
+        <span class="ws-c-author">Von</span>
         <span class="ws-c-action">Punkte</span>
       </div>`;
     rows.forEach((r, i) => {
       const author = getParticipantForDisplay(r.participant_id);
       const authorName = author?.display_name || r.authorName || '–';
-      const isMatrixTop = topVoteIds.has(r.voteId) && r.score > 0;
-      const topClass = isMatrixTop ? ' ws-row--top' : '';
+      const isTop = topVoteIds.has(r.voteId) && r.score > 0;
+      const topClass = isTop ? ' ws-row--top' : '';
       const barPct = r.score > 0 ? Math.round((r.score / maxScore) * 100) : 0;
-      const matrixBadge = isMatrixTop ? '<span class="ws-matrix-badge"><i class="fa-solid fa-arrow-right"></i> Matrix</span>' : '';
+      const matrixBadge = isTop ? '<span class="ws-matrix-badge"><i class="fa-solid fa-arrow-right"></i> Matrix</span>' : '';
+      const chips = r.pointValues.length
+        ? [...r.pointValues].sort((a, b) => b - a).map((p) => `<span class="ws-point-chip">${p}</span>`).join('')
+        : '';
       h += `<div class="ws-row${topClass}${r.score > 0 ? ' ws-row--scored' : ''}">
         <span class="ws-c-rank">${i + 1}</span>
         <span class="ws-c-uc">
@@ -3124,14 +3083,15 @@ function renderFinalVotePresentHtml(slide, visible) {
         <span class="ws-c-author">${participantAvatarHtml(author || { display_name: authorName }, 'xs')}<span class="ws-author-name">${esc(authorName)}</span></span>
         <span class="ws-c-action ws-votes ws-votes--rank">
           ${r.score > 0 ? `<span class="ws-votebar"><span class="ws-votebar-fill" style="width:${barPct}%"></span></span>` : ''}
-          ${renderPointDetail(r)}
+          ${chips ? `<span class="ws-point-chips">${chips}</span>` : ''}
+          <strong class="ws-votenum${r.score === 0 ? ' ws-votenum--pending' : ''}">${r.score || '–'}</strong>
         </span>
       </div>`;
     });
     h += `</div>`;
     return h;
   };
-  return `<div class="ws-board finale-vote">${pipelineHint}${topPreview}${recentHtml}${head}${tableFor(decorate(allItems))}</div>`;
+  return `<div class="ws-board finale-vote">${head}${tableFor(decorate(allItems))}</div>`;
 }
 
 function renderTrackVotePresentHtml(slide, visible) {
@@ -6788,31 +6748,8 @@ function finalizePresentUi(slide) {
   scheduleFitPresentStage();
 }
 
-// Auto-Fit/Auto-Zoom wurde ENTFERNT: das frühere Messen + CSS-`zoom` pro Folie
-// (doppeltes requestAnimationFrame + Resize-Listener) verursachte Flackern und
-// uneinheitliche, springende Größen. Das Layout ist jetzt fest per CSS und für
-// alle Folien gleich breit. Läuft eine Folie über, scrollt die Bühne — kein
-// automatisches Skalieren mehr.
-function scheduleFitPresentStage() {
-  fitPresentStage();
-}
-
-function fitPresentStage() {
-  const stage = document.getElementById('present-stage');
-  if (!stage) return;
-  const slideEl = stage.querySelector(':scope > .pslide-slide');
-  if (!slideEl) return;
-  slideEl.style.zoom = '';
-  if (!document.body.classList.contains('lp-sop-workshop') || !document.body.classList.contains('present-mode')) return;
-  if (stage.classList.contains('ws-hero-present-stage') || stage.classList.contains('ws-closing-present-stage')) return;
-  requestAnimationFrame(() => {
-    const avail = stage.clientHeight - 12;
-    const need = slideEl.scrollHeight;
-    if (need <= avail || avail < 280) return;
-    const scale = Math.max(0.72, Math.min(1, avail / need));
-    if (scale < 0.995) slideEl.style.zoom = String(Math.round(scale * 1000) / 1000);
-  });
-}
+function scheduleFitPresentStage() {}
+function fitPresentStage() {}
 
 async function deleteSlide(id) {
   const slide = State.slides.find((s) => s.id === id);
@@ -9576,10 +9513,6 @@ function bindPresentToolbar() {
   const openWsSettings = () => openPresentWorkshopSettingsModal();
   $('#present-workshop-settings')?.addEventListener('click', openWsSettings);
   $('#present-workshop-settings-pill')?.addEventListener('click', openWsSettings);
-  if (!State._presentFitBound) {
-    State._presentFitBound = true;
-    window.addEventListener('resize', () => scheduleFitPresentStage(), { passive: true });
-  }
   $('#present-reset').onclick = async () => {
     if (!await lpConfirm({ title: 'Antworten zurücksetzen?', desc: 'Alle Antworten dieser Folie werden gelöscht.', okLabel: 'Zurücksetzen', variant: 'warning', icon: 'fa-arrow-rotate-left' })) return;
     const slide = currentSessionSlide();
