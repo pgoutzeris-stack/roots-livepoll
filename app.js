@@ -301,7 +301,7 @@ function getWorkshopSettings() {
   const global = window.LP_WORKSHOP_SETTINGS || {};
   return {
     brainstormTimeLimitSec: presWs.brainstormTimeLimitSec ?? global.brainstormTimeLimitSec ?? 300,
-    brainstormMaxResponses: presWs.brainstormMaxResponses ?? global.brainstormMaxResponses ?? 2,
+    brainstormMaxResponses: presWs.brainstormMaxResponses ?? global.brainstormMaxResponses ?? 1,
     trackVoteCount: presWs.trackVoteCount ?? global.trackVoteCount ?? 3,
     finalPriorityCount: presWs.finalPriorityCount ?? global.finalPriorityCount ?? 5,
     pitchTimerSec: presWs.pitchTimerSec ?? global.pitchTimerSec ?? 120,
@@ -7151,7 +7151,7 @@ function renderEditorProps() {
       <div><div class="props-label">Pitch-Timer (Sek.)</div><input id="prop-ws-pitch-sec" type="number" min="15" max="600" step="15" value="${ws.pitchTimerSec || 120}" /></div>
     </div>
     <div class="props-row-2">
-      <div><div class="props-label">Max. Use Cases pro Person (Sammeln)</div><input id="prop-ws-max-responses" type="number" min="1" max="10" value="${ws.brainstormMaxResponses || 2}" /></div>
+      <div><div class="props-label">Max. Use Cases pro Person (Sammeln)</div><input id="prop-ws-max-responses" type="number" min="1" max="10" value="${ws.brainstormMaxResponses || 1}" /></div>
       <div><div class="props-label">Sammelzeit (Sek., 0 = aus)</div><input id="prop-ws-time-limit" type="number" min="0" value="${ws.brainstormTimeLimitSec ?? 300}" /></div>
     </div>`;
   }
@@ -7323,7 +7323,7 @@ function renderEditorProps() {
     const nextCount = clampFinalPriorityCount($('#prop-ws-final-count')?.value ?? ws.finalPriorityCount ?? 5);
     const next = {
       brainstormTimeLimitSec: Math.max(0, Number($('#prop-ws-time-limit')?.value ?? ws.brainstormTimeLimitSec ?? 300)),
-      brainstormMaxResponses: Math.max(1, Number($('#prop-ws-max-responses')?.value ?? ws.brainstormMaxResponses ?? 2)),
+      brainstormMaxResponses: Math.max(1, Number($('#prop-ws-max-responses')?.value ?? ws.brainstormMaxResponses ?? 1)),
       trackVoteCount: Math.min(15, Math.max(1, Number($('#prop-ws-track-count')?.value ?? ws.trackVoteCount ?? 3))),
       finalPriorityCount: nextCount,
       pitchTimerSec: Math.max(15, Number($('#prop-ws-pitch-sec')?.value ?? ws.pitchTimerSec ?? 120)),

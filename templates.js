@@ -121,7 +121,7 @@ function iceQuadrants() {
 // Gelten für alle Brainstorm-Sammelrunden in SOP- und Marketing-Vorlagen.
 window.LP_WORKSHOP_SETTINGS = {
   brainstormTimeLimitSec: 300,   // Sammelzeit pro Folie in Sekunden (0 = kein Limit)
-  brainstormMaxResponses: 2,     // Maximale Use Cases pro Teilnehmer pro Folie
+  brainstormMaxResponses: 1,     // Maximale Use Cases pro Teilnehmer pro Folie
   trackVoteCount: 3,             // Anzahl je Track priorisierter Use Cases (Zwischen-Vote)
   finalPriorityCount: 5,         // Pflicht-Stimmen pro Person in Gesamt-Priorisierung → Top N in Matrix
   pitchTimerSec: 120,            // Pitch-Timer pro Person (Sekunden)
