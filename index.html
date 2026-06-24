@@ -32,6 +32,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="styles.css?v=__BUILD__" />
 <link rel="stylesheet" href="lp-extra.css?v=__BUILD__" />
 <script src="lp-core.js?v=__BUILD__"></script>
@@ -78,6 +79,7 @@
         <button type="button" class="dash-nav-item" data-filter="draft"><i class="fa-solid fa-pen"></i> Entwürfe</button>
         <button type="button" class="dash-nav-item" data-filter="active"><i class="fa-solid fa-circle-play"></i> Aktiv</button>
         <button type="button" class="dash-nav-item" data-filter="archived"><i class="fa-solid fa-box-archive"></i> Archiv</button>
+        <button type="button" class="dash-nav-item" data-filter="sessions"><i class="fa-solid fa-flag-checkered"></i> Ergebnisse</button>
         <div class="dash-nav-section">Start</div>
         <button type="button" class="dash-nav-item" id="btn-open-templates"><i class="fa-solid fa-clone"></i> Vorlagen</button>
         <button type="button" class="dash-nav-item" id="btn-join-as-participant"><i class="fa-solid fa-mobile-screen"></i> Als Teilnehmer beitreten</button>
@@ -209,8 +211,10 @@
 <!-- RESULTS -->
 <section id="screen-results" class="screen">
   <header class="sop-header compact">
-    <div class="header-left"><button type="button" class="board-back" id="results-back"><i class="fa-solid fa-arrow-left"></i></button><span class="wordmark">Session-Auswertung</span></div>
-    <div class="header-right"><button type="button" class="btn-secondary" id="btn-export-csv"><i class="fa-solid fa-download"></i> CSV</button></div>
+    <div class="header-left"><button type="button" class="board-back" id="results-back"><i class="fa-solid fa-arrow-left"></i></button><span class="wordmark">Session-Ergebnisse</span></div>
+    <div class="header-right">
+      <button type="button" class="btn-secondary" id="btn-export-xlsx"><i class="fa-solid fa-file-excel"></i> Excel</button>
+    </div>
   </header>
   <div class="dash-content" id="results-content"></div>
 </section>

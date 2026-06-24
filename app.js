@@ -5405,6 +5405,71 @@ async function loadPresentations() {
   State.presentations = data || [];
 }
 
+async function loadPastSessions() {
+  if (!State.user?.id) return [];
+  const { data, error } = await sb.from('lp_sessions')
+    .select('id, code, status, started_at, ended_at, presentation_id, settings')
+    .eq('host_id', State.user.id)
+    .eq('status', 'ended')
+    .order('ended_at', { ascending: false })
+    .limit(60);
+  if (error) return [];
+  const sessions = data || [];
+  // attach presentation title
+  const presIds = [...new Set(sessions.map((s) => s.presentation_id).filter(Boolean))];
+  if (presIds.length) {
+    const { data: pres } = await sb.from('lp_presentations').select('id,title').in('id', presIds);
+    const presMap = Object.fromEntries((pres || []).map((p) => [p.id, p.title]));
+    sessions.forEach((s) => { s._presTitle = presMap[s.presentation_id] || ''; });
+  }
+  // attach participant + response counts
+  await Promise.all(sessions.slice(0, 20).map(async (s) => {
+    const [{ count: pCount }, { count: rCount }] = await Promise.all([
+      sb.from('lp_participants').select('id', { count: 'exact', head: true }).eq('session_id', s.id),
+      sb.from('lp_responses').select('id', { count: 'exact', head: true }).eq('session_id', s.id).eq('is_hidden', false),
+    ]);
+    s._participants = pCount || 0;
+    s._responses = rCount || 0;
+  }));
+  return sessions;
+}
+
+async function renderSessionsDashboard() {
+  const grid = $('#presentations-grid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="res-sessions-loading"><i class="fa-solid fa-spinner fa-spin"></i> Lade Sessions…</div>';
+  const sessions = await loadPastSessions();
+  if (!sessions.length) {
+    grid.innerHTML = '<div class="res-sessions-empty"><i class="fa-solid fa-flag-checkered"></i><p>Noch keine abgeschlossenen Sessions.</p><p class="res-sessions-empty-sub">Starte eine Präsentation und beende sie, um die Ergebnisse hier zu sehen.</p></div>';
+    return;
+  }
+  grid.innerHTML = sessions.map((s) => {
+    const date = s.ended_at || s.started_at;
+    const dateStr = date ? new Date(date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '–';
+    return `<article class="sess-card" data-session-id="${esc(s.id)}">
+      <div class="sess-card-thumb"><i class="fa-solid fa-flag-checkered"></i></div>
+      <div class="sess-card-body">
+        <div class="sess-card-title">${esc(s._presTitle || 'Workshop')}</div>
+        <div class="sess-card-meta">
+          <span><i class="fa-regular fa-calendar"></i> ${esc(dateStr)}</span>
+          <span><i class="fa-solid fa-key"></i> ${esc(s.code)}</span>
+          ${s._participants != null ? `<span><i class="fa-solid fa-users"></i> ${s._participants}</span>` : ''}
+          ${s._responses != null ? `<span><i class="fa-solid fa-lightbulb"></i> ${s._responses}</span>` : ''}
+        </div>
+      </div>
+      <button type="button" class="btn-primary sess-card-btn" data-open-session="${esc(s.id)}"><i class="fa-solid fa-chart-bar"></i> Ergebnisse</button>
+    </article>`;
+  }).join('');
+  grid.querySelectorAll('[data-open-session]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.openSession;
+      location.hash = `#results/${id}`;
+      void openResults(id);
+    });
+  });
+}
+
 function filteredPresentations() {
   let list = [...State.presentations];
   const q = State.search.trim().toLowerCase();
@@ -5643,6 +5708,19 @@ function bindDashboardSelection() {
 function renderDashboard() {
   const grid = $('#presentations-grid');
   if (!grid) return;
+
+  // Sessions-Tab: separate view
+  if (State.dashFilter === 'sessions') {
+    const titleEl = $('.dash-title');
+    if (titleEl) titleEl.textContent = 'Session-Ergebnisse';
+    void renderSessionsDashboard();
+    return;
+  }
+
+  // Reset title for presentation views
+  const titleEl = $('.dash-title');
+  if (titleEl) titleEl.textContent = 'Meine Präsentationen';
+
   const list = filteredPresentations();
   const selected = getDashSelectedIds();
   const visibleIds = new Set(list.map((p) => p.id));
@@ -11155,25 +11233,235 @@ async function openResults(sessionId) {
   State.session = session;
   await loadSessionData();
   showScreen('results');
-  const content = $('#results-content');
-  content.innerHTML = `
-    <div class="results-header"><h1>Code ${esc(session.code)}</h1><p>${State.participants.length} Teilnehmer · ${State.responses.length} Antworten</p></div>
-    ${State.slides.map((slide) => {
-      const visible = State.responses.filter((r) => r.slide_id === slide.id && !r.is_hidden);
-      const agg = window.LPViz.aggregateResponses(slide, visible);
-      return `<section class="results-section"><h2>${esc(slide.content?.title || slide.content?.prompt || 'Folie')}</h2>${window.LPViz.renderViz(slide, agg, 'results')}</section>`;
-    }).join('')}`;
+  renderResultsScreen();
 }
 
-function exportCsv() {
-  const rows = [['session_id', 'slide_id', 'participant_id', 'response', 'is_hidden', 'created_at']];
-  State.responses.forEach((r) => rows.push([r.session_id, r.slide_id, r.participant_id, JSON.stringify(r.response), r.is_hidden, r.created_at]));
-  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `livepoll-${State.session?.code || 'export'}.csv`;
-  a.click();
+function renderResultsScreen() {
+  const session = State.session;
+  const content = $('#results-content');
+  if (!content) return;
+  const isWorkshop = !!(State.presentation?.settings?.workshop);
+  if (isWorkshop) {
+    content.innerHTML = renderSopResultsHtml(session);
+  } else {
+    content.innerHTML = `
+      <div class="res-header">
+        <div class="res-header-meta"><span class="res-code">${esc(session.code)}</span></div>
+        <p>${State.participants.length} Teilnehmer · ${State.responses.length} Antworten</p>
+      </div>
+      ${State.slides.map((slide) => {
+        const visible = State.responses.filter((r) => r.slide_id === slide.id && !r.is_hidden);
+        const agg = window.LPViz.aggregateResponses(slide, visible);
+        return `<section class="results-section"><h2>${esc(slide.content?.title || slide.content?.prompt || 'Folie')}</h2>${window.LPViz.renderViz(slide, agg, 'results')}</section>`;
+      }).join('')}`;
+  }
+}
+
+function renderSopResultsHtml(session) {
+  const { byTrack, allItems } = aggregateAllTracksUseCases();
+  const voteSlide = getFinalAllTracksVoteSlide();
+  const matrixSlide = getMatrixSlide();
+  const ws = getWorkshopSettings();
+  const date = session.ended_at || session.started_at;
+  const dateStr = date ? new Date(date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+  const topItems = voteSlide ? resolveFinalPriorityTopN(ws.finalPriorityCount || 5, { allowTrackFallback: false }) : [];
+
+  let html = `<div class="res-sop">
+  <div class="res-sop-head">
+    <div class="res-sop-title">${esc(State.presentation?.title || 'Workshop-Ergebnisse')}</div>
+    <div class="res-sop-meta">
+      ${dateStr ? `<span><i class="fa-regular fa-calendar"></i> ${esc(dateStr)}</span>` : ''}
+      <span><i class="fa-solid fa-key"></i> ${esc(session.code)}</span>
+      <span><i class="fa-solid fa-users"></i> ${State.participants.length} Teilnehmer</span>
+      <span><i class="fa-solid fa-lightbulb"></i> ${allItems.length} Use Cases</span>
+      ${topItems.length ? `<span><i class="fa-solid fa-trophy"></i> Top ${topItems.length} priorisiert</span>` : ''}
+    </div>
+  </div>`;
+
+  // ─── Use Cases by Track ───────────────────────────────────────────────
+  if (byTrack.length) {
+    html += `<div class="res-section-label"><i class="fa-solid fa-lightbulb"></i> Alle Use Cases</div>`;
+    byTrack.forEach((trk) => {
+      const phasesWithItems = trk.phases.filter((p) => p.items.length);
+      if (!phasesWithItems.length) return;
+      html += `<div class="res-track-block">
+        <div class="res-track-head">${esc(trk.trackLabel || trk.trackKey)}</div>`;
+      phasesWithItems.forEach((p) => {
+        if (p.phase) html += `<div class="res-phase-label">${esc(p.phase)}</div>`;
+        html += `<div class="res-uc-list">`;
+        p.items.forEach((item, idx) => {
+          const parts = parseUseCaseParts(item.text);
+          const author = getParticipantForDisplay(item.participant_id);
+          const authorName = author?.display_name || item.authorName || '';
+          html += `<div class="res-uc-row">
+            <span class="res-uc-n">${idx + 1}</span>
+            <span class="res-uc-body">
+              ${parts.hasParts
+                ? `<span class="res-uc-idea">${esc(parts.summary)}</span>${parts.feature ? `<span class="res-uc-feature">${esc(parts.feature)}</span>` : ''}${parts.dependencies ? `<span class="res-uc-deps">${esc(parts.dependencies)}</span>` : ''}`
+                : `<span class="res-uc-idea">${esc(item.text)}</span>`}
+            </span>
+            ${authorName ? `<span class="res-uc-author">${esc(authorName)}</span>` : ''}
+          </div>`;
+        });
+        html += `</div>`;
+      });
+      html += `</div>`;
+    });
+  }
+
+  // ─── Final Prioritization ─────────────────────────────────────────────
+  if (topItems.length) {
+    const { totals } = computeFinalVoteTotals(voteSlide);
+    html += `<div class="res-section-label"><i class="fa-solid fa-ranking-star"></i> Gesamt-Priorisierung</div>
+    <div class="res-prio-table">
+      <div class="res-prio-head">
+        <span class="res-prio-rank">#</span>
+        <span class="res-prio-uc">Use Case</span>
+        <span class="res-prio-track">Track</span>
+        <span class="res-prio-pts">Punkte</span>
+      </div>`;
+    topItems.forEach((item, idx) => {
+      const parts = parseUseCaseParts(item.text);
+      const pts = totals[`resp-${item.id}`] || item.score || 0;
+      const medalCls = idx === 0 ? ' res-prio-row--gold' : idx === 1 ? ' res-prio-row--silver' : idx === 2 ? ' res-prio-row--bronze' : '';
+      const medal = ['🥇', '🥈', '🥉'][idx] || String(idx + 1);
+      html += `<div class="res-prio-row${medalCls}">
+        <span class="res-prio-rank">${medal}</span>
+        <span class="res-prio-uc">
+          <strong>${esc(parts.summary || item.text)}</strong>
+          ${parts.feature ? `<em>${esc(parts.feature)}</em>` : ''}
+        </span>
+        <span class="res-prio-track">${esc(item.trackLabel || '')}</span>
+        <span class="res-prio-pts">${pts}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // ─── Impact/Effort Matrix ─────────────────────────────────────────────
+  if (matrixSlide) {
+    const quadrants = [
+      { key: 'qw', label: 'Quick Wins', icon: 'fa-bolt', cls: 'qw' },
+      { key: 'sb', label: 'Strategische Bets', icon: 'fa-chess-knight', cls: 'sb' },
+      { key: 'ts', label: 'Tech-Schulden', icon: 'fa-wrench', cls: 'ts' },
+      { key: 'dr', label: 'Deprioritieren', icon: 'fa-ban', cls: 'dr' },
+    ];
+    const populated = quadrants.map((q) => ({ ...q, items: aggregateMatrixQuadrantItems(matrixSlide, q.key) })).filter((q) => q.items.length);
+    if (populated.length) {
+      html += `<div class="res-section-label"><i class="fa-solid fa-table-cells-large"></i> Impact / Effort Matrix</div>
+      <div class="res-matrix-grid">`;
+      populated.forEach((q) => {
+        html += `<div class="res-matrix-quad res-matrix-quad--${q.cls}">
+          <div class="res-matrix-quad-head"><i class="fa-solid ${q.icon}"></i> ${esc(q.label)}</div>
+          <div class="res-matrix-quad-items">`;
+        q.items.forEach((item) => {
+          const parts = parseUseCaseParts(item.text);
+          html += `<div class="res-matrix-item">
+            <span class="res-uc-idea">${esc(parts.summary || item.text)}</span>
+            ${parts.feature ? `<span class="res-uc-feature">${esc(parts.feature)}</span>` : ''}
+          </div>`;
+        });
+        html += `</div></div>`;
+      });
+      html += `</div>`;
+    }
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+function exportWorkshopExcel() {
+  if (!window.XLSX) { toast('Excel-Export wird geladen…', 'info'); return; }
+  const XLSX = window.XLSX;
+  const session = State.session;
+  const { byTrack, allItems } = aggregateAllTracksUseCases();
+  const voteSlide = getFinalAllTracksVoteSlide();
+  const matrixSlide = getMatrixSlide();
+  const date = session?.ended_at || session?.started_at;
+  const dateStr = date ? new Date(date).toLocaleDateString('de-DE') : new Date().toLocaleDateString('de-DE');
+  const titleSafe = (State.presentation?.title || 'Workshop').replace(/[<>:"/\\|?*]/g, '').trim().slice(0, 30);
+
+  const wb = XLSX.utils.book_new();
+
+  // ── Sheet 1: Alle Use Cases ──────────────────────────────────────────
+  const ucRows = [['#', 'Track', 'Phase', 'Idee', 'KI-Feature', 'Abhängigkeiten', 'Autor']];
+  let n = 0;
+  byTrack.forEach((trk) => {
+    trk.phases.forEach((p) => {
+      p.items.forEach((item) => {
+        n += 1;
+        const parts = parseUseCaseParts(item.text);
+        const author = getParticipantForDisplay(item.participant_id);
+        ucRows.push([
+          n,
+          trk.trackLabel || trk.trackKey,
+          p.phase || '',
+          parts.summary || item.text,
+          parts.feature || '',
+          parts.dependencies || '',
+          author?.display_name || item.authorName || '',
+        ]);
+      });
+    });
+  });
+  const wsUc = XLSX.utils.aoa_to_sheet(ucRows);
+  wsUc['!cols'] = [{ wch: 4 }, { wch: 22 }, { wch: 18 }, { wch: 34 }, { wch: 34 }, { wch: 34 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, wsUc, 'Use Cases');
+
+  // ── Sheet 2: Priorisierung ────────────────────────────────────────────
+  const prioRows = [['Rang', 'Idee', 'KI-Feature', 'Punkte', 'Track', 'Phase']];
+  if (voteSlide) {
+    const wsSettings = getWorkshopSettings();
+    const topItems = resolveFinalPriorityTopN(wsSettings.finalPriorityCount || 5, { allowTrackFallback: false });
+    const { totals } = computeFinalVoteTotals(voteSlide);
+    topItems.forEach((item, idx) => {
+      const parts = parseUseCaseParts(item.text);
+      prioRows.push([
+        idx + 1,
+        parts.summary || item.text,
+        parts.feature || '',
+        totals[`resp-${item.id}`] || item.score || 0,
+        item.trackLabel || '',
+        item.phase || '',
+      ]);
+    });
+  }
+  const wsPrio = XLSX.utils.aoa_to_sheet(prioRows);
+  wsPrio['!cols'] = [{ wch: 6 }, { wch: 34 }, { wch: 34 }, { wch: 8 }, { wch: 22 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, wsPrio, 'Priorisierung');
+
+  // ── Sheet 3: Matrix ───────────────────────────────────────────────────
+  const matrixRows = [['Quadrant', 'Idee', 'KI-Feature', 'Track', 'Phase']];
+  if (matrixSlide) {
+    const qLabels = { qw: 'Quick Wins', sb: 'Strategische Bets', ts: 'Tech-Schulden', dr: 'Deprioritieren' };
+    ['qw', 'sb', 'ts', 'dr'].forEach((q) => {
+      aggregateMatrixQuadrantItems(matrixSlide, q).forEach((item) => {
+        const parts = parseUseCaseParts(item.text);
+        matrixRows.push([qLabels[q], parts.summary || item.text, parts.feature || '', item.trackLabel || '', item.phase || '']);
+      });
+    });
+  }
+  const wsMx = XLSX.utils.aoa_to_sheet(matrixRows);
+  wsMx['!cols'] = [{ wch: 20 }, { wch: 34 }, { wch: 34 }, { wch: 22 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, wsMx, 'Matrix');
+
+  // ── Sheet 4: Info ─────────────────────────────────────────────────────
+  const metaRows = [
+    ['Feld', 'Wert'],
+    ['Titel', State.presentation?.title || ''],
+    ['Datum', dateStr],
+    ['Code', session?.code || ''],
+    ['Teilnehmer', State.participants.length],
+    ['Use Cases gesamt', allItems.length],
+    ['Exportiert am', new Date().toLocaleDateString('de-DE')],
+  ];
+  const wsMeta = XLSX.utils.aoa_to_sheet(metaRows);
+  wsMeta['!cols'] = [{ wch: 20 }, { wch: 30 }];
+  XLSX.utils.book_append_sheet(wb, wsMeta, 'Info');
+
+  XLSX.writeFile(wb, `${titleSafe}_${session?.code || 'export'}_${dateStr.replace(/\./g, '-')}.xlsx`);
+  toast('Excel-Export erstellt', 'success');
 }
 
 function exportPresentationJson() {
@@ -11273,7 +11561,7 @@ function bindUi() {
   $$('.modal-close').forEach((btn) => btn.addEventListener('click', () => closeModal(btn.dataset.close)));
   $$('.modal').forEach((m) => m.addEventListener('click', (e) => { if (e.target === m) closeModal(m.id); }));
   $('#results-back')?.addEventListener('click', goDashboard);
-  $('#btn-export-csv')?.addEventListener('click', exportCsv);
+  $('#btn-export-xlsx')?.addEventListener('click', exportWorkshopExcel);
 }
 
 window.addEventListener('hashchange', routeFromHash);
