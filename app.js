@@ -11230,8 +11230,18 @@ async function openResults(sessionId) {
   const { data: session, error } = await sb.from('lp_sessions').select('*').eq('id', sessionId).single();
   if (error || !session) { toast('Session nicht gefunden', 'error'); goDashboard(); return; }
   if (auth?.user?.id !== session.host_id) { toast('Nur der Host kann Ergebnisse sehen', 'error'); goDashboard(); return; }
+
+  // If we already have live in-memory data for this exact session (e.g. just ended a
+  // real or simulated session), skip the DB reload — sim data is never written to DB.
+  // For historical sessions from the dashboard, State.session.id won't match → reload.
+  const hasLiveState = State.session?.id === sessionId
+    && (State.responses?.length > 0 || State.participants?.length > 0)
+    && State.slides?.length > 0;
+
   State.session = session;
-  await loadSessionData();
+  if (!hasLiveState) {
+    await loadSessionData();
+  }
   showScreen('results');
   renderResultsScreen();
 }
