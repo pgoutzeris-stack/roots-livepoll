@@ -520,9 +520,9 @@ window.LP_USE_CASE_LABELS = {
   dependencies: 'Abhängigkeiten',
   formula: ['Use Case Idee', 'KI-Feature', 'Abhängigkeiten'],
   guides: [
-    { label: 'Use Case Idee', question: 'Was wollt ihr konkret umsetzen oder verbessern?' },
-    { label: 'KI-Feature', question: 'Was soll die KI tun — Input, Output, welches Tool?' },
-    { label: 'Abhängigkeiten', question: 'Was muss im Team schon da sein (Daten, Zugänge, Vorlagen)?' },
+    { label: 'Use Case Idee', question: 'Welches konkrete Problem oder welcher Arbeitsschritt soll leichter werden?' },
+    { label: 'KI-Feature', question: 'Was macht die KI genau — welcher Input, welcher Output, welches Tool?' },
+    { label: 'Abhängigkeiten', question: 'Was braucht ihr dafür schon (Daten, Zugänge, Vorlagen, Freigaben)?' },
   ],
 };
 
@@ -585,7 +585,7 @@ function buildUseCaseInstructionBody(exampleKey = 'consulting') {
     ],
   };
   const avoid = [
-    'Neues vollautomatisiertes Rechnungstool',
+    'Neues Rechnungstool einführen',
     'KI für Rechnungen',
     'ChatGPT nutzen',
     'Automatisierung',
@@ -594,12 +594,12 @@ function buildUseCaseInstructionBody(exampleKey = 'consulting') {
   const examples = good[exampleKey] || good.consulting;
   const L = window.LP_USE_CASE_LABELS;
   return [
-    `Format: ${L.formula.join(' | ')}`,
+    `Format: ${L.formula.join(' | ')} — alle drei Teile ausfüllen.`,
     '',
-    'Gute Use Cases:',
+    'Starke Beispiele (Idee | KI-Feature | Abhängigkeiten):',
     ...examples,
     '',
-    'Bitte vermeiden:',
+    'Bitte vermeiden (zu vage, ohne Feature & Abhängigkeiten):',
     ...avoid,
   ].join('\n');
 }
@@ -656,7 +656,7 @@ function sopTrackBrainstorm(track) {
     title: 'Use Cases sammeln',
     body: '',
     subtitle: '',
-    prompt: `Welche KI Use Cases seht ihr in diesem Track? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\n\nNutzt die SOP-Übersicht als Orientierung — alle Phasen und Karten sind mögliche Ansatzpunkte.`,
+    prompt: `Welche KI Use Cases seht ihr in diesem Track? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\n\nFormat: Use Case Idee | KI-Feature | Abhängigkeiten\n\nBeispiel:\n${simUseCase('Discovery-Calls auswerten', 'Transkript → Themen, Zitate und Action Items nach Notion', 'Teams-Aufzeichnung + Notion-Projektseite')}\n\nNutzt die SOP-Übersicht — alle Phasen und Karten sind Ansatzpunkte.`,
     isQuestionSlide: true,
     sopKind: SK.TRACK_COLLECT,
     sopBoard: sopBoardData(track),
@@ -1384,12 +1384,12 @@ window.LP_TEMPLATES = [
 // ─── DEBUG MOCK DATA ─────────────────────────────────────────────────────────
 // Simulation: Use Cases im gleichen Format wie die Instruktionsfolie (Use Case | Feature | Abhängigkeiten)
 window.LP_SIM_GENERIC_USE_CASES = [
-  simUseCase('Meeting-Protokolle strukturieren', 'Transkript, Summary und To-dos landen in Notion', 'Teams-Aufzeichnung + Notion-Seite pro Projekt'),
-  simUseCase('Erstkontakt-Mail vor Gespräch vorbereiten', 'Recherche zu Firma und Ansprechpartner, drei Gesprächseinstiege als Entwurf', 'LinkedIn-Profil + Website + CRM-Eintrag'),
-  simUseCase('Workshop-Ergebnisse aufbereiten', 'Cluster aus Post-its, Priorisierung und nächste Schritte als Protokoll', 'Miro-Board oder Foto der Flipcharts + Notion-Vorlage'),
-  simUseCase('Wiederkehrende Reports erstellen', 'Daten werden zusammengeführt, KPIs kommentiert, PDF versendet', 'Excel-Exporte + feste Report-Vorlage in PowerPoint'),
-  simUseCase('Onboarding neuer Teammitglieder', 'Checkliste, Lernpfad und Q&A-Bot aus internen SOPs', 'SharePoint-SOPs + Confluence/Notion-Wissensbasis'),
-  simUseCase('Kundenfeedback aus Umfragen auswerten', 'Sentiment, Top-Themen und Zitate als Kurzbericht', 'Typeform/Forms-Export + anonymisierte Rohdaten'),
+  simUseCase('Discovery-Calls strukturiert auswerten', 'Transkript → Pain Points, Zitate und To-dos werden nach Notion exportiert', 'Teams-Aufzeichnung + Notion-Template pro Projekt'),
+  simUseCase('Erstkontakt vor dem Gespräch vorbereiten', 'GPT recherchiert Firma/Ansprechpartner und schlägt drei Gesprächseinstiege vor', 'CRM-Eintrag + LinkedIn-Profil + Firmenwebsite'),
+  simUseCase('Workshop-Ergebnisse in Protokoll überführen', 'Post-its/Notizen werden geclustert, priorisiert und als Next Steps formatiert', 'Miro-Export oder Foto der Flipcharts + Notion-Vorlage'),
+  simUseCase('Wöchentlichen KPI-Report erstellen', 'Daten aus Excel/BI werden zusammengeführt, kommentiert und als PDF versendet', 'Excel-Exporte + feste Report-Vorlage in PowerPoint'),
+  simUseCase('Onboarding-Plan für neue Kolleg:innen', '30/60/90-Tage-Plan mit Checkliste und Lernlinks aus internen SOPs', 'SharePoint-SOPs + Rollenprofil + Mentor:in'),
+  simUseCase('Kundenfeedback aus Umfragen verdichten', 'Sentiment, Top-Themen und Zitate als Kurzbericht für Steering', 'Typeform/Forms-Export + anonymisierte Rohdaten'),
 ];
 
 window.LP_DEBUG_PHASE_USE_CASES = {
@@ -1473,6 +1473,29 @@ window.LP_DEBUG_PARTICIPANTS = [
 // Anzahl simulierter Teilnehmer (1…LP_DEBUG_PARTICIPANTS.length). Zur Laufzeit
 // per window.LP_SIM_PARTICIPANT_COUNT oder im Simulations-Panel anpassbar.
 window.LP_SIM_PARTICIPANT_COUNT = 6;
+
+// SOP-Karten: Prompts mit Formel + phase-passendem Beispiel (Idee | Feature | Abhängigkeiten).
+(function enrichSopCardPrompts() {
+  const L = window.LP_USE_CASE_LABELS;
+  const generic = window.LP_SIM_GENERIC_USE_CASES || [];
+  const byPhase = window.LP_DEBUG_PHASE_USE_CASES || {};
+  const formatPrompt = (question, example) => {
+    const q = String(question || '').trim().split('\n\n')[0].replace(/\n\nBeispiele:[\s\S]*/i, '').trim();
+    if (!q) return question;
+    return `${q}\n\nFormat: ${L.formula.join(' | ')}\n\nBeispiel:\n${example}`;
+  };
+  const enrichTracks = (tracks) => {
+    (tracks || []).forEach((track) => (track.phases || []).forEach((phase) => {
+      const pool = [...(byPhase[phase.name] || []), ...generic];
+      (phase.cards || []).forEach((card, i) => {
+        const ex = pool[i % pool.length] || pool[0];
+        if (ex) card.prompt = formatPrompt(card.prompt, ex);
+      });
+    }));
+  };
+  enrichTracks(window.SOP_TOOL_TRACKS);
+  enrichTracks(window.INTERNAL_SOP_TRACKS);
+})();
 
 window.LP_SLIDE_TYPES = [
   { type: 'content', label: 'Inhalt', icon: 'fa-align-left', desc: 'Titel, Text, Bild' },

@@ -1880,14 +1880,9 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 .final-rank-pt.is-active{background:var(--brand);border-color:var(--brand);color:#fff}
 .ws-vote-sub{display:block;font-size:.65rem;color:var(--muted);font-weight:600;margin-top:.1rem}
+.ws-board-foot{margin:.45rem 0 0;font-size:.76rem;color:var(--muted);display:flex;align-items:center;gap:.4rem}
 
-/* Presenter: Workshop-Einstellungen während Live-Session */
-.present-ws-settings-pill{
-  margin-right:.65rem;border:none;cursor:pointer;font:inherit;
-  transition:transform .15s ease, box-shadow .15s ease;
-}
-.present-ws-settings-pill:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(32,110,251,.18)}
-.present-ws-settings-pill.hidden{display:none!important}
+/* Presenter: Workshop-Einstellungen Modal */
 .lp-ws-settings-card{max-width:420px}
 .lp-ws-settings-field{display:flex;flex-direction:column;gap:.35rem;margin:.75rem 0;text-align:left}
 .lp-ws-settings-label{font-size:.78rem;font-weight:700;color:var(--muted)}
@@ -2675,9 +2670,34 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   scrollbar-width:none;
 }
 .lp-sop-workshop.present-mode .ws-table{
-  max-height:none;
-  overflow:visible;
-  scrollbar-width:none;
+  max-height:min(38vh,380px);
+  overflow-y:auto;
+  overflow-x:hidden;
+  scrollbar-width:thin;
+  scrollbar-color:var(--line) transparent;
+}
+.lp-sop-workshop.present-mode .finale-vote--compact .ws-vote-matrix-hint{
+  margin-bottom:.45rem;padding:.45rem .65rem;font-size:.76rem;
+}
+.lp-sop-workshop.present-mode .finale-vote--compact .ws-board-head{
+  margin-bottom:.25rem;gap:.35rem .65rem;
+}
+.lp-sop-workshop.present-mode .finale-vote--compact .ws-board-stat{font-size:.74rem}
+.lp-sop-workshop.present-mode .finale-vote--compact .ws-table{
+  max-height:min(34vh,340px);
+  margin-top:.45rem;gap:.28rem;
+}
+.lp-sop-workshop.present-mode .finale-vote--compact .ws-row{padding:.45rem .7rem;border-radius:10px}
+.lp-sop-workshop.present-mode .finale-vote--compact .ws-title{font-size:clamp(1.35rem,2.8vw,1.85rem)}
+.lp-sop-workshop.present-mode .finale-vote--compact .ws-lead,
+.lp-sop-workshop.present-mode .finale-vote--compact .ws-sub-lead{
+  font-size:.84rem;margin-bottom:.45rem;
+}
+.lp-sop-workshop.present-mode .ws-table::-webkit-scrollbar{
+  width:6px;height:6px;
+}
+.lp-sop-workshop.present-mode .ws-table::-webkit-scrollbar-thumb{
+  background:var(--line);border-radius:99px;
 }
 .lp-sop-workshop.present-mode .ws-split-sop-board,
 .lp-sop-workshop.present-mode .ws-split-collect-viz,
@@ -2690,8 +2710,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-sop-workshop.present-mode .ws-split-collect-viz::-webkit-scrollbar,
 .lp-sop-workshop.present-mode .sop-split-col-body::-webkit-scrollbar,
 .lp-sop-workshop.present-mode .sop-board-phases-row::-webkit-scrollbar,
-.lp-sop-workshop.present-mode .viz-bubble-cloud::-webkit-scrollbar,
-.lp-sop-workshop.present-mode .ws-table::-webkit-scrollbar{
+.lp-sop-workshop.present-mode .viz-bubble-cloud::-webkit-scrollbar{
   display:none;width:0;height:0;
 }
 .lp-sop-workshop.present-mode .ws-body .sop-team-grid{

@@ -526,7 +526,21 @@ async function applyFinalPriorityCountChange(newCount, { resetPrioritization = f
 
   if (typeof renderPresent === 'function') renderPresent();
   if (typeof renderEditorCanvas === 'function') renderEditorCanvas();
-  return { ok: true, changed: count !== ws.finalPriorityCount || resetPrioritization, count };
+
+  const shouldNavigate = resetPrioritization && voteSlide && State.session?.status === 'live';
+  if (shouldNavigate) {
+    const voteIdx = (State.slides || []).findIndex((s) => s.id === voteSlide.id);
+    if (voteIdx >= 0) {
+      State.confettiSlideId = null;
+      State.session.current_slide_index = voteIdx;
+      State.session.question_open = true;
+      broadcastSessionPatch({ current_slide_index: voteIdx, question_open: true });
+      await sb.from('lp_sessions').update({ current_slide_index: voteIdx, question_open: true }).eq('id', State.session.id);
+      if (typeof renderPresent === 'function') renderPresent();
+    }
+  }
+
+  return { ok: true, changed: count !== ws.finalPriorityCount || resetPrioritization, count, navigated: shouldNavigate };
 }
 
 async function tryChangeFinalPriorityCount(newCount) {
@@ -556,7 +570,9 @@ async function tryChangeFinalPriorityCount(newCount) {
   if (!ok) return { ok: false, cancelled: true, count };
 
   const result = await applyFinalPriorityCountChange(count, { resetPrioritization: true });
-  toast(`Priorisierung zurückgesetzt · ${count} Use Cases`, 'success');
+  toast(result.navigated
+    ? `Priorisierung zurückgesetzt · ${count} Use Cases — Folie geöffnet`
+    : `Priorisierung zurückgesetzt · ${count} Use Cases`, 'success');
   return { ...result, noop: false, reset: true };
 }
 
@@ -684,9 +700,9 @@ function getUseCaseLabels() {
     dependencies: 'Abhängigkeiten',
     formula: ['Use Case Idee', 'KI-Feature', 'Abhängigkeiten'],
     guides: [
-      { label: 'Use Case Idee', question: 'Was wollt ihr konkret umsetzen oder verbessern?' },
-      { label: 'KI-Feature', question: 'Was soll die KI tun — Input, Output, welches Tool?' },
-      { label: 'Abhängigkeiten', question: 'Was muss im Team schon da sein (Daten, Zugänge, Vorlagen)?' },
+      { label: 'Use Case Idee', question: 'Welches konkrete Problem oder welcher Arbeitsschritt soll leichter werden?' },
+      { label: 'KI-Feature', question: 'Was macht die KI genau — welcher Input, welcher Output, welches Tool?' },
+      { label: 'Abhängigkeiten', question: 'Was braucht ihr dafür schon (Daten, Zugänge, Vorlagen, Freigaben)?' },
     ],
   };
 }
@@ -3031,8 +3047,15 @@ function renderFinalVotePresentHtml(slide, visible) {
     h += `</div>`;
     return h;
   };
-  // Konsolidierte Priorisierung — EINE Liste über beide SOPs, kein Split.
-  return `<div class="ws-board finale-vote">${pipelineHint}${head}${tableFor(decorate(allItems))}</div>`;
+  const ranked = decorate(allItems);
+  const displayCap = Math.max(topN * 3, 12);
+  const displayRows = ranked.slice(0, displayCap);
+  const hiddenCount = Math.max(0, ranked.length - displayRows.length);
+  const hiddenNote = hiddenCount
+    ? `<p class="ws-board-foot"><i class="fa-solid fa-ellipsis"></i> ${hiddenCount} weitere Use Cases ohne Punkte — nur Top ${topN} gehen in die Matrix.</p>`
+    : '';
+  // Konsolidierte Priorisierung — kompakte Live-Tabelle (Top-Kandidaten, nicht alle 40+ Zeilen).
+  return `<div class="ws-board finale-vote finale-vote--compact">${pipelineHint}${head}${tableFor(displayRows)}${hiddenNote}</div>`;
 }
 
 function renderTrackVotePresentHtml(slide, visible) {
@@ -6700,9 +6723,18 @@ function scheduleFitPresentStage() {
 function fitPresentStage() {
   const stage = document.getElementById('present-stage');
   if (!stage) return;
-  // Nur einen evtl. von einer früheren Version gesetzten Zoom zurücksetzen.
-  const content = stage.querySelector(':scope > .pslide-slide');
-  if (content && content.style.zoom) content.style.zoom = '';
+  const slideEl = stage.querySelector(':scope > .pslide-slide');
+  if (!slideEl) return;
+  slideEl.style.zoom = '';
+  if (!document.body.classList.contains('lp-sop-workshop') || !document.body.classList.contains('present-mode')) return;
+  if (stage.classList.contains('ws-hero-present-stage') || stage.classList.contains('ws-closing-present-stage')) return;
+  requestAnimationFrame(() => {
+    const avail = stage.clientHeight - 12;
+    const need = slideEl.scrollHeight;
+    if (need <= avail || avail < 280) return;
+    const scale = Math.max(0.72, Math.min(1, avail / need));
+    if (scale < 0.995) slideEl.style.zoom = String(Math.round(scale * 1000) / 1000);
+  });
 }
 
 async function deleteSlide(id) {
@@ -9467,6 +9499,10 @@ function bindPresentToolbar() {
   const openWsSettings = () => openPresentWorkshopSettingsModal();
   $('#present-workshop-settings')?.addEventListener('click', openWsSettings);
   $('#present-workshop-settings-pill')?.addEventListener('click', openWsSettings);
+  if (!State._presentFitBound) {
+    State._presentFitBound = true;
+    window.addEventListener('resize', () => scheduleFitPresentStage(), { passive: true });
+  }
   $('#present-reset').onclick = async () => {
     if (!await lpConfirm({ title: 'Antworten zurücksetzen?', desc: 'Alle Antworten dieser Folie werden gelöscht.', okLabel: 'Zurücksetzen', variant: 'warning', icon: 'fa-arrow-rotate-left' })) return;
     const slide = currentSessionSlide();
