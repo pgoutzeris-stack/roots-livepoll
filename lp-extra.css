@@ -2239,7 +2239,8 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   text-align:left;
   padding:clamp(.85rem,2vw,1.35rem) clamp(.85rem,2.5vw,2rem) 5.25rem;
   background:var(--bg);
-  overflow:hidden;
+  overflow-y:auto;
+  overflow-x:hidden;
 }
 .lp-sop-workshop.present-mode .present-stage h1{margin-bottom:0}
 .lp-sop-workshop.present-mode .pslide-slide{
@@ -3119,10 +3120,11 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   flex-direction:column;
 }
 .lp-sop-workshop.present-mode .present-stage.ws-hero-present-stage .ws-hero-stage{
-  min-height:0;
-  flex:1 1 auto;
-  max-height:min(52vh,520px);
-  padding:clamp(1rem,2.5vw,2rem);
+  min-height:min(44vh,440px);
+  max-width:min(740px,92%);
+  margin:0 auto;
+  padding:clamp(1.5rem,3vw,2.5rem);
+  border-radius:16px;
 }
 .lp-sop-workshop.present-mode .present-stage.ws-hero-present-stage .ws-hero-icon-ring{
   width:72px;height:72px;font-size:1.65rem;border-radius:20px;
@@ -3131,9 +3133,11 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   font-size:clamp(.92rem,1.8vw,1.05rem);line-height:1.5;
 }
 .lp-sop-workshop.present-mode .present-stage.ws-closing-present-stage .ws-closing-stage{
-  min-height:0;
-  max-height:min(52vh,520px);
-  padding:clamp(1rem,2.5vw,2rem);
+  min-height:min(44vh,440px);
+  max-width:min(740px,92%);
+  margin:0 auto;
+  padding:clamp(1.5rem,3vw,2.5rem);
+  border-radius:16px;
 }
 .lp-sop-workshop.present-mode .present-stage.ws-hero-present-stage .pslide-slide-content--ws{
   align-items:center;

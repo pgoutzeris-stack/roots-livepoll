@@ -3034,18 +3034,15 @@ function renderFinalVotePresentHtml(slide, visible) {
   const partPct = totalCount ? Math.round((votedCount / totalCount) * 100) : 0;
   const voteSlide = slide;
   const { totals: scoreTotals } = computeFinalVoteTotals(voteSlide);
-  const { breakdown: pointBreakdown } = aggregateFinalRankPoints(voteSlide);
   const topVoteIds = new Set(resolveFinalPriorityTopN(topN).map((item) => `resp-${item.id}`));
   const decorate = (items) => items
     .map((item) => {
       const voteId = `resp-${item.id}`;
-      const bd = pointBreakdown[voteId];
       return {
         ...item,
         voteId,
         votes: voteCounts[voteId] || 0,
         score: scoreTotals[voteId] || 0,
-        pointValues: bd?.values || [],
       };
     })
     .sort((a, b) => b.score - a.score || b.votes - a.votes || String(a.text).localeCompare(String(b.text), 'de'));
@@ -3072,18 +3069,14 @@ function renderFinalVotePresentHtml(slide, visible) {
       const topClass = isTop ? ' ws-row--top' : '';
       const barPct = r.score > 0 ? Math.round((r.score / maxScore) * 100) : 0;
       const matrixBadge = isTop ? '<span class="ws-matrix-badge"><i class="fa-solid fa-arrow-right"></i> Matrix</span>' : '';
-      const chips = r.pointValues.length
-        ? [...r.pointValues].sort((a, b) => b - a).map((p) => `<span class="ws-point-chip">${p}</span>`).join('')
-        : '';
       h += `<div class="ws-row${topClass}${r.score > 0 ? ' ws-row--scored' : ''}">
         <span class="ws-c-rank">${i + 1}</span>
         <span class="ws-c-uc">
           <span class="ws-uc-text">${renderUseCaseDisplayHtml(r.text, 'full')}${matrixBadge}</span>
         </span>
         <span class="ws-c-author">${participantAvatarHtml(author || { display_name: authorName }, 'xs')}<span class="ws-author-name">${esc(authorName)}</span></span>
-        <span class="ws-c-action ws-votes ws-votes--rank">
+        <span class="ws-c-action ws-votes">
           ${r.score > 0 ? `<span class="ws-votebar"><span class="ws-votebar-fill" style="width:${barPct}%"></span></span>` : ''}
-          ${chips ? `<span class="ws-point-chips">${chips}</span>` : ''}
           <strong class="ws-votenum${r.score === 0 ? ' ws-votenum--pending' : ''}">${r.score || '–'}</strong>
         </span>
       </div>`;
