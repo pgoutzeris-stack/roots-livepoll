@@ -520,9 +520,9 @@ window.LP_USE_CASE_LABELS = {
   dependencies: 'Abhängigkeiten',
   formula: ['Use Case Idee', 'KI-Feature', 'Abhängigkeiten'],
   guides: [
-    { label: 'Use Case Idee', question: 'Welches konkrete Problem oder welcher Arbeitsschritt soll leichter werden?' },
-    { label: 'KI-Feature', question: 'Was macht die KI genau — welcher Input, welcher Output, welches Tool?' },
-    { label: 'Abhängigkeiten', question: 'Was braucht ihr dafür schon (Daten, Zugänge, Vorlagen, Freigaben)?' },
+    { label: 'Use Case Idee', question: 'Was wollt ihr konkret umsetzen oder verbessern?' },
+    { label: 'KI-Feature', question: 'Was soll die KI tun — Input, Output, welches Tool?' },
+    { label: 'Abhängigkeiten', question: 'Was muss im Team schon da sein (Daten, Zugänge, Vorlagen)?' },
   ],
 };
 
@@ -585,7 +585,7 @@ function buildUseCaseInstructionBody(exampleKey = 'consulting') {
     ],
   };
   const avoid = [
-    'Neues Rechnungstool einführen',
+    'Neues vollautomatisiertes Rechnungstool',
     'KI für Rechnungen',
     'ChatGPT nutzen',
     'Automatisierung',
@@ -594,12 +594,12 @@ function buildUseCaseInstructionBody(exampleKey = 'consulting') {
   const examples = good[exampleKey] || good.consulting;
   const L = window.LP_USE_CASE_LABELS;
   return [
-    `Format: ${L.formula.join(' | ')} — alle drei Teile ausfüllen.`,
+    `Format: ${L.formula.join(' | ')}`,
     '',
-    'Starke Beispiele (Idee | KI-Feature | Abhängigkeiten):',
+    'Gute Use Cases:',
     ...examples,
     '',
-    'Bitte vermeiden (zu vage, ohne Feature & Abhängigkeiten):',
+    'Bitte vermeiden:',
     ...avoid,
   ].join('\n');
 }

@@ -700,9 +700,9 @@ function getUseCaseLabels() {
     dependencies: 'Abhängigkeiten',
     formula: ['Use Case Idee', 'KI-Feature', 'Abhängigkeiten'],
     guides: [
-      { label: 'Use Case Idee', question: 'Welches konkrete Problem oder welcher Arbeitsschritt soll leichter werden?' },
-      { label: 'KI-Feature', question: 'Was macht die KI genau — welcher Input, welcher Output, welches Tool?' },
-      { label: 'Abhängigkeiten', question: 'Was braucht ihr dafür schon (Daten, Zugänge, Vorlagen, Freigaben)?' },
+      { label: 'Use Case Idee', question: 'Was wollt ihr konkret umsetzen oder verbessern?' },
+      { label: 'KI-Feature', question: 'Was soll die KI tun — Input, Output, welches Tool?' },
+      { label: 'Abhängigkeiten', question: 'Was muss im Team schon da sein (Daten, Zugänge, Vorlagen)?' },
     ],
   };
 }
@@ -4724,17 +4724,18 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
         if (t.startsWith('Format:')) {
           flushAvoid();
           mode = '';
-          const formula = t.replace(/^Format:\s*/, '').split('|').map((p) => p.trim()).filter(Boolean);
+          const formula = t.replace(/^Format:\s*/, '').split(/\s*[—–-]\s+/)[0]
+            .split('|').map((p) => p.trim()).filter(Boolean);
           instrHtml += `<div class="wi-formula">${formula.map((p, i) =>
             `${i > 0 ? '<span class="wi-formula-plus">+</span>' : ''}<span class="wi-formula-part"><i class="fa-solid ${['fa-lightbulb', 'fa-gear', 'fa-link'][i] || 'fa-circle'}"></i> ${esc(p)}</span>`
           ).join('')}</div>`;
         } else if (/^(Pro Eintrag|Je präziser)/i.test(t)) {
           continue;
-        } else if (t === 'Gute Use Cases:') {
+        } else if (t === 'Gute Use Cases:' || /^Starke Beispiele/i.test(t)) {
           flushAvoid();
           mode = 'good';
           instrHtml += `<div class="wi-section-head wi-section-good"><i class="fa-solid fa-circle-check"></i> <span>So sieht ein guter Use Case aus</span></div>`;
-        } else if (t === 'Bitte vermeiden:') {
+        } else if (t === 'Bitte vermeiden:' || /^Bitte vermeiden/i.test(t)) {
           flushAvoid();
           mode = 'avoid';
           instrHtml += `<div class="wi-section-head wi-section-avoid"><i class="fa-solid fa-circle-minus"></i> <span>Bitte vermeiden</span></div>`;
