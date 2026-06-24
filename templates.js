@@ -534,53 +534,53 @@ function buildUseCaseInstructionBody(exampleKey = 'consulting') {
   const good = {
     consulting: [
       simUseCase(
-        'Discovery-Calls automatisch auswerten',
-        'Transkript, Themen-Cluster und Action Items werden erzeugt und nach Notion exportiert',
-        'MS Teams-Aufzeichnungen + Notion-Workspace für das Projekt',
+        'Discovery-Calls auswerten',
+        'Transkript → Themen, Zitate und Action Items werden nach Notion exportiert',
+        'MS Teams-Aufzeichnung + Notion-Projektseite',
       ),
       simUseCase(
-        'Rechnungsentwürfe aus Projektzeiten erstellen',
-        'GPT füllt Positionen, prüft Umsatzsteuer und EN 16931-Konformität',
+        'Rechnungsentwürfe aus Zeiterfassung',
+        'Harvest-Zeiten → Positionen, USt-Prüfung und EN-16931-Konformität in Vorlage',
         'Zeiterfassung in Harvest + Rechnungsvorlage in SharePoint',
       ),
       simUseCase(
-        'Erstes Angebot aus Kundenbriefing skizzieren',
-        'Scope wird zu Workplan, Meilensteinen und grober Aufwandsschätzung',
-        'Briefing-Dokument in Google Docs + interne Angebots-Templates',
+        'Erstes Angebot aus Kundenbriefing',
+        'Briefing → Workplan, Meilensteine und grobe Aufwandsschätzung',
+        'Briefing in Google Docs + interne Angebots-Templates',
       ),
     ],
     marketing: [
       simUseCase(
-        'Paid-Social-Creatives aus Briefing ableiten',
-        'Hook, Headline und Format-Varianten je Zielgruppe, Export als CSV für Meta Ads',
-        'Creative-Briefing in Figma + Zielgruppen-Definition in Notion',
+        'Paid-Social-Creatives aus Briefing',
+        'Briefing → Hook, Headline und Format-Varianten je Zielgruppe als CSV für Meta Ads',
+        'Creative-Briefing in Figma + Zielgruppen in Notion',
       ),
       simUseCase(
         'Wöchentlichen Kampagnen-Report versenden',
-        'KPI-Digest mit Anomalie-Hinweisen und Handlungsempfehlungen per E-Mail',
-        'Zugang zu GA4 + Meta Ads + feste Report-Vorlage',
+        'GA4 + Meta-Daten → KPI-Digest mit Anomalie-Hinweisen und Handlungsempfehlungen per E-Mail',
+        'Zugang zu GA4 + Meta Ads + Report-Vorlage',
       ),
       simUseCase(
-        'Landingpage-Texte aus Produkt-One-Pager',
-        'SEO-Titel, Meta-Description und drei CTA-Varianten zum A/B-Test',
+        'Landingpage-Texte aus One-Pager',
+        'Produkt-One-Pager → SEO-Titel, Meta-Description und drei CTA-Varianten zum A/B-Test',
         'Produkt-One-Pager in Notion + Marken-Tonalität dokumentiert',
       ),
     ],
     internal: [
       simUseCase(
-        'Onboarding-Plan für neue Teammitglieder erstellen',
-        '30/60/90-Tage-Plan, Checkliste und Lernpfad aus internen SOPs generieren',
-        'SharePoint-SOPs + Rollenprofil + Mentor-Zuweisung',
+        'Onboarding-Plan für neue Kolleg:innen',
+        'Rollenprofil + SOPs → 30/60/90-Tage-Plan mit Checkliste und Lernlinks',
+        'SharePoint-SOPs + Rollenprofil + Mentor:in',
       ),
       simUseCase(
-        'Meeting-Minutes in Actions überführen',
-        'Transkript wird zu Beschlüssen, To-dos und Verantwortlichen in der Aufgabenliste',
-        'Teams-Aufzeichnung + Meeting-Etiquette-Vorlage',
+        'Meeting-Minutes in To-dos überführen',
+        'Teams-Transkript → Beschlüsse, Aufgaben und Verantwortliche in der Aufgabenliste',
+        'Teams-Aufzeichnung + Meeting-Protokoll-Vorlage',
       ),
       simUseCase(
-        'OKR-Review aus Team-Updates verdichten',
-        'Status pro Key Result, Ampel und Vorschläge fürs Planungs-Meeting',
-        'OKR-Board + letzte Wochen-Updates der Teams',
+        'OKR-Review aus Team-Updates',
+        'Wochen-Updates → Status je Key Result, Ampel und Vorschläge fürs Planungs-Meeting',
+        'OKR-Board + Wochen-Updates der Teams',
       ),
     ],
   };
