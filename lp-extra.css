@@ -953,7 +953,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 .ws-row:hover{border-color:var(--brand);box-shadow:0 2px 10px rgba(32,110,251,.08)}
 .ws-row--head{
-  background:transparent;border:none;padding:.1rem .9rem;box-shadow:none;
+  background:var(--bg,#fff);border:none;padding:.1rem .9rem;box-shadow:none;
   position:sticky;top:0;z-index:1;
 }
 .ws-row--head:hover{box-shadow:none}
