@@ -520,9 +520,9 @@ window.LP_USE_CASE_LABELS = {
   dependencies: 'Abhängigkeiten',
   formula: ['Use Case Idee', 'KI-Feature', 'Abhängigkeiten'],
   guides: [
-    { label: 'Use Case Idee', question: 'Was wollt ihr konkret umsetzen oder verbessern?' },
-    { label: 'KI-Feature', question: 'Was soll die KI tun — Input, Output, welches Tool?' },
-    { label: 'Abhängigkeiten', question: 'Was muss im Team schon da sein (Daten, Zugänge, Vorlagen)?' },
+    { label: 'Use Case Idee', question: 'Welches konkrete Problem oder welcher Arbeitsschritt soll leichter werden?' },
+    { label: 'KI-Feature', question: 'Was macht die KI genau — welcher Input, welcher Output, welches Tool?' },
+    { label: 'Abhängigkeiten', question: 'Was braucht ihr dafür schon (Daten, Zugänge, Vorlagen, Freigaben)?' },
   ],
 };
 
@@ -534,58 +534,58 @@ function buildUseCaseInstructionBody(exampleKey = 'consulting') {
   const good = {
     consulting: [
       simUseCase(
-        'Discovery-Calls auswerten',
-        'Transkript → Themen, Zitate und Action Items werden nach Notion exportiert',
-        'MS Teams-Aufzeichnung + Notion-Projektseite',
+        'Discovery-Calls automatisch auswerten',
+        'Transkript, Themen-Cluster und Action Items werden erzeugt und nach Notion exportiert',
+        'MS Teams-Aufzeichnungen + Notion-Workspace für das Projekt',
       ),
       simUseCase(
-        'Rechnungsentwürfe aus Zeiterfassung',
-        'Positionen, USt und EN-16931-Prüfung werden automatisch in die Vorlage eingetragen',
-        'Harvest-Zeiten + Rechnungsvorlage in SharePoint',
+        'Rechnungsentwürfe aus Projektzeiten erstellen',
+        'GPT füllt Positionen, prüft Umsatzsteuer und EN 16931-Konformität',
+        'Zeiterfassung in Harvest + Rechnungsvorlage in SharePoint',
       ),
       simUseCase(
-        'Erstes Angebot aus Kundenbriefing',
+        'Erstes Angebot aus Kundenbriefing skizzieren',
         'Scope wird zu Workplan, Meilensteinen und grober Aufwandsschätzung',
-        'Briefing in Google Docs + interne Angebots-Templates',
+        'Briefing-Dokument in Google Docs + interne Angebots-Templates',
       ),
     ],
     marketing: [
       simUseCase(
-        'Paid-Social-Creatives aus Briefing',
-        'Hook, Headline und Format-Varianten je Zielgruppe als CSV für Meta Ads',
-        'Creative-Briefing in Figma + Zielgruppen in Notion',
+        'Paid-Social-Creatives aus Briefing ableiten',
+        'Hook, Headline und Format-Varianten je Zielgruppe, Export als CSV für Meta Ads',
+        'Creative-Briefing in Figma + Zielgruppen-Definition in Notion',
       ),
       simUseCase(
         'Wöchentlichen Kampagnen-Report versenden',
         'KPI-Digest mit Anomalie-Hinweisen und Handlungsempfehlungen per E-Mail',
-        'Zugang zu GA4 + Meta Ads + Report-Vorlage',
+        'Zugang zu GA4 + Meta Ads + feste Report-Vorlage',
       ),
       simUseCase(
-        'Landingpage-Texte aus One-Pager',
+        'Landingpage-Texte aus Produkt-One-Pager',
         'SEO-Titel, Meta-Description und drei CTA-Varianten zum A/B-Test',
         'Produkt-One-Pager in Notion + Marken-Tonalität dokumentiert',
       ),
     ],
     internal: [
       simUseCase(
-        'Onboarding-Plan für neue Kolleg:innen',
-        '30/60/90-Tage-Plan mit Checkliste und Lernlinks aus internen SOPs',
-        'SharePoint-SOPs + Rollenprofil + Mentor:in',
+        'Onboarding-Plan für neue Teammitglieder erstellen',
+        '30/60/90-Tage-Plan, Checkliste und Lernpfad aus internen SOPs generieren',
+        'SharePoint-SOPs + Rollenprofil + Mentor-Zuweisung',
       ),
       simUseCase(
-        'Meeting-Minutes in To-dos überführen',
-        'Transkript → Beschlüsse, Aufgaben und Verantwortliche in der Aufgabenliste',
-        'Teams-Aufzeichnung + Meeting-Protokoll-Vorlage',
+        'Meeting-Minutes in Actions überführen',
+        'Transkript wird zu Beschlüssen, To-dos und Verantwortlichen in der Aufgabenliste',
+        'Teams-Aufzeichnung + Meeting-Etiquette-Vorlage',
       ),
       simUseCase(
-        'OKR-Review aus Team-Updates',
-        'Status je Key Result, Ampel und Vorschläge fürs Planungs-Meeting',
-        'OKR-Board + Wochen-Updates der Teams',
+        'OKR-Review aus Team-Updates verdichten',
+        'Status pro Key Result, Ampel und Vorschläge fürs Planungs-Meeting',
+        'OKR-Board + letzte Wochen-Updates der Teams',
       ),
     ],
   };
   const avoid = [
-    'Neues vollautomatisiertes Rechnungstool',
+    'Neues Rechnungstool einführen',
     'KI für Rechnungen',
     'ChatGPT nutzen',
     'Automatisierung',
@@ -594,9 +594,9 @@ function buildUseCaseInstructionBody(exampleKey = 'consulting') {
   const examples = good[exampleKey] || good.consulting;
   const L = window.LP_USE_CASE_LABELS;
   return [
-    `Format: ${L.formula.join(' | ')}`,
+    `Format: ${L.formula.join(' | ')} — alle drei Teile ausfüllen.`,
     '',
-    'Gute Use Cases (Idee | KI-Feature | Abhängigkeiten):',
+    'Starke Beispiele (Idee | KI-Feature | Abhängigkeiten):',
     ...examples,
     '',
     'Bitte vermeiden (zu vage, ohne Feature & Abhängigkeiten):',
@@ -656,14 +656,7 @@ function sopTrackBrainstorm(track) {
     title: 'Use Cases sammeln',
     body: '',
     subtitle: '',
-    prompt: `Welche KI Use Cases seht ihr in diesem Track? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.
-
-Format: Use Case Idee | KI-Feature | Abhängigkeiten
-
-Beispiel:
-${simUseCase('Discovery-Calls auswerten', 'Transkript → Themen, Zitate und To-dos nach Notion', 'Teams-Aufzeichnung + Notion-Projektseite')}
-
-Nutzt die SOP-Übersicht — alle Phasen und Karten sind Ansatzpunkte.`,
+    prompt: `Welche KI Use Cases seht ihr in diesem Track? Max. ${ws.brainstormMaxResponses} Use Cases pro Person.\n\nFormat: Use Case Idee | KI-Feature | Abhängigkeiten\n\nBeispiel:\n${simUseCase('Discovery-Calls auswerten', 'Transkript → Themen, Zitate und Action Items nach Notion', 'Teams-Aufzeichnung + Notion-Projektseite')}\n\nNutzt die SOP-Übersicht — alle Phasen und Karten sind Ansatzpunkte.`,
     isQuestionSlide: true,
     sopKind: SK.TRACK_COLLECT,
     sopBoard: sopBoardData(track),
@@ -1391,26 +1384,26 @@ window.LP_TEMPLATES = [
 // ─── DEBUG MOCK DATA ─────────────────────────────────────────────────────────
 // Simulation: Use Cases im gleichen Format wie die Instruktionsfolie (Use Case | Feature | Abhängigkeiten)
 window.LP_SIM_GENERIC_USE_CASES = [
-  simUseCase('Meeting-Protokolle strukturieren', 'Transkript → Summary und To-dos landen in Notion', 'Teams-Aufzeichnung + Notion-Seite pro Projekt'),
-  simUseCase('Erstkontakt vor dem Gespräch vorbereiten', 'Recherche zu Firma/Ansprechpartner → drei Gesprächseinstiege als Entwurf', 'CRM-Eintrag + LinkedIn + Firmenwebsite'),
-  simUseCase('Workshop-Ergebnisse aufbereiten', 'Post-its werden geclustert, priorisiert und als Protokoll formatiert', 'Miro-Export oder Flipchart-Foto + Notion-Vorlage'),
-  simUseCase('Wöchentlichen KPI-Report erstellen', 'Excel-Daten → kommentierte KPIs als PDF versendet', 'Excel-Exporte + Report-Vorlage in PowerPoint'),
-  simUseCase('Onboarding neuer Teammitglieder', 'Checkliste, Lernpfad und Q&A-Bot aus internen SOPs', 'SharePoint-SOPs + Confluence/Notion-Wissensbasis'),
-  simUseCase('Kundenfeedback aus Umfragen auswerten', 'Sentiment, Top-Themen und Zitate als Kurzbericht', 'Typeform/Forms-Export + anonymisierte Rohdaten'),
+  simUseCase('Discovery-Calls strukturiert auswerten', 'Transkript → Pain Points, Zitate und To-dos werden nach Notion exportiert', 'Teams-Aufzeichnung + Notion-Template pro Projekt'),
+  simUseCase('Erstkontakt vor dem Gespräch vorbereiten', 'GPT recherchiert Firma/Ansprechpartner und schlägt drei Gesprächseinstiege vor', 'CRM-Eintrag + LinkedIn-Profil + Firmenwebsite'),
+  simUseCase('Workshop-Ergebnisse in Protokoll überführen', 'Post-its/Notizen werden geclustert, priorisiert und als Next Steps formatiert', 'Miro-Export oder Foto der Flipcharts + Notion-Vorlage'),
+  simUseCase('Wöchentlichen KPI-Report erstellen', 'Daten aus Excel/BI werden zusammengeführt, kommentiert und als PDF versendet', 'Excel-Exporte + feste Report-Vorlage in PowerPoint'),
+  simUseCase('Onboarding-Plan für neue Kolleg:innen', '30/60/90-Tage-Plan mit Checkliste und Lernlinks aus internen SOPs', 'SharePoint-SOPs + Rollenprofil + Mentor:in'),
+  simUseCase('Kundenfeedback aus Umfragen verdichten', 'Sentiment, Top-Themen und Zitate als Kurzbericht für Steering', 'Typeform/Forms-Export + anonymisierte Rohdaten'),
 ];
 
 window.LP_DEBUG_PHASE_USE_CASES = {
   'Anbahnung': [
-    simUseCase('Bedarfssignale bei Zielkunden erkennen', 'LinkedIn, News und Stellenanzeigen → wöchentliche Shortlist', 'Sales Navigator + Liste der Zielaccounts'),
-    simUseCase('Outreach vor Erstgespräch personalisieren', 'Recherche zu Firma/Ansprechpartner → drei Gesprächseinstiege als Entwurf', 'CRM-Eintrag + öffentliche Unternehmensinfos'),
-    simUseCase('Erstgespräch-Protokoll erstellen', 'Transkript → Pain Points und nächste Schritte nach Notion', 'Teams-Call-Aufzeichnung + Notion-Template'),
+    simUseCase('Bedarfssignale bei Zielkunden erkennen', 'LinkedIn-Posts, News und Stellenanzeigen werden gescannt, wöchentliche Shortlist', 'Sales Navigator + Liste der Zielaccounts'),
+    simUseCase('Outreach vor Erstgespräch personalisieren', 'GPT recherchiert Firma und schlägt drei konkrete Gesprächseinstiege vor', 'CRM-Eintrag + öffentliche Unternehmensinfos'),
+    simUseCase('Erstgespräch-Protokoll automatisch', 'Transkript, Pain Points und nächste Schritte nach Notion', 'Teams-Call-Aufzeichnung + Notion-Template'),
   ],
   'Exploration': [
-    simUseCase('Discovery-Call auswerten', 'Transkript → Themen-Cluster, Zitate und offene Fragen', 'Aufgezeichnete Calls + Glossar der Kundenbegriffe'),
-    simUseCase('Symptome von Ursachen trennen', 'Interview-Notizen → 5-Why-Kette als Issue Tree', 'Interview-Transkripte oder Moderations-Notizen'),
-    simUseCase('SMART-Ziele aus Workshop-Notizen', 'Notizen → Ziele mit Messgrößen, Owner und Deadline-Vorschlag', 'Workshop-Protokoll + Stakeholder-Liste'),
-    simUseCase('Markt- und Wettbewerbs-Snapshot', 'Branche/Region → Memo zu Markt, Wettbewerbern und Trends', 'Branche definiert + freigegebene Research-Tools'),
-    simUseCase('Erste Hypothesen strukturieren', 'Gesprächsnotizen → Issue Tree und Hypothesen', 'Erkenntnisse aus der Exploration-Phase'),
+    simUseCase('Discovery-Call auswerten', 'Themen-Cluster, Zitate und offene Fragen aus Transkript', 'Aufgezeichnete Calls + Glossar der Kundenbegriffe'),
+    simUseCase('Symptome von Ursachen trennen', '5-Why-Kette aus Interview-Notizen, Visualisierung als Issue Tree', 'Interview-Transkripte oder Moderations-Notizen'),
+    simUseCase('SMART-Ziele aus Workshop-Notizen', 'Ziele mit Messgrößen, Verantwortlichen und Deadline-Vorschlag', 'Workshop-Protokoll + Stakeholder-Liste'),
+    simUseCase('Markt- und Wettbewerbs-Snapshot', 'Perplexity-Research zu Markt, Wettbewerbern und Trends als Memo', 'Branche + Region definiert + Quellenfreigabe'),
+    simUseCase('Erste Hypothesen strukturieren', 'Issue Tree und Hypothesen aus Gesprächsnotizen', 'Gesammelte Erkenntnisse aus Exploration-Phase'),
   ],
   'Pitch': [
     simUseCase('Angebots-Workplan aus Scope', 'Meilensteine, Deliverables und grobe Aufwände aus Briefing-Dokument', 'Scope-Doc + interne Workplan-Templates'),
@@ -1480,6 +1473,29 @@ window.LP_DEBUG_PARTICIPANTS = [
 // Anzahl simulierter Teilnehmer (1…LP_DEBUG_PARTICIPANTS.length). Zur Laufzeit
 // per window.LP_SIM_PARTICIPANT_COUNT oder im Simulations-Panel anpassbar.
 window.LP_SIM_PARTICIPANT_COUNT = 6;
+
+// SOP-Karten: Prompts mit Formel + phase-passendem Beispiel (Idee | Feature | Abhängigkeiten).
+(function enrichSopCardPrompts() {
+  const L = window.LP_USE_CASE_LABELS;
+  const generic = window.LP_SIM_GENERIC_USE_CASES || [];
+  const byPhase = window.LP_DEBUG_PHASE_USE_CASES || {};
+  const formatPrompt = (question, example) => {
+    const q = String(question || '').trim().split('\n\n')[0].replace(/\n\nBeispiele:[\s\S]*/i, '').trim();
+    if (!q) return question;
+    return `${q}\n\nFormat: ${L.formula.join(' | ')}\n\nBeispiel:\n${example}`;
+  };
+  const enrichTracks = (tracks) => {
+    (tracks || []).forEach((track) => (track.phases || []).forEach((phase) => {
+      const pool = [...(byPhase[phase.name] || []), ...generic];
+      (phase.cards || []).forEach((card, i) => {
+        const ex = pool[i % pool.length] || pool[0];
+        if (ex) card.prompt = formatPrompt(card.prompt, ex);
+      });
+    }));
+  };
+  enrichTracks(window.SOP_TOOL_TRACKS);
+  enrichTracks(window.INTERNAL_SOP_TRACKS);
+})();
 
 window.LP_SLIDE_TYPES = [
   { type: 'content', label: 'Inhalt', icon: 'fa-align-left', desc: 'Titel, Text, Bild' },
