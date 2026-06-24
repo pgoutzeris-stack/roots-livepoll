@@ -1056,7 +1056,7 @@ function getQuickWinMatrixUseCases() {
 }
 
 function defaultNextStepAction() {
-  return { owner: '', dueDate: '', nextStep: '', status: 'planned', notes: '' };
+  return { owner: '', supporters: '', dueDate: '', nextStep: '', status: 'planned', notes: '' };
 }
 
 function getNextStepActions() {
@@ -1084,7 +1084,7 @@ function renderNextStepsActionLogHtml({ editable = false } = {}) {
   }
   const filled = items.filter((it) => {
     const a = actions[it.id] || {};
-    return a.owner || a.dueDate || a.nextStep || (a.status && a.status !== 'planned') || a.notes;
+    return a.owner || a.supporters || a.dueDate || a.nextStep || (a.status && a.status !== 'planned') || a.notes;
   }).length;
   const head = `<div class="ws-board-head ws-board-head--actionlog">
       <span class="ws-board-stat"><i class="fa-solid fa-rocket"></i> ${items.length} Quick Win${items.length === 1 ? '' : 's'}</span>
@@ -1095,11 +1095,14 @@ function renderNextStepsActionLogHtml({ editable = false } = {}) {
   const row = (it, i) => {
     const a = { ...defaultNextStepAction(), ...(actions[it.id] || {}) };
     const ownerCell = editable
-      ? `<input type="text" class="ns-input" list="ns-owner-suggestions" data-ns-field="owner" data-ns-item="${esc(it.id)}" value="${esc(a.owner)}" placeholder="Name" />`
+      ? `<input type="text" class="ns-input" list="ns-person-suggestions" data-ns-field="owner" data-ns-item="${esc(it.id)}" value="${esc(a.owner)}" placeholder="Name…" />`
       : `<span class="ns-value${a.owner ? '' : ' ns-value--empty'}">${a.owner ? esc(a.owner) : '–'}</span>`;
+    const supportersCell = editable
+      ? `<input type="text" class="ns-input" list="ns-person-suggestions" data-ns-field="supporters" data-ns-item="${esc(it.id)}" value="${esc(a.supporters || '')}" placeholder="Lisa, Tom…" />`
+      : `<span class="ns-value${a.supporters ? '' : ' ns-value--empty'}">${a.supporters ? esc(a.supporters) : '–'}</span>`;
     const dueCell = editable
-      ? `<input type="date" class="ns-input ns-input--date" data-ns-field="dueDate" data-ns-item="${esc(it.id)}" value="${esc(a.dueDate)}" />`
-      : `<span class="ns-value${a.dueDate ? '' : ' ns-value--empty'}">${a.dueDate ? esc(formatNextStepDate(a.dueDate)) : '–'}</span>`;
+      ? `<input type="text" class="ns-input" data-ns-field="dueDate" data-ns-item="${esc(it.id)}" value="${esc(a.dueDate)}" placeholder="z.B. KW 27, Q3…" />`
+      : `<span class="ns-value${a.dueDate ? '' : ' ns-value--empty'}">${a.dueDate ? esc(a.dueDate) : '–'}</span>`;
     const stepCell = editable
       ? `<input type="text" class="ns-input" data-ns-field="nextStep" data-ns-item="${esc(it.id)}" value="${esc(a.nextStep)}" placeholder="Erster Schritt…" />`
       : `<span class="ns-value${a.nextStep ? '' : ' ns-value--empty'}">${a.nextStep ? esc(a.nextStep) : '–'}</span>`;
@@ -1116,6 +1119,7 @@ function renderNextStepsActionLogHtml({ editable = false } = {}) {
           ${(it.trackLabel || it.phase) ? `<span class="ws-uc-meta">${it.trackLabel ? `<span class="ws-uc-track">${esc(it.trackLabel)}</span>` : ''}${it.phase && it.phase !== it.trackLabel ? `<span class="ws-uc-phase">${esc(it.phase)}</span>` : ''}</span>` : ''}
         </span>
         <span class="ws-c-owner">${ownerCell}</span>
+        <span class="ws-c-supporters">${supportersCell}</span>
         <span class="ws-c-due">${dueCell}</span>
         <span class="ws-c-step">${stepCell}</span>
         <span class="ws-c-status">${statusCell}</span>
@@ -1123,15 +1127,16 @@ function renderNextStepsActionLogHtml({ editable = false } = {}) {
       </div>`;
   };
   const datalist = editable && participants.length
-    ? `<datalist id="ns-owner-suggestions">${participants.map((p) => `<option value="${esc(p.display_name || '')}"></option>`).join('')}</datalist>`
+    ? `<datalist id="ns-person-suggestions">${participants.map((p) => `<option value="${esc(p.display_name || '')}"></option>`).join('')}</datalist>`
     : '';
   return `${datalist}<div class="ws-board ws-action-log">${head}
     <div class="ws-table ws-table--actionlog">
       <div class="ws-row ws-row--head ws-row--action">
         <span class="ws-c-rank">#</span>
         <span class="ws-c-uc">Quick Win · Use Case</span>
-        <span class="ws-c-owner">Verantwortlich</span>
-        <span class="ws-c-due">Bis wann</span>
+        <span class="ws-c-owner">Owner</span>
+        <span class="ws-c-supporters">Supporter</span>
+        <span class="ws-c-due">Timing</span>
         <span class="ws-c-step">Nächster Schritt</span>
         <span class="ws-c-status">Status</span>
         <span class="ws-c-notes">Notiz</span>
@@ -6578,8 +6583,9 @@ function renderParticipantNextStepsHtml() {
       <div class="participant-ns-uc">${renderUseCaseDisplayHtml(it.text, 'full')}</div>
       ${meta ? `<div class="participant-ns-meta">${esc(meta)}</div>` : ''}
       <dl class="participant-ns-fields">
-        <div class="participant-ns-field"><dt>Verantwortlich</dt><dd>${a.owner ? esc(a.owner) : '–'}</dd></div>
-        <div class="participant-ns-field"><dt>Bis wann</dt><dd>${a.dueDate ? esc(formatNextStepDate(a.dueDate)) : '–'}</dd></div>
+        <div class="participant-ns-field"><dt>Owner</dt><dd>${a.owner ? esc(a.owner) : '–'}</dd></div>
+        <div class="participant-ns-field"><dt>Supporter</dt><dd>${a.supporters ? esc(a.supporters) : '–'}</dd></div>
+        <div class="participant-ns-field"><dt>Timing</dt><dd>${a.dueDate ? esc(a.dueDate) : '–'}</dd></div>
         <div class="participant-ns-field participant-ns-field--full"><dt>Nächster Schritt</dt><dd>${a.nextStep ? esc(a.nextStep) : '–'}</dd></div>
         ${a.notes ? `<div class="participant-ns-field participant-ns-field--full"><dt>Notiz</dt><dd>${esc(a.notes)}</dd></div>` : ''}
       </dl>
@@ -11333,26 +11339,28 @@ function renderSopResultsHtml(session) {
     <div class="res-qw-table">
       <div class="res-qw-head">
         <span class="res-qw-uc">Use Case</span>
-        <span class="res-qw-owner">Verantwortlich</span>
-        <span class="res-qw-due">Bis wann</span>
+        <span class="res-qw-owner">Owner</span>
+        <span class="res-qw-supporters">Supporter</span>
+        <span class="res-qw-due">Timing</span>
         <span class="res-qw-step">Nächster Schritt</span>
         <span class="res-qw-status">Status</span>
         <span class="res-qw-notes">Notiz</span>
       </div>`;
     quickWins.forEach((item) => {
       const a = { ...defaultNextStepAction(), ...(actions[item.id] || {}) };
-      const dueStr = a.dueDate ? formatNextStepDate(a.dueDate) : '–';
       const statusCls = `res-qw-status-badge--${a.status || 'planned'}`;
+      const empty = (t) => `<span class="res-qw-empty">${t || '–'}</span>`;
       html += `<div class="res-qw-row">
         <span class="res-qw-uc">
           <span class="res-uc-body">${ucPillsHtml(item.text)}</span>
           ${(item.trackLabel || item.phase) ? `<span class="res-qw-meta">${item.trackLabel ? `<span>${esc(item.trackLabel)}</span>` : ''}${item.phase ? `<span>${esc(item.phase)}</span>` : ''}</span>` : ''}
         </span>
-        <span class="res-qw-owner">${a.owner ? esc(a.owner) : '<span class="res-qw-empty">–</span>'}</span>
-        <span class="res-qw-due">${a.dueDate ? esc(dueStr) : '<span class="res-qw-empty">–</span>'}</span>
-        <span class="res-qw-step">${a.nextStep ? esc(a.nextStep) : '<span class="res-qw-empty">–</span>'}</span>
+        <span class="res-qw-owner">${a.owner ? esc(a.owner) : empty()}</span>
+        <span class="res-qw-supporters">${a.supporters ? esc(a.supporters) : empty()}</span>
+        <span class="res-qw-due">${a.dueDate ? esc(a.dueDate) : empty()}</span>
+        <span class="res-qw-step">${a.nextStep ? esc(a.nextStep) : empty()}</span>
         <span class="res-qw-status"><span class="res-qw-status-badge ${statusCls}">${esc(statusLabel(a.status))}</span></span>
-        <span class="res-qw-notes">${a.notes ? esc(a.notes) : '<span class="res-qw-empty">–</span>'}</span>
+        <span class="res-qw-notes">${a.notes ? esc(a.notes) : empty()}</span>
       </div>`;
     });
     html += `</div>`;
@@ -11425,20 +11433,30 @@ function exportWorkshopExcel() {
   wsPrio['!cols'] = [{ wch: 6 }, { wch: 34 }, { wch: 34 }, { wch: 8 }, { wch: 22 }, { wch: 18 }];
   XLSX.utils.book_append_sheet(wb, wsPrio, 'Priorisierung');
 
-  // ── Sheet 3: Matrix ───────────────────────────────────────────────────
-  const matrixRows = [['Quadrant', 'Idee', 'KI-Feature', 'Track', 'Phase']];
-  if (matrixSlide) {
-    const qLabels = { qw: 'Quick Wins', sb: 'Strategische Bets', ts: 'Tech-Schulden', dr: 'Deprioritieren' };
-    ['qw', 'sb', 'ts', 'dr'].forEach((q) => {
-      aggregateMatrixQuadrantItems(matrixSlide, q).forEach((item) => {
-        const parts = parseUseCaseParts(item.text);
-        matrixRows.push([qLabels[q], parts.summary || item.text, parts.feature || '', item.trackLabel || '', item.phase || '']);
-      });
-    });
-  }
-  const wsMx = XLSX.utils.aoa_to_sheet(matrixRows);
-  wsMx['!cols'] = [{ wch: 20 }, { wch: 34 }, { wch: 34 }, { wch: 22 }, { wch: 18 }];
-  XLSX.utils.book_append_sheet(wb, wsMx, 'Matrix');
+  // ── Sheet 3: Quick Wins + Next Steps ─────────────────────────────────
+  const nsActions = getNextStepActions();
+  const qwItems = matrixSlide ? aggregateMatrixQuadrantItems(matrixSlide, 'qw') : [];
+  const nsRows = [['Use Case', 'KI-Feature', 'Track', 'Phase', 'Owner', 'Supporter', 'Timing', 'Nächster Schritt', 'Status', 'Notiz']];
+  qwItems.forEach((item) => {
+    const parts = parseUseCaseParts(item.text);
+    const a = { ...defaultNextStepAction(), ...(nsActions[item.id] || {}) };
+    const statusLbl = NEXT_STEP_STATUSES.find((s) => s.id === a.status)?.label || 'Geplant';
+    nsRows.push([
+      parts.summary || item.text,
+      parts.feature || '',
+      item.trackLabel || '',
+      item.phase || '',
+      a.owner || '',
+      a.supporters || '',
+      a.dueDate || '',
+      a.nextStep || '',
+      statusLbl,
+      a.notes || '',
+    ]);
+  });
+  const wsNs = XLSX.utils.aoa_to_sheet(nsRows);
+  wsNs['!cols'] = [{ wch: 30 }, { wch: 30 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 12 }, { wch: 30 }, { wch: 12 }, { wch: 24 }];
+  XLSX.utils.book_append_sheet(wb, wsNs, 'Quick Wins');
 
   // ── Sheet 4: Info ─────────────────────────────────────────────────────
   const metaRows = [

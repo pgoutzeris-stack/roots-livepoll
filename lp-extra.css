@@ -1282,12 +1282,12 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .sop-pslide-nextsteps,.ws-sop-main--nextsteps{max-width:min(1280px,100%)}
 .ws-action-log{max-width:min(1280px,100%)}
 .ws-table--actionlog .ws-row--action{
-  grid-template-columns:2.2rem minmax(180px,1.35fr) minmax(108px,.75fr) minmax(118px,.65fr) minmax(140px,1fr) minmax(108px,.62fr) minmax(120px,.75fr);
+  grid-template-columns:2.2rem minmax(155px,1.15fr) minmax(90px,.6fr) minmax(105px,.68fr) minmax(85px,.48fr) minmax(125px,.88fr) minmax(88px,.5fr) minmax(105px,.62fr);
   align-items:start;
 }
 .ws-row--action .ws-c-rank{margin-top:.15rem}
-.ws-row--action .ws-c-owner,.ws-row--action .ws-c-due,.ws-row--action .ws-c-step,
-.ws-row--action .ws-c-status,.ws-row--action .ws-c-notes{min-width:0}
+.ws-row--action .ws-c-owner,.ws-row--action .ws-c-supporters,.ws-row--action .ws-c-due,
+.ws-row--action .ws-c-step,.ws-row--action .ws-c-status,.ws-row--action .ws-c-notes{min-width:0}
 .ns-input{
   width:100%;border:1px solid var(--line);border-radius:8px;background:var(--bg);
   padding:.42rem .55rem;font-size:.84rem;color:var(--ink);font-family:inherit;
@@ -1318,8 +1318,8 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
     grid-template-columns:2rem 1fr 1fr;
     grid-template-areas:
       "rank uc uc"
-      ". owner due"
-      ". step step"
+      ". owner supporters"
+      ". due step"
       ". status notes";
     gap:.35rem .65rem;
   }
@@ -1327,18 +1327,20 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
   .ws-row--action .ws-c-rank{grid-area:rank}
   .ws-row--action .ws-c-uc{grid-area:uc}
   .ws-row--action .ws-c-owner{grid-area:owner}
+  .ws-row--action .ws-c-supporters{grid-area:supporters}
   .ws-row--action .ws-c-due{grid-area:due}
   .ws-row--action .ws-c-step{grid-area:step}
   .ws-row--action .ws-c-status{grid-area:status}
   .ws-row--action .ws-c-notes{grid-area:notes}
-  .ws-row--action .ws-c-owner::before,.ws-row--action .ws-c-due::before,
-  .ws-row--action .ws-c-step::before,.ws-row--action .ws-c-status::before,
-  .ws-row--action .ws-c-notes::before{
+  .ws-row--action .ws-c-owner::before,.ws-row--action .ws-c-supporters::before,
+  .ws-row--action .ws-c-due::before,.ws-row--action .ws-c-step::before,
+  .ws-row--action .ws-c-status::before,.ws-row--action .ws-c-notes::before{
     display:block;font-size:.64rem;font-weight:800;text-transform:uppercase;
     letter-spacing:.05em;color:var(--muted);margin-bottom:.15rem;
   }
-  .ws-row--action .ws-c-owner::before{content:"Verantwortlich"}
-  .ws-row--action .ws-c-due::before{content:"Bis wann"}
+  .ws-row--action .ws-c-owner::before{content:"Owner"}
+  .ws-row--action .ws-c-supporters::before{content:"Supporter"}
+  .ws-row--action .ws-c-due::before{content:"Timing"}
   .ws-row--action .ws-c-step::before{content:"Nächster Schritt"}
   .ws-row--action .ws-c-status::before{content:"Status"}
   .ws-row--action .ws-c-notes::before{content:"Notiz"}
@@ -4426,7 +4428,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 .res-qw-head {
   display: grid;
-  grid-template-columns: 1fr 9rem 7rem 1fr 7rem 1fr;
+  grid-template-columns: 1fr 8rem 8rem 6rem 1fr 6.5rem 1fr;
   background: var(--surface, #f8f9fa);
   font-size: .72rem; font-weight: 700; text-transform: uppercase;
   letter-spacing: .05em; color: var(--muted, #6b7280);
@@ -4436,7 +4438,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 .res-qw-row {
   display: grid;
-  grid-template-columns: 1fr 9rem 7rem 1fr 7rem 1fr;
+  grid-template-columns: 1fr 8rem 8rem 6rem 1fr 6.5rem 1fr;
   padding: .7rem 1rem;
   border-bottom: 1px solid var(--border, #e5e7eb);
   align-items: start;
@@ -4476,9 +4478,11 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 
 /* Responsive: collapse minor columns on small screens */
+.res-qw-supporters { font-size: .82rem; color: var(--text, #111827); padding-top: .15rem; word-break: break-word; }
+
 @media (max-width: 900px) {
   .res-qw-head, .res-qw-row {
-    grid-template-columns: 1fr 8rem 1fr;
+    grid-template-columns: 1fr 8rem 8rem;
   }
   .res-qw-due, .res-qw-status, .res-qw-notes {
     display: none;
