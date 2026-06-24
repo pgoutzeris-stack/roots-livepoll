@@ -11267,15 +11267,28 @@ function renderResultsScreen() {
   }
 }
 
+function ucPillsHtml(text) {
+  const p = parseUseCaseParts(text);
+  if (!p.hasParts) return `<span class="res-uc-idea">${esc(p.full || text)}</span>`;
+  return `<span class="res-uc-idea">${esc(p.summary)}</span>${p.feature ? `<span class="res-uc-feature">${esc(p.feature)}</span>` : ''}${p.dependencies ? `<span class="res-uc-deps">${esc(p.dependencies)}</span>` : ''}`;
+}
+
+const RES_MEDALS = ['🥇', '🥈', '🥉', '🏅', '🏅'];
+const RES_MEDAL_CLS = ['res-prio-row--gold', 'res-prio-row--silver', 'res-prio-row--bronze', 'res-prio-row--4', 'res-prio-row--5'];
+
 function renderSopResultsHtml(session) {
-  const { byTrack, allItems } = aggregateAllTracksUseCases();
+  const { allItems } = aggregateAllTracksUseCases();
   const voteSlide = getFinalAllTracksVoteSlide();
   const matrixSlide = getMatrixSlide();
   const ws = getWorkshopSettings();
   const date = session.ended_at || session.started_at;
   const dateStr = date ? new Date(date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
   const topItems = voteSlide ? resolveFinalPriorityTopN(ws.finalPriorityCount || 5, { allowTrackFallback: false }) : [];
+  const quickWins = matrixSlide ? aggregateMatrixQuadrantItems(matrixSlide, 'qw') : [];
+  const actions = getNextStepActions();
+  const statusLabel = (id) => NEXT_STEP_STATUSES.find((s) => s.id === id)?.label || 'Geplant';
 
+  // ─── Header ───────────────────────────────────────────────────────────
   let html = `<div class="res-sop">
   <div class="res-sop-head">
     <div class="res-sop-title">${esc(State.presentation?.title || 'Workshop-Ergebnisse')}</div>
@@ -11285,96 +11298,67 @@ function renderSopResultsHtml(session) {
       <span><i class="fa-solid fa-users"></i> ${State.participants.length} Teilnehmer</span>
       <span><i class="fa-solid fa-lightbulb"></i> ${allItems.length} Use Cases</span>
       ${topItems.length ? `<span><i class="fa-solid fa-trophy"></i> Top ${topItems.length} priorisiert</span>` : ''}
+      ${quickWins.length ? `<span><i class="fa-solid fa-bolt"></i> ${quickWins.length} Quick Win${quickWins.length === 1 ? '' : 's'}</span>` : ''}
     </div>
   </div>`;
 
-  // ─── Use Cases by Track ───────────────────────────────────────────────
-  if (byTrack.length) {
-    html += `<div class="res-section-label"><i class="fa-solid fa-lightbulb"></i> Alle Use Cases</div>`;
-    byTrack.forEach((trk) => {
-      const phasesWithItems = trk.phases.filter((p) => p.items.length);
-      if (!phasesWithItems.length) return;
-      html += `<div class="res-track-block">
-        <div class="res-track-head">${esc(trk.trackLabel || trk.trackKey)}</div>`;
-      phasesWithItems.forEach((p) => {
-        if (p.phase) html += `<div class="res-phase-label">${esc(p.phase)}</div>`;
-        html += `<div class="res-uc-list">`;
-        p.items.forEach((item, idx) => {
-          const parts = parseUseCaseParts(item.text);
-          const author = getParticipantForDisplay(item.participant_id);
-          const authorName = author?.display_name || item.authorName || '';
-          html += `<div class="res-uc-row">
-            <span class="res-uc-n">${idx + 1}</span>
-            <span class="res-uc-body">
-              ${parts.hasParts
-                ? `<span class="res-uc-idea">${esc(parts.summary)}</span>${parts.feature ? `<span class="res-uc-feature">${esc(parts.feature)}</span>` : ''}${parts.dependencies ? `<span class="res-uc-deps">${esc(parts.dependencies)}</span>` : ''}`
-                : `<span class="res-uc-idea">${esc(item.text)}</span>`}
-            </span>
-            ${authorName ? `<span class="res-uc-author">${esc(authorName)}</span>` : ''}
-          </div>`;
-        });
-        html += `</div>`;
-      });
-      html += `</div>`;
-    });
-  }
-
-  // ─── Final Prioritization ─────────────────────────────────────────────
+  // ─── Gesamt-Priorisierung (alle 5 mit Medaille) ───────────────────────
   if (topItems.length) {
     const { totals } = computeFinalVoteTotals(voteSlide);
     html += `<div class="res-section-label"><i class="fa-solid fa-ranking-star"></i> Gesamt-Priorisierung</div>
     <div class="res-prio-table">
       <div class="res-prio-head">
-        <span class="res-prio-rank">#</span>
+        <span class="res-prio-rank"></span>
         <span class="res-prio-uc">Use Case</span>
-        <span class="res-prio-track">Track</span>
+        <span class="res-prio-track">Track · Phase</span>
         <span class="res-prio-pts">Punkte</span>
       </div>`;
     topItems.forEach((item, idx) => {
-      const parts = parseUseCaseParts(item.text);
       const pts = totals[`resp-${item.id}`] || item.score || 0;
-      const medalCls = idx === 0 ? ' res-prio-row--gold' : idx === 1 ? ' res-prio-row--silver' : idx === 2 ? ' res-prio-row--bronze' : '';
-      const medal = ['🥇', '🥈', '🥉'][idx] || String(idx + 1);
-      html += `<div class="res-prio-row${medalCls}">
+      const medal = RES_MEDALS[idx] || String(idx + 1);
+      const cls = RES_MEDAL_CLS[idx] || '';
+      html += `<div class="res-prio-row${cls ? ' ' + cls : ''}">
         <span class="res-prio-rank">${medal}</span>
-        <span class="res-prio-uc">
-          <strong>${esc(parts.summary || item.text)}</strong>
-          ${parts.feature ? `<em>${esc(parts.feature)}</em>` : ''}
-        </span>
-        <span class="res-prio-track">${esc(item.trackLabel || '')}</span>
+        <span class="res-prio-uc">${ucPillsHtml(item.text)}</span>
+        <span class="res-prio-track">${esc(item.trackLabel || '')}${item.phase ? `<br><small>${esc(item.phase)}</small>` : ''}</span>
         <span class="res-prio-pts">${pts}</span>
       </div>`;
     });
     html += `</div>`;
   }
 
-  // ─── Impact/Effort Matrix ─────────────────────────────────────────────
-  if (matrixSlide) {
-    const quadrants = [
-      { key: 'qw', label: 'Quick Wins', icon: 'fa-bolt', cls: 'qw' },
-      { key: 'sb', label: 'Strategische Bets', icon: 'fa-chess-knight', cls: 'sb' },
-      { key: 'ts', label: 'Tech-Schulden', icon: 'fa-wrench', cls: 'ts' },
-      { key: 'dr', label: 'Deprioritieren', icon: 'fa-ban', cls: 'dr' },
-    ];
-    const populated = quadrants.map((q) => ({ ...q, items: aggregateMatrixQuadrantItems(matrixSlide, q.key) })).filter((q) => q.items.length);
-    if (populated.length) {
-      html += `<div class="res-section-label"><i class="fa-solid fa-table-cells-large"></i> Impact / Effort Matrix</div>
-      <div class="res-matrix-grid">`;
-      populated.forEach((q) => {
-        html += `<div class="res-matrix-quad res-matrix-quad--${q.cls}">
-          <div class="res-matrix-quad-head"><i class="fa-solid ${q.icon}"></i> ${esc(q.label)}</div>
-          <div class="res-matrix-quad-items">`;
-        q.items.forEach((item) => {
-          const parts = parseUseCaseParts(item.text);
-          html += `<div class="res-matrix-item">
-            <span class="res-uc-idea">${esc(parts.summary || item.text)}</span>
-            ${parts.feature ? `<span class="res-uc-feature">${esc(parts.feature)}</span>` : ''}
-          </div>`;
-        });
-        html += `</div></div>`;
-      });
-      html += `</div>`;
-    }
+  // ─── Quick Wins + Next Steps ──────────────────────────────────────────
+  if (quickWins.length) {
+    html += `<div class="res-section-label"><i class="fa-solid fa-bolt"></i> Quick Wins &amp; Next Steps</div>
+    <div class="res-qw-table">
+      <div class="res-qw-head">
+        <span class="res-qw-uc">Use Case</span>
+        <span class="res-qw-owner">Verantwortlich</span>
+        <span class="res-qw-due">Bis wann</span>
+        <span class="res-qw-step">Nächster Schritt</span>
+        <span class="res-qw-status">Status</span>
+        <span class="res-qw-notes">Notiz</span>
+      </div>`;
+    quickWins.forEach((item) => {
+      const a = { ...defaultNextStepAction(), ...(actions[item.id] || {}) };
+      const dueStr = a.dueDate ? formatNextStepDate(a.dueDate) : '–';
+      const statusCls = `res-qw-status-badge--${a.status || 'planned'}`;
+      html += `<div class="res-qw-row">
+        <span class="res-qw-uc">
+          <span class="res-uc-body">${ucPillsHtml(item.text)}</span>
+          ${(item.trackLabel || item.phase) ? `<span class="res-qw-meta">${item.trackLabel ? `<span>${esc(item.trackLabel)}</span>` : ''}${item.phase ? `<span>${esc(item.phase)}</span>` : ''}</span>` : ''}
+        </span>
+        <span class="res-qw-owner">${a.owner ? esc(a.owner) : '<span class="res-qw-empty">–</span>'}</span>
+        <span class="res-qw-due">${a.dueDate ? esc(dueStr) : '<span class="res-qw-empty">–</span>'}</span>
+        <span class="res-qw-step">${a.nextStep ? esc(a.nextStep) : '<span class="res-qw-empty">–</span>'}</span>
+        <span class="res-qw-status"><span class="res-qw-status-badge ${statusCls}">${esc(statusLabel(a.status))}</span></span>
+        <span class="res-qw-notes">${a.notes ? esc(a.notes) : '<span class="res-qw-empty">–</span>'}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  } else if (matrixSlide) {
+    html += `<div class="res-section-label"><i class="fa-solid fa-bolt"></i> Quick Wins &amp; Next Steps</div>
+    <div class="res-empty-hint"><i class="fa-solid fa-table-cells-large"></i> Noch keine Quick Wins aus der Matrix-Abstimmung. Bitte Matrix-Folie ausfüllen.</div>`;
   }
 
   html += `</div>`;

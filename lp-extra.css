@@ -4413,3 +4413,78 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .sess-card-meta{ display:flex; flex-wrap:wrap; gap:.3rem .75rem; font-size:.75rem; color:var(--muted,#6b7280); margin-top:.3rem; }
 .sess-card-meta span{ display:flex; align-items:center; gap:.3rem; }
 .sess-card-btn{ white-space:nowrap; flex-shrink:0; font-size:.78rem; padding:.4rem .9rem; }
+
+/* ─── Results: 4th & 5th place rows ─── */
+.res-prio-row--4,
+.res-prio-row--5 { background: var(--bg, #fff); }
+
+/* ─── Results: Quick Wins table ─── */
+.res-qw-table {
+  border: 1.5px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.res-qw-head {
+  display: grid;
+  grid-template-columns: 1fr 9rem 7rem 1fr 7rem 1fr;
+  background: var(--surface, #f8f9fa);
+  font-size: .72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--muted, #6b7280);
+  padding: .55rem 1rem;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  gap: .5rem;
+}
+.res-qw-row {
+  display: grid;
+  grid-template-columns: 1fr 9rem 7rem 1fr 7rem 1fr;
+  padding: .7rem 1rem;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  align-items: start;
+  gap: .5rem;
+}
+.res-qw-row:last-child { border-bottom: none; }
+.res-qw-row:hover { background: #f0fdf4; }
+.res-qw-uc { display: flex; flex-direction: column; gap: .35rem; }
+.res-uc-body { display: flex; flex-wrap: wrap; gap: .25rem .35rem; align-items: center; }
+.res-qw-meta { display: flex; gap: .3rem; flex-wrap: wrap; margin-top: .1rem; }
+.res-qw-meta span {
+  font-size: .68rem; color: var(--muted, #9ca3af);
+  background: var(--surface, #f3f4f6);
+  padding: .1rem .4rem; border-radius: 999px;
+}
+.res-qw-owner, .res-qw-due, .res-qw-step, .res-qw-notes {
+  font-size: .82rem; color: var(--text, #111827);
+  padding-top: .15rem; word-break: break-word;
+}
+.res-qw-empty { color: var(--muted, #d1d5db); font-style: italic; }
+.res-qw-status { padding-top: .1rem; }
+.res-qw-status-badge {
+  display: inline-block;
+  font-size: .7rem; font-weight: 600;
+  padding: .2rem .6rem; border-radius: 999px;
+}
+.res-qw-status-badge--planned { background: #f3f4f6; color: #6b7280; }
+.res-qw-status-badge--progress { background: #dbeafe; color: #1d4ed8; }
+.res-qw-status-badge--blocked { background: #fee2e2; color: #991b1b; }
+.res-qw-status-badge--done { background: #d1fae5; color: #065f46; }
+
+/* Empty hint */
+.res-empty-hint {
+  padding: 1.5rem 1rem; color: var(--muted, #9ca3af);
+  font-size: .85rem; display: flex; align-items: center; gap: .6rem;
+  border: 1.5px dashed var(--border, #e5e7eb); border-radius: 12px;
+}
+
+/* Responsive: collapse minor columns on small screens */
+@media (max-width: 900px) {
+  .res-qw-head, .res-qw-row {
+    grid-template-columns: 1fr 8rem 1fr;
+  }
+  .res-qw-due, .res-qw-status, .res-qw-notes {
+    display: none;
+  }
+  .res-prio-head, .res-prio-row {
+    grid-template-columns: 3rem 1fr 5rem;
+  }
+  .res-prio-track { display: none; }
+}
