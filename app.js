@@ -4,8 +4,14 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const APP_VERSION = '20260520-resultsfx';
 const JOIN_BASE = `${location.origin}${location.pathname}`;
 const { createClient } = supabase;
+const ROOTS_EMBEDDED_AUTH = window.parent !== window;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
-  auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false, storage: window.localStorage },
+  auth: {
+    persistSession: !ROOTS_EMBEDDED_AUTH,
+    autoRefreshToken: !ROOTS_EMBEDDED_AUTH,
+    detectSessionInUrl: false,
+    ...(ROOTS_EMBEDDED_AUTH ? {} : { storage: window.localStorage }),
+  },
 });
 window.__rootsSupabaseClient = sb;
 
