@@ -284,7 +284,7 @@
             const labelHtml = window.LPUseCase?.renderUseCasePillsHtml
               ? window.LPUseCase.renderUseCasePillsHtml(it.text, 'collect')
               : esc(label);
-            return `<div class="lp-matrix-result-item" style="--i:${i}" title="${esc(label)} – ${it.max}/${it.total} Stimmen">
+            return `<div class="lp-matrix-result-item" style="--i:${i}" title="${esc(label)} - ${it.max}/${it.total} Stimmen">
               <span class="lp-matrix-result-text">${labelHtml}</span>
               <span class="lp-matrix-result-pct">${pct}%</span>
             </div>`;

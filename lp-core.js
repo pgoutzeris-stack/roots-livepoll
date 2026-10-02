@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════
-   ROOTS Live Poll – Core Resilience & Foundation Layer
+   ROOTS Live Poll - Core Resilience & Foundation Layer
    Wird VOR app.js geladen. Definiert globale Utilities, die app.js
    verwendet bzw. die window-globalen Verhaltensmuster setzen.
    ════════════════════════════════════════════════════════════════ */
@@ -40,7 +40,7 @@
   });
 
   // ─── SUPABASE WRAPPER ────────────────────────────────
-  // Wraps a Supabase query promise — surfaces errors visibly + logs.
+  // Wraps a Supabase query promise - surfaces errors visibly + logs.
   // Usage:
   //   await LP.sb('loadPresentations', () => sb.from('lp_presentations').select('*'));
   async function sbCall(label, fn) {
@@ -205,7 +205,7 @@
   // ─── PWA SERVICE WORKER ──────────────────────────────
   // DEAKTIVIERT: SW hatte Probleme mit Cross-Origin-Auth-Bridge-Cache
   // (Login-Popups trotz aktiver Intranet-Session). Live-Poll braucht keinen
-  // Offline-Modus — alles ist eh Realtime. SWs aus aelteren Versionen
+  // Offline-Modus - alles ist eh Realtime. SWs aus aelteren Versionen
   // werden hier proaktiv abgemeldet und ihre Caches geleert.
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then((regs) => {
@@ -267,8 +267,8 @@
       console.info(`%c[LP] Boot OK %c build ${st.build}${context ? ` · ${context}` : ''}`,
         'color:#059669;font-weight:700', 'color:inherit');
     } else {
-      console.error('[LP] Boot incomplete — fehlende Globals:', st.missing);
-      if (window.toast) window.toast('App nicht vollständig geladen — bitte Hard-Refresh (⌘⇧R)', 'error');
+      console.error('[LP] Boot incomplete - fehlende Globals:', st.missing);
+      if (window.toast) window.toast('App nicht vollständig geladen - bitte Hard-Refresh (⌘⇧R)', 'error');
     }
     return st;
   }

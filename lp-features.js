@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════
-   ROOTS Live Poll – Feature Layer
+   ROOTS Live Poll - Feature Layer
    Wird NACH app.js geladen. Erweitert die State + UI um:
    - Timer / Countdown
    - Quiz-Leaderboard

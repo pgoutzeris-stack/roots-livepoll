@@ -549,7 +549,7 @@ html.lp-join-route #screen-participant{display:flex!important}
 .pslide-q-title{font-size:clamp(1.75rem,4vw,3rem)!important;font-weight:800!important;line-height:1.15!important;margin:0!important}
 .pslide-q-sub{font-size:1.05rem;color:var(--muted);line-height:1.6;max-width:640px;margin:0 auto .75rem}
 .pslide-q-prompt{font-size:clamp(1rem,2vw,1.2rem)!important;line-height:1.55!important;max-width:680px;margin:0 auto 1.25rem!important;color:var(--muted)}
-/* Desktop-Teilnehmer: ruhige, einheitliche Größen — nicht beamer-groß.
+/* Desktop-Teilnehmer: ruhige, einheitliche Größen - nicht beamer-groß.
    (Mobile-Overrides in lp-extra.css greifen darüber bei ≤768px.) */
 #screen-participant .pslide-q-title{font-size:clamp(1.4rem,2.2vw,1.85rem)!important;letter-spacing:-.01em!important}
 #screen-participant .pslide-q-prompt{font-size:clamp(.95rem,1.3vw,1.05rem)!important;margin:0 auto 1rem!important}

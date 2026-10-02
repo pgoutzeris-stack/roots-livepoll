@@ -1,4 +1,4 @@
-// ROOTS Live Poll – Service Worker
+// ROOTS Live Poll - Service Worker
 // Strategy: network-first for HTML/JS/CSS, cache-first for assets
 // Cache name versioned via __BUILD__ placeholder (replaced by deploy workflow)
 
@@ -34,7 +34,7 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  // Don't intercept Supabase/realtime/auth — must be fresh
+  // Don't intercept Supabase/realtime/auth - must be fresh
   if (
     url.hostname.includes('supabase.co') ||
     url.hostname.includes('supabase.in') ||

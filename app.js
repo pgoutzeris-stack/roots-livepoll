@@ -393,7 +393,7 @@ function syncWorkshopSettingsToSlides({ finalPriorityCount, trackVoteCount, pitc
       if (c.prompt && /Die \d+ meistgewählten/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/Die \d+ meistgewählten/i, `Die ${fin} meistgewählten`);
       if (c.prompt && /Die \d+ Use Cases mit den meisten/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/Die \d+ Use Cases mit den meisten/i, `Die ${fin} Use Cases mit den meisten`);
       if (c.prompt && /Schritt 1: Wähle genau \d+/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/Schritt 1: Wähle genau \d+/i, `Schritt 1: Wähle genau ${fin}`);
-      if (c.prompt && /1–\d+ Punkte/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/1–\d+ Punkte/gi, `1–${fin} Punkte`);
+      if (c.prompt && /1[-–]\d+ Punkte/i.test(String(c.prompt))) c.prompt = String(c.prompt).replace(/1[-–]\d+ Punkte/gi, `1-${fin} Punkte`);
       if (c.subtitle && /Top \d+ aus Gesamt/i.test(String(c.subtitle))) c.subtitle = String(c.subtitle).replace(/Top \d+ aus Gesamt/i, `Top ${fin} aus Gesamt`);
       mark(s);
     }
@@ -577,7 +577,7 @@ async function tryChangeFinalPriorityCount(newCount) {
 
   const result = await applyFinalPriorityCountChange(count, { resetPrioritization: true });
   toast(result.navigated
-    ? `Priorisierung zurückgesetzt · ${count} Use Cases — Folie geöffnet`
+    ? `Priorisierung zurückgesetzt · ${count} Use Cases - Folie geöffnet`
     : `Priorisierung zurückgesetzt · ${count} Use Cases`, 'success');
   return { ...result, noop: false, reset: true };
 }
@@ -707,7 +707,7 @@ function getUseCaseLabels() {
     formula: ['Use Case Idee', 'KI-Feature', 'Abhängigkeiten'],
     guides: [
       { label: 'Use Case Idee', question: 'Was wollt ihr konkret umsetzen oder verbessern?' },
-      { label: 'KI-Feature', question: 'Was soll die KI tun — Input, Output, welches Tool?' },
+      { label: 'KI-Feature', question: 'Was soll die KI tun - Input, Output, welches Tool?' },
       { label: 'Abhängigkeiten', question: 'Was muss im Team schon da sein (Daten, Zugänge, Vorlagen)?' },
     ],
   };
@@ -855,7 +855,7 @@ function aggregateAllTracksUseCases() {
     const c = slide.content || {};
     const trackKey = c.sopTrackClass || c.sopTrackKey;
     const trackLabel = c.sopTrackLabel || trackKey;
-    // Nur die echte Phase verwenden — KEIN Fallback auf den Folientitel, der bei
+    // Nur die echte Phase verwenden - KEIN Fallback auf den Folientitel, der bei
     // track-collect den Track-Namen wiederholt (führte zu doppeltem Track im UI).
     const phaseName = c.sopPhaseName || '';
     if (!byTrackKey.has(trackKey)) {
@@ -1024,7 +1024,7 @@ function aggregateMatrixQuadrantItems(slide, quadrant = 'qw') {
       total: counts.qw + counts.sb + counts.ts + counts.dr,
     });
   });
-  // Live-Workshop: Quick Wins nur nach Team-Abstimmung — kein Host-Local-Fallback.
+  // Live-Workshop: Quick Wins nur nach Team-Abstimmung - kein Host-Local-Fallback.
   if (!result.length && slide?.settings?.sopAllTracksMatrix && State.session) {
     return [];
   }
@@ -1102,22 +1102,22 @@ function renderNextStepsActionLogHtml({ editable = false } = {}) {
     const a = { ...defaultNextStepAction(), ...(actions[it.id] || {}) };
     const ownerCell = editable
       ? `<input type="text" class="ns-input" list="ns-person-suggestions" data-ns-field="owner" data-ns-item="${esc(it.id)}" value="${esc(a.owner)}" placeholder="Name…" />`
-      : `<span class="ns-value${a.owner ? '' : ' ns-value--empty'}">${a.owner ? esc(a.owner) : '–'}</span>`;
+      : `<span class="ns-value${a.owner ? '' : ' ns-value--empty'}">${a.owner ? esc(a.owner) : '-'}</span>`;
     const supportersCell = editable
       ? `<input type="text" class="ns-input" list="ns-person-suggestions" data-ns-field="supporters" data-ns-item="${esc(it.id)}" value="${esc(a.supporters || '')}" placeholder="Lisa, Tom…" />`
-      : `<span class="ns-value${a.supporters ? '' : ' ns-value--empty'}">${a.supporters ? esc(a.supporters) : '–'}</span>`;
+      : `<span class="ns-value${a.supporters ? '' : ' ns-value--empty'}">${a.supporters ? esc(a.supporters) : '-'}</span>`;
     const dueCell = editable
       ? `<input type="text" class="ns-input" data-ns-field="dueDate" data-ns-item="${esc(it.id)}" value="${esc(a.dueDate)}" placeholder="z.B. KW 27, Q3…" />`
-      : `<span class="ns-value${a.dueDate ? '' : ' ns-value--empty'}">${a.dueDate ? esc(a.dueDate) : '–'}</span>`;
+      : `<span class="ns-value${a.dueDate ? '' : ' ns-value--empty'}">${a.dueDate ? esc(a.dueDate) : '-'}</span>`;
     const stepCell = editable
       ? `<input type="text" class="ns-input" data-ns-field="nextStep" data-ns-item="${esc(it.id)}" value="${esc(a.nextStep)}" placeholder="Erster Schritt…" />`
-      : `<span class="ns-value${a.nextStep ? '' : ' ns-value--empty'}">${a.nextStep ? esc(a.nextStep) : '–'}</span>`;
+      : `<span class="ns-value${a.nextStep ? '' : ' ns-value--empty'}">${a.nextStep ? esc(a.nextStep) : '-'}</span>`;
     const statusCell = editable
       ? `<select class="ns-input ns-select" data-ns-field="status" data-ns-item="${esc(it.id)}">${NEXT_STEP_STATUSES.map((s) => `<option value="${s.id}"${a.status === s.id ? ' selected' : ''}>${esc(s.label)}</option>`).join('')}</select>`
       : `<span class="ns-status ns-status--${esc(a.status || 'planned')}">${esc(statusLabel(a.status))}</span>`;
     const notesCell = editable
       ? `<input type="text" class="ns-input" data-ns-field="notes" data-ns-item="${esc(it.id)}" value="${esc(a.notes)}" placeholder="Notiz…" />`
-      : `<span class="ns-value ns-value--notes${a.notes ? '' : ' ns-value--empty'}">${a.notes ? esc(a.notes) : '–'}</span>`;
+      : `<span class="ns-value ns-value--notes${a.notes ? '' : ' ns-value--empty'}">${a.notes ? esc(a.notes) : '-'}</span>`;
     return `<div class="ws-row ws-row--action${editable ? ' ws-row--action-edit' : ''}" data-ns-item="${esc(it.id)}">
         <span class="ws-c-rank">${i + 1}</span>
         <span class="ws-c-uc">
@@ -1385,7 +1385,7 @@ function assertMatrixItemsIntegrity(items, slide, { count } = {}) {
   const expected = resolveFinalPriorityTopN(n, { allowTrackFallback: !getFinalAllTracksVoteSlide() });
 
   // Teilnehmer ohne lokale Vote-Daten: gebroadcastete Items nicht verwerfen.
-  // (Sonst leere Matrix trotz gültigem Host-Broadcast — Hauptursache des Bugs.)
+  // (Sonst leere Matrix trotz gültigem Host-Broadcast - Hauptursache des Bugs.)
   if (isParticipantView && !expected.length) return actual;
 
   const expectedIds = expected.map((i) => i.id);
@@ -1438,7 +1438,7 @@ function validateFinalRankPoints(slide, values, points) {
   if (vals.length !== max) return { ok: false, error: `Bitte genau ${max} Use Cases wählen` };
   for (const id of vals) {
     if (pts[id] == null || pts[id] === '') {
-      return { ok: false, error: `Allen ${max} Use Cases Punkte zuweisen (1–${max})` };
+      return { ok: false, error: `Allen ${max} Use Cases Punkte zuweisen (1-${max})` };
     }
   }
   const assigned = vals.map((id) => Number(pts[id]));
@@ -1449,7 +1449,7 @@ function validateFinalRankPoints(slide, values, points) {
   const sorted = [...assigned].sort((a, b) => b - a);
   const permutationOk = sorted.length === expected.length && sorted.every((v, i) => v === expected[i]);
   if (!permutationOk) {
-    return { ok: false, error: `Jeder Punktwert 1–${max} genau einmal — keine Doppelung, keine Lücke` };
+    return { ok: false, error: `Jeder Punktwert 1-${max} genau einmal - keine Doppelung, keine Lücke` };
   }
   const out = {};
   vals.forEach((id) => { out[id] = Number(pts[id]); });
@@ -1465,8 +1465,8 @@ function validateVoteValues(slide, values) {
   if (exactFinalVote) {
     if (vals.length !== max) {
       return { ok: false, error: vals.length < max
-        ? `Bitte genau ${max} Use Cases wählen (${vals.length}/${max}) — keine eigenen Beiträge`
-        : `Maximal ${max} Use Cases — bitte genau ${max} wählen` };
+        ? `Bitte genau ${max} Use Cases wählen (${vals.length}/${max}) - keine eigenen Beiträge`
+        : `Maximal ${max} Use Cases - bitte genau ${max} wählen` };
     }
   } else {
     if (!vals.length) return { ok: false, error: 'Mindestens 1 Use Case wählen' };
@@ -1476,7 +1476,7 @@ function validateVoteValues(slide, values) {
     ? getAllTracksVoteOptionIds(slide)
     : new Set(getVoteOptions(slide).map((o) => o.id).filter((id) => id !== 'none'));
   if (vals.some((id) => !validIds.has(id))) {
-    return { ok: false, error: 'Ungültige Auswahl — bitte erneut wählen' };
+    return { ok: false, error: 'Ungültige Auswahl - bitte erneut wählen' };
   }
   if (slide.settings?.sopFairVote && State.participant?.id) {
     const ownIds = new Set();
@@ -1919,7 +1919,7 @@ async function toggleSimulationMode() {
   try {
     await sb.from('lp_presentations').update({ settings }).eq('id', State.presentation.id);
     toast(settings.debug
-      ? '🧪 Simulation an — beim Präsentieren joinen simulierte Teilnehmer & Antworten'
+      ? '🧪 Simulation an - beim Präsentieren joinen simulierte Teilnehmer & Antworten'
       : 'Simulation aus', settings.debug ? 'info' : 'success');
   } catch (e) {
     toast(e?.message || 'Konnte Simulation nicht umschalten', 'error');
@@ -2265,7 +2265,7 @@ function renderTrackVoteGroupHeadHtml(g) {
 }
 
 // Teilnehmer: vom Moderator gebroadcastete Vote-Optionen (funktioniert auch im
-// Simulationsmodus, wo fremde Antworten nur lokal beim Presenter liegen — analog
+// Simulationsmodus, wo fremde Antworten nur lokal beim Presenter liegen - analog
 // zu den Matrix-Items). Lookup über die Folien-ID, mit Fallback auf den Host-Slide.
 function getBroadcastVoteGroups(slide) {
   // Nur auf der Teilnehmerseite (kein eingeloggter Host) gebroadcastete Optionen nutzen.
@@ -2849,8 +2849,8 @@ function renderDualSopIdleColumn(activeGroup) {
   const idleSide = activeGroup === 'internal' ? 'consulting' : 'internal';
   const meta = getSopGroupMeta(idleSide);
   const title = idleSide === 'consulting'
-    ? 'Consulting-Team ist fertig — unterstützt jetzt Internal'
-    : 'Internal-Team ist fertig — unterstützt jetzt Consulting';
+    ? 'Consulting-Team ist fertig - unterstützt jetzt Internal'
+    : 'Internal-Team ist fertig - unterstützt jetzt Consulting';
   return renderSopEmptyState({ icon: meta.icon, title, hint: 'Beide Teams bleiben am selben Track-Paar.' });
 }
 
@@ -2909,7 +2909,7 @@ function renderBrainstormSlideColumn(slide) {
     <div class="present-wait-msg ws-collect-wait"><i class="fa-solid fa-lightbulb"></i> Use Cases erscheinen hier live …</div>`;
 }
 
-// Split-View (nur Beamer): links Internal-SOP, rechts Consulting-SOP — immer aktiv bis zur Gesamt-Priorisierung.
+// Split-View (nur Beamer): links Internal-SOP, rechts Consulting-SOP - immer aktiv bis zur Gesamt-Priorisierung.
 function renderSopSplitColumn(group, bodyHtml, { trackName = '', idle = false } = {}) {
   const meta = getSopGroupMeta(group);
   const short = meta.shortLabel || meta.label.replace(/\s+SOP$/, '');
@@ -3032,7 +3032,7 @@ function renderBrainstormSplitViz(currentSlide) {
   return renderDualSopSplitView(currentSlide, (group, pairIdx) => renderDualPairCollectColumn(group, pairIdx));
 }
 
-// Finale Priorisierung (Moderator/Beamer): moderne Tabelle — alle Use Cases mit
+// Finale Priorisierung (Moderator/Beamer): moderne Tabelle - alle Use Cases mit
 // Autor + Live-Stimmen, immer sichtbar (auch vor der ersten Stimme).
 function renderFinalVotePresentHtml(slide, visible) {
   const { allItems } = aggregateAllTracksUseCases();
@@ -3075,7 +3075,7 @@ function renderFinalVotePresentHtml(slide, visible) {
       </div>`;
     rows.forEach((r, i) => {
       const author = getParticipantForDisplay(r.participant_id);
-      const authorName = author?.display_name || r.authorName || '–';
+      const authorName = author?.display_name || r.authorName || '-';
       const isTop = topVoteIds.has(r.voteId) && r.score > 0;
       const topClass = isTop ? ' ws-row--top' : '';
       const barPct = r.score > 0 ? Math.round((r.score / maxScore) * 100) : 0;
@@ -3088,7 +3088,7 @@ function renderFinalVotePresentHtml(slide, visible) {
         <span class="ws-c-author">${participantAvatarHtml(author || { display_name: authorName }, 'xs')}<span class="ws-author-name">${esc(authorName)}</span></span>
         <span class="ws-c-action ws-votes">
           ${r.score > 0 ? `<span class="ws-votebar"><span class="ws-votebar-fill" style="width:${barPct}%"></span></span>` : ''}
-          <strong class="ws-votenum${r.score === 0 ? ' ws-votenum--pending' : ''}">${r.score || '–'}</strong>
+          <strong class="ws-votenum${r.score === 0 ? ' ws-votenum--pending' : ''}">${r.score || '-'}</strong>
         </span>
       </div>`;
     });
@@ -3776,7 +3776,7 @@ function renderParticipantSettingsBody() {
       <div class="participant-settings-section">
         <h3>Session</h3>
         <dl class="participant-settings-meta">
-          <div><dt>Code</dt><dd>${esc(sessionCode || '—')}</dd></div>
+          <div><dt>Code</dt><dd>${esc(sessionCode || '-')}</dd></div>
           ${sopMeta ? `<div><dt>SOP</dt><dd>${esc(sopMeta.label)}</dd></div>` : ''}
         </dl>
       </div>` : ''}
@@ -4151,7 +4151,7 @@ function getWsPresentLead(slide) {
   const st = slide.settings || {};
   if (st.sopAllTracksVote || c.sopKind === 'final-vote' || c.sopKind === 'group-vote') {
     const n = finalPriorityCount(slide);
-    return `Jede Person wählt genau ${n} fremde Use Cases und vergibt jedem 1–${n} Punkte (${n} = höchste Priorität). Die ${n} Use Cases mit den meisten Gesamtpunkten landen in der Matrix.`;
+    return `Jede Person wählt genau ${n} fremde Use Cases und vergibt jedem 1-${n} Punkte (${n} = höchste Priorität). Die ${n} Use Cases mit den meisten Gesamtpunkten landen in der Matrix.`;
   }
   if (st.sopAllTracksMatrix || c.sopKind === 'final-matrix' || slide.slide_type === 'priority_matrix') {
     const n = getFinalMatrixItemCount(slide);
@@ -4161,7 +4161,7 @@ function getWsPresentLead(slide) {
   if (c.sopKind === 'next-steps' || st.sopNextSteps) {
     const qw = getQuickWinMatrixUseCases().length;
     return qw
-      ? `${qw} Quick Win${qw === 1 ? '' : 's'} aus der Matrix — Verantwortliche, Deadlines und Actions festlegen.`
+      ? `${qw} Quick Win${qw === 1 ? '' : 's'} aus der Matrix - Verantwortliche, Deadlines und Actions festlegen.`
       : 'Quick Wins aus der Matrix-Abstimmung erscheinen hier automatisch.';
   }
   if (c.subtitle) return getPatchedWorkshopSubtitle(c.subtitle);
@@ -4331,7 +4331,7 @@ function renderDualSopParallelPanelHtml(currentIndex, { clickable = false, onNav
 
 function renderSopWorkshopPanelHtml(currentIndex, { clickable = false, onNavigate } = {}) {
   // Finale-Folien (Pitch Session, Finale-Priorisierung, Impact/Effort-Matrix) haben
-  // keinen aktiven Track — sie bekommen ein eigenes Finale-Panel mit den drei
+  // keinen aktiven Track - sie bekommen ein eigenes Finale-Panel mit den drei
   // Finale-Schritten + Liste der abgeschlossenen Tracks. Frühzeitig zurückkehren,
   // damit die track-basierte Logik (getActiveTrackKey läuft sonst rückwärts zum
   // LETZTEN Track) für die Finale-Folien NICHT greift.
@@ -4517,7 +4517,7 @@ function syncSopWorkshopShell(mode, slideIndex) {
     panel.bind(el);
   };
 
-  // Die SOP-Übersicht soll auf ALLEN SOP-Folien sichtbar sein — inklusive der
+  // Die SOP-Übersicht soll auf ALLEN SOP-Folien sichtbar sein - inklusive der
   // drei Finale-Folien (Pitch Session, Finale-Priorisierung, Impact/Effort-Matrix).
   // renderSopWorkshopPanelHtml rendert für diese Folien automatisch das Finale-Panel.
   const hidePanelForSlide = false;
@@ -4737,7 +4737,7 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
         ${legacyMatrix}
       </div>`;
   }
-  // Instructions slide — structured ROOTS-Design layout
+  // Instructions slide - structured ROOTS-Design layout
   if (c.sopKind === 'instructions') {
     const theme = { accent: '#206efb', soft: 'rgba(32,110,251,.08)', badgeBg: '#206efb', badgeColor: '#fff' };
     const titleEl = editable
@@ -4802,7 +4802,7 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
         <div class="workshop-instructions-card">${instrHtml}</div>
       </div>`;
   }
-  // Next Steps — Quick Wins aus der Matrix als Action Log
+  // Next Steps - Quick Wins aus der Matrix als Action Log
   if (c.sopKind === 'next-steps') {
     const titleEl = editable
       ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
@@ -4822,7 +4822,7 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
         ${log}
       </div>`;
   }
-  // Pitch Session — alle Use Cases mit Autornamen + Timer
+  // Pitch Session - alle Use Cases mit Autornamen + Timer
   if (c.sopKind === 'pitch-session') {
     const timerSec = Number(c.pitchTimerSec || getWorkshopSettings().pitchTimerSec || 120);
     const tMin = Math.floor(timerSec / 60);
@@ -4832,7 +4832,7 @@ function renderSopContentHtml(c, editable = false, opts = {}) {
       ? `<div class="canvas-editable sop-pslide-title" contenteditable="true" data-field="title">${esc(c.title || '')}</div>`
       : `<h1 class="sop-pslide-title">${esc(c.title || '')}</h1>`;
     const subEl = c.subtitle ? `<p class="sop-pslide-sub">${esc(c.subtitle)}</p>` : '';
-    // Kein globaler Timer mehr — jeder Use Case bekommt einen eigenen Timer (s.u.).
+    // Kein globaler Timer mehr - jeder Use Case bekommt einen eigenen Timer (s.u.).
     // Im Editor nur die Dauer pro Pitch konfigurierbar.
     const configEl = editable
       ? `<div class="pitch-timer-edit"><i class="fa-solid fa-stopwatch"></i> Timer pro Pitch: <span contenteditable="true" class="canvas-editable pitch-timer-sec" data-field="pitchTimerSec">${timerSec}</span> Sekunden</div>`
@@ -5396,7 +5396,7 @@ async function handleLogin(e) {
     if (State.authMode === 'signup') {
       const { error } = await sb.auth.signUp({ email, password: pw });
       if (error) throw error;
-      toast('Konto erstellt – bitte E-Mail bestätigen.', 'success');
+      toast('Konto erstellt - bitte E-Mail bestätigen.', 'success');
     } else {
       const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
       if (error) throw error;
@@ -5456,7 +5456,7 @@ async function renderSessionsDashboard() {
   }
   grid.innerHTML = sessions.map((s) => {
     const date = s.ended_at || s.started_at;
-    const dateStr = date ? new Date(date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '–';
+    const dateStr = date ? new Date(date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-';
     return `<article class="sess-card" data-session-id="${esc(s.id)}">
       <div class="sess-card-thumb"><i class="fa-solid fa-flag-checkered"></i></div>
       <div class="sess-card-body">
@@ -6589,10 +6589,10 @@ function renderParticipantNextStepsHtml() {
       <div class="participant-ns-uc">${renderUseCaseDisplayHtml(it.text, 'full')}</div>
       ${meta ? `<div class="participant-ns-meta">${esc(meta)}</div>` : ''}
       <dl class="participant-ns-fields">
-        <div class="participant-ns-field"><dt>Owner</dt><dd>${a.owner ? esc(a.owner) : '–'}</dd></div>
-        <div class="participant-ns-field"><dt>Supporter</dt><dd>${a.supporters ? esc(a.supporters) : '–'}</dd></div>
-        <div class="participant-ns-field"><dt>Timing</dt><dd>${a.dueDate ? esc(a.dueDate) : '–'}</dd></div>
-        <div class="participant-ns-field participant-ns-field--full"><dt>Nächster Schritt</dt><dd>${a.nextStep ? esc(a.nextStep) : '–'}</dd></div>
+        <div class="participant-ns-field"><dt>Owner</dt><dd>${a.owner ? esc(a.owner) : '-'}</dd></div>
+        <div class="participant-ns-field"><dt>Supporter</dt><dd>${a.supporters ? esc(a.supporters) : '-'}</dd></div>
+        <div class="participant-ns-field"><dt>Timing</dt><dd>${a.dueDate ? esc(a.dueDate) : '-'}</dd></div>
+        <div class="participant-ns-field participant-ns-field--full"><dt>Nächster Schritt</dt><dd>${a.nextStep ? esc(a.nextStep) : '-'}</dd></div>
         ${a.notes ? `<div class="participant-ns-field participant-ns-field--full"><dt>Notiz</dt><dd>${esc(a.notes)}</dd></div>` : ''}
       </dl>
     </article>`;
@@ -6625,7 +6625,7 @@ function renderAllTracksUseCasesWithAuthors(timerSec = 120) {
       p.items.forEach((item) => {
         n += 1;
         const author = getParticipantForDisplay(item.participant_id);
-        const authorName = author?.display_name || item.authorName || '–';
+        const authorName = author?.display_name || item.authorName || '-';
         html += `<div class="ws-row" data-pitch-row="${esc(item.id)}">
           <span class="ws-c-rank">${n}</span>
           <span class="ws-c-uc">
@@ -6856,7 +6856,7 @@ async function deleteSlide(id) {
 function renderEditorCanvas() {
   const slide = currentSlide();
   const canvas = $('#editor-canvas');
-  if (!slide) { canvas.innerHTML = '<p>Keine Folien – füge eine hinzu.</p>'; return; }
+  if (!slide) { canvas.innerHTML = '<p>Keine Folien - füge eine hinzu.</p>'; return; }
   const c = { ...defaultStyle(), ...slide.content };
   const accent = c.accentColor || '#206efb';
   canvas.style.background = c.bgColor || '#fff';
@@ -7089,8 +7089,8 @@ function brainstormSourceOptionsHtml(matrixSlide, selectedId) {
     const label = (s.content?.title || s.slide_type) + ` (Folie ${i + 1})`;
     opts.push(`<option value="${esc(s.id)}" ${s.id === selectedId ? 'selected' : ''}>${esc(label)}</option>`);
   });
-  if (!opts.length) return '<option value="">— keine Brainstorm-Folie davor —</option>';
-  return '<option value="">— automatisch (nächste davor) —</option>' + opts.join('');
+  if (!opts.length) return '<option value="">- keine Brainstorm-Folie davor -</option>';
+  return '<option value="">- automatisch (nächste davor) -</option>' + opts.join('');
 }
 
 function renderEditorProps() {
@@ -7109,7 +7109,7 @@ function renderEditorProps() {
 
     if (isSopScoped) {
       // SOP-Vorlage: Optionen automatisch aus den Brainstorming-Folien der
-      // Phase/des Tracks — Logik im Editor sichtbar (read-only).
+      // Phase/des Tracks - Logik im Editor sichtbar (read-only).
       const scopeLabel = sopScope.kind === 'phase' ? `der Phase „${esc(sopScope.phaseName || '')}"`
         : sopScope.kind === 'track' ? 'dieses Tracks'
           : sopScope.kind === 'card' ? `der Karte „${esc(sopScope.cardName || '')}"`
@@ -7297,7 +7297,7 @@ function renderEditorProps() {
       prompt: $('#prop-prompt')?.value || '',
       // Body nur bei nicht-interaktiven Inhalts-/SOP-Folien aus dem Prompt-Feld
       // spiegeln. Bei interaktiven Folien (Brainstorm, Offen, MC …) ist das
-      // Prompt-Feld die Frage — sonst landet die Frage doppelt in body+prompt.
+      // Prompt-Feld die Frage - sonst landet die Frage doppelt in body+prompt.
       body: (['content', 'section'].includes(slideObj.slide_type)
         || (slideObj.content.sopKind && !(window.LP_INTERACTIVE_TYPES || new Set()).has(slideObj.slide_type)))
         ? ($('#prop-prompt')?.value || slideObj.content.body)
@@ -7552,7 +7552,7 @@ function renderAddSlideModal() {
         await togglePresentationClosureCard(type);
         return;
       }
-      // Reguläre Folie mit sinnvollen Defaults hinzufügen — alle weiteren
+      // Reguläre Folie mit sinnvollen Defaults hinzufügen - alle weiteren
       // Einstellungen macht der Nutzer danach in der rechten Seitenleiste.
       const base = JSON.parse(JSON.stringify(window.LP_DEFAULT_CONTENT[type] || { title: 'Neu' }));
       const settings = { ...window.LP_DEFAULT_SETTINGS };
@@ -7649,9 +7649,9 @@ async function restoreVersion(versionId, versions) {
     content: s.content,
     settings: s.settings || { ...window.LP_DEFAULT_SETTINGS },
   }));
-  // Erst neue Folien einfuegen, dann alte loeschen — schlaegt der Insert fehl, bleibt die Praesentation intakt.
+  // Erst neue Folien einfuegen, dann alte loeschen - schlaegt der Insert fehl, bleibt die Praesentation intakt.
   const { data: inserted, error: insErr } = await sb.from('lp_slides').insert(rows).select('*');
-  if (insErr || !inserted) { toast('Wiederherstellung fehlgeschlagen – nichts geaendert', 'error'); return; }
+  if (insErr || !inserted) { toast('Wiederherstellung fehlgeschlagen - nichts geaendert', 'error'); return; }
   if (oldIds.length) await sb.from('lp_slides').delete().in('id', oldIds);
   if (snap.title) {
     await sb.from('lp_presentations').update({ title: snap.title }).eq('id', State.presentation.id);
@@ -7700,7 +7700,7 @@ async function startPresentation() {
   renderPresent();
   bindPresentToolbar();
   void renderQrCode();
-  toast(`Session gestartet – Code ${code}`, 'success');
+  toast(`Session gestartet - Code ${code}`, 'success');
 }
 
 async function loadSessionData() {
@@ -7728,11 +7728,11 @@ function sessionChannelName(sessionId) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// DEBUG-MODE — Realtime-Simulator
+// DEBUG-MODE - Realtime-Simulator
 // Teilnehmer joinen zeitversetzt, Antworten kommen drip-by-drip wie in
 // einem echten Workshop. Alles ausschließlich client-seitig.
 // ════════════════════════════════════════════════════════════════
-// DEBUG SIMULATOR — simulierte Teilnehmer & Antworten für Tests
+// DEBUG SIMULATOR - simulierte Teilnehmer & Antworten für Tests
 // ════════════════════════════════════════════════════════════════
 
 function resolveSimUseCasesForSlide(slide) {
@@ -7796,7 +7796,7 @@ function buildGlobalSimUseCasePool() {
 
 // Erzeugt aus einem Use Case eine eindeutige Variante, indem die "Use Case Idee"
 // um einen Kontext-Zusatz (Phase/Track) ergänzt wird. Wird nur genutzt, wenn der
-// Pool einzigartiger Use Cases erschöpft ist — so entstehen nie wörtliche Dubletten.
+// Pool einzigartiger Use Cases erschöpft ist - so entstehen nie wörtliche Dubletten.
 function makeUseCaseVariant(text, suffix) {
   const parts = parseUseCaseParts(text);
   if (!parts.hasParts) return `${text} (${suffix})`;
@@ -7899,7 +7899,7 @@ const LP_DebugSim = {
     this.prepareResponses();
     this.dripNextParticipant();
     this.schedule(() => this.catchUpDripsThrough(State.session?.current_slide_index || 0), 400);
-    try { toast(`🧪 Simulation gestartet — simulierte Teilnehmer joinen zeitversetzt`, 'info'); } catch {}
+    try { toast(`🧪 Simulation gestartet - simulierte Teilnehmer joinen zeitversetzt`, 'info'); } catch {}
   },
 
   stop() {
@@ -7951,7 +7951,7 @@ const LP_DebugSim = {
     try { renderPresent(); } catch {}
     this.joinIdx++;
     if (this.joinIdx < defs.length) {
-      const next = 700 + Math.random() * 1300; // 0.7–2.0s
+      const next = 700 + Math.random() * 1300; // 0.7-2.0s
       this.schedule(() => this.dripNextParticipant(), next);
     }
   },
@@ -7965,9 +7965,9 @@ const LP_DebugSim = {
     const now = Date.now();
     function pseudoRandom(seed) { let x = Math.sin(seed) * 10000; return x - Math.floor(x); }
 
-    // First pass: brainstorm slides — Use Cases im Instruktions-Format (Use Case | Feature | Abhängigkeiten)
+    // First pass: brainstorm slides - Use Cases im Instruktions-Format (Use Case | Feature | Abhängigkeiten)
     // Session-weite Eindeutigkeit: jede Use-Case-Idee wird in der gesamten Simulation
-    // nur EINMAL vergeben — kein Teilnehmer und keine Folie bekommt eine Dublette.
+    // nur EINMAL vergeben - kein Teilnehmer und keine Folie bekommt eine Dublette.
     const allCollected = [];
     const usedUseCaseKeys = new Set();
     const globalSimPool = buildGlobalSimUseCasePool();
@@ -7975,7 +7975,7 @@ const LP_DebugSim = {
       if (slide.slide_type !== 'brainstorm') return;
       const c = slide.content || {};
       // Parallel-Vorlage: die sichtbare Sammel-Anker-Folie (dual-pair-collect) ist NICHT
-      // der echte Sammel-Bucket — Teilnehmer schreiben in die versteckten Gruppen-Folien.
+      // der echte Sammel-Bucket - Teilnehmer schreiben in die versteckten Gruppen-Folien.
       // Daher hier überspringen, sonst entstünden doppelte/phantom Use Cases.
       if (c.sopKind === 'dual-pair-collect') return;
       const phaseName = c.sopPhaseName || c.title || '';
@@ -7996,7 +7996,7 @@ const LP_DebugSim = {
         const sent = perParticipantCount.get(fakeP) || 0;
         if (responseLimit > 0 && sent >= responseLimit) return;
         perParticipantCount.set(fakeP, sent + 1);
-        // Sicherstellen, dass der (simulierte) Autor in State.participants existiert —
+        // Sicherstellen, dass der (simulierte) Autor in State.participants existiert -
         // sonst hätten Use Cases von noch nicht "beigetretenen" Teilnehmern keinen Autor.
         pushSimParticipant(simParticipantRecord(pIdx, sessionId, pDef));
         const respId = `debug-r-${slide.id}-${i}`;
@@ -8142,7 +8142,7 @@ const LP_DebugSim = {
             created_at: new Date(now + idx * 200).toISOString(),
             updated_at: new Date(now + idx * 200).toISOString(),
           };
-          // Drip-Delay: 1.2–3.5s zwischen Antworten (zufällig pro Teilnehmer)
+          // Drip-Delay: 1.2-3.5s zwischen Antworten (zufällig pro Teilnehmer)
           const delayMs = 1000 + idx * (1400 + Math.random() * 1500);
           queue.push({ response: full, delayMs });
         }
@@ -8482,7 +8482,7 @@ function removeDebugPanel() {
 
 function seedDebugSession() {
   if (State._debugSeeded) {
-    console.info('[DEBUG-Sim] bereits initialisiert — übersprungen. Reset mit LP_resetDebug().');
+    console.info('[DEBUG-Sim] bereits initialisiert - übersprungen. Reset mit LP_resetDebug().');
     return;
   }
   if (!State.session) { console.warn('[DEBUG-Sim] keine Session'); return; }
@@ -8719,7 +8719,7 @@ function showSopAssignCelebration(group) {
       <div class="sop-assign-celebration-icon"><i class="fa-solid ${meta.icon}"></i></div>
       <p class="sop-assign-celebration-kicker">Du bist dabei!</p>
       <h2 class="sop-assign-celebration-title">${esc(meta.label)}</h2>
-      <p class="sop-assign-celebration-text">Der Host hat dich diesem SOP zugewiesen. Ab jetzt siehst du nur deine Tracks — bis Pitch, Priorisierung und Matrix gemeinsam laufen.</p>
+      <p class="sop-assign-celebration-text">Der Host hat dich diesem SOP zugewiesen. Ab jetzt siehst du nur deine Tracks - bis Pitch, Priorisierung und Matrix gemeinsam laufen.</p>
       <button type="button" class="sop-assign-celebration-close">Los geht's</button>
     </div>`;
   document.body.appendChild(el);
@@ -8754,7 +8754,7 @@ function broadcastMatrixItems(slide, { force = false } = {}) {
 }
 
 // Presenter: aufgelöste Vote-Optionen (gruppiert, inkl. participant_id für FairVote)
-// an Teilnehmer broadcasten — analog zu broadcastMatrixItems. Damit sehen Teilnehmer
+// an Teilnehmer broadcasten - analog zu broadcastMatrixItems. Damit sehen Teilnehmer
 // dieselben Use Cases wie der Beamer, auch wenn ihre lokale Antwortliste leer ist
 // (Simulation oder reduzierte Sichtbarkeit).
 function isVoteBroadcastSlide(slide) {
@@ -8786,7 +8786,7 @@ function maybeRefreshVoteBroadcastFromResponse(response) {
   if (!response) return;
   const cur = currentSessionSlide();
   if (cur && isVoteBroadcastSlide(cur)) broadcastVoteOptions(cur);
-  // Collect-Antworten füttern spätere Vote-Folien — Broadcast neu anstoßen.
+  // Collect-Antworten füttern spätere Vote-Folien - Broadcast neu anstoßen.
   const src = State.slides?.find((s) => s.id === response.slide_id);
   if (src?.slide_type === 'brainstorm' && cur && (
     isVoteBroadcastSlide(cur)
@@ -8919,7 +8919,7 @@ async function verifyLivePersistence() {
     const realLocal = (State.responses || []).filter((r) => !String(r.id).startsWith('debug-')).length;
     if (State.liveDbCount > realLocal) {
       // Realtime hat Antworten verpasst → frisch aus Supabase nachladen.
-      liveDebugLog('info', `${State.liveDbCount - realLocal} Antwort(en) in Supabase, lokal noch nicht — lade nach …`);
+      liveDebugLog('info', `${State.liveDbCount - realLocal} Antwort(en) in Supabase, lokal noch nicht - lade nach …`);
       const { data } = await sb.from('lp_responses').select('*').eq('session_id', State.session.id).order('created_at');
       if (data) {
         const debugOnly = (State.responses || []).filter((r) => String(r.id).startsWith('debug-'));
@@ -8992,7 +8992,7 @@ function subscribeSessionChannel() {
     })
     .on('system', {}, () => window.LP?.channelHeartbeat(chName))
     .subscribe((status) => {
-      if (status === 'SUBSCRIBED') { window.LP?.channelHeartbeat(chName); setLiveConn('live', 'Realtime verbunden — Antworten werden live gespeichert'); }
+      if (status === 'SUBSCRIBED') { window.LP?.channelHeartbeat(chName); setLiveConn('live', 'Realtime verbunden - Antworten werden live gespeichert'); }
       else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setLiveConn('err', `Realtime-Fehler: ${status}`);
       else if (status === 'CLOSED') setLiveConn('warn', 'Realtime-Kanal geschlossen');
     });
@@ -9488,7 +9488,7 @@ async function copyTextToClipboard(text) {
   } catch { return false; }
 }
 
-// Klick auf den Join-Link (unter dem QR) kopiert ihn — einmalig gebunden.
+// Klick auf den Join-Link (unter dem QR) kopiert ihn - einmalig gebunden.
 function bindJoinUrlCopy(el) {
   if (!el || el.dataset.copyBound) return;
   el.dataset.copyBound = '1';
@@ -9906,7 +9906,7 @@ function subscribeParticipantChannel() {
       void (async () => {
         await ensureParticipantResponses(true);
         const slide = State.slides[State.session.current_slide_index || 0];
-        // Nur neu rendern, wenn die Ansicht fremde Beitraege zeigt — sonst gehen laufende Eingaben verloren.
+        // Nur neu rendern, wenn die Ansicht fremde Beitraege zeigt - sonst gehen laufende Eingaben verloren.
         if (slide?.settings?.sopTrackVote || slide?.settings?.sopPhaseVote || slide?.settings?.sopCardVote || slide?.settings?.brainstormVote || slide?.slide_type === 'qa') await renderParticipantQuestion();
       })();
     })
@@ -10075,7 +10075,7 @@ async function renderParticipantQuestion() {
   if (hostSlide?.content?.sopKind === 'participants') {
     root.innerHTML = wrapParticipantSlide(renderParticipantSopWaitHtml({
       title: 'SOP-Zuweisung läuft',
-      lead: 'Der Host ordnet dich gleich Internal oder Consulting zu. Danach siehst du nur dein SOP — bis Pitch, Priorisierung und Matrix.',
+      lead: 'Der Host ordnet dich gleich Internal oder Consulting zu. Danach siehst du nur dein SOP - bis Pitch, Priorisierung und Matrix.',
     }), slideIndex);
     finishParticipant();
     return;
@@ -10110,7 +10110,7 @@ async function renderParticipantQuestion() {
           ...getSlideShellMeta(hostSlide),
           title: getWsPresentTitle(hostSlide),
           chips: getWsPresentChips(hostSlide),
-          lead: inFocus ? 'Live-Pitch — Timer läuft' : (getWsPresentLead(hostSlide) || 'Überblick: wer pitcht welchen Use Case?'),
+          lead: inFocus ? 'Live-Pitch - Timer läuft' : (getWsPresentLead(hostSlide) || 'Überblick: wer pitcht welchen Use Case?'),
           main: renderParticipantPitchHtml(),
         })}
         ${inFocus ? '' : '<p class="participant-sop-wait participant-sop-wait--compact"><i class="fa-solid fa-eye"></i> Der Host startet die Pitch-Timer — dann siehst du hier den aktiven Use Case live.</p>'}
@@ -10126,7 +10126,7 @@ async function renderParticipantQuestion() {
           ...getSlideShellMeta(hostSlide),
           title: getWsPresentTitle(hostSlide),
           chips: getWsPresentChips(hostSlide),
-          lead: getWsPresentLead(hostSlide) || 'Impact vs. Aufwand — so priorisieren wir',
+          lead: getWsPresentLead(hostSlide) || 'Impact vs. Aufwand - so priorisieren wir',
           main: renderParticipantGoalMatrixHtml(hostSlide),
         })}
       </div>`, slideIndex);
@@ -10225,7 +10225,7 @@ async function renderParticipantQuestion() {
     const opts = type === 'yesno'
       ? [{ id: 'yes', text: 'Ja' }, { id: 'no', text: 'Nein' }]
       : (slide.settings?.sopTrackVote ? getTrackVoteOptions(slide) : (c.options || []));
-    // Zweistufig: erst auswählen (markieren), dann unten „Senden" bestätigen —
+    // Zweistufig: erst auswählen (markieren), dann unten „Senden" bestätigen -
     // verhindert versehentliches Absenden durch Fehl-Tap (wichtig bei Quiz).
     input = `<div id="choice-wrap" class="participant-choice-wrap">${opts.map((o) => `<button type="button" class="participant-option" data-val="${esc(o.id)}" aria-pressed="false" style="border-color:${esc(o.color || c.accentColor || 'var(--line)')}">${esc(o.text)}</button>`).join('')}</div>
       <button type="button" class="btn-primary participant-submit" id="submit-choice" disabled>Senden</button>`;
@@ -10389,7 +10389,7 @@ function startQuestionTimer(sec) {
 }
 
 // Finde die nächste vorausgehende Sammel-Folie (Brainstorm/Offen/Wortwolke)
-// vor der Matrix — für automatisches Item-Sourcing.
+// vor der Matrix - für automatisches Item-Sourcing.
 function findPrecedingCollectSlide(matrixSlide) {
   const idx = (State.slides || []).findIndex((s) => s.id === matrixSlide.id);
   if (idx < 0) return null;
@@ -10402,7 +10402,7 @@ function findPrecedingCollectSlide(matrixSlide) {
 
 function getMatrixItems(slide, { fresh = false } = {}) {
   // 0. Vom Presenter gebroadcastete Items (Teilnehmer sehen exakt dieselben
-  //    Items wie der Presenter — funktioniert auch im Simulationsmodus).
+  //    Items wie der Presenter - funktioniert auch im Simulationsmodus).
   if (!fresh) {
     const pushed = getPushedMatrixItems(slide);
     if (pushed?.length) {
@@ -10414,7 +10414,7 @@ function getMatrixItems(slide, { fresh = false } = {}) {
 
   // 1. SOP-Workshop-Matrix: NUR die final priorisierten Use Cases (Top-N) übernehmen.
   //    Strikte Quelle: Gesamt-Priorisierung (sopAllTracksVote). Kein Fallback auf
-  //    Sammel-Reihenfolge — verhindert falsche Items (z. B. nicht gewählte Use Cases).
+  //    Sammel-Reihenfolge - verhindert falsche Items (z. B. nicht gewählte Use Cases).
   if (slide?.settings?.sopAllTracksMatrix) {
     const count = getFinalMatrixItemCount(slide);
     const allowTrackFallback = !getFinalAllTracksVoteSlide();
@@ -10496,7 +10496,7 @@ function renderParticipantMatrixHtml(slide) {
     const origin = [it.trackLabel, it.phase].filter(Boolean).join(' · ');
     const ownCls = readonly ? ' lp-mx-item--own' : '';
     const ownBadge = readonly ? '<span class="vote-own-badge">Mein Beitrag</span>' : '';
-    return `<div class="lp-mx-item${ownCls}" data-item-id="${esc(it.id)}" data-text="${esc(it.text)}"${readonly ? ' data-readonly="1"' : ''} title="${esc(useCaseCollectLabel(it.text))}${origin ? ' — ' + esc(origin) : ''}">
+    return `<div class="lp-mx-item${ownCls}" data-item-id="${esc(it.id)}" data-text="${esc(it.text)}"${readonly ? ' data-readonly="1"' : ''} title="${esc(useCaseCollectLabel(it.text))}${origin ? ' - ' + esc(origin) : ''}">
     <span class="lp-mx-item-text">${renderUseCaseDisplayHtml(it.text, 'collect')}</span>
     ${origin ? `<span class="lp-mx-item-origin">${esc(origin)}</span>` : ''}
     ${ownBadge}
@@ -11152,7 +11152,7 @@ async function submitResponse(response) {
       return;
     }
     if (placeable.length && !Object.keys(placements).some((id) => placeable.some((p) => p.id === id))) {
-      toast('Eigene Beiträge können nicht eingeordnet werden — bitte fremde Use Cases wählen', 'warn');
+      toast('Eigene Beiträge können nicht eingeordnet werden - bitte fremde Use Cases wählen', 'warn');
       return;
     }
     const meta = {};
@@ -11163,7 +11163,7 @@ async function submitResponse(response) {
   }
 
   // Autor-Name direkt in der Antwort speichern (Snapshot), damit "Eingebracht von"
-  // robust ist — unabhängig davon, ob der Teilnehmer beim Host gerade in
+  // robust ist - unabhängig davon, ob der Teilnehmer beim Host gerade in
   // State.participants vorliegt (Realtime-Lücken o. Ä.).
   const responsePayload = (response && typeof response === 'object' && !Array.isArray(response) && State.participant?.display_name)
     ? { ...response, _author: State.participant.display_name }
@@ -11185,10 +11185,10 @@ async function submitResponse(response) {
   if (error) {
     State.pendingQueue.push(row);
     localStorage.setItem('lp_pending_queue', JSON.stringify(State.pendingQueue));
-    toast('Offline gespeichert – wird nachgereicht', 'warn');
+    toast('Offline gespeichert - wird nachgereicht', 'warn');
     // View sperren, damit kein versehentliches Doppel-Senden passiert.
     markAnswered(slide.id);
-    showParticipantSentState('Offline gespeichert – wird automatisch nachgereicht.');
+    showParticipantSentState('Offline gespeichert - wird automatisch nachgereicht.');
     return;
   }
   if (data) {
@@ -11202,7 +11202,7 @@ async function submitResponse(response) {
   const submittedCount = isCollectText ? countParticipantTextResponses(slide.id, State.participant?.id) : 0;
   const canSubmitMore = isCollectText && collectLimit > 1 && submittedCount < collectLimit;
   if (canSubmitMore) {
-    toast(`Use Case ${submittedCount}/${collectLimit} gespeichert — du kannst noch ${collectLimit - submittedCount} eingeben`, 'success');
+    toast(`Use Case ${submittedCount}/${collectLimit} gespeichert - du kannst noch ${collectLimit - submittedCount} eingeben`, 'success');
     void renderParticipantQuestion();
     return;
   }
@@ -11244,7 +11244,7 @@ async function openResults(sessionId) {
   if (auth?.user?.id !== session.host_id) { toast('Nur der Host kann Ergebnisse sehen', 'error'); goDashboard(); return; }
 
   // If we already have live in-memory data for this exact session (e.g. just ended a
-  // real or simulated session), skip the DB reload — sim data is never written to DB.
+  // real or simulated session), skip the DB reload - sim data is never written to DB.
   // For historical sessions from the dashboard, State.session.id won't match → reload.
   const hasLiveState = State.session?.id === sessionId
     && (State.responses?.length > 0 || State.participants?.length > 0)
@@ -11355,7 +11355,7 @@ function renderSopResultsHtml(session) {
     quickWins.forEach((item) => {
       const a = { ...defaultNextStepAction(), ...(actions[item.id] || {}) };
       const statusCls = `res-qw-status-badge--${a.status || 'planned'}`;
-      const empty = (t) => `<span class="res-qw-empty">${t || '–'}</span>`;
+      const empty = (t) => `<span class="res-qw-empty">${t || '-'}</span>`;
       html += `<div class="res-qw-row">
         <span class="res-qw-uc">
           <span class="res-uc-body">${ucPillsHtml(item.text)}</span>

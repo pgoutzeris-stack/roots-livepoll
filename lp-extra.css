@@ -1,4 +1,4 @@
-/* ROOTS Live Poll – Additional Styles
+/* ROOTS Live Poll - Additional Styles
    Wird NACH styles.css geladen.
    Enthält: Skeleton, Empty States, Tooltips, Timer, Leaderboard,
    Reactions, Sync-Status, Focus-Rings, Reduce-Motion. */
@@ -142,7 +142,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .lp-info-banner{background:#eff6ff;border-left:4px solid #206efb;color:#1e3a8a;padding:.85rem 1rem;border-radius:8px;display:flex;gap:8px;align-items:flex-start;margin:1rem 0}
 
 /* ═══════ #13 SOP TRACK-FARB-CODING (Präsentations-Modus) ═══════ */
-/* Sichtbare Track-Verankerung — Teilnehmer wissen jederzeit visuell,
+/* Sichtbare Track-Verankerung - Teilnehmer wissen jederzeit visuell,
    in welchem SOP-Track sie sich gerade bewegen. */
 .present-stage-wrap[data-track-class="track-pre"]::before,
 .present-stage[data-track-class="track-pre"]::before {
@@ -487,7 +487,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 
 /* ═══════ FINAL-VOTE: Uniforme kompakte Bubbles ═══════════════ */
 /* Auf der Top-5-Vote-Slide sollen alle Use-Case-Bubbles gleich gross
-   und in einem ordentlichen Grid liegen — keine zufaelligen Groessen/Rotationen. */
+   und in einem ordentlichen Grid liegen - keine zufaelligen Groessen/Rotationen. */
 .track-vote-present[data-uniform-bubbles="true"] .viz-bubble-cloud{
   display:grid !important;
   grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));
@@ -551,8 +551,8 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 
 /* ═══════ PHASE-BRAINSTORM Folien-Body: Karten als prominente Liste ═══════ */
-/* Damit Teilnehmer die Unterpunkte (z.B. 'Projektstruktur aufbauen — …')
-   wirklich lesen koennen — gross, klar, mit visueller Trennung. */
+/* Damit Teilnehmer die Unterpunkte (z.B. 'Projektstruktur aufbauen - …')
+   wirklich lesen koennen - gross, klar, mit visueller Trennung. */
 .pslide-q-sub, .workshop-slide-body .pslide-q-sub, .pslide-question-block .pslide-q-sub{
   white-space:pre-wrap;
   line-height:1.7;
@@ -1393,10 +1393,10 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 
 /* ═══════ SOP switch + participants ═══════════════════════════════
    Zwei neue, von app.js gerenderte Komponenten:
-   1) .sop-switch-bar  — segmentierte Pille (Consulting / Internal) auf den
+   1) .sop-switch-bar  - segmentierte Pille (Consulting / Internal) auf den
       beiden Priorisierungs-Folien im Beamer. Self-contained, kein
       bestimmter Parent nötig; gut auf Beamer UND mobil tappbar.
-   2) .sop-pslide-participants — Teilnehmer-Intro-Folie: Body enthält zwei
+   2) .sop-pslide-participants - Teilnehmer-Intro-Folie: Body enthält zwei
       Teams, getrennt durch eine Leerzeile → als zwei klare Team-Blöcke. */
 
 /* ── 1) Speaker SOP-Switch-Bar (segmented pill) ── */
@@ -1473,10 +1473,10 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 
 /* ═══════ Mobile hardening ════════════════════════════════════════
-   Höchste Priorität: das ganze Tool — besonders die Teilnehmer-Ansicht
-   (QR auf dem Handy) — sauber mobil. Diese Datei wird NACH styles.css
+   Höchste Priorität: das ganze Tool - besonders die Teilnehmer-Ansicht
+   (QR auf dem Handy) - sauber mobil. Diese Datei wird NACH styles.css
    geladen, gewinnt also bei gleicher Spezifität. Breakpoint einheitlich
-   768px für Teilnehmer/Mobile (deckt die 760–900px-Lücke konsistent ab),
+   768px für Teilnehmer/Mobile (deckt die 760-900px-Lücke konsistent ab),
    ohne Desktop-Regeln zu verändern. */
 
 /* — Kein horizontaler Overflow auf dem Handy — */
@@ -1801,7 +1801,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 .sop-empty-state i{font-size:1.35rem;color:var(--brand);opacity:.55;margin-bottom:.15rem}
 @keyframes ws-pill-in{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
 /* Inhalt füllt die ECHTE Bühne (zwischen Intranet-Toolbar links und Folien-Navi
-   rechts) — nicht 96vw (= Viewport), sonst skaliert fitPresentStage breitengetrieben
+   rechts) - nicht 96vw (= Viewport), sonst skaliert fitPresentStage breitengetrieben
    uneinheitlich runter. So bleibt der Zoom über alle Folien gleich. */
 .lp-sop-workshop.present-mode .present-stage .pslide-slide{width:100%;max-width:min(1240px,100%);text-align:left}
 /* Vertikal kompakter: doppelte Bottom-Paddings im Present-Modus reduzieren,
@@ -2299,7 +2299,7 @@ body[data-screen="present"] .editor-stage-wrap{padding-top:36px}
 }
 .lp-sop-workshop.present-mode .ws-title{
   /* Kompakter, enger Clamp → über alle Folien & Fenstergrößen einheitlich groß
-     (vorher 2–3.25rem bei 4vw → wirkte zu groß und sprang je Viewport). */
+     (vorher 2-3.25rem bei 4vw → wirkte zu groß und sprang je Viewport). */
   font-size:clamp(1.6rem,2.2vw,2.1rem);
   font-weight:700;
   letter-spacing:-.025em;
